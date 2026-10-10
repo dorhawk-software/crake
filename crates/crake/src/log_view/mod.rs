@@ -6,7 +6,7 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::*;
 use gpui_kit::{
     AnyElement, ClipboardItem, Context, Div, Entity, FocusHandle, FontWeight, PathBuilder, Pixels,
-    Stateful, Subscription, Window, canvas, div, point, px, svg,
+    Stateful, Subscription, TestSupportExt, Window, canvas, div, point, px, svg,
 };
 
 use crake_proto::{LogEntry, LogKind};
@@ -16,6 +16,9 @@ use crate::theme::{Theme, fonts};
 
 mod day_chart;
 mod rows;
+
+#[cfg(test)]
+mod tests;
 
 use self::rows::rows;
 
@@ -107,7 +110,8 @@ impl Render for Log {
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.earlier_days = true;
                                 cx.notify();
-                            })),
+                            }))
+                            .test_support(),
                     ),
                 );
             }
@@ -141,7 +145,14 @@ impl Render for Log {
             }))
             .child(self.header(&t, cx))
             .child(self.filters(&model, &t, cx))
-            .child(div().id("days").flex_1().overflow_y_scroll().child(body))
+            .child(
+                div()
+                    .id("days")
+                    .flex_1()
+                    .overflow_y_scroll()
+                    .child(body)
+                    .test_support(),
+            )
     }
 }
 
@@ -320,7 +331,8 @@ impl Log {
                     t,
                 )
                 .px(px(12.))
-                .on_click(cx.listener(|this, _, _, cx| this.copy_for_helpdesk(cx))),
+                .on_click(cx.listener(|this, _, _, cx| this.copy_for_helpdesk(cx)))
+                .test_support(),
             )
             .child(
                 outline_button("export", "Export\u{2026}", 36., t)
@@ -348,7 +360,8 @@ impl Log {
                             .size(px(14.))
                             .text_color(t.ink),
                     )
-                    .on_click(cx.listener(|_, _, _, cx| cx.emit(Close))),
+                    .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
+                    .test_support(),
             )
     }
 
@@ -364,7 +377,8 @@ impl Log {
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.show = show;
                         cx.notify();
-                    })),
+                    }))
+                    .test_support(),
             );
         }
 
@@ -397,7 +411,8 @@ impl Log {
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.picking_tunnel = !this.picking_tunnel;
                     cx.notify();
-                })),
+                }))
+                .test_support(),
         );
         if self.picking_tunnel {
             let mut options: Vec<(Option<String>, String)> = vec![(None, "All tunnels".into())];
@@ -432,7 +447,8 @@ impl Log {
                             this.tunnel = name.clone();
                             this.picking_tunnel = false;
                             cx.notify();
-                        })),
+                        }))
+                        .test_support(),
                 );
             }
             picker = picker.child(gpui_kit::deferred(menu.occlude()).with_priority(1));
