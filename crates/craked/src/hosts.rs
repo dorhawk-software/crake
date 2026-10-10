@@ -147,6 +147,10 @@ pub struct TunnelHosts {
     pub last_dns: Vec<Ipv4Addr>,
     #[serde(default)]
     pub last_net: Option<Target>,
+    /// The last good answer its DNS gave for each name: (addresses, when),
+    /// to keep known names working while that DNS doesn't answer.
+    #[serde(default)]
+    pub answers: BTreeMap<String, (Vec<Ipv4Addr>, u64)>,
 }
 
 impl TunnelHosts {
@@ -173,6 +177,30 @@ impl TunnelHosts {
             .filter(|(_, e)| **e > now)
             .map(|(a, e)| (*a, e - now))
             .collect()
+    }
+
+    /// Remember what its DNS said for `name`. True when that's news.
+    pub fn remember(&mut self, name: &str, addrs: &[Ipv4Addr], now: u64) -> bool {
+        const KEEP: usize = 1000;
+        let fresh = self
+            .answers
+            .get(name)
+            .is_none_or(|(a, at)| a != addrs || now.saturating_sub(*at) > 3600);
+        if fresh {
+            self.answers.insert(name.to_owned(), (addrs.to_vec(), now));
+            if self.answers.len() > KEEP {
+                // The longest unseen goes.
+                if let Some(old) = self
+                    .answers
+                    .iter()
+                    .min_by_key(|(_, (_, at))| *at)
+                    .map(|(n, _)| n.clone())
+                {
+                    self.answers.remove(&old);
+                }
+            }
+        }
+        fresh
     }
 
     pub fn is_empty(&self) -> bool {

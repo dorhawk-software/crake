@@ -491,6 +491,7 @@ fn to_dict(s: &Snapshot) -> HashMap<String, OwnedValue> {
     );
     d.insert("since".into(), OwnedValue::from(s.since.unwrap_or(0)));
     d.insert("clash".into(), text(s.clash.as_deref().unwrap_or("")));
+    d.insert("dns_down".into(), OwnedValue::from(s.dns_down));
     d.insert(
         "transport".into(),
         text(s.transport.as_deref().unwrap_or("")),

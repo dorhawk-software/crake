@@ -16,12 +16,18 @@ pub const ADDR: Ipv4Addr = Ipv4Addr::new(169, 254, 53, 53);
 
 /// The answer to any question: the same id and question, REFUSED, nothing else.
 pub fn refuse(query: &[u8]) -> Option<Vec<u8>> {
+    reply_code(query, 5)
+}
+
+/// The same id and question with response code `rcode` (5 REFUSED,
+/// 2 SERVFAIL, 0 with no answers), nothing else.
+pub fn reply_code(query: &[u8], rcode: u8) -> Option<Vec<u8>> {
     if query.len() < 12 || query[2] & 0x80 != 0 {
         return None; // too short, or itself a response
     }
     let mut out = query.to_vec();
     out[2] = 0x80 | (query[2] & 0x79); // QR, keep opcode and RD
-    out[3] = 0x80 | 5; // RA, REFUSED
+    out[3] = 0x80 | (rcode & 0x0f); // RA, the code
     // Keep the question; no answers, authority or additional records.
     out[6..12].fill(0);
     let mut i = 12;

@@ -34,6 +34,8 @@ pub struct Snapshot {
     pub hosts: usize,
     /// A kept sign-in: switching on needs no new one.
     pub signed_in: bool,
+    /// Its DNS doesn't answer (7h).
+    pub dns_down: bool,
     /// Why it can't be switched on now (it clashes with a tunnel that's up),
     /// as far as craked knows from its last connection.
     pub clash: Option<String>,
@@ -105,6 +107,15 @@ pub struct Manager {
     /// One hush update at a time; the REFUSED answerer runs once.
     hush: tokio::sync::Mutex<()>,
     hush_serving: std::sync::atomic::AtomicBool,
+    /// Tunnels whose DNS doesn't answer (7h): tunnel -> the names already
+    /// said to be answered from memory during this outage.
+    dns_down: Mutex<HashMap<String, std::collections::HashSet<String>>>,
+    /// Checks in a row each tunnel's DNS didn't answer.
+    dns_misses: Mutex<HashMap<String, u8>>,
+    /// The memory answerer (`keep.rs`) runs, and its link is changed one at
+    /// a time.
+    keep_serving: std::sync::atomic::AtomicBool,
+    keep: tokio::sync::Mutex<()>,
     /// Serializes host changes so the store and the kernel sets move together.
     ops: tokio::sync::Mutex<()>,
     log: Log,
@@ -142,6 +153,11 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
 const SEEN_NAME_FOR: Duration = Duration::from_secs(3600);
 /// How long to wait for one tunnel DNS server.
 const TUNNEL_DNS_WAIT: Duration = Duration::from_millis(800);
+/// How often each tunnel's DNS is asked whether it still answers (7h), how
+/// long it gets, and how many silences in a row mean it stopped.
+const DNS_CHECK_EVERY: Duration = Duration::from_secs(30);
+const DNS_CHECK_WAIT: Duration = Duration::from_secs(3);
+const DNS_CHECK_MISSES: u8 = 2;
 
 /// Why a DNS answer sent a host through a tunnel.
 #[derive(Clone, Copy)]
@@ -203,6 +219,10 @@ impl Manager {
             settings: Mutex::new(settings),
             hush: tokio::sync::Mutex::new(()),
             hush_serving: std::sync::atomic::AtomicBool::new(false),
+            dns_down: Mutex::new(HashMap::new()),
+            dns_misses: Mutex::new(HashMap::new()),
+            keep_serving: std::sync::atomic::AtomicBool::new(false),
+            keep: tokio::sync::Mutex::new(()),
             ops: tokio::sync::Mutex::new(()),
             log,
             net,
@@ -248,6 +268,18 @@ impl Manager {
             && let Err(e) = crate::probe::spawn(Arc::clone(self))
         {
             tracing::error!("connection probing is off: {e:#}");
+        }
+        // Each tunnel's DNS, asked now and then whether it still answers.
+        if let Routing::Real = self.routing
+            && self.cfg.use_resolved
+        {
+            let this = Arc::clone(self);
+            tokio::spawn(async move {
+                loop {
+                    tokio::time::sleep(DNS_CHECK_EVERY).await;
+                    this.check_dns().await;
+                }
+            });
         }
         // Tunnels start off: their remembered domains stay private.
         self.update_hush().await;
@@ -657,10 +689,12 @@ impl Manager {
                 .cloned();
         }
         drop(transport);
+        let down = self.dns_down.lock().unwrap().clone();
         for s in &mut list {
             if matches!(s.state, TunnelState::Off | TunnelState::Trouble) {
                 s.clash = self.remembered_clash(&s.config.name);
             }
+            s.dns_down = s.state == TunnelState::Connected && down.contains_key(&s.config.name);
         }
         let store = self.hosts.lock().unwrap();
         for s in &mut list {
@@ -727,6 +761,222 @@ impl Manager {
             }
         }
         None
+    }
+
+    /// Ask each connected tunnel's DNS a small question through the tunnel
+    /// (its first domain's SOA): any answer at all means it's there.
+    async fn check_dns(self: &Arc<Self>) {
+        let up: Vec<(String, String, Vec<Ipv4Addr>)> = self
+            .tunnels
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, e)| e.state == TunnelState::Connected)
+            .filter_map(|(n, e)| {
+                let i = e.info.as_ref()?;
+                (!i.dns.is_empty()).then(|| (n.clone(), i.device.clone(), i.dns.clone()))
+            })
+            .collect();
+        for (name, device, servers) in up {
+            let Some(domain) = self.domains(&name).into_iter().next() else {
+                continue;
+            };
+            let alive =
+                ask_within(&device, &servers, &domain, RecordType::SOA, DNS_CHECK_WAIT)
+                    .await
+                    .is_some();
+            let misses = {
+                let mut m = self.dns_misses.lock().unwrap();
+                if alive {
+                    m.remove(&name);
+                    0
+                } else {
+                    let n = m.entry(name.clone()).or_insert(0);
+                    *n = n.saturating_add(1);
+                    *n
+                }
+            };
+            if alive || misses >= DNS_CHECK_MISSES {
+                self.dns_checked(&name, alive).await;
+            }
+        }
+    }
+
+    /// A tunnel's DNS answers (again) or has stopped: say so once, and move
+    /// its names to the memory answerer or back.
+    pub async fn dns_checked(self: &Arc<Self>, name: &str, alive: bool) {
+        let Some((label, info)) = self.tunnels.lock().unwrap().get(name).and_then(|e| {
+            Some((e.config.display().to_owned(), e.info.clone()?))
+        }) else {
+            return;
+        };
+        let domains = self.domains(name);
+        let was_down = self.dns_down.lock().unwrap().contains_key(name);
+        if !alive && !was_down {
+            self.dns_down
+                .lock()
+                .unwrap()
+                .insert(name.to_owned(), std::collections::HashSet::new());
+            let servers: Vec<String> = info.dns.iter().map(Ipv4Addr::to_string).collect();
+            self.log.system(
+                Some(name),
+                format!("{label}'s DNS ({}) doesn't answer.", servers.join(", ")),
+                Some(format!(
+                    "Names under {} won't resolve until it answers again. Meanwhile Crake answers the names it has seen with their last address, while that still answers through {label}.",
+                    domains.join(", ")
+                )),
+            );
+            // Nobody waits for it meanwhile.
+            self.resolved.revert(&info.device).await;
+            // The answerer's address exists once its link is up.
+            self.apply_keep().await;
+            if self.cfg.apply_network
+                && self.cfg.use_resolved
+                && !self
+                    .keep_serving
+                    .swap(true, std::sync::atomic::Ordering::SeqCst)
+            {
+                let this = Arc::clone(self);
+                tokio::spawn(async move {
+                    if let Err(e) = crate::keep::serve(this).await {
+                        tracing::error!("answering from memory: {e:#}");
+                    }
+                });
+            }
+            let _ = self.changes.send(name.to_owned());
+        } else if alive && was_down {
+            self.dns_down.lock().unwrap().remove(name);
+            self.log
+                .system(Some(name), format!("{label}'s DNS answers again."), None);
+            self.register_dns(name, &label, &info, &domains).await;
+            self.apply_keep().await;
+            let _ = self.changes.send(name.to_owned());
+        }
+    }
+
+    /// The memory answerer's link takes the domains of every tunnel whose
+    /// DNS doesn't answer; with none, it goes.
+    async fn apply_keep(&self) {
+        if !(self.cfg.apply_network && self.cfg.use_resolved) {
+            return;
+        }
+        let down: Vec<String> = self.dns_down.lock().unwrap().keys().cloned().collect();
+        let mut domains: Vec<String> = Vec::new();
+        for t in &down {
+            for d in self.domains(t) {
+                if !domains.contains(&d) {
+                    domains.push(d);
+                }
+            }
+        }
+        let _keep = self.keep.lock().await;
+        if domains.is_empty() {
+            self.resolved.revert(crate::keep::DEVICE).await;
+            self.net.remove(crate::keep::DEVICE).await;
+            return;
+        }
+        if let Err(e) = self.net.dummy(crate::keep::DEVICE, crate::keep::ADDR).await {
+            tracing::error!("answering from memory: {e:#}");
+            return;
+        }
+        if let Err(e) = self
+            .resolved
+            .set_link(crate::keep::DEVICE, &[crate::keep::ADDR], &domains, false)
+            .await
+        {
+            tracing::error!("answering from memory: {e:#}");
+        }
+        self.resolved.flush().await;
+    }
+
+    /// The memory answerer's reply to one question: the last address its
+    /// tunnel's DNS gave, if that still answers through the tunnel; else
+    /// SERVFAIL (it doesn't resolve, honestly).
+    pub async fn keep_answer(&self, query: &[u8]) -> Option<Vec<u8>> {
+        let (qname, qtype) = crate::keep::question(query)?;
+        let down: Vec<String> = self.dns_down.lock().unwrap().keys().cloned().collect();
+        let Some(tunnel) = down
+            .into_iter()
+            .find(|t| dns::in_domains(&qname, &self.domains(t)))
+        else {
+            return crate::hush::reply_code(query, 2);
+        };
+        let known = self
+            .hosts
+            .lock()
+            .unwrap()
+            .tunnels
+            .get(&tunnel)
+            .and_then(|t| t.answers.get(&qname).map(|(a, _)| a.clone()));
+        let Some(addrs) = known else {
+            return crate::hush::reply_code(query, 2);
+        };
+        if qtype != RecordType::A {
+            // The name exists; it just has no such record we know of.
+            return crate::keep::answer(query, &[]);
+        }
+        let learning = self.learning(&tunnel);
+        let mut ok = Vec::new();
+        for a in addrs {
+            if learning.allows(Some(&qname), a) && self.still_answers(&tunnel, a).await {
+                ok.push(a);
+            }
+        }
+        if ok.is_empty() {
+            return crate::hush::reply_code(query, 2);
+        }
+        // Routed through the tunnel (it may have expired meanwhile).
+        {
+            let _ops = self.ops.lock().await;
+            for a in &ok {
+                let covered = self
+                    .hosts
+                    .lock()
+                    .unwrap()
+                    .tunnels
+                    .get(&tunnel)
+                    .is_some_and(|t| t.covers(*a));
+                if !covered && let Err(e) = self.learn_one(&tunnel, *a, Some(&qname), "dns").await {
+                    tracing::error!("routing {a} for {tunnel}: {e:#}");
+                }
+            }
+        }
+        let first = self
+            .dns_down
+            .lock()
+            .unwrap()
+            .get_mut(&tunnel)
+            .is_some_and(|said| said.insert(qname.clone()));
+        if first {
+            let label = self.label(&tunnel);
+            self.log.system(
+                Some(&tunnel),
+                format!("{label}'s DNS doesn't answer. Using the address {qname} had last time."),
+                Some(format!("{} still answers through {label}.", ok[0])),
+            );
+        }
+        crate::keep::answer(query, &ok)
+    }
+
+    /// `addr` answers through `tunnel` on a web port (in development and
+    /// tests, where nothing is applied, it's taken as answering).
+    async fn still_answers(&self, tunnel: &str, addr: Ipv4Addr) -> bool {
+        if !self.cfg.apply_network {
+            return true;
+        }
+        let Ok((index, _, _)) = self.entry(tunnel) else {
+            return false;
+        };
+        let mark = crate::routing::ids(index).mark;
+        for port in [443, 80] {
+            if crate::probe::through_tunnel(SocketAddrV4::new(addr, port), mark, PROBE_TIMEOUT / 3)
+                .await
+                .is_some()
+            {
+                return true;
+            }
+        }
+        false
     }
 
     /// The tunnel that's up and already sends `addr` through itself
@@ -1445,6 +1695,10 @@ impl Manager {
         }
         self.sync_learned(name).await;
         self.resolved.revert(&interface_name(name)).await;
+        self.dns_misses.lock().unwrap().remove(name);
+        if self.dns_down.lock().unwrap().remove(name).is_some() {
+            self.apply_keep().await;
+        }
         let Ok((index, _, _)) = self.entry(name) else {
             return;
         };
@@ -1700,6 +1954,16 @@ impl Manager {
     pub async fn learn_from_dns(&self, name: &str, answer: Answer) {
         if answer.addrs.is_empty() || !dns::in_domains(&answer.name, &self.domains(name)) {
             return;
+        }
+        // The last good answer, for when this DNS stops answering (7h).
+        {
+            let mut store = self.hosts.lock().unwrap();
+            if store
+                .tunnel(name)
+                .remember(&answer.name, &answer.addrs, hosts::now())
+            {
+                store.save();
+            }
         }
         self.learn_answer(name, &answer, Why::TunnelDomain).await;
     }
@@ -2656,6 +2920,17 @@ fn th_name(store: &HostStore, tunnel: &str, addr: Ipv4Addr) -> Option<String> {
 /// that failed publicly). The socket is bound to the tunnel, so the
 /// question can't leak elsewhere.
 async fn ask(device: &str, servers: &[Ipv4Addr], name: &str, qtype: RecordType) -> Option<Message> {
+    ask_within(device, servers, name, qtype, TUNNEL_DNS_WAIT).await
+}
+
+/// `ask`, giving each server `wait` to answer.
+async fn ask_within(
+    device: &str,
+    servers: &[Ipv4Addr],
+    name: &str,
+    qtype: RecordType,
+    wait: Duration,
+) -> Option<Message> {
     use std::hash::BuildHasher;
     for server in servers {
         let id = std::collections::hash_map::RandomState::new().hash_one(Instant::now()) as u16;
@@ -2672,7 +2947,7 @@ async fn ask(device: &str, servers: &[Ipv4Addr], name: &str, qtype: RecordType) 
             continue;
         }
         let mut buf = vec![0u8; 4096];
-        let wait = tokio::time::timeout(TUNNEL_DNS_WAIT, async {
+        let wait = tokio::time::timeout(wait, async {
             loop {
                 let n = sock.recv(&mut buf).await.ok()?;
                 if let Some(m) = dns::parse_reply(&buf[..n], id, name) {
@@ -2707,6 +2982,7 @@ fn snapshot(e: &Entry) -> Snapshot {
         info: e.info.clone(),
         hosts: 0,
         signed_in: e.session.is_some(),
+        dns_down: false,
         clash: None,
         since: e.up_since,
         transport: None,

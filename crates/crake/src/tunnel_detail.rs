@@ -542,6 +542,7 @@ fn header_button(id: &'static str, t: &Theme) -> Stateful<Div> {
 /// "ACME", the Managed tag, and the state.
 fn title_row(tunnel: &Tunnel, t: &Theme) -> impl IntoElement {
     let (dot, state) = match tunnel.state.as_str() {
+        "connected" if tunnel.dns_down => (t.danger, "Connected \u{b7} its DNS doesn\u{2019}t answer"),
         "connected" => (t.accent, "Connected"),
         "connecting" => (t.accent, "Connecting\u{2026}"),
         "trouble" => (t.danger, "Couldn\u{2019}t stay connected"),

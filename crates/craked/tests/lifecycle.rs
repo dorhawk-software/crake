@@ -499,3 +499,71 @@ async fn sends(mgr: &Manager, tunnel: &str, host: &str) -> bool {
         .iter()
         .any(|r| r.target.to_string() == host && !r.direct)
 }
+
+/// A tunnel's DNS that stops answering (7h): said once, known names keep
+/// working from memory, unknown ones fail honestly, and it's said again
+/// when the DNS is back.
+#[tokio::test]
+async fn known_names_keep_working_while_a_tunnels_dns_is_silent() {
+    use hickory_proto::op::{Message, ResponseCode};
+    use hickory_proto::rr::RecordType;
+    use std::collections::HashMap;
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(dir.path(), FAKE);
+    let mgr = Manager::new(cfg).unwrap();
+    let t = mgr
+        .add_tunnel(&HashMap::from([
+            ("display_name".to_owned(), "Initech".to_owned()),
+            ("gateway".to_owned(), "initech".to_owned()),
+            ("protocol".to_owned(), "openvpn3".to_owned()),
+        ]))
+        .unwrap();
+    mgr.attach(
+        &t,
+        &HashMap::from([
+            ("device".to_owned(), "tun0".to_owned()),
+            ("dns".to_owned(), "10.8.0.1".to_owned()),
+            ("domains".to_owned(), "initech.internal".to_owned()),
+        ]),
+    )
+    .await
+    .unwrap();
+    // Its DNS said where GitLab is, while it still answered.
+    mgr.learn_from_dns(
+        &t,
+        craked::dns::Answer {
+            name: "gitlab.initech.internal".into(),
+            addrs: vec!["10.81.1.4".parse().unwrap()],
+        },
+    )
+    .await;
+
+    mgr.dns_checked(&t, false).await;
+    mgr.dns_checked(&t, false).await;
+    assert!(mgr.get(&t).unwrap().dns_down);
+    let ask = |name: &str, qtype| craked::dns::query(7, name, qtype);
+    let reply = |bytes: Option<Vec<u8>>| Message::from_vec(&bytes.unwrap()).unwrap();
+
+    let known = reply(mgr.keep_answer(&ask("gitlab.initech.internal", RecordType::A)).await);
+    assert_eq!(known.metadata.response_code, ResponseCode::NoError);
+    assert_eq!(craked::dns::a_records(&known), vec!["10.81.1.4".parse::<std::net::Ipv4Addr>().unwrap()]);
+    let again = reply(mgr.keep_answer(&ask("gitlab.initech.internal", RecordType::A)).await);
+    assert_eq!(craked::dns::a_records(&again).len(), 1);
+    let v6 = reply(mgr.keep_answer(&ask("gitlab.initech.internal", RecordType::AAAA)).await);
+    assert_eq!(v6.metadata.response_code, ResponseCode::NoError);
+    assert!(v6.answers.is_empty(), "it exists, just no IPv6 we know of");
+    let unknown = reply(mgr.keep_answer(&ask("wiki.initech.internal", RecordType::A)).await);
+    assert_eq!(unknown.metadata.response_code, ResponseCode::ServFail);
+    assert!(sends(&mgr, &t, "10.81.1.4").await, "routed through Initech");
+
+    mgr.dns_checked(&t, true).await;
+    assert!(!mgr.get(&t).unwrap().dns_down);
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert_eq!(log.matches("Initech's DNS (10.8.0.1) doesn't answer.").count(), 1, "{log}");
+    assert_eq!(
+        log.matches("Using the address gitlab.initech.internal had last time.").count(),
+        1,
+        "said once per name: {log}"
+    );
+    assert!(log.contains("Initech's DNS answers again."), "{log}");
+}

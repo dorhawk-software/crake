@@ -114,6 +114,8 @@ pub struct Tunnel {
     /// Why it can't be switched on now: "Turn ACME off to use Nordbank.
     /// Both use 10.0.0.2 for DNS." (empty when it can).
     pub clash: String,
+    /// Its DNS doesn't answer (craked answers known names from memory).
+    pub dns_down: bool,
 }
 
 pub fn start(updates: async_channel::Sender<Update>) -> async_channel::Sender<Command> {
@@ -262,6 +264,7 @@ fn tunnel(d: &HashMap<String, OwnedValue>) -> Tunnel {
         transport: text("transport"),
         dns: strings("dns"),
         clash: text("clash"),
+        dns_down: flag("dns_down"),
     }
 }
 

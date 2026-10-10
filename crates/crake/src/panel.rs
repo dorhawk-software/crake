@@ -757,7 +757,9 @@ impl Panel {
                                     .child(
                                         div()
                                             .text_size(px(13.))
-                                            .text_color(if tunnel.state == "trouble" {
+                                            .text_color(if tunnel.state == "trouble"
+                                                || (tunnel.state == "connected" && tunnel.dns_down)
+                                            {
                                                 t.danger
                                             } else {
                                                 t.muted

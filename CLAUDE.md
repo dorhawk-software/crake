@@ -441,7 +441,23 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    redirect-gateway, routes pushed as hints), and read the session's tun
    device and pushed DNS. To check: how much routing openvpn3 insists on
    doing itself, and whether it allows a custom tun name.
-7h. **A tunnel's DNS that stops answering (requested).** Found with an
+7h. **A tunnel's DNS that stops answering (requested). Built**
+   (lifecycle test; the real-network path not yet tried): every 30 s
+   craked asks each connected tunnel's DNS for its first domain's SOA
+   through the tunnel (3 s); two silences in a row mean it stopped. Then it
+   logs "Initech's DNS (10.8.0.1) doesn't answer." once, reverts the
+   tunnel's link in resolved (nobody waits on it) and moves the tunnel's
+   domains to a dummy link `crake-keep` (169.254.53.54, `keep.rs`), where
+   craked answers from the last good answers (remembered per name in the
+   host store, `answers`, from every answer its DNS gave): an A query gets
+   the remembered addresses that still answer through the tunnel (443/80),
+   routed first, TTL 30, said once per name per outage ("Using the
+   address gitlab.initech.internal had last time."); another type for a
+   known name gets an empty NOERROR; anything else SERVFAIL. The panel and
+   tunnel detail say "Connected · its DNS doesn't answer". When it answers
+   again: "Initech's DNS answers again.", its link is registered again and
+   crake-keep shrinks or goes.
+   Original request: Found with an
    OpenVPN profile that set `dhcp-option DNS <address>` by hand; the DNS VM
    was restarted, got another address, and every name under the company's
    domain failed although the servers themselves hadn't moved. Crake can't find the new
@@ -522,6 +538,17 @@ it doesn't, bundle, and own the updates.**
   Crake with no engine. openvpn3 isn't in Ubuntu's archive (OpenVPN's own
   repository), so it's never pulled in, only suggested. The tray extension
   and keyring are Recommends (KDE needs neither).
+- **Goal: a PPA on Launchpad** (the user's request), so Ubuntu users
+  `sudo add-apt-repository ppa:…/crake && sudo apt install crake`.
+  Launchpad builds from a *source* package, on its own builders, without
+  network access: the Rust crates must be vendored into the source package
+  (`cargo vendor`, `.cargo/config.toml` pointing at the vendor dir), and
+  the build must use a Rust toolchain from Ubuntu's archive (versioned
+  `rustc-1.xx`/`cargo-1.xx` packages; check the series we target has one
+  new enough for edition 2024 and GPUI). debian/ with rules, control (the
+  Depends above), changelog, copyright; signed with the user's GPG key,
+  uploaded with `dput`. Test the built .deb in a throwaway container
+  first, never on the user's machine.
 - **At runtime (built, `engines.rs`):** the app checks which engines exist
   (openconnect on PATH, or `CRAKE_OPENCONNECT`; openvpn3's D-Bus
   configuration service file). New tunnel shows every protocol; one whose

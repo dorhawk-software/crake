@@ -517,6 +517,7 @@ pub fn human_bytes(bytes: u64) -> String {
 /// "Connected · 4 hosts", "Off", ...
 pub fn tunnel_state(t: &Tunnel) -> String {
     match t.state.as_str() {
+        "connected" if t.dns_down => "Connected · its DNS doesn\u{2019}t answer".into(),
         "connected" if t.hosts == 1 => "Connected · 1 host".into(),
         "connected" => format!("Connected · {} hosts", t.hosts),
         "connecting" => "Connecting…".into(),

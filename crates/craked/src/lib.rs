@@ -7,6 +7,7 @@ pub mod dns_queue;
 pub mod hook_server;
 pub mod hosts;
 pub mod hush;
+pub mod keep;
 pub mod info;
 pub mod log;
 pub mod manager;
