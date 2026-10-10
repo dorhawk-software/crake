@@ -204,7 +204,8 @@ impl Routing {
         if apply { Self::Real } else { Self::Noop }
     }
 
-    /// At startup: clear whatever a previous run left behind.
+    /// At startup and at shutdown: clear everything Crake sets up (its
+    /// nftables table, policy rules and routing tables), whatever is left.
     pub async fn reset_all(&self) -> Result<()> {
         let Self::Real = self else { return Ok(()) };
         nft(&format!(
@@ -226,6 +227,10 @@ impl Routing {
             {
                 ip(&["rule", "del", "priority", &p.to_string()]).await.ok();
             }
+        }
+        // And the routing tables those rules pointed at.
+        for table in range {
+            ip(&["route", "flush", "table", &table.to_string()]).await.ok();
         }
         Ok(())
     }

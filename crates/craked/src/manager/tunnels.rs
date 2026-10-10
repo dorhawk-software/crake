@@ -97,10 +97,17 @@ impl Manager {
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
-        // Leave nothing behind: Crake off is Crake gone.
+        // Leave nothing behind: Crake off is Crake gone. Its own nftables
+        // table, policy rules and routing tables (OpenVPN 3 sessions, which
+        // outlive craked, included) and its dummy links.
+        if let Err(e) = self.routing.reset_all().await {
+            tracing::error!("removing Crake's routing: {e:#}");
+        }
         if self.cfg.apply_network && self.cfg.use_resolved {
-            self.resolved.revert(crate::hush::DEVICE).await;
-            self.net.remove(crate::hush::DEVICE).await;
+            for dev in [crate::hush::DEVICE, crate::keep::DEVICE] {
+                self.resolved.revert(dev).await;
+                self.net.remove(dev).await;
+            }
         }
     }
 
