@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 
 # Lines covered, in percent.
 declare -A floor=(
-    [crake]=55
+    [crake]=66
     [craked]=63
     [crake-proto]=95
 )
