@@ -521,8 +521,10 @@ The user doesn't want development builds installed on their machine.
   refusal, detach, remove. A new D-Bus call gets a step there.
 - Window tests (headless, GPUI's test platform: nothing on screen):
   `#[gpui_kit::test]` with `gpui_kit::test::TestWindowExt` (click, input,
-  press), in `tests.rs` of `new_tunnel/`, `panel/`, `settings_view/` and
-  `tunnel_detail/`. An element is clickable from a test once it has
+  press), in `tests.rs` of `new_tunnel/`, `panel/`, `settings_view/`,
+  `tunnel_detail/` and `signin_view/` (against a fake openconnect, given
+  by `Spec::openconnect`; real I/O needs `cx.executor().allow_parking()`).
+  An element is clickable from a test once it has
   `.test_support()` as its last call (a no-op in normal builds; the
   dev-dependency turns on gpui-kit's `test-support`). Nothing of this
   computer's in a test: `look_around` returns fixed profiles and engines,

@@ -30,10 +30,10 @@ impl SignIn {
                         buttons().child(div().flex_1())
                             .child(button("no", "Don\u{2019}t connect", Look::Text, t).on_click(cx.listener(|this, _, _, cx| {
                                 this.reply("no".into(), cx)
-                            })))
+                            })).test_support())
                             .child(button("yes", "Trust it", Look::Primary, t).on_click(cx.listener(|this, _, _, cx| {
                                 this.reply("yes".into(), cx)
-                            }))),
+                            })).test_support()),
                     );
                 return body;
             }
@@ -53,13 +53,15 @@ impl SignIn {
                         button(("choice", i), "", Look::Outline, t)
                             .h(px(40.))
                             .child(option.clone())
-                            .on_click(cx.listener(move |this, _, _, cx| this.reply(o.clone(), cx))),
+                            .on_click(cx.listener(move |this, _, _, cx| this.reply(o.clone(), cx)))
+                            .test_support(),
                     );
                 }
                 return body.child(list).child(
                     buttons().child(div().flex_1()).child(
                         button("cancel", "Cancel", Look::Text, t)
-                            .on_click(cx.listener(|this, _, _, cx| this.cancel(cx))),
+                            .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
+                            .test_support(),
                     ),
                 );
             }
@@ -124,7 +126,8 @@ impl SignIn {
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.remember = !this.remember;
                     cx.notify();
-                })),
+                }))
+                .test_support(),
             );
             if let Some(path) = from_file {
                 let home = std::env::var("HOME").unwrap_or_default();
@@ -135,7 +138,7 @@ impl SignIn {
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.keep_certificate = !this.keep_certificate;
                             cx.notify();
-                        })),
+                        })).test_support(),
                 )
                 .when(self.keep_certificate, |b| {
                     b.child(
@@ -155,11 +158,13 @@ impl SignIn {
                 .child(div().flex_1())
                 .child(
                     button("cancel", "Cancel", Look::Text, t)
-                        .on_click(cx.listener(|this, _, _, cx| this.cancel(cx))),
+                        .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
+                        .test_support(),
                 )
                 .child(
                     button("continue", "Continue", Look::Primary, t)
-                        .on_click(cx.listener(|this, _, _, cx| this.answer(cx))),
+                        .on_click(cx.listener(|this, _, _, cx| this.answer(cx)))
+                        .test_support(),
                 ),
         )
     }

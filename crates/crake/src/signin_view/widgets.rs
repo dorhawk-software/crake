@@ -132,6 +132,12 @@ pub(super) fn button(
             b.text_color(t.ink).hover(|s| s.bg(t.surface))
         })
         .child(label)
+        .on_mouse_down(gpui_kit::MouseButton::Left, keep_press)
+}
+
+/// A press on a control is its own: the card's window drag doesn't take it.
+fn keep_press(_: &gpui_kit::MouseDownEvent, _: &mut gpui_kit::Window, cx: &mut gpui_kit::App) {
+    cx.stop_propagation();
 }
 
 pub(super) fn checkbox(
@@ -166,4 +172,5 @@ pub(super) fn checkbox(
                 }),
         )
         .child(label)
+        .on_mouse_down(gpui_kit::MouseButton::Left, keep_press)
 }

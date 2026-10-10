@@ -342,6 +342,7 @@ pub(super) fn open_sign_in(tunnel: client::Tunnel, cx: &mut App) {
             .get(&tunnel.gateway)
             .cloned(),
         keyring: !shell.demo,
+        openconnect: None,
     };
     let bounds = centered(signin_view::WIDTH, 360., cx);
     // A plain transparent window: the card draws its own rounded frame, as

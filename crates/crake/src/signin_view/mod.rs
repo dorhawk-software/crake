@@ -6,7 +6,9 @@ use std::time::Duration;
 
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::*;
-use gpui_kit::{Context, Div, Entity, FontWeight, Stateful, Subscription, Window, div, px, svg};
+use gpui_kit::{
+    Context, Div, Entity, FontWeight, Stateful, Subscription, TestSupportExt, Window, div, px, svg,
+};
 
 use crate::Request;
 use crate::model::Model;
@@ -16,6 +18,9 @@ use crate::theme::{Theme, fonts};
 mod explain;
 mod question;
 mod widgets;
+
+#[cfg(test)]
+mod tests;
 
 use self::explain::explain;
 use self::widgets::{Look, button, buttons, checkbox, lower_first, para, steps, title};
@@ -144,16 +149,22 @@ impl Render for SignIn {
                                 button("helpdesk", "Copy for helpdesk", Look::Outline, &t)
                                     .on_click(
                                         cx.listener(|this, _, _, cx| this.copy_for_helpdesk(cx)),
-                                    ),
+                                    )
+                                    .test_support(),
                             )
                             .child(div().flex_1())
                             .child(
                                 button("close", "Close", Look::Text, &t)
-                                    .on_click(cx.listener(|this, _, _, cx| this.cancel(cx))),
+                                    .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
+                                    .test_support(),
                             )
-                            .child(button("retry", "Try again", Look::Primary, &t).on_click(
-                                cx.listener(|this, _, window, cx| this.retry(window, cx)),
-                            )),
+                            .child(
+                                button("retry", "Try again", Look::Primary, &t)
+                                    .on_click(
+                                        cx.listener(|this, _, window, cx| this.retry(window, cx)),
+                                    )
+                                    .test_support(),
+                            ),
                     )
             }
             stage => card
@@ -163,7 +174,8 @@ impl Render for SignIn {
                 .child(
                     buttons().child(div().flex_1()).child(
                         button("cancel", "Cancel", Look::Text, &t)
-                            .on_click(cx.listener(|this, _, _, cx| this.cancel(cx))),
+                            .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
+                            .test_support(),
                     ),
                 ),
         };

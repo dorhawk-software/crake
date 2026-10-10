@@ -29,6 +29,9 @@ pub struct Spec {
     pub user_agent: Option<String>,
     /// Read and write the keyring (off in demo mode: nothing real is stored).
     pub keyring: bool,
+    /// The openconnect to run (tests: a fake). None: CRAKE_OPENCONNECT
+    /// (development), or openconnect on PATH.
+    pub openconnect: Option<PathBuf>,
 }
 
 impl Spec {
@@ -310,8 +313,11 @@ fn attempt(
     events: &async_channel::Sender<Event>,
     replies: &async_channel::Receiver<Reply>,
 ) -> Result<Result<String, Vec<String>>, String> {
-    // CRAKE_OPENCONNECT (development, tests): another openconnect to run.
-    let program = std::env::var_os("CRAKE_OPENCONNECT").unwrap_or_else(|| "openconnect".into());
+    // CRAKE_OPENCONNECT (development): another openconnect to run.
+    let program = match &spec.openconnect {
+        Some(p) => p.clone().into_os_string(),
+        None => std::env::var_os("CRAKE_OPENCONNECT").unwrap_or_else(|| "openconnect".into()),
+    };
     let mut cmd = Command::new(program);
     cmd.arg("--authenticate")
         .arg(format!("--protocol={}", spec.protocol));
@@ -670,8 +676,6 @@ mod tests {
         .unwrap();
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
-        // SAFETY: no other test reads or writes this variable.
-        unsafe { std::env::set_var("CRAKE_OPENCONNECT", &fake) };
         let rt = tokio::runtime::Builder::new_current_thread()
             .build()
             .unwrap();
@@ -687,6 +691,7 @@ mod tests {
             extra_args: vec![],
             user_agent: None,
             keyring: false,
+            openconnect: Some(fake),
         };
         let s = run(&spec, &events, &replies, &rt).unwrap();
         assert_eq!(s.user_agent.as_deref(), Some(ANYCONNECT));
