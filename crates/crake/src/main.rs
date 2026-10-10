@@ -397,6 +397,13 @@ fn main() {
 }
 
 fn on_update(update: client::Update, cx: &mut App) {
+    // craked refused an OpenVPN 3 session (it clashes with a tunnel that's
+    // up; the log says which): end it, so it doesn't stay up unrouted.
+    if let client::Update::AttachRefused(t) = &update
+        && let Some(control) = cx.global_mut::<Shell>().sessions.remove(t)
+    {
+        control.send_blocking(signin::Reply::Cancel).ok();
+    }
     // New tunnel's "Add and connect": craked named it; keep its
     // certificate, then switch it on (sign-in opens).
     if let client::Update::Added(name) = &update
@@ -672,6 +679,24 @@ fn on_request(request: Request, cx: &mut App) {
     match request {
         Request::Panel(at) => toggle_panel(at, cx),
         Request::Switch(t, true) => {
+            // It can't be up together with a tunnel that's on: say so
+            // before signing in, not after.
+            let shell = cx.global::<Shell>();
+            let model = shell.model.clone();
+            let clash = model
+                .read(cx)
+                .tunnels
+                .iter()
+                .find(|x| x.name == t)
+                .map(|x| x.clash.clone())
+                .filter(|c| !c.is_empty());
+            if let Some(why) = clash {
+                model.update(cx, |m, cx| {
+                    m.failed = Some((why, std::time::Instant::now()));
+                    cx.notify();
+                });
+                return;
+            }
             remember_on(&t, true, cx);
             // Without a kept sign-in, sign in first (in this session, as the user).
             let tunnel = cx

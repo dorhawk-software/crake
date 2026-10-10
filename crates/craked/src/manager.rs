@@ -34,6 +34,9 @@ pub struct Snapshot {
     pub hosts: usize,
     /// A kept sign-in: switching on needs no new one.
     pub signed_in: bool,
+    /// Why it can't be switched on now (it clashes with a tunnel that's up),
+    /// as far as craked knows from its last connection.
+    pub clash: Option<String>,
     /// When it came up (seconds since the epoch).
     pub since: Option<u64>,
     /// How its packets travel: DTLS, ESP, TLS (TCP only), UDP or TCP.
@@ -86,6 +89,9 @@ struct Entry {
     /// When it last came up (seconds since the epoch); kept across a
     /// reconnect, cleared when it goes off.
     up_since: Option<u64>,
+    /// Refused because it clashes with a tunnel that's up: it's stopping,
+    /// already said why, and goes Off quietly.
+    refused: bool,
 }
 
 pub struct Manager {
@@ -111,6 +117,9 @@ pub struct Manager {
     transport: Arc<Mutex<HashMap<String, String>>>,
     /// Names no tunnel knew lately; not asked again for a while.
     unknown: Mutex<HashMap<(String, RecordType), Instant>>,
+    /// Addresses another tunnel's DNS also gave (tunnel, address), when
+    /// last said: once per 10 min, not on every lookup.
+    contested: Mutex<HashMap<(String, Ipv4Addr), Instant>>,
     /// "Ask me first" questions lately (tunnel, host): not asked again soon.
     asked: Mutex<HashMap<(String, Ipv4Addr), Instant>>,
     /// Names under an organisation's domain whose tunnel DNS had no private
@@ -171,6 +180,7 @@ impl Manager {
                     routed: false,
                     resumed: false,
                     up_since: None,
+                    refused: false,
                 };
                 (t.name.clone(), e)
             })
@@ -201,6 +211,7 @@ impl Manager {
             traffic: Arc::default(),
             transport: Arc::default(),
             unknown: Mutex::new(HashMap::new()),
+            contested: Mutex::new(HashMap::new()),
             asked: Mutex::new(HashMap::new()),
             no_split: Mutex::new(HashMap::new()),
             probed: Mutex::new(HashMap::new()),
@@ -491,6 +502,7 @@ impl Manager {
                     routed: false,
                     resumed: false,
                     up_since: None,
+                    refused: false,
                 },
             );
         }
@@ -645,6 +657,11 @@ impl Manager {
                 .cloned();
         }
         drop(transport);
+        for s in &mut list {
+            if matches!(s.state, TunnelState::Off | TunnelState::Trouble) {
+                s.clash = self.remembered_clash(&s.config.name);
+            }
+        }
         let store = self.hosts.lock().unwrap();
         for s in &mut list {
             s.hosts = store
@@ -657,6 +674,132 @@ impl Manager {
 
     pub fn get(&self, name: &str) -> Option<Snapshot> {
         self.list().into_iter().find(|s| s.config.name == name)
+    }
+
+    /// A tunnel that's up and can't be up together with `name`, and why:
+    /// they share a DNS server (craked routes each server through its own
+    /// tunnel), their own networks overlap, or a network is pinned to both.
+    fn clash(
+        &self,
+        name: &str,
+        dns: &[Ipv4Addr],
+        net: Option<Target>,
+    ) -> Option<(String, String)> {
+        // The tunnels that are up, copied out: one lock at a time.
+        let up: Vec<(String, String, TunnelInfo)> = self
+            .tunnels
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(other, e)| *other != name && e.state == TunnelState::Connected)
+            .filter_map(|(other, e)| {
+                e.info
+                    .clone()
+                    .map(|i| (other.clone(), e.config.display().to_owned(), i))
+            })
+            .collect();
+        let pinned_of = |t: &str| -> Vec<Target> {
+            self.hosts
+                .lock()
+                .unwrap()
+                .tunnels
+                .get(t)
+                .map(|h| h.pinned.iter().copied().collect())
+                .unwrap_or_default()
+        };
+        let pinned = pinned_of(name);
+        for (other, label, info) in up {
+            if let Some(d) = dns.iter().find(|d| info.dns.contains(d)) {
+                return Some((label, format!("Both use {d} for DNS.")));
+            }
+            if let (Some(a), Some(b)) = (net, own_net(&info))
+                && overlap(a, b)
+            {
+                let wider = if a.prefix_len() <= b.prefix_len() { a } else { b };
+                return Some((label, format!("Both are on {wider}.")));
+            }
+            let theirs = pinned_of(&other);
+            if let Some(p) = pinned
+                .iter()
+                .find(|p| theirs.iter().any(|q| overlap(**p, *q)))
+            {
+                return Some((label, format!("{p} is pinned to both.")));
+            }
+        }
+        None
+    }
+
+    /// The tunnel that's up and already sends `addr` through itself
+    /// (learned or pinned), other than `except`.
+    fn owner_of(&self, addr: Ipv4Addr, except: &str) -> Option<String> {
+        let up: Vec<String> = self
+            .tunnels
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(n, e)| *n != except && e.state == TunnelState::Connected)
+            .map(|(n, _)| n.clone())
+            .collect();
+        let store = self.hosts.lock().unwrap();
+        up.into_iter()
+            .find(|t| store.tunnels.get(t).is_some_and(|h| h.covers(addr)))
+    }
+
+    /// Say (once per 10 min) that `host` on `tunnel` has an address that
+    /// already goes through `owner`, and offer to move it.
+    fn contested(&self, tunnel: &str, label: &str, owner: &str, host: &str, addr: Ipv4Addr) {
+        {
+            let mut seen = self.contested.lock().unwrap();
+            let key = (tunnel.to_owned(), addr);
+            if seen
+                .get(&key)
+                .is_some_and(|t| t.elapsed() < Duration::from_secs(600))
+            {
+                return;
+            }
+            seen.insert(key, Instant::now());
+        }
+        let owner_label = self.label(owner);
+        let theirs = th_name(&self.hosts.lock().unwrap(), owner, addr)
+            .map(|n| format!(" ({n})"))
+            .unwrap_or_default();
+        self.log.append(LogEntry {
+            ts: crate::log::now(),
+            kind: LogKind::System,
+            tunnel: Some(owner.to_owned()),
+            message: format!("{host} can't go through {label}."),
+            reason: Some(format!(
+                "Its address, {addr}, already goes through {owner_label}{theirs}. One address goes through one tunnel at a time; you can move it to {label}."
+            )),
+            hosts: vec![addr.to_string()],
+            others: vec![tunnel.to_owned()],
+        });
+    }
+
+    fn label(&self, name: &str) -> String {
+        self.tunnels
+            .lock()
+            .unwrap()
+            .get(name)
+            .map_or_else(|| name.to_owned(), |e| e.config.display().to_owned())
+    }
+
+    /// `clash` with what `name` got when it was last up, before it's
+    /// switched on again: said before signing in, not after.
+    fn remembered_clash(&self, name: &str) -> Option<String> {
+        let (dns, net) = {
+            let store = self.hosts.lock().unwrap();
+            let t = store.tunnels.get(name)?;
+            (t.last_dns.clone(), t.last_net)
+        };
+        let display = self
+            .tunnels
+            .lock()
+            .unwrap()
+            .get(name)
+            .map(|e| e.config.display().to_owned())?;
+        self.clash(name, &dns, net)
+            .map(|(other, why)| format!("Turn {other} off to use {display}. {why}"))
     }
 
     /// The tunnel whose device this is: `crake-<name>` for openconnect's,
@@ -816,6 +959,42 @@ impl Manager {
         first: bool,
     ) -> Result<()> {
         let display = display.to_owned();
+        // What it got this time, for the next check before switching on.
+        {
+            let mut store = self.hosts.lock().unwrap();
+            let t = store.tunnel(name);
+            t.last_dns = info.dns.clone();
+            t.last_net = own_net(&info);
+            store.save();
+        }
+        // Two tunnels that share a DNS server, a network or a pinned network
+        // can't both work: don't half-work, say which to switch off.
+        if let Some((other, why)) = self.clash(name, &info.dns, own_net(&info)) {
+            let text = format!("Turn {other} off to use {display}.");
+            self.log.system(Some(name), text.clone(), Some(why.clone()));
+            let stop = {
+                let mut map = self.tunnels.lock().unwrap();
+                map.get_mut(name).and_then(|e| {
+                    e.refused = true;
+                    e.stop.take()
+                })
+            };
+            return match stop {
+                // openconnect: stop it, keeping the sign-in for later.
+                Some(tx) => {
+                    let _ = tx.send(Stop::KeepSession);
+                    Ok(())
+                }
+                // An OpenVPN 3 session: the app ends it.
+                None => {
+                    if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
+                        e.refused = false;
+                    }
+                    self.set_state(name, TunnelState::Off, true);
+                    Err(anyhow!("{text} {why}"))
+                }
+            };
+        }
         for dns in &info.dns {
             self.net.route_dns(&info.device, *dns).await?;
         }
@@ -957,6 +1136,16 @@ impl Manager {
             .get(name)
             .map(|e| e.config.display().to_owned())
             .ok_or_else(|| anyhow!("no tunnel named {name}"))?;
+        // Refused at attach (it clashed): it never came up, nothing to undo.
+        let never_up = self
+            .tunnels
+            .lock()
+            .unwrap()
+            .get(name)
+            .is_some_and(|e| e.state == TunnelState::Off && e.info.is_none());
+        if never_up {
+            return Ok(());
+        }
         self.remove_routing(name).await;
         if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
             e.info = None;
@@ -1138,13 +1327,25 @@ impl Manager {
     async fn finish(&self, name: &str, label: &str, state: TunnelState, reason: Option<String>) {
         self.remove_routing(name).await;
         self.update_hush().await;
-        if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
-            e.stop = None;
-            e.running = false;
-            // A failed run may mean the session is no good any more.
-            if state == TunnelState::Trouble {
-                e.session = None;
+        let refused = {
+            let mut map = self.tunnels.lock().unwrap();
+            match map.get_mut(name) {
+                Some(e) => {
+                    e.stop = None;
+                    e.running = false;
+                    // A failed run may mean the session is no good any more.
+                    if state == TunnelState::Trouble && !e.refused {
+                        e.session = None;
+                    }
+                    std::mem::take(&mut e.refused)
+                }
+                None => false,
             }
+        };
+        if refused {
+            // Already said why ("Turn ACME off to use Nordbank.").
+            self.set_state(name, TunnelState::Off, true);
+            return;
         }
         self.set_state(name, state, true);
         let msg = match state {
@@ -1397,6 +1598,12 @@ impl Manager {
         for a in &addrs {
             guard(&label, Target::host(*a), gw)?;
             self.check_scope(name, &label, Target::host(*a), Some(host))?;
+            if let Some(owner) = self.owner_of(*a, name) {
+                let owner = self.label(&owner);
+                bail!(
+                    "{host} is {a}, which already goes through {owner}. One address goes through one tunnel at a time: forget it there first."
+                );
+            }
         }
         for a in &addrs {
             self.hosts.lock().unwrap().tunnel(name).direct.remove(a);
@@ -1429,6 +1636,12 @@ impl Manager {
         }
         guard(&label, t, gw)?;
         self.check_scope(name, &label, t, None)?;
+        if let Some(owner) = self.owner_of(t.addr(), name) {
+            let owner = self.label(&owner);
+            bail!(
+                "{t} already goes through {owner}. One address goes through one tunnel at a time: forget it there first."
+            );
+        }
         let expiry = self.expiry_sentence(name);
         {
             let mut store = self.hosts.lock().unwrap();
@@ -2051,6 +2264,13 @@ impl Manager {
                     continue;
                 }
             }
+            // Already another tunnel's: two companies using the same
+            // private address. One address goes through one tunnel; it
+            // stays where it is, and the user may move it.
+            if let Some(owner) = self.owner_of(*addr, name) {
+                self.contested(name, &label, &owner, &answer.name, *addr);
+                continue;
+            }
             if self.never(Some(&answer.name), *addr) {
                 continue;
             }
@@ -2487,9 +2707,27 @@ fn snapshot(e: &Entry) -> Snapshot {
         info: e.info.clone(),
         hosts: 0,
         signed_in: e.session.is_some(),
+        clash: None,
         since: e.up_since,
         transport: None,
     }
+}
+
+/// The network a tunnel's own address is on (none for a single address).
+fn own_net(info: &TunnelInfo) -> Option<Target> {
+    let (addr, len) = (info.address?, info.prefix?);
+    if len == 0 || len >= 32 {
+        return None;
+    }
+    let mask = u32::MAX << (32 - u32::from(len));
+    format!("{}/{len}", Ipv4Addr::from(u32::from(addr) & mask))
+        .parse()
+        .ok()
+}
+
+/// Two networks (or hosts) share an address.
+fn overlap(a: Target, b: Target) -> bool {
+    a.contains(b.addr()) || b.contains(a.addr())
 }
 
 fn describe(info: &TunnelInfo, domains: &[String]) -> String {

@@ -149,6 +149,8 @@ impl Model {
             Update::TunnelTraffic(tunnel, minutes) => {
                 self.tunnel_traffic.insert(tunnel, minutes);
             }
+            // Handled by the app (it ends the session).
+            Update::AttachRefused(_) => {}
             Update::Traffic(t) => self.traffic = t,
             Update::Days(d) => self.days = d,
             Update::Settings(s) => self.settings = s,

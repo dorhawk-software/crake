@@ -67,6 +67,9 @@ pub enum Update {
     Hosts(String, Vec<HashMap<String, String>>),
     /// Bytes through a tunnel per minute, two days.
     TunnelTraffic(String, Vec<(u64, u64)>),
+    /// craked wouldn't route through an OpenVPN 3 session (it clashes with
+    /// a tunnel that's up): the app ends it.
+    AttachRefused(String),
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -108,6 +111,9 @@ pub struct Tunnel {
     pub transport: String,
     /// Its DNS servers, while up.
     pub dns: Vec<String>,
+    /// Why it can't be switched on now: "Turn ACME off to use Nordbank.
+    /// Both use 10.0.0.2 for DNS." (empty when it can).
+    pub clash: String,
 }
 
 pub fn start(updates: async_channel::Sender<Update>) -> async_channel::Sender<Command> {
@@ -255,6 +261,7 @@ fn tunnel(d: &HashMap<String, OwnedValue>) -> Tunnel {
             .unwrap_or(0),
         transport: text("transport"),
         dns: strings("dns"),
+        clash: text("clash"),
     }
 }
 
@@ -354,7 +361,13 @@ async fn session(
                         }
                         done
                     }
-                    Command::Attach(t, fields) => api.call::<_, ()>("Attach", &(t, fields)).await,
+                    Command::Attach(t, fields) => match api.call::<_, ()>("Attach", &(t.clone(), fields)).await {
+                        Err(e) => {
+                            if !send(Update::AttachRefused(t)).await { return Ok(()); }
+                            Err(e)
+                        }
+                        ok => ok,
+                    },
                     Command::Detach(t, why) => api.call::<_, ()>("Detach", &(t, why)).await,
                     Command::Pin(t, targets) => {
                         let mut done = Ok(());

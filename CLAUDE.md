@@ -224,7 +224,27 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    "ask me" uses the first in order and then logs "Nordbank answers for X
    too." (LogEntry `others`) with a notification offering "Use Nordbank"
    (D-Bus `MoveHosts`: direct for the old tunnel, learned on the new).
-   The collision check when switching on is still to do.
+   **Collisions: built** (lifecycle tests). When a tunnel comes up
+   (`tunnel_up`, for openconnect and OpenVPN 3 alike) craked compares it
+   with every tunnel that's up: a shared DNS server, overlapping own
+   networks, or a network pinned to both. On a clash it doesn't half-work:
+   it logs "Turn ACME off to use Nordbank." with the reason ("Both use
+   10.0.0.2 for DNS."), stops an openconnect tunnel keeping its sign-in
+   (SIGHUP), or refuses an OpenVPN 3 attach (the app then ends the session,
+   `Update::AttachRefused`); no "Switched off" line follows. What each tunnel
+   got last time (`last_dns`, `last_net` in the host store) gives the same
+   sentence before switching on (ListTunnels `clash`): the app shows it and
+   doesn't open sign-in.
+   One address, two companies (the user's case: ACME's abcd.com and
+   Nordbank's xyz.com both 10.0.0.1): an address another tunnel that's up
+   already sends (learned or pinned) isn't taken by a second tunnel's DNS
+   answer; craked says "xyz.com can't go through Nordbank." ("Its address,
+   10.0.0.1, already goes through ACME (abcd.com)...", once per 10 min) with
+   `others`, so the app offers "Use Nordbank" (MoveHosts). Adding it by hand
+   is refused the same way. Routing goes by destination address, so both
+   can't work at once. Later, maybe: give each such name its own stand-in
+   address (fake-IP in the DNS answer, DNAT per tunnel), which would let
+   both work.
 6. UI: tray icon states, panel, notifications; then log, tunnel detail,
    settings, new tunnel, sign-in. **Built:** tray, panel, notifications,
    log, sign-in, Settings, New tunnel, tunnel detail.

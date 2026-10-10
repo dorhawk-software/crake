@@ -140,6 +140,13 @@ pub struct TunnelHosts {
     /// Domains it pushed when last connected: kept private while it's off.
     #[serde(default)]
     pub domains: Vec<String>,
+    /// What it got when last connected: its DNS servers and its own
+    /// network. Before it's switched on again, checked against the tunnels
+    /// that are up (they can't share them).
+    #[serde(default)]
+    pub last_dns: Vec<Ipv4Addr>,
+    #[serde(default)]
+    pub last_net: Option<Target>,
 }
 
 impl TunnelHosts {

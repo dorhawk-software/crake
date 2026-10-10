@@ -390,3 +390,112 @@ async fn an_openvpn3_session_attaches_and_detaches() {
         "{log}"
     );
 }
+
+/// Two tunnels that share a DNS server can't both work: the second is
+/// refused with a sentence saying which to switch off, and craked warns
+/// before it's switched on again, until the first is off.
+#[tokio::test]
+async fn tunnels_that_clash_are_refused_and_say_why() {
+    use std::collections::HashMap;
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(dir.path(), FAKE);
+    let mgr = Manager::new(cfg).unwrap();
+    let add = |display: &str, profile: &str| {
+        mgr.add_tunnel(&HashMap::from([
+            ("display_name".to_owned(), display.to_owned()),
+            ("gateway".to_owned(), profile.to_owned()),
+            ("protocol".to_owned(), "openvpn3".to_owned()),
+        ]))
+        .unwrap()
+    };
+    let (acme, nord) = (add("Initech", "initech"), add("Nordbank", "nordbank"));
+    let attach = |device: &str| {
+        HashMap::from([
+            ("device".to_owned(), device.to_owned()),
+            ("dns".to_owned(), "10.0.0.2".to_owned()),
+            ("domains".to_owned(), "corp.internal".to_owned()),
+        ])
+    };
+    mgr.attach(&acme, &attach("tun0")).await.unwrap();
+    let refused = mgr.attach(&nord, &attach("tun1")).await.unwrap_err();
+    assert_eq!(
+        format!("{refused:#}"),
+        "Turn Initech off to use Nordbank. Both use 10.0.0.2 for DNS."
+    );
+    assert_eq!(mgr.get(&nord).unwrap().state, TunnelState::Off);
+    assert_eq!(mgr.get(&acme).unwrap().state, TunnelState::Connected);
+    // Ending the refused session changes nothing and logs nothing more.
+    mgr.detach(&nord, None).await.unwrap();
+    // Said before switching on again, from what it got last time.
+    assert_eq!(
+        mgr.get(&nord).unwrap().clash.as_deref(),
+        Some("Turn Initech off to use Nordbank. Both use 10.0.0.2 for DNS.")
+    );
+    mgr.detach(&acme, None).await.unwrap();
+    assert_eq!(mgr.get(&nord).unwrap().clash, None, "nothing in the way now");
+    mgr.attach(&nord, &attach("tun1")).await.unwrap();
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert_eq!(log.matches("Turn Initech off to use Nordbank.").count(), 1, "{log}");
+    assert!(!log.contains("Switched Nordbank off."), "{log}");
+}
+
+/// Two companies using the same private address: it stays with the tunnel
+/// that has it, Crake says so once and offers the other tunnel.
+#[tokio::test]
+async fn an_address_another_tunnel_has_stays_there_and_says_so() {
+    use std::collections::HashMap;
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(dir.path(), FAKE);
+    let mgr = Manager::new(cfg).unwrap();
+    let add = |display: &str, profile: &str| {
+        mgr.add_tunnel(&HashMap::from([
+            ("display_name".to_owned(), display.to_owned()),
+            ("gateway".to_owned(), profile.to_owned()),
+            ("protocol".to_owned(), "openvpn3".to_owned()),
+        ]))
+        .unwrap()
+    };
+    let (a, b) = (add("Initech", "initech"), add("Nordbank", "nordbank"));
+    let up = |device: &str, dns: &str, domain: &str| {
+        HashMap::from([
+            ("device".to_owned(), device.to_owned()),
+            ("dns".to_owned(), dns.to_owned()),
+            ("domains".to_owned(), domain.to_owned()),
+        ])
+    };
+    mgr.attach(&a, &up("tun0", "10.8.0.1", "initech.internal")).await.unwrap();
+    mgr.attach(&b, &up("tun1", "10.9.0.1", "nordbank.internal")).await.unwrap();
+    mgr.add_host(&a, "10.0.0.1").await.unwrap();
+
+    // Nordbank's DNS says xyz.nordbank.internal is 10.0.0.1 too.
+    let answer = || craked::dns::Answer {
+        name: "xyz.nordbank.internal".into(),
+        addrs: vec!["10.0.0.1".parse().unwrap()],
+    };
+    mgr.learn_from_dns(&b, answer()).await;
+    mgr.learn_from_dns(&b, answer()).await;
+    assert!(sends(&mgr, &a, "10.0.0.1").await, "it stays with Initech");
+    assert!(!sends(&mgr, &b, "10.0.0.1").await, "Nordbank doesn't take it as well");
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert_eq!(
+        log.matches("xyz.nordbank.internal can't go through Nordbank.").count(),
+        1,
+        "said once, not on every lookup: {log}"
+    );
+    assert!(log.contains("already goes through Initech"), "{log}");
+    // Adding it by hand is refused the same way.
+    let refused = mgr.add_host(&b, "10.0.0.1").await.unwrap_err();
+    assert!(format!("{refused:#}").contains("already goes through Initech"));
+    // Moving it is the user's choice.
+    mgr.move_hosts(&a, &b, &["10.0.0.1"]).await.unwrap();
+    assert!(sends(&mgr, &b, "10.0.0.1").await && !sends(&mgr, &a, "10.0.0.1").await);
+}
+
+/// The tunnel sends this host through itself (learned or pinned).
+async fn sends(mgr: &Manager, tunnel: &str, host: &str) -> bool {
+    mgr.hosts(tunnel)
+        .await
+        .unwrap()
+        .iter()
+        .any(|r| r.target.to_string() == host && !r.direct)
+}
