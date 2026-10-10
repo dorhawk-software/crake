@@ -54,6 +54,15 @@ const PROTOCOLS: [(&str, &str, &str, &str); 9] = [
     ),
 ];
 
+/// Protocols Crake has been used with against a real gateway. Every other
+/// one says "Beta" until it has been (CLAUDE.md: Beta protocols).
+pub const TRIED: [&str; 2] = ["anyconnect", "openvpn3"];
+
+/// Not yet tried against a real gateway: shown as Beta.
+pub fn beta(protocol: &str) -> bool {
+    !protocol.is_empty() && protocol != "auto" && !TRIED.contains(&protocol)
+}
+
 /// Sign-in methods (step 2): id, name, sub.
 const METHODS: [(&str, &str, &str); 3] = [
     (
@@ -863,7 +872,8 @@ impl NewTunnel {
                                                 .text_color(t.accent)
                                                 .child("Recommended"),
                                         )
-                                    }),
+                                    })
+                                    .when(beta(id), |d| d.child(beta_tag(t))),
                             )
                             .child(
                                 div()
@@ -1008,6 +1018,24 @@ impl NewTunnel {
                     .child("Protocol"),
             )
             .child(protocols)
+            .when_some(
+                PROTOCOLS
+                    .iter()
+                    .find(|p| p.0 == self.protocol && beta(p.0))
+                    .map(|p| p.1),
+                |d, name| {
+                    d.child(
+                        div()
+                            .mt(px(10.))
+                            .text_size(px(13.))
+                            .line_height(px(19.))
+                            .text_color(t.muted)
+                            .child(format!(
+                                "Beta: Crake hasn\u{2019}t been tried against a real {name} gateway yet. openconnect speaks it, so it should work. If it doesn\u{2019}t, Copy for helpdesk in the sign-in window says what happened."
+                            )),
+                    )
+                },
+            )
             .children(group_row)
     }
 
@@ -1530,6 +1558,19 @@ impl NewTunnel {
         }
         picker
     }
+}
+
+/// "Beta": a protocol not yet tried against a real gateway.
+pub fn beta_tag(t: &Theme) -> impl IntoElement {
+    div()
+        .px(px(6.))
+        .rounded(px(4.))
+        .bg(t.surface)
+        .text_size(px(12.))
+        .line_height(px(17.))
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(t.muted)
+        .child("Beta")
 }
 
 fn heading(text: &'static str) -> impl IntoElement {

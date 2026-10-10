@@ -42,17 +42,18 @@ ago. Neither knows what you actually open.**
   <tr>
     <td align="center"><strong>Speaks</strong></td>
     <td align="center"><sub>Cisco AnyConnect<br/>ocserv</sub></td>
-    <td align="center"><sub>Palo Alto<br/>GlobalProtect</sub></td>
-    <td align="center"><sub>Ivanti Connect Secure<br/>(Pulse)</sub></td>
-    <td align="center"><sub>Juniper<br/>Network Connect</sub></td>
-    <td align="center"><sub>Fortinet<br/>SSL VPN</sub></td>
-    <td align="center"><sub>F5<br/>BIG-IP</sub></td>
-    <td align="center"><sub>Array<br/>Networks</sub></td>
+    <td align="center"><sub>Palo Alto<br/>GlobalProtect<br/><em>beta</em></sub></td>
+    <td align="center"><sub>Ivanti Connect Secure<br/>(Pulse)<br/><em>beta</em></sub></td>
+    <td align="center"><sub>Juniper<br/>Network Connect<br/><em>beta</em></sub></td>
+    <td align="center"><sub>Fortinet<br/>SSL VPN<br/><em>beta</em></sub></td>
+    <td align="center"><sub>F5<br/>BIG-IP<br/><em>beta</em></sub></td>
+    <td align="center"><sub>Array<br/>Networks<br/><em>beta</em></sub></td>
     <td align="center"><sub>OpenVPN 3<br/>profiles</sub></td>
   </tr>
 </table>
 
-<em>Every protocol openconnect speaks, plus the OpenVPN 3 profiles already on your computer.</em>
+<em>Every protocol openconnect speaks, plus the OpenVPN 3 profiles already on your computer.
+Beta: openconnect speaks it, but Crake hasn't been used against a real gateway of that kind yet.</em>
 
 </div>
 
@@ -249,8 +250,9 @@ forgotten so the app's next try goes through.
 - ✅ OpenVPN 3 profiles, including sessions started elsewhere
 - ✅ Tray, panel, log, settings, new tunnel, sign-in, tunnel detail; light and dark
 - 🟡 Networks that block UDP: built, not yet tried on such a network
-- 🟡 Fortinet SSL VPN: speaks it through openconnect, not yet tried against a real gateway
-- ⚪ Tunnels that can't be up together: say so before they half-work
+- 🟡 GlobalProtect, Ivanti/Pulse, Juniper, Fortinet, F5 and Array: spoken through openconnect,
+  marked Beta in the app until each has been used against a real gateway
+- ✅ Tunnels that can't be up together: refused with the reason, before they half-work
 - ⚪ A tunnel's DNS that stops answering: say so, keep known names working
 - ⚪ Packaging: a systemd service, polkit, a `.deb` for Ubuntu
 - ⚪ IPv6

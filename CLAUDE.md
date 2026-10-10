@@ -299,6 +299,13 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    the running Crake, `single.rs`), start at login (`autostart.rs`, an
    entry in ~/.config/autostart for this binary with `--autostart`, which
    switches on the tunnels left on), hide host names in helpdesk copies.
+   **Beta protocols (requested):** only protocols used against a real
+   gateway are shown plain; every other one carries a "Beta" tag (New
+   tunnel's list, the Tunnels rows) and New tunnel says what that means
+   when one is chosen. The list is `new_tunnel::TRIED` (today: anyconnect,
+   openvpn3). A protocol leaves Beta only after the user (or someone they
+   trust) has signed in, connected and had hosts routed through a real
+   gateway of that kind; the README's "Speaks" table follows it.
 7. Managed profiles and policy enforcement; helpdesk export. **Built**,
    proven in the lifecycle test (scope) and a throwaway namespace (full
    tunnel; a mutation without the LAN exclusion fails it).

@@ -778,6 +778,9 @@ impl Settings {
                                         .text_color(t.muted)
                                         .child("Managed"),
                                 )
+                            })
+                            .when(crate::new_tunnel::beta(&tunnel.protocol), |d| {
+                                d.child(crate::new_tunnel::beta_tag(t))
                             }),
                     )
                     .child(
