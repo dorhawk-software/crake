@@ -447,7 +447,10 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    device and pushed DNS. To check: how much routing openvpn3 insists on
    doing itself, and whether it allows a custom tun name.
 7h. **A tunnel's DNS that stops answering (requested). Built**
-   (lifecycle test; the real-network path not yet tried): every 30 s
+   (lifecycle tests; tried on the user's real OpenVPN 3 tunnel with its
+   DNS blocked by an nft rule: detected in about a minute, a known name
+   answered from memory via crake-keep, unknown names SERVFAIL, recovery
+   said): every 30 s
    craked asks each connected tunnel's DNS for its first domain's SOA
    through the tunnel (3 s); two silences in a row mean it stopped. Then it
    logs "Initech's DNS (10.8.0.1) doesn't answer." once, reverts the
@@ -455,7 +458,8 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    domains to a dummy link `crake-keep` (169.254.53.54, `keep.rs`), where
    craked answers from the last good answers (remembered per name in the
    host store, `answers`, from every answer its DNS gave): an A query gets
-   the remembered addresses that still answer through the tunnel (443/80),
+   the remembered addresses (or, failing that, the hosts it routes under
+   that name) that still answer through the tunnel (443/80),
    routed first, TTL 30, said once per name per outage ("Using the
    address gitlab.initech.internal had last time."); another type for a
    known name gets an empty NOERROR; anything else SERVFAIL. The panel and
