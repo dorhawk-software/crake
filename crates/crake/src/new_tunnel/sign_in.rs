@@ -28,13 +28,15 @@ impl NewTunnel {
         let mut methods = div().flex().flex_col().gap(px(8.)).mt(px(18.));
         for (i, (id, name, sub)) in METHODS.into_iter().enumerate() {
             let on = self.method == id;
-            methods = methods.child(card(("method", i), on, name, sub, None, t).on_click(
-                cx.listener(move |this, _, _, cx| {
-                    this.method = id;
-                    this.problem = None;
-                    cx.notify();
-                }),
-            ));
+            methods = methods.child(
+                card(("method", i), on, name, sub, None, t)
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.method = id;
+                        this.problem = None;
+                        cx.notify();
+                    }))
+                    .test_support(),
+            );
         }
         let detail = self.method_detail(t, cx);
         div()

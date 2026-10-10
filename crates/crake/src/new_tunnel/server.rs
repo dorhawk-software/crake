@@ -210,7 +210,8 @@ impl NewTunnel {
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.protocol = id;
                         cx.notify();
-                    })),
+                    }))
+                    .test_support(),
             );
         }
         protocols

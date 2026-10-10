@@ -247,7 +247,8 @@ impl Render for NewTunnel {
                                     this.step -= 1;
                                     this.problem = None;
                                     cx.notify();
-                                })),
+                                }))
+                                .test_support(),
                         )
                     })
                     .child(div().flex_1())
@@ -270,7 +271,8 @@ impl Render for NewTunnel {
                             .font_weight(FontWeight::BOLD)
                             .cursor_pointer()
                             .child(next_label)
-                            .on_click(cx.listener(|this, _, _, cx| this.next(cx))),
+                            .on_click(cx.listener(|this, _, _, cx| this.next(cx)))
+                            .test_support(),
                     ),
             )
             .child(fit);

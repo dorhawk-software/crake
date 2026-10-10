@@ -513,6 +513,12 @@ The user doesn't want development builds installed on their machine.
   `client.rs` drives it and its updates feed the app's `Model`): add an
   OpenVPN 3 tunnel, attach, add a host, list hosts, change a setting, a
   refusal, detach, remove. A new D-Bus call gets a step there.
+- Window tests (headless, GPUI's test platform: nothing on screen):
+  `#[gpui_kit::test]` with `gpui_kit::test::TestWindowExt` (click, input,
+  press), e.g. `new_tunnel/tests.rs`. An element is clickable from a test
+  once it has `.test_support()` as its last call (a no-op in normal builds;
+  the dev-dependency turns on gpui-kit's `test-support`). Nothing of this
+  computer's in a test: `look_around` returns fixed profiles and engines.
 - `scripts/netns-test.sh`: real nftables and policy routing inside a
   disposable container with no network (host filesystem read-only).
 - Daily use, nothing installed: `sudo ./target/debug/craked --config dev/<yours>.toml --dev`

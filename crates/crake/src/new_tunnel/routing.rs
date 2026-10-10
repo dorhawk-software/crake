@@ -25,7 +25,8 @@ impl NewTunnel {
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.mode = id;
                         cx.notify();
-                    })),
+                    }))
+                    .test_support(),
                 );
             }
             modes = modes.child(row);
@@ -99,6 +100,7 @@ impl NewTunnel {
                         this.list_input.update(cx, |f, cx| f.focus(window, cx));
                         cx.notify();
                     }))
+                    .test_support()
                     .into_any_element()
             });
             div()

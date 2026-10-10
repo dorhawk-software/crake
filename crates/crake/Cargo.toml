@@ -33,3 +33,5 @@ x11rb = { version = "0.13", features = ["randr"] }
 # The integration test (src/wire_tests.rs): craked itself, serving its API.
 craked = { path = "../craked" }
 tempfile = "3"
+# Headless windows and simulated clicks for the window tests.
+gpui-kit = { version = "0.7", features = ["test-support"] }

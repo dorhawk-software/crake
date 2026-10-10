@@ -9,7 +9,7 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::*;
 use gpui_kit::{
     AnyElement, Context, Div, Entity, FocusHandle, FontWeight, Stateful, Subscription, Task,
-    Window, div, px, svg,
+    TestSupportExt, Window, div, px, svg,
 };
 
 use crate::Request;
@@ -27,6 +27,9 @@ mod server;
 mod sign_in;
 
 mod widgets;
+
+#[cfg(test)]
+mod tests;
 
 // What the steps share, and what the rest of the app uses.
 pub use self::server::{beta, beta_tag};
@@ -178,6 +181,19 @@ pub struct NewTunnel {
 /// Asks the app to close the window.
 pub struct Close;
 
+/// openvpn3's profiles on this computer and the installed engines. Tests get
+/// a fixed pair (three profiles, both engines), never this computer's.
+fn look_around() -> (Vec<String>, crate::engines::Engines) {
+    if cfg!(test) {
+        let both = crate::engines::Engines {
+            openconnect: true,
+            openvpn3: true,
+        };
+        return (vec!["globex".into(), "acme".into(), "initech".into()], both);
+    }
+    (crate::ovpn3::profiles(), crate::engines::Engines::find())
+}
+
 impl gpui_kit::EventEmitter<Close> for NewTunnel {}
 
 fn static_of<const N: usize, T>(
@@ -285,7 +301,7 @@ impl NewTunnel {
         cx.spawn(async move |this, cx| {
             let (found, engines) = cx
                 .background_executor()
-                .spawn(async { (crate::ovpn3::profiles(), crate::engines::Engines::find()) })
+                .spawn(async { look_around() })
                 .await;
             let _ = this.update(cx, |this: &mut Self, cx| {
                 this.profiles = found;
