@@ -3,7 +3,7 @@
 //! opens in the user's runtime directory. Keeps trying while craked is away.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use crake_proto::{BUS_NAME, BUS_PATH, LogEntry};
@@ -119,6 +119,22 @@ pub struct Tunnel {
 }
 
 pub fn start(updates: async_channel::Sender<Update>) -> async_channel::Sender<Command> {
+    spawn(None, updates)
+}
+
+/// The same, always on this socket (tests: a craked of their own).
+#[cfg(test)]
+pub fn start_on(
+    socket: PathBuf,
+    updates: async_channel::Sender<Update>,
+) -> async_channel::Sender<Command> {
+    spawn(Some(socket), updates)
+}
+
+fn spawn(
+    socket: Option<PathBuf>,
+    updates: async_channel::Sender<Update>,
+) -> async_channel::Sender<Command> {
     let (commands, incoming) = async_channel::unbounded();
     std::thread::Builder::new()
         .name("craked-client".into())
@@ -127,7 +143,7 @@ pub fn start(updates: async_channel::Sender<Update>) -> async_channel::Sender<Co
                 .enable_all()
                 .build()
                 .expect("a runtime for the D-Bus client");
-            rt.block_on(run(updates, incoming));
+            rt.block_on(run(socket, updates, incoming));
         })
         .expect("a thread for the D-Bus client");
     commands
@@ -143,8 +159,8 @@ fn dev_socket() -> Option<PathBuf> {
     p.exists().then_some(p)
 }
 
-async fn connect() -> zbus::Result<(Connection, bool)> {
-    match dev_socket() {
+async fn connect(socket: Option<&Path>) -> zbus::Result<(Connection, bool)> {
+    match socket.map(Path::to_path_buf).or_else(dev_socket) {
         Some(path) => {
             let stream = tokio::net::UnixStream::connect(&path).await?;
             let conn = zbus::connection::Builder::unix_stream(stream)
@@ -157,10 +173,14 @@ async fn connect() -> zbus::Result<(Connection, bool)> {
     }
 }
 
-async fn run(updates: async_channel::Sender<Update>, commands: async_channel::Receiver<Command>) {
+async fn run(
+    socket: Option<PathBuf>,
+    updates: async_channel::Sender<Update>,
+    commands: async_channel::Receiver<Command>,
+) {
     let mut reachable = None;
     loop {
-        let result = session(&updates, &commands, &mut reachable).await;
+        let result = session(socket.as_deref(), &updates, &commands, &mut reachable).await;
         if let Err(e) = result {
             tracing_like(&format!("craked: {e}"));
         }
@@ -269,11 +289,12 @@ fn tunnel(d: &HashMap<String, OwnedValue>) -> Tunnel {
 }
 
 async fn session(
+    socket: Option<&Path>,
     updates: &async_channel::Sender<Update>,
     commands: &async_channel::Receiver<Command>,
     reachable: &mut Option<bool>,
 ) -> zbus::Result<()> {
-    let (conn, p2p) = connect().await?;
+    let (conn, p2p) = connect(socket).await?;
     let api = Api {
         conn: conn.clone(),
         p2p,

@@ -161,15 +161,25 @@ async fn routes_only_what_it_is_told() {
     assert!(!goes_through_tunnel("10.33.1.1"));
     mgr.shutdown().await;
     // Off is gone: nothing of Crake's is left in the network setup.
-    assert!(!sh("nft list ruleset").contains("crake"), "{}", sh("nft list ruleset"));
+    assert!(
+        !sh("nft list ruleset").contains("crake"),
+        "{}",
+        sh("nft list ruleset")
+    );
     let rules = sh("ip rule show");
-    assert!(!rules.contains("lookup 7"), "Crake's policy rules stay: {rules}");
+    assert!(
+        !rules.contains("lookup 7"),
+        "Crake's policy rules stay: {rules}"
+    );
     for table in 7301..=7364 {
         let left = sh(&format!("ip route show table {table} 2>/dev/null"));
         assert!(left.trim().is_empty(), "table {table} keeps {left}");
     }
     let links = sh("ip -br link");
-    assert!(!links.contains("crake-hush") && !links.contains("crake-keep"), "{links}");
+    assert!(
+        !links.contains("crake-hush") && !links.contains("crake-keep"),
+        "{links}"
+    );
 
     let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
     for want in [

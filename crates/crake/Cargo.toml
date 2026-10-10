@@ -28,3 +28,8 @@ notify-rust = "4"
 oo7 = { version = "0.6", default-features = false, features = ["async-std", "native_crypto"] }
 # The real monitors (GPUI's X11 backend reports one screen spanning them all).
 x11rb = { version = "0.13", features = ["randr"] }
+
+[dev-dependencies]
+# The integration test (src/wire_tests.rs): craked itself, serving its API.
+craked = { path = "../craked" }
+tempfile = "3"

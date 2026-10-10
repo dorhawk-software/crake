@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Every check that must pass before a build counts: clippy with all lints as
-# errors (set in Cargo.toml's [workspace.lints]), cargo-deny (known
-# vulnerabilities, licences, banned and unknown sources) and cargo-machete
-# (unused dependencies), no client names in what would be committed
+# Every check that must pass before a build counts: rustfmt's layout, clippy
+# with all lints as errors (set in Cargo.toml's [workspace.lints]),
+# cargo-deny (known vulnerabilities, licences, banned and unknown sources) and
+# cargo-machete (unused dependencies), no client names in what would be committed
 # (scripts/check-private.sh), and no file or function past its size limit
 # (scripts/check-size.sh, clippy::too_many_lines). Exits non-zero if any fails.
 #
@@ -23,6 +23,7 @@ step() {
     fi
 }
 
+step "rustfmt (run cargo fmt)" cargo fmt --all --check
 step "clippy" cargo clippy --workspace --all-targets --quiet
 step "cargo deny" cargo deny --log-level error check
 step "cargo machete" cargo machete

@@ -489,7 +489,8 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
 Any lint stops the build; fix it and build again, never silence it.
 - `Cargo.toml` `[workspace.lints]`: every rustc warning (unused imports
   included) and every clippy lint is `deny`.
-- `scripts/lint.sh`: clippy (all targets), `cargo deny check` (`deny.toml`:
+- `scripts/lint.sh`: `cargo fmt --check` (run `cargo fmt`), clippy (all
+  targets), `cargo deny check` (`deny.toml`:
   known vulnerabilities anywhere, unmaintained crates Crake uses directly,
   licences compatible with GPL-3.0-or-later, crates.io only) and
   `cargo machete` (unused dependencies). Tools in `~/.cargo/bin`.
@@ -507,6 +508,11 @@ Any lint stops the build; fix it and build again, never silence it.
 The user doesn't want development builds installed on their machine.
 
 - `cargo test`: unit tests, plus lifecycle tests with a fake openconnect.
+- `crates/crake/src/wire_tests.rs`: the app and craked together over real
+  D-Bus (craked's manager on a private socket, as `--dev`; the app's own
+  `client.rs` drives it and its updates feed the app's `Model`): add an
+  OpenVPN 3 tunnel, attach, add a host, list hosts, change a setting, a
+  refusal, detach, remove. A new D-Bus call gets a step there.
 - `scripts/netns-test.sh`: real nftables and policy routing inside a
   disposable container with no network (host filesystem read-only).
 - Daily use, nothing installed: `sudo ./target/debug/craked --config dev/<yours>.toml --dev`

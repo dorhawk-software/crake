@@ -230,7 +230,9 @@ impl Routing {
         }
         // And the routing tables those rules pointed at.
         for table in range {
-            ip(&["route", "flush", "table", &table.to_string()]).await.ok();
+            ip(&["route", "flush", "table", &table.to_string()])
+                .await
+                .ok();
         }
         Ok(())
     }

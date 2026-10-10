@@ -51,6 +51,8 @@ mod theme;
 mod tray;
 
 mod tunnel_detail;
+#[cfg(test)]
+mod wire_tests;
 
 // What the parts of the app call on each other.
 use requests::{keep_certificate, on_request, start_left_on};
