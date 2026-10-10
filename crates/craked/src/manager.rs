@@ -901,13 +901,19 @@ impl Manager {
         else {
             return crate::hush::reply_code(query, 2);
         };
-        let known = self
-            .hosts
-            .lock()
-            .unwrap()
-            .tunnels
-            .get(&tunnel)
-            .and_then(|t| t.answers.get(&qname).map(|(a, _)| a.clone()));
+        // Its last answer; else the hosts it routes under that name (learned
+        // or pinned before answers were remembered, or since forgotten).
+        let known = self.hosts.lock().unwrap().tunnels.get(&tunnel).and_then(|t| {
+            t.answers.get(&qname).map(|(a, _)| a.clone()).or_else(|| {
+                let named: Vec<Ipv4Addr> = t
+                    .names
+                    .iter()
+                    .filter(|(a, n)| **n == qname && t.covers(**a))
+                    .map(|(a, _)| *a)
+                    .collect();
+                (!named.is_empty()).then_some(named)
+            })
+        });
         let Some(addrs) = known else {
             return crate::hush::reply_code(query, 2);
         };

@@ -567,3 +567,53 @@ async fn known_names_keep_working_while_a_tunnels_dns_is_silent() {
     );
     assert!(log.contains("Initech's DNS answers again."), "{log}");
 }
+
+/// A host learned under a name before answers were remembered (an older
+/// craked, or a name not looked up since) still works while the DNS is silent.
+#[tokio::test]
+async fn hosts_learned_under_a_name_are_answered_too() {
+    use hickory_proto::op::{Message, ResponseCode};
+    use hickory_proto::rr::RecordType;
+    use std::collections::HashMap;
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(dir.path(), FAKE);
+    let until = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        + 86_400;
+    std::fs::write(
+        dir.path().join("hosts.json"),
+        format!(
+            r#"{{"initech": {{"learned": {{"10.81.1.9": {until}}}, "names": {{"10.81.1.9": "jira.initech.internal"}}}}}}"#
+        ),
+    )
+    .unwrap();
+    let mgr = Manager::new(cfg).unwrap();
+    let t = mgr
+        .add_tunnel(&HashMap::from([
+            ("display_name".to_owned(), "Initech".to_owned()),
+            ("gateway".to_owned(), "initech".to_owned()),
+            ("protocol".to_owned(), "openvpn3".to_owned()),
+        ]))
+        .unwrap();
+    assert_eq!(t, "initech");
+    mgr.attach(
+        &t,
+        &HashMap::from([
+            ("device".to_owned(), "tun0".to_owned()),
+            ("dns".to_owned(), "10.8.0.1".to_owned()),
+            ("domains".to_owned(), "initech.internal".to_owned()),
+        ]),
+    )
+    .await
+    .unwrap();
+    mgr.dns_checked(&t, false).await;
+    let q = craked::dns::query(9, "jira.initech.internal", RecordType::A);
+    let msg = Message::from_vec(&mgr.keep_answer(&q).await.unwrap()).unwrap();
+    assert_eq!(msg.metadata.response_code, ResponseCode::NoError);
+    assert_eq!(
+        craked::dns::a_records(&msg),
+        vec!["10.81.1.9".parse::<std::net::Ipv4Addr>().unwrap()]
+    );
+}
