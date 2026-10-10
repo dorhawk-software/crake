@@ -558,6 +558,18 @@ it doesn't, bundle, and own the updates.**
   Depends above), changelog, copyright; signed with the user's GPG key,
   uploaded with `dput`. Test the built .deb in a throwaway container
   first, never on the user's machine.
+- **Toolchain finding (built in containers):** GPUI needs Rust 1.95 in
+  practice (`std::hint::cold_path`, `slice::as_array`), whatever the
+  crates declare. Ubuntu's archive has rustc-1.93 at most in 26.04 and 1.91
+  in 24.04/22.04; only 26.10 has 1.95+. So a Launchpad PPA could build
+  Crake for 26.10 and newer only. Proposed instead (to decide with the
+  user): build the .deb ourselves (GitHub Actions, current Rust via
+  rustup) on the oldest Ubuntu supported (22.04), so one .deb runs on
+  22.04, 24.04, 26.04, 26.10 and recent Debian, and publish it in our own
+  signed apt repository (e.g. apt.dorhawk.software on Cloudflare) so
+  `apt install crake` and updates work everywhere. Depends need
+  alternatives for older releases: `systemd-resolved | systemd (<< 252)`,
+  `polkitd | policykit-1`.
 - **At runtime (built, `engines.rs`):** the app checks which engines exist
   (openconnect on PATH, or `CRAKE_OPENCONNECT`; openvpn3's D-Bus
   configuration service file). New tunnel shows every protocol; one whose

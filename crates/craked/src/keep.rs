@@ -73,12 +73,18 @@ mod tests {
         let r = answer(&q, &[a]).unwrap();
         let msg = Message::from_vec(&r).unwrap();
         assert_eq!(msg.metadata.id, 0x4242);
-        assert_eq!(msg.metadata.response_code, hickory_proto::op::ResponseCode::NoError);
+        assert_eq!(
+            msg.metadata.response_code,
+            hickory_proto::op::ResponseCode::NoError
+        );
         assert_eq!(crate::dns::a_records(&msg), vec![a]);
         assert!(msg.answers.iter().all(|r| r.ttl == TTL));
         let fail = crate::hush::reply_code(&q, 2).unwrap();
         let msg = Message::from_vec(&fail).unwrap();
-        assert_eq!(msg.metadata.response_code, hickory_proto::op::ResponseCode::ServFail);
+        assert_eq!(
+            msg.metadata.response_code,
+            hickory_proto::op::ResponseCode::ServFail
+        );
         assert!(msg.answers.is_empty());
     }
 }

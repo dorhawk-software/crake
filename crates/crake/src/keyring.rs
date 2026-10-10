@@ -29,8 +29,8 @@ impl Kind {
     }
 }
 
-fn attributes(tunnel: &str, kind: Kind) -> [(&'static str, String); 3] {
-    [
+fn attributes(tunnel: &str, kind: Kind) -> Vec<(&'static str, String)> {
+    vec![
         ("application", "crake".to_owned()),
         ("tunnel", tunnel.to_owned()),
         ("kind", kind.as_str().to_owned()),

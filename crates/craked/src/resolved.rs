@@ -82,7 +82,8 @@ impl Resolved {
             return Ok((Vec::new(), Vec::new()));
         };
         let index = ifindex(device)?;
-        let path: zbus::zvariant::OwnedObjectPath = m.call("GetLink", &(index,)).await.context("GetLink")?;
+        let path: zbus::zvariant::OwnedObjectPath =
+            m.call("GetLink", &(index,)).await.context("GetLink")?;
         let link = zbus::Proxy::new(
             m.connection(),
             "org.freedesktop.resolve1",

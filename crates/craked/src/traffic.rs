@@ -120,7 +120,12 @@ impl Traffic {
     }
 
     /// Bytes through each tunnel device since the last sample, by tunnel.
-    fn sample_tunnels(&self, each: HashMap<String, u64>, devices: &HashMap<String, String>, now: u64) {
+    fn sample_tunnels(
+        &self,
+        each: HashMap<String, u64>,
+        devices: &HashMap<String, String>,
+        now: u64,
+    ) {
         let minute = now / 60;
         let mut last = self.last_tunnels.lock().unwrap();
         let mut tunnels = self.tunnels.lock().unwrap();

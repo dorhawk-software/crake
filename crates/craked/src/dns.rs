@@ -239,7 +239,10 @@ pub(crate) mod tests {
 
     #[test]
     fn the_organisation_is_the_gateways_own_domain() {
-        assert_eq!(organisation("vpn.acme.example").as_deref(), Some("acme.example"));
+        assert_eq!(
+            organisation("vpn.acme.example").as_deref(),
+            Some("acme.example")
+        );
         assert_eq!(
             organisation("https://vpn.acme.co.uk/staff").as_deref(),
             Some("acme.co.uk")

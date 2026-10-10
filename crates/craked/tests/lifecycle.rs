@@ -319,11 +319,20 @@ async fn tunnels_added_in_the_app_can_be_changed_and_removed() {
     mgr.add_host("home-lab", "10.9.9.9").await.unwrap();
     // Tunnel detail: when and how it was learned.
     let rows = mgr.hosts("home-lab").await.unwrap();
-    let row = rows.iter().find(|r| r.target.to_string() == "10.9.9.9").unwrap();
+    let row = rows
+        .iter()
+        .find(|r| r.target.to_string() == "10.9.9.9")
+        .unwrap();
     assert_eq!(row.learned.as_ref().map(|l| l.1.as_str()), Some("you"));
     // A name needs the tunnel up, to ask its DNS.
-    let off = mgr.add_host("home-lab", "wiki.lab.example").await.unwrap_err();
-    assert!(format!("{off:#}").contains("Switch Lab on first"), "{off:#}");
+    let off = mgr
+        .add_host("home-lab", "wiki.lab.example")
+        .await
+        .unwrap_err();
+    assert!(
+        format!("{off:#}").contains("Switch Lab on first"),
+        "{off:#}"
+    );
     mgr.remove_tunnel("home-lab").await.unwrap();
     assert!(mgr.get("home-lab").is_none());
     assert!(mgr.hosts("home-lab").await.unwrap_or_default().is_empty());
@@ -432,10 +441,18 @@ async fn tunnels_that_clash_are_refused_and_say_why() {
         Some("Turn Initech off to use Nordbank. Both use 10.0.0.2 for DNS.")
     );
     mgr.detach(&acme, None).await.unwrap();
-    assert_eq!(mgr.get(&nord).unwrap().clash, None, "nothing in the way now");
+    assert_eq!(
+        mgr.get(&nord).unwrap().clash,
+        None,
+        "nothing in the way now"
+    );
     mgr.attach(&nord, &attach("tun1")).await.unwrap();
     let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
-    assert_eq!(log.matches("Turn Initech off to use Nordbank.").count(), 1, "{log}");
+    assert_eq!(
+        log.matches("Turn Initech off to use Nordbank.").count(),
+        1,
+        "{log}"
+    );
     assert!(!log.contains("Switched Nordbank off."), "{log}");
 }
 
@@ -463,8 +480,12 @@ async fn an_address_another_tunnel_has_stays_there_and_says_so() {
             ("domains".to_owned(), domain.to_owned()),
         ])
     };
-    mgr.attach(&a, &up("tun0", "10.8.0.1", "initech.internal")).await.unwrap();
-    mgr.attach(&b, &up("tun1", "10.9.0.1", "nordbank.internal")).await.unwrap();
+    mgr.attach(&a, &up("tun0", "10.8.0.1", "initech.internal"))
+        .await
+        .unwrap();
+    mgr.attach(&b, &up("tun1", "10.9.0.1", "nordbank.internal"))
+        .await
+        .unwrap();
     mgr.add_host(&a, "10.0.0.1").await.unwrap();
 
     // Nordbank's DNS says xyz.nordbank.internal is 10.0.0.1 too.
@@ -475,10 +496,14 @@ async fn an_address_another_tunnel_has_stays_there_and_says_so() {
     mgr.learn_from_dns(&b, answer()).await;
     mgr.learn_from_dns(&b, answer()).await;
     assert!(sends(&mgr, &a, "10.0.0.1").await, "it stays with Initech");
-    assert!(!sends(&mgr, &b, "10.0.0.1").await, "Nordbank doesn't take it as well");
+    assert!(
+        !sends(&mgr, &b, "10.0.0.1").await,
+        "Nordbank doesn't take it as well"
+    );
     let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
     assert_eq!(
-        log.matches("xyz.nordbank.internal can't go through Nordbank.").count(),
+        log.matches("xyz.nordbank.internal can't go through Nordbank.")
+            .count(),
         1,
         "said once, not on every lookup: {log}"
     );
@@ -544,24 +569,45 @@ async fn known_names_keep_working_while_a_tunnels_dns_is_silent() {
     let ask = |name: &str, qtype| craked::dns::query(7, name, qtype);
     let reply = |bytes: Option<Vec<u8>>| Message::from_vec(&bytes.unwrap()).unwrap();
 
-    let known = reply(mgr.keep_answer(&ask("gitlab.initech.internal", RecordType::A)).await);
+    let known = reply(
+        mgr.keep_answer(&ask("gitlab.initech.internal", RecordType::A))
+            .await,
+    );
     assert_eq!(known.metadata.response_code, ResponseCode::NoError);
-    assert_eq!(craked::dns::a_records(&known), vec!["10.81.1.4".parse::<std::net::Ipv4Addr>().unwrap()]);
-    let again = reply(mgr.keep_answer(&ask("gitlab.initech.internal", RecordType::A)).await);
+    assert_eq!(
+        craked::dns::a_records(&known),
+        vec!["10.81.1.4".parse::<std::net::Ipv4Addr>().unwrap()]
+    );
+    let again = reply(
+        mgr.keep_answer(&ask("gitlab.initech.internal", RecordType::A))
+            .await,
+    );
     assert_eq!(craked::dns::a_records(&again).len(), 1);
-    let v6 = reply(mgr.keep_answer(&ask("gitlab.initech.internal", RecordType::AAAA)).await);
+    let v6 = reply(
+        mgr.keep_answer(&ask("gitlab.initech.internal", RecordType::AAAA))
+            .await,
+    );
     assert_eq!(v6.metadata.response_code, ResponseCode::NoError);
     assert!(v6.answers.is_empty(), "it exists, just no IPv6 we know of");
-    let unknown = reply(mgr.keep_answer(&ask("wiki.initech.internal", RecordType::A)).await);
+    let unknown = reply(
+        mgr.keep_answer(&ask("wiki.initech.internal", RecordType::A))
+            .await,
+    );
     assert_eq!(unknown.metadata.response_code, ResponseCode::ServFail);
     assert!(sends(&mgr, &t, "10.81.1.4").await, "routed through Initech");
 
     mgr.dns_checked(&t, true).await;
     assert!(!mgr.get(&t).unwrap().dns_down);
     let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
-    assert_eq!(log.matches("Initech's DNS (10.8.0.1) doesn't answer.").count(), 1, "{log}");
     assert_eq!(
-        log.matches("Using the address gitlab.initech.internal had last time.").count(),
+        log.matches("Initech's DNS (10.8.0.1) doesn't answer.")
+            .count(),
+        1,
+        "{log}"
+    );
+    assert_eq!(
+        log.matches("Using the address gitlab.initech.internal had last time.")
+            .count(),
         1,
         "said once per name: {log}"
     );
