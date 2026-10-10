@@ -472,6 +472,48 @@ The user doesn't want development builds installed on their machine.
   (`add`, `pin`, `unpin`, `forget`, `list`). Ctrl+C removes everything; state
   lives in `/tmp/crake-dev`. `dev/` is git-ignored.
 
+## Packaging and dependencies (decided with the user)
+
+Crake drives VPN engines it doesn't contain: openconnect (AnyConnect,
+GlobalProtect, Pulse, Juniper, Fortinet, F5, Array) and OpenVPN 3. Rule:
+**where the platform has a package manager, depend on its packages; where
+it doesn't, bundle, and own the updates.**
+
+- **Debian/Ubuntu (.deb), first:** never bundle openconnect or other system
+  software (a bundled copy misses the distro's security fixes; Debian policy
+  discourages it). Rust crates (GPUI etc.) are linked in as usual; system C
+  libraries come from `${shlibs:Depends}`.
+  ```
+  Depends:    ${shlibs:Depends}, nftables, iproute2, systemd-resolved,
+              polkitd, dbus, openconnect | openvpn3
+  Recommends: gnome-shell-extension-appindicator, gnome-keyring
+  Suggests:   openvpn3
+  ```
+  At least one engine is required (`openconnect | openvpn3`): an
+  OpenVPN-3-only user pulls nothing extra, a user with neither gets
+  openconnect. Not plain Recommends: `--no-install-recommends` would leave
+  Crake with no engine. openvpn3 isn't in Ubuntu's archive (OpenVPN's own
+  repository), so it's never pulled in, only suggested. The tray extension
+  and keyring are Recommends (KDE needs neither).
+- **At runtime:** craked and the app check which engines exist. New tunnel
+  shows every protocol; one whose engine is missing says how to get it
+  ("Needs openconnect: sudo apt install openconnect") instead of failing at
+  connect.
+- **Fedora/RPM:** the same with rich dependencies,
+  `Requires: (openconnect or openvpn3)`, `Recommends:` as above.
+- **Arch:** no alternatives in pacman: `optdepends` for both engines plus
+  the runtime check.
+- **Not Flatpak or Snap:** craked needs root-level network control on the
+  host (nftables, policy routing, resolved), which sandboxes don't allow.
+- **macOS and Windows (someday):** no package manager to pull engines in,
+  so the installer bundles them: openconnect (Windows: its DLL plus Wintun;
+  macOS: inside the signed, notarized .app). Bundling makes Crake
+  responsible for their security updates: a Crake release follows each
+  openconnect security release. openconnect is LGPL-2.1: ship it as a
+  separate library with its licence and a pointer to its source. OpenVPN 3
+  there: its core library, or OpenVPN Connect when installed; to decide.
+  A Homebrew formula could depend on Homebrew's openconnect instead.
+
 ## Someday: other platforms
 
 Wanted one day, not planned yet. Keep the split that makes it possible:
