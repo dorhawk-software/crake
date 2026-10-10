@@ -19,6 +19,9 @@ unsafe_op_in_unsafe_fn = "deny"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
+# Long functions too (the limit is in clippy.toml); long files are checked by
+# scripts/check-size.sh.
+too_many_lines = "deny"
 
 [workspace.dependencies]
 anyhow = "1"

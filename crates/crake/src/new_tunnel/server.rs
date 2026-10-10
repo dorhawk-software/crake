@@ -24,125 +24,8 @@ impl NewTunnel {
                 ),
             ),
         };
-        let auto_sub = match &self.detect {
-            Detect::Done(Found::AnyConnect { .. }) => {
-                "Crake asks the gateway. It answered: AnyConnect."
-            }
-            Detect::Asking => "Crake asks the gateway\u{2026}",
-            Detect::Done(_) => "Crake asked; the gateway didn\u{2019}t say.",
-            Detect::Idle => "Crake asks the gateway.",
-        };
-        let mut protocols = div()
-            .mt(px(8.))
-            .border_1()
-            .border_color(t.line)
-            .rounded(px(8.))
-            .overflow_hidden();
-        for (i, (id, name, sub, code)) in PROTOCOLS.into_iter().enumerate() {
-            let on = self.protocol == id;
-            let sub = if id == "auto" { auto_sub } else { sub };
-            protocols = protocols.child(
-                div()
-                    .id(("protocol", i))
-                    .min_h(px(46.))
-                    .py(px(8.))
-                    .px(px(14.))
-                    .flex()
-                    .items_center()
-                    .gap(px(12.))
-                    .when(i > 0, |r| r.border_t_1().border_color(t.line))
-                    .bg(if on { t.accent_soft } else { t.panel })
-                    .cursor_pointer()
-                    .child(radio(on, t))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .child(
-                                div()
-                                    .flex()
-                                    .items_baseline()
-                                    .gap(px(8.))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child(name)
-                                    .when(id == "auto", |d| {
-                                        d.child(
-                                            div()
-                                                .text_size(px(12.))
-                                                .text_color(t.accent)
-                                                .child("Recommended"),
-                                        )
-                                    })
-                                    .when(beta(id), |d| d.child(beta_tag(t)))
-                                    .when(id != "auto" && self.missing(id).is_some(), |d| {
-                                        d.child(tag("Not installed", t))
-                                    }),
-                            )
-                            .child(
-                                div()
-                                    .text_size(px(13.))
-                                    .line_height(px(19.))
-                                    .text_color(t.muted)
-                                    .child(sub),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .font_family(fonts::MONO)
-                            .text_size(px(12.))
-                            .text_color(t.muted)
-                            .child(code),
-                    )
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.protocol = id;
-                        cx.notify();
-                    })),
-            );
-        }
-        let groups = self.groups();
-        let group_row = (groups.len() > 1 && self.protocol != "openvpn3").then(|| {
-            let options: Vec<(String, String)> =
-                groups.iter().map(|g| (g.clone(), g.clone())).collect();
-            div()
-                .flex()
-                .gap(px(14.))
-                .mt(px(18.))
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        .child(label("Group"))
-                        .child(self.dropdown(
-                            "group",
-                            options,
-                            self.group.clone().unwrap_or_default(),
-                            None,
-                            t,
-                            cx,
-                            |this, v| this.group = Some(v),
-                        )),
-                )
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        // A column, so the sentence wraps.
-                        .flex()
-                        .flex_col()
-                        .justify_end()
-                        .pb(px(4.))
-                        .text_size(px(13.))
-                        .text_color(t.muted)
-                        .child(format!(
-                            "The gateway offers {} groups. Ask your IT team if you\u{2019}re not sure.",
-                            match groups.len() {
-                                2 => "two".to_owned(),
-                                3 => "three".to_owned(),
-                                n => n.to_string(),
-                            }
-                        )),
-                )
-        });
+        let protocols = self.protocol_list(t, cx);
+        let group_row = self.group_row(t, cx);
         div()
             .child(heading("Where does it connect?"))
             .child(
@@ -250,6 +133,135 @@ impl NewTunnel {
                 },
             )
             .children(group_row)
+    }
+
+    /// The protocols, each with what it is, its code, and its tags (Beta,
+    /// not installed); "Detect automatically" first.
+    fn protocol_list(&self, t: &Theme, cx: &mut Context<Self>) -> Div {
+        let auto_sub = match &self.detect {
+            Detect::Done(Found::AnyConnect { .. }) => {
+                "Crake asks the gateway. It answered: AnyConnect."
+            }
+            Detect::Asking => "Crake asks the gateway\u{2026}",
+            Detect::Done(_) => "Crake asked; the gateway didn\u{2019}t say.",
+            Detect::Idle => "Crake asks the gateway.",
+        };
+        let mut protocols = div()
+            .mt(px(8.))
+            .border_1()
+            .border_color(t.line)
+            .rounded(px(8.))
+            .overflow_hidden();
+        for (i, (id, name, sub, code)) in PROTOCOLS.into_iter().enumerate() {
+            let on = self.protocol == id;
+            let sub = if id == "auto" { auto_sub } else { sub };
+            protocols = protocols.child(
+                div()
+                    .id(("protocol", i))
+                    .min_h(px(46.))
+                    .py(px(8.))
+                    .px(px(14.))
+                    .flex()
+                    .items_center()
+                    .gap(px(12.))
+                    .when(i > 0, |r| r.border_t_1().border_color(t.line))
+                    .bg(if on { t.accent_soft } else { t.panel })
+                    .cursor_pointer()
+                    .child(radio(on, t))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_baseline()
+                                    .gap(px(8.))
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child(name)
+                                    .when(id == "auto", |d| {
+                                        d.child(
+                                            div()
+                                                .text_size(px(12.))
+                                                .text_color(t.accent)
+                                                .child("Recommended"),
+                                        )
+                                    })
+                                    .when(beta(id), |d| d.child(beta_tag(t)))
+                                    .when(id != "auto" && self.missing(id).is_some(), |d| {
+                                        d.child(tag("Not installed", t))
+                                    }),
+                            )
+                            .child(
+                                div()
+                                    .text_size(px(13.))
+                                    .line_height(px(19.))
+                                    .text_color(t.muted)
+                                    .child(sub),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .font_family(fonts::MONO)
+                            .text_size(px(12.))
+                            .text_color(t.muted)
+                            .child(code),
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.protocol = id;
+                        cx.notify();
+                    })),
+            );
+        }
+        protocols
+    }
+
+    /// The gateway's sign-in groups to choose from, when it offers more than one.
+    fn group_row(&self, t: &Theme, cx: &mut Context<Self>) -> Option<Div> {
+        let groups = self.groups();
+        (groups.len() > 1 && self.protocol != "openvpn3").then(|| {
+            let options: Vec<(String, String)> =
+                groups.iter().map(|g| (g.clone(), g.clone())).collect();
+            div()
+                .flex()
+                .gap(px(14.))
+                .mt(px(18.))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .child(label("Group"))
+                        .child(self.dropdown(
+                            "group",
+                            options,
+                            self.group.clone().unwrap_or_default(),
+                            None,
+                            t,
+                            cx,
+                            |this, v| this.group = Some(v),
+                        )),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        // A column, so the sentence wraps.
+                        .flex()
+                        .flex_col()
+                        .justify_end()
+                        .pb(px(4.))
+                        .text_size(px(13.))
+                        .text_color(t.muted)
+                        .child(format!(
+                            "The gateway offers {} groups. Ask your IT team if you\u{2019}re not sure.",
+                            match groups.len() {
+                                2 => "two".to_owned(),
+                                3 => "three".to_owned(),
+                                n => n.to_string(),
+                            }
+                        )),
+                )
+        })
     }
 }
 

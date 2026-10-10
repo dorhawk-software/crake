@@ -36,7 +36,82 @@ impl NewTunnel {
                 }),
             ));
         }
-        let detail: AnyElement = match self.method {
+        let detail = self.method_detail(t, cx);
+        div()
+            .child(heading("How do you sign in?"))
+            .child(methods)
+            .child(detail)
+            .child(
+                div()
+                    .mt(px(22.))
+                    .pt(px(14.))
+                    .border_t_1()
+                    .border_color(t.line)
+                    .child(
+                        div()
+                            .id("advanced")
+                            .flex()
+                            .items_center()
+                            .gap(px(6.))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .cursor_pointer()
+                            .child(
+                                svg()
+                                    .path(if self.advanced {
+                                        "crake/disclose-down.svg"
+                                    } else {
+                                        "crake/disclose-right.svg"
+                                    })
+                                    .size(px(10.))
+                                    .text_color(t.ink),
+                            )
+                            .child("Advanced")
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.advanced = !this.advanced;
+                                cx.notify();
+                            })),
+                    )
+                    .when(self.advanced, |d| {
+                        d.child(
+                            checkbox(
+                                "client-version",
+                                self.client_version,
+                                "Report a different client version",
+                                t,
+                                cx.listener(|this, _, _, cx| {
+                                    this.client_version = !this.client_version;
+                                    cx.notify();
+                                }),
+                            )
+                            .mt(px(12.)),
+                        )
+                        .child(
+                            checkbox(
+                                "weak-ciphers",
+                                self.weak_ciphers,
+                                "Allow weak ciphers",
+                                t,
+                                cx.listener(|this, _, _, cx| {
+                                    this.weak_ciphers = !this.weak_ciphers;
+                                    cx.notify();
+                                }),
+                            )
+                            .mt(px(10.))
+                            .child(
+                                div()
+                                    .text_color(t.muted)
+                                    .child("(only if your gateway is very old)"),
+                            ),
+                        )
+                    }),
+            )
+            .into_any_element()
+    }
+
+    /// What the chosen method needs: a username, where the certificate comes
+    /// from, or how the browser sign-in goes.
+    fn method_detail(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
+        match self.method {
             "password" => div()
                 .mt(px(18.))
                 .child(label("Username"))
@@ -139,76 +214,7 @@ impl NewTunnel {
                         }),
                 )
                 .into_any_element(),
-        };
-        div()
-            .child(heading("How do you sign in?"))
-            .child(methods)
-            .child(detail)
-            .child(
-                div()
-                    .mt(px(22.))
-                    .pt(px(14.))
-                    .border_t_1()
-                    .border_color(t.line)
-                    .child(
-                        div()
-                            .id("advanced")
-                            .flex()
-                            .items_center()
-                            .gap(px(6.))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .cursor_pointer()
-                            .child(
-                                svg()
-                                    .path(if self.advanced {
-                                        "crake/disclose-down.svg"
-                                    } else {
-                                        "crake/disclose-right.svg"
-                                    })
-                                    .size(px(10.))
-                                    .text_color(t.ink),
-                            )
-                            .child("Advanced")
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.advanced = !this.advanced;
-                                cx.notify();
-                            })),
-                    )
-                    .when(self.advanced, |d| {
-                        d.child(
-                            checkbox(
-                                "client-version",
-                                self.client_version,
-                                "Report a different client version",
-                                t,
-                                cx.listener(|this, _, _, cx| {
-                                    this.client_version = !this.client_version;
-                                    cx.notify();
-                                }),
-                            )
-                            .mt(px(12.)),
-                        )
-                        .child(
-                            checkbox(
-                                "weak-ciphers",
-                                self.weak_ciphers,
-                                "Allow weak ciphers",
-                                t,
-                                cx.listener(|this, _, _, cx| {
-                                    this.weak_ciphers = !this.weak_ciphers;
-                                    cx.notify();
-                                }),
-                            )
-                            .mt(px(10.))
-                            .child(
-                                div()
-                                    .text_color(t.muted)
-                                    .child("(only if your gateway is very old)"),
-                            ),
-                        )
-                    }),
-            )
-            .into_any_element()
+        }
     }
 }
 

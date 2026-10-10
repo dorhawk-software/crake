@@ -1,0 +1,404 @@
+//! The sign-in window (design/screens/sign-in.html): the steps as they
+//! happen, the gateway's questions in its own words, and what went wrong
+//! when it couldn't connect.
+
+use std::time::Duration;
+
+use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::prelude::*;
+use gpui_kit::{Context, Div, Entity, FontWeight, Stateful, Subscription, Window, div, px, svg};
+
+use crate::Request;
+use crate::model::Model;
+use crate::signin::{Ask, Event, Prompt, Reply, Spec};
+use crate::theme::{Theme, fonts};
+
+mod explain;
+mod question;
+mod widgets;
+
+use self::explain::explain;
+use self::widgets::{Look, button, buttons, checkbox, lower_first, para, steps, title};
+
+pub const WIDTH: f32 = 340.;
+
+#[derive(Clone, Debug, PartialEq)]
+enum Stage {
+    Reaching,
+    SigningIn,
+    Asking(Prompt),
+    /// Signed in; waiting for craked to bring the tunnel up.
+    Connecting,
+    Up,
+    /// It stopped at this step (see `steps`), for this reason.
+    Failed {
+        reason: String,
+        at: usize,
+    },
+}
+
+impl Stage {
+    /// The step it's at: reaching the gateway, signing in, tunnel up.
+    fn step(&self) -> usize {
+        match self {
+            Stage::Reaching => 0,
+            Stage::SigningIn | Stage::Asking(_) => 1,
+            Stage::Connecting => 2,
+            Stage::Up => 3,
+            Stage::Failed { at, .. } => *at,
+        }
+    }
+}
+
+pub struct SignIn {
+    spec: Spec,
+    requests: async_channel::Sender<Request>,
+    replies: async_channel::Sender<Reply>,
+    stage: Stage,
+    field: Entity<InputState>,
+    /// The window's own focus, for Esc.
+    focus: gpui_kit::FocusHandle,
+    remember: bool,
+    keep_certificate: bool,
+    model: Entity<Model>,
+    /// The session went to the app or craked: closing ends nothing.
+    handed_over: bool,
+    _subscriptions: Vec<Subscription>,
+}
+
+/// Asks the app to close the window.
+pub struct Close;
+
+impl gpui_kit::EventEmitter<Close> for SignIn {}
+
+/// Runs a sign-in and feeds its events to the view.
+fn start(
+    spec: Spec,
+    requests: async_channel::Sender<Request>,
+    window: &mut Window,
+    cx: &mut Context<SignIn>,
+) -> async_channel::Sender<Reply> {
+    let (events, incoming) = async_channel::unbounded();
+    // OpenVPN 3 profiles run as openvpn3 sessions; the rest is openconnect.
+    let replies = if spec.protocol == "openvpn3" {
+        crate::ovpn3::start(spec.tunnel.clone(), spec.gateway.clone(), events, requests)
+    } else {
+        crate::signin::start(spec, events)
+    };
+    cx.spawn_in(window, async move |this, cx| {
+        while let Ok(event) = incoming.recv().await {
+            if this
+                .update_in(cx, |this, window, cx| this.on_event(event, window, cx))
+                .is_err()
+            {
+                return;
+            }
+        }
+    })
+    .detach();
+    replies
+}
+
+impl Render for SignIn {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let t = Theme::current(cx);
+        let display = self.spec.display.clone();
+        // The card of sign-in.html: 12 px corners, a hairline, 22 px inside.
+        let mut card = div()
+            .relative()
+            .w(px(WIDTH))
+            .flex()
+            .flex_col()
+            .pt(px(22.))
+            .px(px(22.))
+            .pb(px(18.))
+            .bg(t.panel)
+            .border_1()
+            .border_color(t.line)
+            .rounded(px(12.))
+            .text_color(t.ink)
+            .font_family(fonts::UI)
+            .text_size(px(14.))
+            .line_height(px(20.));
+
+        card = match self.stage.clone() {
+            Stage::Asking(prompt) => card.child(self.question(&prompt, &t, window, cx)),
+            // "When it can't connect": what happened, the steps up to where it
+            // stopped, Copy for helpdesk and Try again.
+            Stage::Failed { reason, at } => {
+                let why = explain(&reason, at, &self.spec);
+                card.child(title(why.title))
+                    .child(para(why.sentence, t.ink))
+                    .child(steps(at, Some((at, why.row)), &self.spec, &t))
+                    // openconnect's (or openvpn3's) own words, for whoever helps.
+                    .child(
+                        div()
+                            .mt(px(12.))
+                            .text_size(px(13.))
+                            .text_color(t.muted)
+                            .child(format!("{} said: {reason}", self.spec.program())),
+                    )
+                    .child(
+                        buttons()
+                            .child(
+                                button("helpdesk", "Copy for helpdesk", Look::Outline, &t)
+                                    .on_click(
+                                        cx.listener(|this, _, _, cx| this.copy_for_helpdesk(cx)),
+                                    ),
+                            )
+                            .child(div().flex_1())
+                            .child(
+                                button("close", "Close", Look::Text, &t)
+                                    .on_click(cx.listener(|this, _, _, cx| this.cancel(cx))),
+                            )
+                            .child(button("retry", "Try again", Look::Primary, &t).on_click(
+                                cx.listener(|this, _, window, cx| this.retry(window, cx)),
+                            )),
+                    )
+            }
+            stage => card
+                .child(title(format!("Sign in to {display}")))
+                .child(para("This window updates by itself.".into(), t.muted))
+                .child(steps(stage.step(), None, &self.spec, &t))
+                .child(
+                    buttons().child(div().flex_1()).child(
+                        button("cancel", "Cancel", Look::Text, &t)
+                            .on_click(cx.listener(|this, _, _, cx| this.cancel(cx))),
+                    ),
+                ),
+        };
+        // No title bar: the card moves by dragging it anywhere but its
+        // controls; Esc closes it too.
+        div()
+            .id("sign-in")
+            .track_focus(&self.focus)
+            .size_full()
+            .flex()
+            .flex_col()
+            .items_start()
+            .on_key_down(cx.listener(|this, event: &gpui_kit::KeyDownEvent, _, cx| {
+                if event.keystroke.key == "escape" {
+                    this.cancel(cx);
+                }
+            }))
+            .on_mouse_down(gpui_kit::MouseButton::Left, |_, window, _| {
+                window.start_window_move()
+            })
+            .child(card.child(fit_window()))
+    }
+}
+
+/// The window follows the card's height (it grows and shrinks downward).
+fn fit_window() -> impl IntoElement {
+    gpui_kit::canvas(
+        |bounds, window, _| {
+            // Measured inside the card's 1 px border: add it back.
+            let want = gpui_kit::size(px(WIDTH), bounds.size.height + px(2.));
+            let have = window.viewport_size();
+            if (f32::from(have.height) - f32::from(want.height)).abs() > 0.5 {
+                window.on_next_frame(move |window, _| window.resize(want));
+            }
+        },
+        |_, _, _, _| {},
+    )
+    .absolute()
+    .inset_0()
+}
+
+impl SignIn {
+    pub fn new(
+        spec: Spec,
+        model: Entity<Model>,
+        requests: async_channel::Sender<Request>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let field = cx.new(|cx| InputState::new(window, cx).masked(true));
+        let replies = start(spec.clone(), requests.clone(), window, cx);
+        // Connecting, as far as the tray and panel go, from now on; until
+        // this window goes, unless the session was handed over first.
+        let tunnel = spec.tunnel.clone();
+        model.update(cx, |m, cx| {
+            m.signing_in(&tunnel, true, false);
+            cx.notify();
+        });
+        let ended = model.clone();
+        cx.on_release(move |this: &mut Self, cx| {
+            if this.handed_over {
+                return;
+            }
+            ended.update(cx, |m, cx| {
+                if m.signing_in.contains(&tunnel) {
+                    m.signing_in(&tunnel, false, false);
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+        let subscriptions = vec![
+            cx.subscribe_in(&field, window, |this, _, event: &InputEvent, _, cx| {
+                if let InputEvent::PressEnter { .. } = event {
+                    this.answer(cx);
+                }
+            }),
+            // The tunnel coming up (or not) after sign-in.
+            cx.observe(&model, |this, model, cx| {
+                if this.stage != Stage::Connecting {
+                    return;
+                }
+                let state = model
+                    .read(cx)
+                    .tunnels
+                    .iter()
+                    .find(|t| t.name == this.spec.tunnel)
+                    .map(|t| t.state.clone());
+                match state.as_deref() {
+                    Some("connected") => {
+                        this.stage = Stage::Up;
+                        cx.spawn(async move |this, cx| {
+                            cx.background_executor()
+                                .timer(Duration::from_millis(900))
+                                .await;
+                            let _ = this.update(cx, |_, cx| cx.emit(Close));
+                        })
+                        .detach();
+                    }
+                    Some("trouble") => {
+                        let display = &this.spec.display;
+                        this.stage = Stage::Failed {
+                            reason: format!("{display} accepted the sign-in, but the tunnel didn\u{2019}t stay up."),
+                            at: 2,
+                        };
+                    }
+                    _ => {}
+                }
+                cx.notify();
+            }),
+            cx.observe_window_appearance(window, |_, _, cx| {
+                Theme::current(cx).sync_components(cx);
+                cx.notify();
+            }),
+        ];
+        Self {
+            spec,
+            model,
+            handed_over: false,
+            requests,
+            replies,
+            stage: Stage::Reaching,
+            field,
+            focus: cx.focus_handle(),
+            remember: true,
+            keep_certificate: true,
+            _subscriptions: subscriptions,
+        }
+    }
+
+    fn on_event(&mut self, event: Event, window: &mut Window, cx: &mut Context<Self>) {
+        match event {
+            Event::Reached => {
+                if self.stage == Stage::Reaching {
+                    self.stage = Stage::SigningIn;
+                }
+            }
+            Event::Prompt(prompt) => {
+                let secret = matches!(prompt.ask, Ask::Secret | Ask::CertificatePassword { .. });
+                self.field.update(cx, |f, cx| {
+                    f.set_value("", window, cx);
+                    f.set_masked(secret, window, cx);
+                });
+                self.field.update(cx, |f, cx| f.focus(window, cx));
+                self.stage = Stage::Asking(prompt);
+            }
+            Event::Done(session) => {
+                self.stage = Stage::Connecting;
+                self.handed_over = true;
+                self.signing(false, true, cx);
+                // Let in only as AnyConnect: remembered, and said openly.
+                if let Some(ua) = &session.user_agent
+                    && self.spec.user_agent.as_ref() != Some(ua)
+                {
+                    let _ = self
+                        .requests
+                        .send_blocking(Request::ActsAs(self.spec.gateway.clone(), ua.clone()));
+                }
+                let _ = self.requests.send_blocking(Request::ConnectWithSession(
+                    self.spec.tunnel.clone(),
+                    session,
+                ));
+            }
+            Event::Attached(fields) => {
+                self.handed_over = true;
+                // (Still "signing in" until the app has the session: then
+                // nothing else takes it over meanwhile.)
+                // The session stays the app's; its control goes with it.
+                let _ = self.requests.send_blocking(Request::Attach(
+                    self.spec.tunnel.clone(),
+                    fields,
+                    self.replies.clone(),
+                ));
+                return cx.emit(Close);
+            }
+            Event::Failed(reason) => {
+                if reason == "Cancelled." {
+                    return cx.emit(Close);
+                }
+                self.signing(false, false, cx);
+                let at = self.stage.step().min(2);
+                self.stage = Stage::Failed { reason, at };
+                window.focus(&self.focus, cx);
+            }
+        }
+        cx.notify();
+    }
+
+    fn answer(&mut self, cx: &mut Context<Self>) {
+        let text = self.field.read(cx).value().to_string();
+        self.reply(text, cx);
+    }
+
+    fn reply(&mut self, text: String, cx: &mut Context<Self>) {
+        let _ = self.replies.send_blocking(Reply::Answer {
+            text,
+            remember: self.remember,
+            keep_certificate: self.keep_certificate,
+        });
+        self.stage = Stage::SigningIn;
+        cx.notify();
+    }
+
+    fn signing(&self, on: bool, handed_over: bool, cx: &mut Context<Self>) {
+        let tunnel = self.spec.tunnel.clone();
+        self.model.update(cx, |m, cx| {
+            m.signing_in(&tunnel, on, handed_over);
+            cx.notify();
+        });
+    }
+
+    fn retry(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.handed_over = false;
+        self.signing(true, false, cx);
+        self.replies = start(self.spec.clone(), self.requests.clone(), window, cx);
+        self.stage = Stage::Reaching;
+        cx.notify();
+    }
+
+    /// What happened, in plain text for whoever helps.
+    fn copy_for_helpdesk(&mut self, cx: &mut Context<Self>) {
+        let reason = match &self.stage {
+            Stage::Failed { reason, .. } => reason.clone(),
+            _ => return,
+        };
+        let now = jiff::Zoned::now().strftime("%Y-%m-%d %H:%M %Z").to_string();
+        let text = format!(
+            "Crake, {now}\nCouldn\u{2019}t sign in to {} ({}, {}).\n{reason}\n",
+            self.spec.display, self.spec.gateway, self.spec.protocol
+        );
+        cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(text));
+    }
+
+    fn cancel(&mut self, cx: &mut Context<Self>) {
+        let _ = self.replies.send_blocking(Reply::Cancel);
+        cx.emit(Close);
+    }
+}

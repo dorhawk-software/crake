@@ -493,6 +493,12 @@ Any lint stops the build; fix it and build again, never silence it.
   known vulnerabilities anywhere, unmaintained crates Crake uses directly,
   licences compatible with GPL-3.0-or-later, crates.io only) and
   `cargo machete` (unused dependencies). Tools in `~/.cargo/bin`.
+- Size (requested): at most 700 lines of code per source file (its tests
+  not counted) and 1000 per integration test file (`scripts/check-size.sh`),
+  at most 200 lines per function (`clippy::too_many_lines`, `clippy.toml`).
+  Past that, split by topic: a folder module with one file per part (the
+  pattern of `manager/`, `new_tunnel/`, `settings_view/`, `panel/`), or a
+  function's parts into named helpers.
 - `.claude/settings.json`: a PostToolUse hook runs `scripts/lint.sh` after
   every `cargo build` / `cargo test` from Claude Code and blocks on failure.
 
