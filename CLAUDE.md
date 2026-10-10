@@ -306,6 +306,11 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    openvpn3). A protocol leaves Beta only after the user (or someone they
    trust) has signed in, connected and had hosts routed through a real
    gateway of that kind; the README's "Speaks" table follows it.
+   **To add (requested):** a "?" help card next to "What Crake did" in the
+   panel, saying a host appears there once, when Crake first sends it
+   through a tunnel, and is remembered after that (each use keeps it
+   another week); tunnel detail shows when it was last used. The user
+   expected every visit to show and didn't know it records only the first.
 7. Managed profiles and policy enforcement; helpdesk export. **Built**,
    proven in the lifecycle test (scope) and a throwaway namespace (full
    tunnel; a mutation without the LAN exclusion fails it).
