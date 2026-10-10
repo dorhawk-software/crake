@@ -68,7 +68,8 @@ impl TunnelDetail {
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.tab = tab;
                         cx.notify();
-                    })),
+                    }))
+                    .test_support(),
             );
         }
 
@@ -187,7 +188,8 @@ impl TunnelDetail {
                                 .child(format!("Send through {display}"))
                                 .on_click(
                                     cx.listener(|this, _, window, cx| this.send_added(window, cx)),
-                                ),
+                                )
+                                .test_support(),
                         ),
                 )
             })
@@ -236,22 +238,24 @@ impl TunnelDetail {
                     .gap(px(6.))
                     .justify_end()
                     .child(
-                        row_button(("pin", i), if pinned { "Unpin" } else { "Pin" }, t).on_click(
-                            cx.listener(move |this, _, _, _| {
+                        row_button(("pin", i), if pinned { "Unpin" } else { "Pin" }, t)
+                            .on_click(cx.listener(move |this, _, _, _| {
                                 let tunnel = this.tunnel.clone();
                                 this.send(if pinned {
                                     Request::Unpin(tunnel, pin_target.clone())
                                 } else {
                                     Request::Pin(tunnel, vec![pin_target.clone()])
                                 });
-                            }),
-                        ),
+                            }))
+                            .test_support(),
                     )
-                    .child(row_button(("forget", i), "Forget", t).on_click(cx.listener(
-                        move |this, _, _, _| {
-                            this.send(Request::Forget(this.tunnel.clone(), target.clone()));
-                        },
-                    ))),
+                    .child(
+                        row_button(("forget", i), "Forget", t)
+                            .on_click(cx.listener(move |this, _, _, _| {
+                                this.send(Request::Forget(this.tunnel.clone(), target.clone()));
+                            }))
+                            .test_support(),
+                    ),
             )
     }
 }

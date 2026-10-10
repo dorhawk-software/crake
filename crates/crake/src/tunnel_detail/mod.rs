@@ -9,7 +9,7 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::*;
 use gpui_kit::{
     AnyElement, Context, Div, Entity, FocusHandle, FontWeight, PathBuilder, Stateful, Subscription,
-    Window, canvas, div, point, px, svg,
+    TestSupportExt, Window, canvas, div, point, px, svg,
 };
 
 use crate::Request;
@@ -20,6 +20,9 @@ use crate::theme::{Theme, fonts};
 mod chart;
 mod facts;
 mod hosts;
+
+#[cfg(test)]
+mod tests;
 
 use self::chart::{chart, learned_today, today};
 use self::facts::{facts, policy, title_row};
@@ -132,7 +135,8 @@ impl Render for TunnelDetail {
                     .on_click(cx.listener(|this, _, _, cx| {
                         let _ = this.requests.send_blocking(Request::Settings);
                         cx.emit(Close);
-                    })),
+                    }))
+                    .test_support(),
             )
             .child(div().flex_1())
             .child(
@@ -146,7 +150,8 @@ impl Render for TunnelDetail {
                         let _ = this
                             .requests
                             .send_blocking(Request::Switch(this.tunnel.clone(), !on));
-                    })),
+                    }))
+                    .test_support(),
             )
             .child(
                 div()
@@ -167,7 +172,8 @@ impl Render for TunnelDetail {
                     .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
                         cx.stop_propagation()
                     })
-                    .on_click(cx.listener(|_, _, _, cx| cx.emit(Close))),
+                    .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
+                    .test_support(),
             );
 
         let top = div()

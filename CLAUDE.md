@@ -515,12 +515,12 @@ The user doesn't want development builds installed on their machine.
   refusal, detach, remove. A new D-Bus call gets a step there.
 - Window tests (headless, GPUI's test platform: nothing on screen):
   `#[gpui_kit::test]` with `gpui_kit::test::TestWindowExt` (click, input,
-  press): `new_tunnel/`, `panel/`, `settings_view/` (`tests.rs`). An element is
-  clickable from a test once it has `.test_support()` as its last call (a
-  no-op in normal builds; the dev-dependency turns on gpui-kit's
-  `test-support`). Nothing of this computer's in a test: `look_around`
-  returns fixed profiles and engines, `Prefs { scratch: true }` writes
-  nothing.
+  press), in `tests.rs` of `new_tunnel/`, `panel/`, `settings_view/` and
+  `tunnel_detail/`. An element is clickable from a test once it has
+  `.test_support()` as its last call (a no-op in normal builds; the
+  dev-dependency turns on gpui-kit's `test-support`). Nothing of this
+  computer's in a test: `look_around` returns fixed profiles and engines,
+  `Prefs { scratch: true }` writes nothing.
 - `scripts/netns-test.sh`: real nftables and policy routing inside a
   disposable container with no network (host filesystem read-only).
 - Daily use, nothing installed: `sudo ./target/debug/craked --config dev/<yours>.toml --dev`
