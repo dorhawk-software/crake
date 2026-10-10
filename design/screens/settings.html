@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Crake settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0F766E}a:hover{color:#0B5D57}
+button,input,select{font:inherit}
+.mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}
+</style>
+</helmet>
+<div style="min-height: 920px; box-sizing: border-box; padding: 40px 16px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
+<div style="max-width: 1040px; margin: 0 auto; display: flex; flex-wrap: wrap; background: {{c.panel}}; border: 1px solid {{c.line}}; border-radius: 12px; box-shadow: 0 30px 60px -30px rgba(0,0,0,0.35); overflow: hidden">
+
+<nav aria-label="Settings sections" style="flex: 1 1 220px; box-sizing: border-box; padding: 16px 12px; background: {{c.surface}}; border-right: 1px solid {{c.line}}; min-height: 820px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 10px 16px">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{c.ink}}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 20.5 5.3 15"></path><path d="M6.2 20.5l.6-3.4"></path><path d="M17.4 20.5l-.6-3.6"></path><path d="M20.5 20.5l-1.7-5.2"></path><path d="M8.5 20.5V12a3.75 3.75 0 0 1 7.5 0"></path><path d="M16 10.4l4.3 1.2-4.3 1.2"></path><path d="M16 12.8c0 2.7-.9 5-2.6 7.7"></path><circle cx="12.4" cy="10.6" r="0.9" fill="{{c.ink}}" stroke="none"></circle><path d="M19.2 6.2l1.4-1.6M21 8.4l1.6-.7" stroke="{{c.accent}}"></path></svg>
+<span style="font-size: 17px; font-weight: 700">Settings</span>
+</div>
+<sc-for list="{{sections}}" as="s" hint-placeholder-count="6">
+<button type="button" onClick="{{s.pick}}" aria-current="{{s.current}}" style="width: 100%; display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px; margin-bottom: 2px; border: none; border-radius: 6px; background: {{s.bg}}; color: {{c.ink}}; font-weight: {{s.weight}}; text-align: left; cursor: pointer">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{s.icon}}"></path></svg>{{s.label}}
+</button>
+</sc-for>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 14px 16px 32px 36px">
+<div style="display: flex; justify-content: flex-end"><button type="button" aria-label="Close" style="width: 32px; height: 32px; border: none; border-radius: 50%; background: {{c.surface}}; color: {{c.ink}}; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"></path></svg></button></div>
+<div style="max-width: 640px; padding-right: 20px">
+<h1 style="margin: 0; font-size: 26px; font-weight: 700">{{title}}</h1>
+<sc-if value="{{is.notAbout}}" hint-placeholder-val="{{true}}"><p style="margin: 4px 0 0; color: {{c.muted}}">{{lede}}</p></sc-if>
+<sc-if value="{{is.about}}" hint-placeholder-val="{{false}}"><p style="margin: 4px 0 0; color: {{c.muted}}">Named after the corncrake, <a href="https://en.wikipedia.org/wiki/Corn_crake" style="font-style: italic; color: {{c.accent}}">Crex crex</a>.</p></sc-if>
+
+<sc-if value="{{is.general}}" hint-placeholder-val="{{true}}">
+<div style="margin-top: 22px; border: 1px solid {{c.line}}; border-radius: 8px">
+<div style="display: flex; align-items: center; gap: 16px; padding: 14px 16px">
+<div style="flex: 1 1 auto"><div style="font-weight: 600">Start when you log in</div><div style="font-size: 13px; color: {{c.muted}}">The bird is there when you need it.</div></div>
+<button type="button" role="switch" aria-checked="{{sw.startup.aria}}" aria-label="Start when you log in" onClick="{{sw.startup.flip}}" style="flex: 0 0 auto; width: 46px; height: 26px; border: none; border-radius: 13px; padding: 3px; background: {{sw.startup.track}}; display: flex; justify-content: {{sw.startup.justify}}; cursor: pointer"><span style="width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,0.3)"></span></button>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; padding: 14px 16px 14px 40px; border-top: 1px solid {{c.line}}; opacity: {{sw.reconnect.dim}}">
+<div style="flex: 1 1 auto"><div style="font-weight: 600">Switch on the tunnels you left on</div><div style="font-size: 13px; color: {{c.muted}}">Some may ask you to sign in.</div></div>
+<button type="button" role="switch" aria-checked="{{sw.reconnect.aria}}" aria-label="Switch on the tunnels you left on" onClick="{{sw.reconnect.flip}}" style="flex: 0 0 auto; width: 46px; height: 26px; border: none; border-radius: 13px; padding: 3px; background: {{sw.reconnect.track}}; display: flex; justify-content: {{sw.reconnect.justify}}; cursor: pointer"><span style="width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,0.3)"></span></button>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-top: 1px solid {{c.line}}">
+<div style="flex: 1 1 auto"><div style="font-weight: 600">Show the bird in the top bar</div><div style="font-size: 13px; color: {{c.muted}}">Without it, open Crake from your apps.</div></div>
+<button type="button" role="switch" aria-checked="{{sw.tray.aria}}" aria-label="Show in top bar" onClick="{{sw.tray.flip}}" style="flex: 0 0 auto; width: 46px; height: 26px; border: none; border-radius: 13px; padding: 3px; background: {{sw.tray.track}}; display: flex; justify-content: {{sw.tray.justify}}; cursor: pointer"><span style="width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,0.3)"></span></button>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-top: 1px solid {{c.line}}">
+<div style="flex: 1 1 auto"><label for="notif" style="font-weight: 600">When Crake routes a host</label><div style="font-size: 13px; color: {{c.muted}}">Undo stays in the panel either way.</div></div>
+<select id="notif" style="height: 38px; padding: 0 10px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}"><option>Say nothing</option><option selected="selected">Quiet notification</option><option>Notification and a “crex crex”</option></select>
+</div>
+</div>
+<div style="margin-top: 16px; border: 1px solid {{c.line}}; border-radius: 8px">
+<div style="display: flex; align-items: center; gap: 16px; padding: 14px 16px">
+<div style="flex: 1 1 auto"><label for="appear" style="font-weight: 600">Appearance</label></div>
+<select id="appear" style="height: 38px; padding: 0 10px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}"><option selected="selected">Follow the system</option><option>Light</option><option>Dark</option></select>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{is.learning}}" hint-placeholder-val="{{false}}">
+<div style="margin-top: 22px; border: 1px solid {{c.line}}; border-radius: 8px">
+<div style="padding: 14px 16px">
+<div style="font-weight: 600">Wait for a direct answer</div>
+<div style="font-size: 13px; color: {{c.muted}}">Shorter feels faster. Longer avoids routing slow but public servers.</div>
+<div role="radiogroup" aria-label="Wait for a direct answer" style="display: inline-flex; margin-top: 10px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; overflow: hidden">
+<sc-for list="{{waits}}" as="w" hint-placeholder-count="4">
+<button type="button" role="radio" aria-checked="{{w.aria}}" onClick="{{w.pick}}" class="mono" style="height: 36px; min-width: 56px; padding: 0 12px; border: none; border-left: {{w.border}}; background: {{w.bg}}; color: {{w.fg}}; font-size: 13px; cursor: pointer">{{w.label}}</button>
+</sc-for>
+</div>
+</div>
+<div style="padding: 14px 16px; border-top: 1px solid {{c.line}}">
+<div style="font-weight: 600">Try tunnels in this order</div>
+<div style="font-size: 13px; color: {{c.muted}}">When a host doesn’t answer directly, Crake asks the tunnels one by one.</div>
+<ol style="list-style: none; margin: 10px 0 0; padding: 0; border: 1px solid {{c.line}}; border-radius: 6px">
+<li style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="{{c.muted}}" aria-hidden="true"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg><span class="mono" style="font-size: 12px; color: {{c.muted}}">1</span><span style="font-weight: 600">ACME</span></li>
+<li style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px; border-top: 1px solid {{c.line}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="{{c.muted}}" aria-hidden="true"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg><span class="mono" style="font-size: 12px; color: {{c.muted}}">2</span><span style="font-weight: 600">Nordbank</span></li>
+<li style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px; border-top: 1px solid {{c.line}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="{{c.muted}}" aria-hidden="true"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg><span class="mono" style="font-size: 12px; color: {{c.muted}}">3</span><span style="font-weight: 600">Home lab</span></li>
+</ol>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-top: 1px solid {{c.line}}">
+<div style="flex: 1 1 auto"><label for="both" style="font-weight: 600">When two tunnels answer</label></div>
+<select id="both" style="height: 38px; padding: 0 10px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}"><option selected="selected">Ask me</option><option>Use the faster one</option><option>Use the first in order</option></select>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-top: 1px solid {{c.line}}">
+<div style="flex: 1 1 auto"><label for="fg" style="font-weight: 600">Forget hosts unused for</label></div>
+<select id="fg" style="height: 38px; padding: 0 10px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}"><option>1 day</option><option selected="selected">7 days</option><option>30 days</option><option>Never</option></select>
+</div>
+</div>
+<div style="margin-top: 16px; border: 1px solid {{c.line}}; border-radius: 8px; padding: 14px 16px">
+<div style="font-weight: 600">Never send through a tunnel</div>
+<div style="font-size: 13px; color: {{c.muted}}">Personal banking, home devices. Crake leaves these alone even if they don’t answer.</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px">
+<span class="mono" style="display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 6px 0 10px; border: 1px solid {{c.line}}; border-radius: 4px; font-size: 13px">*.mybank.example<button type="button" aria-label="Remove *.mybank.example" style="width: 22px; height: 22px; border: none; border-radius: 4px; background: transparent; color: {{c.muted}}; cursor: pointer">✕</button></span>
+<span class="mono" style="display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 6px 0 10px; border: 1px solid {{c.line}}; border-radius: 4px; font-size: 13px">192.168.1.0/24<button type="button" aria-label="Remove 192.168.1.0/24" style="width: 22px; height: 22px; border: none; border-radius: 4px; background: transparent; color: {{c.muted}}; cursor: pointer">✕</button></span>
+<button type="button" style="height: 30px; padding: 0 10px; border: 1px dashed {{c.lineStrong}}; border-radius: 4px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">+ Add</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{is.dns}}" hint-placeholder-val="{{false}}">
+<div style="margin-top: 22px; border: 1px solid {{c.line}}; border-radius: 8px">
+<div style="padding: 14px 16px">
+<div style="font-weight: 600">Ask a tunnel’s DNS for these names</div>
+<div style="font-size: 13px; color: {{c.muted}}">Pushed by your gateways when they connect.</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px">
+<span class="mono" style="height: 28px; display: inline-flex; align-items: center; padding: 0 10px; border-radius: 4px; background: {{c.surface}}; font-size: 13px">*.acme.internal → ACME</span>
+<span class="mono" style="height: 28px; display: inline-flex; align-items: center; padding: 0 10px; border-radius: 4px; background: {{c.surface}}; font-size: 13px">*.nordbank.example → Nordbank</span>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-top: 1px solid {{c.line}}">
+<div style="flex: 1 1 auto"><div style="font-weight: 600">Keep internal names private</div><div style="font-size: 13px; color: {{c.muted}}">Names like *.acme.internal never go to your internet provider’s DNS.</div></div>
+<button type="button" role="switch" aria-checked="{{sw.leak.aria}}" aria-label="Keep internal names private" onClick="{{sw.leak.flip}}" style="flex: 0 0 auto; width: 46px; height: 26px; border: none; border-radius: 13px; padding: 3px; background: {{sw.leak.track}}; display: flex; justify-content: {{sw.leak.justify}}; cursor: pointer"><span style="width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,0.3)"></span></button>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-top: 1px solid {{c.line}}">
+<div style="flex: 1 1 auto"><div style="font-weight: 600">Ask every tunnel when a name is unknown</div><div style="font-size: 13px; color: {{c.muted}}">How Crake finds internal names nobody told it about.</div></div>
+<button type="button" role="switch" aria-checked="{{sw.probeDns.aria}}" aria-label="Ask every tunnel when a name is unknown" onClick="{{sw.probeDns.flip}}" style="flex: 0 0 auto; width: 46px; height: 26px; border: none; border-radius: 13px; padding: 3px; background: {{sw.probeDns.track}}; display: flex; justify-content: {{sw.probeDns.justify}}; cursor: pointer"><span style="width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,0.3)"></span></button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{is.privacy}}" hint-placeholder-val="{{false}}">
+<div style="margin-top: 22px; display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 8px; background: {{c.accentSoft}}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{c.accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 auto; margin-top: 1px"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"></path></svg>
+<div><div style="font-weight: 700">Everything Crake decides stays on this machine.</div><div style="font-size: 13px; color: {{c.muted}}">It sends nothing to anyone, including us. Your tunnels’ gateways see what passes through them, as with any VPN.</div></div>
+</div>
+<div style="margin-top: 16px; border: 1px solid {{c.line}}; border-radius: 8px">
+<div style="display: flex; align-items: center; gap: 16px; padding: 14px 16px">
+<div style="flex: 1 1 auto"><label for="keep" style="font-weight: 600">Keep the log for</label><div class="mono" style="font-size: 12px; color: {{c.muted}}">~/.local/share/crake/log</div></div>
+<select id="keep" style="height: 38px; padding: 0 10px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}"><option>1 day</option><option>7 days</option><option selected="selected">30 days</option><option>Don’t keep a log</option></select>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-top: 1px solid {{c.line}}">
+<div style="flex: 1 1 auto"><div style="font-weight: 600">Hide host names in helpdesk copies</div><div style="font-size: 13px; color: {{c.muted}}">“Copy for helpdesk” replaces names with tunnel and timing only.</div></div>
+<button type="button" role="switch" aria-checked="{{sw.redact.aria}}" aria-label="Hide host names in helpdesk copies" onClick="{{sw.redact.flip}}" style="flex: 0 0 auto; width: 46px; height: 26px; border: none; border-radius: 13px; padding: 3px; background: {{sw.redact.track}}; display: flex; justify-content: {{sw.redact.justify}}; cursor: pointer"><span style="width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,0.3)"></span></button>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-top: 1px solid {{c.line}}">
+<div style="flex: 1 1 auto"><div style="font-weight: 600">Clear the log</div><div style="font-size: 13px; color: {{c.muted}}">Learned hosts stay. Only the history goes.</div></div>
+<button type="button" style="height: 38px; padding: 0 14px; border: 1px solid {{c.danger}}; border-radius: 6px; background: transparent; color: {{c.danger}}; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 22l-1-4M19 14a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2h-3a1 1 0 0 1-1-1V4a2 2 0 0 0-4 0v5a1 1 0 0 1-1 1H6a2 2 0 0 0-2 2v1a1 1 0 0 0 1 1M5 14h14l1.97 6.77A1 1 0 0 1 20 22H4a1 1 0 0 1-.97-1.23zM8 22l1-4"></path></svg>Clear log…</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{is.managed}}" hint-placeholder-val="{{false}}">
+<div style="margin-top: 22px; border: 1px solid {{c.line}}; border-radius: 8px">
+<div style="padding: 14px 16px">
+<div style="display: flex; align-items: center; gap: 8px"><span style="font-size: 15px; font-weight: 700">ACME</span><span style="font-size: 12px; padding: 1px 7px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}">Managed</span></div>
+<div style="margin-top: 4px">Learning allowed for <span class="mono" style="font-size: 13px">*.acme.internal</span> and <span class="mono" style="font-size: 13px">10.40.0.0/16</span>.</div>
+<div class="mono" style="margin-top: 4px; font-size: 12px; color: {{c.muted}}">/etc/crake/managed.d/acme.toml</div>
+</div>
+<div style="padding: 14px 16px; border-top: 1px solid {{c.line}}">
+<div style="display: flex; align-items: center; gap: 8px"><span style="font-size: 15px; font-weight: 700">Globex</span><span style="font-size: 12px; padding: 1px 7px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}">Managed</span></div>
+<div style="margin-top: 4px">Full tunnel required. Crake sends everything through and learns nothing.</div>
+<div class="mono" style="margin-top: 4px; font-size: 12px; color: {{c.muted}}">/etc/crake/managed.d/globex.toml</div>
+</div>
+</div>
+<p style="margin: 16px 0 0; color: {{c.muted}}">You can switch managed tunnels on and off, but not change them. Your organisation gets nothing from Crake itself.</p>
+</sc-if>
+
+<sc-if value="{{is.about}}" hint-placeholder-val="{{false}}">
+<div style="margin-top: 22px; display: flex; gap: 16px; align-items: center">
+<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="{{c.ink}}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 20.5 5.3 15"></path><path d="M6.2 20.5l.6-3.4"></path><path d="M17.4 20.5l-.6-3.6"></path><path d="M20.5 20.5l-1.7-5.2"></path><path d="M8.5 20.5V12a3.75 3.75 0 0 1 7.5 0"></path><path d="M16 10.4l4.3 1.2-4.3 1.2"></path><path d="M16 12.8c0 2.7-.9 5-2.6 7.7"></path><circle cx="12.4" cy="10.6" r="0.9" fill="{{c.ink}}" stroke="none"></circle><path d="M19.2 6.2l1.4-1.6M21 8.4l1.6-.7" stroke="{{c.accent}}"></path></svg>
+<div><div style="font-size: 20px; font-weight: 700">Crake 0.1.0</div><div style="color: {{c.muted}}">A VPN client that routes only what needs routing. Built on openconnect.</div><div style="color: {{c.muted}}">Because a VPN shouldn’t be a chore.</div></div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px">
+<a href="https://github.com/dorhawk-software" style="font-weight: 600">Source on GitHub</a>
+<span style="color: {{c.muted}}">·</span>
+<a href="https://dorhawk.software/" style="font-weight: 600">dorhawk.software</a>
+</div>
+</sc-if>
+</div>
+</main>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true},&quot;$preview&quot;:{&quot;width&quot;:1200,&quot;height&quot;:920}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sec: 'learning', wait: 3, sw: { startup: true, reconnect: false, tray: true, leak: true, probeDns: true, redact: false } };
+  }
+  renderVals() {
+    const dark = this.props.dark ?? false;
+    const c = dark ? {
+      desk: '#121314', panel: '#1E2022', surface: '#26292C', line: '#33363A', lineStrong: '#4A4E53',
+      ink: '#ECEDEE', muted: '#A9AEB4', accent: '#2DD4BF', accentInk: '#0B1514', accentSoft: '#17332F', track: '#4A4E53', danger: '#F97066'
+    } : {
+      desk: '#DCDCD8', panel: '#FFFFFF', surface: '#F3F3F0', line: '#E2E2DE', lineStrong: '#BDBDB8',
+      ink: '#1A1C1E', muted: '#5A5F64', accent: '#0F766E', accentInk: '#FFFFFF', accentSoft: '#E2F1EF', track: '#BDBDB8', danger: '#B42318'
+    };
+    const st = this.state;
+    const info = {
+      general: ['General', 'How Crake starts and how it tells you things.', 'M12 15a3 3 0 1 0 0-6a3 3 0 1 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1'],
+      learning: ['Learning', 'How Crake decides what needs a tunnel.', 'M6 18V6M12 18V10M18 18V4'],
+      dns: ['Names', 'Which DNS answers which names.', 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z'],
+      privacy: ['Privacy & log', 'What Crake remembers, and for how long.', 'M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z'],
+      managed: ['Managed by IT', 'Tunnels your organisation set up for you.', 'M6 11h12v10H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3'],
+      about: ['About', 'Named after the corncrake, Crex crex.', 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v6M12 7.5v.5']
+    };
+    const sections = Object.keys(info).map(k => ({
+      label: info[k][0], icon: info[k][2], current: st.sec === k ? 'page' : 'false',
+      bg: st.sec === k ? c.panel : 'transparent', weight: st.sec === k ? 700 : 500,
+      pick: () => this.setState({ sec: k })
+    }));
+    const sw = {};
+    Object.keys(st.sw).forEach(k => {
+      const v = st.sw[k];
+      // "Switch on the tunnels you left on" only means something with startup on.
+      sw[k] = { aria: v ? 'true' : 'false', track: v ? c.accent : c.track, justify: v ? 'flex-end' : 'flex-start',
+        dim: k === 'reconnect' && !st.sw.startup ? 0.45 : 1,
+        flip: () => this.setState({ sw: Object.assign({}, this.state.sw, { [k]: !this.state.sw[k] }) }) };
+    });
+    const waits = [1, 2, 3, 5].map((n, i) => {
+      const on = st.wait === n;
+      return { label: n + ' s', aria: on ? 'true' : 'false', bg: on ? c.accent : c.panel, fg: on ? c.accentInk : c.ink,
+        border: i === 0 ? 'none' : '1px solid ' + c.lineStrong, pick: () => this.setState({ wait: n }) };
+    });
+    const is = {};
+    Object.keys(info).forEach(k => { is[k] = st.sec === k; });
+    is.notAbout = st.sec !== 'about';
+    return { c, sections, sw, waits, is, title: info[st.sec][0], lede: info[st.sec][1] };
+  }
+}
+</script>
+</body>
+</html>

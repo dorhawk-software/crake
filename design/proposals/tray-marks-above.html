@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: tray marks above the head</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #121314; color: #ECEDEE; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; }
+  .page { padding: 24px 32px; }
+  .intro { color: #A9AEB4; font-size: 13px; max-width: 900px; margin-bottom: 16px; }
+  .intro b { color: #ECEDEE; }
+  table { border-collapse: separate; border-spacing: 0 10px; }
+  td { vertical-align: middle; padding-right: 22px; }
+  .cap { font-weight: 600; font-size: 13px; }
+  .sub { font-size: 12px; color: #A9AEB4; max-width: 240px; }
+  .bar { background: #000; border-radius: 6px; padding: 8px 12px; display: inline-flex; align-items: center; gap: 14px; }
+  .bar .app { width: 16px; height: 16px; border-radius: 4px; background: #5e81ac; }
+  .bar .app2 { width: 16px; height: 16px; border-radius: 50%; background: #e5e5e5; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>Proposal: the call marks and the "!" above the head.</b> The bar icon is a fixed square, so room
+    above the head is taken from the bird's size. <b>A</b> keeps the marks clear of the head (bird about 20% smaller).
+    <b>B</b> lets them sit on the crown, cut into it like today (bird about 12% smaller). Each row: bar size next to app
+    icons, then 24 px and 72 px.</div>
+  <table id="t"></table>
+</div>
+<script>
+const SIL = 'M8.5 20.5V12A3.75 3.75 0 0 1 15.95 11.4L16 10.4L20.6 11.6L16 12.8C16 15.5 15.1 17.8 13.4 20.5Z';
+let id = 0;
+// marks: {calls: [[path...], width] | null, badge: [cx, cy, r] | null}
+function icon(vb, state, v, size) {
+  const m = 'm' + (id++);
+  let holes = `<circle cx="12.35" cy="11.4" r="1.55" fill="#000"/>`, over = '';
+  if (state === 'routed') {
+    holes += `<path d="${v.calls}" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>`;
+    over += `<path d="${v.calls}" fill="none" stroke="#2DD4BF" stroke-width="1.7" stroke-linecap="round"/>`;
+  }
+  if (state === 'trouble') {
+    const [cx, cy] = v.badge;
+    holes += `<circle cx="${cx}" cy="${cy}" r="3.45" fill="#000"/>`;
+    over += `<circle cx="${cx}" cy="${cy}" r="2.75" fill="#F97066"/><path d="M${cx} ${cy - 1.5}v1.7" fill="none" stroke="#0b1514" stroke-width="1.15" stroke-linecap="round"/><circle cx="${cx}" cy="${cy + 1.6}" r="0.6" fill="#0b1514"/>`;
+  }
+  return `<svg width="${size}" height="${size}" viewBox="${vb}"><defs><mask id="${m}" maskUnits="userSpaceOnUse" x="-5" y="-5" width="40" height="40"><path d="${SIL}" fill="#fff" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>${holes}</mask></defs><rect x="-5" y="-5" width="40" height="40" fill="#fff" mask="url(#${m})"/>${over}</svg>`;
+}
+const variants = [
+  ['Today', 'Marks off the beak, badge on the back of the head.', '7.1 6.6 15.2 15.2',
+    { calls: 'M17.95 9.65l1.6-1.8M19.2 11.25l1.9-.8', badge: [19.2, 9.4] }],
+  ['A · clear above', 'The two-stroke tick (tall, short) and the badge float over the crown, not touching it.', '5.6 1.9 18.6 18.6',
+    { calls: 'M11.3 6.3V3.6M14.3 6.3V4.6', badge: [12.6, 4.7] }],
+  ['B · on the crown', 'Same marks, lower: they overlap the top of the head with a gap cut around them.', '6.4 3.6 17.2 17.2',
+    { calls: 'M11.6 7.6V4.9M14.6 7.6V5.9', badge: [15.6, 6.4] }],
+];
+document.getElementById('t').innerHTML = variants.map(([cap, sub, vb, v]) =>
+  ['routed', 'trouble'].map((s, i) => `<tr><td>${i ? '' : `<div class="cap">${cap}</div><div class="sub">${sub}</div>`}</td>
+    <td><span class="bar"><span class="app"></span>${icon(vb, s, v, 16)}<span class="app2"></span>${icon(vb, 'listening', v, 16)}</span></td>
+    <td>${icon(vb, s, v, 24)}</td><td>${icon(vb, s, v, 72)}</td></tr>`).join('')).join('');
+</script>
+</body>
+</html>

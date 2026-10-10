@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: zooming the day</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+    --ink: #ECEDEE; --muted: #A9AEB4; --bars: #3E4246; --accent: #2DD4BF; --accentInk: #0B1514; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8;
+    --ink: #1A1C1E; --muted: #5A5F64; --bars: #D8D9D5; --accent: #0F766E; --accentInk: #FFFFFF; }
+  body { margin: 0; background: var(--desk); color: var(--ink);
+    font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  .page { padding: 28px 40px 40px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 980px; margin-bottom: 18px; }
+  .intro b { color: var(--ink); }
+  .card { max-width: 980px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  .today { padding: 18px 20px 14px; }
+  .head { display: flex; align-items: baseline; gap: 10px; }
+  .head h2 { margin: 0; font-size: 18px; font-weight: 700; }
+  .head .sum { font-size: 13px; color: var(--muted); }
+  .head .span { margin-left: auto; font-size: 13px; color: var(--muted); }
+  .whole { height: 30px; padding: 0 10px; margin-left: 8px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .chart { position: relative; margin-top: 10px; cursor: grab; user-select: none; }
+  .chart.dragging { cursor: grabbing; }
+  .under { display: flex; justify-content: space-between; align-items: baseline; height: 18px; margin-top: 2px; font-size: 11px; color: var(--muted); }
+  .readout { display: flex; gap: 8px; align-items: baseline; font-size: 13px; color: var(--ink); }
+  .readout .t { font-size: 11px; color: var(--muted); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>Proposal: zooming the day.</b> Try it: <b>scroll</b> over the chart to zoom in and out around
+    the pointer, <b>drag</b> to move along the day, <b>double-click</b> or <b>Whole day</b> to go back. Bars get finer as
+    you zoom (5 minutes for the whole day, down to 1 minute); ticks that shared a mark separate. Pointing reads it, as
+    in the panel. Nothing else on the window changes.</div>
+  <div class="card"><div class="today">
+    <div class="head"><h2>Today</h2><span class="sum">7 hosts routed, 1 left alone, 1 undone</span>
+      <span class="span mono" id="span"></span><button class="whole" id="whole" hidden>Whole day</button></div>
+    <div class="chart" id="chart"></div>
+    <div class="under" id="under"></div>
+    <div class="hint">Scroll to zoom · drag to move</div>
+  </div></div>
+</div>
+<script>
+if (location.search.includes('dark=false')) document.body.classList.add('light');
+const css = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+const W = 938, H = 84, BASE = 62;
+const NOW = 13 * 60 + 24; // the design's "now", 13:24
+// One minute of traffic each, all day (bytes), busy from 8:18.
+let s = 3; const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+const minutes = [];
+for (let m = 0; m <= NOW; m++) minutes.push(m > 498 ? 300000 + rnd() * 1800000 * (1 + Math.sin(m / 37)) : (rnd() < 0.06 ? 80000 + rnd() * 200000 : 0));
+const events = [
+  [8 * 60 + 40, 'r', 'Sent builds.acme.example through ACME.'], [9 * 60 + 12, 'r', 'Sent jira.acme.internal through ACME.'],
+  [9 * 60 + 14, 'r', 'Sent wiki.acme.internal through ACME.'], [10 * 60 + 47, 'r', 'Sent 10.62.0.18 through ACME.'],
+  [11 * 60 + 4, 'r', 'Sent sftp.nordbank.example through Nordbank.'], [11 * 60 + 30, 'r', 'Sent 172.22.8.4 through Nordbank.'],
+  [13 * 60 + 2, 'a', 'Left 10.62.0.77 alone.'], [13 * 60 + 21, 'r', 'Sent git.acme.internal through ACME.'],
+];
+const fmt = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(Math.floor(m % 60)).padStart(2, '0');
+const mb = b => b >= 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1e3)) + ' KB';
+
+// What's shown: [from, to] in minutes since midnight.
+const params = new URLSearchParams(location.search);
+let view = (params.get('view') || '').split('-').map(Number);
+if (view.length !== 2 || isNaN(view[0])) view = [0, NOW];
+let hover = null;
+
+function render() {
+  const [a, b] = view, span = b - a;
+  const x = m => 2 + (W - 4) * (m - a) / span;
+  // Bars at least ~6 px apart: the finest bin that fits.
+  const bin = [1, 2, 5, 10, 15, 30].find(n => (n / span) * W >= 6) || 30;
+  const bins = [];
+  for (let m = Math.floor(a / bin) * bin; m <= b; m += bin) {
+    let sum = 0; for (let k = m; k < m + bin && k <= NOW; k++) sum += minutes[k] || 0;
+    bins.push([m + bin / 2, sum, m]);
+  }
+  const max = Math.max(1, ...bins.map(v => v[1]));
+  const bw = Math.max(2, Math.min(8, (bin / span) * W * 0.55));
+  // Marks less than 8 px apart share one, with a count.
+  const marks = [];
+  for (const [m, k, text] of events) {
+    if (m < a || m > b) continue;
+    const last = [...marks].reverse().find(v => v.k === k);
+    if (last && x(m) - x(last.m) < 8) { last.m = m; last.n++; last.texts.push(text); } else marks.push({ m, k, n: 1, texts: [text] });
+  }
+  let pointed = null;
+  if (hover != null) {
+    const near = marks.filter(v => Math.abs(x(v.m) - x(hover)) <= 6).sort((p, q) => Math.abs(p.m - hover) - Math.abs(q.m - hover))[0];
+    if (near) pointed = { m: near.m, text: near.n > 1 ? `${near.n} decisions: ${near.texts.join(' ')}` : near.texts[0] };
+    else {
+      const bn = bins.find(v => hover >= v[2] && hover < v[2] + bin);
+      if (bn) pointed = { m: bn[0], bar: bn, text: bn[1] ? `${mb(bn[1])} of traffic` + (bin > 1 ? ` in ${bin} minutes` : '') : 'No traffic', t: `${fmt(bn[2])}${bin > 1 ? '–' + fmt(bn[2] + bin) : ''}` };
+    }
+  }
+  let svg = `<svg viewBox="0 0 ${W} ${H - 20}" style="display:block;width:100%;height:auto">`;
+  for (const v of bins) {
+    if (!v[1]) continue;
+    const h = 2 + 21 * Math.sqrt(v[1] / max), on = pointed && pointed.bar === v;
+    svg += `<rect x="${(x(v[0]) - bw / 2).toFixed(1)}" y="${(BASE - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${on ? css('--muted') : css('--bars')}"/>`;
+  }
+  const bar = (cx, top, w) => `M${cx - w / 2} ${BASE}V${top + w / 2}a${w / 2} ${w / 2} 0 0 1 ${w} 0V${BASE}Z`;
+  for (const v of marks) if (v.k === 'r') svg += `<path d="${bar(x(v.m), 22.5, 6) + bar(x(v.m) + 4.5, 31.5, 6)}" fill="${css('--panel')}"/>`;
+  svg += `<line x1="0" y1="${BASE + 0.5}" x2="${W}" y2="${BASE + 0.5}" stroke="${css('--lineStrong')}"/>`;
+  for (const v of marks) {
+    if (v.k === 'r') {
+      svg += `<path d="${bar(x(v.m), 24, 3) + bar(x(v.m) + 4.5, 33, 3)}" fill="${css('--accent')}"/>`;
+      if (v.n > 1) svg += `<text x="${x(v.m) + 2}" y="18" text-anchor="middle" font-family="Atkinson Hyperlegible Mono" font-size="11" fill="${css('--accent')}">${v.n}</text>`;
+    } else svg += `<circle cx="${x(v.m)}" cy="${BASE - 8}" r="4" fill="${css('--panel')}" stroke="${css('--muted')}" stroke-width="1.6"/>`;
+  }
+  if (pointed) svg += `<line x1="${x(pointed.m)}" y1="2" x2="${x(pointed.m)}" y2="16" stroke="${css('--lineStrong')}" stroke-dasharray="2 3"/>`;
+  document.getElementById('chart').innerHTML = svg + `</svg>`;
+  // Round times under the chart: start, a round time near the middle, end.
+  const step = [360, 120, 60, 30, 15, 10, 5, 1].find(st => span / st >= 2) || 1;
+  const mid = Math.round((a + b) / 2 / step) * step;
+  const ticks = [a, mid, b].map(m => `<span class="mono">${Math.abs(m - NOW) < 0.5 ? 'now' : fmt(m)}</span>`).join('');
+  document.getElementById('under').innerHTML = pointed
+    ? `<span class="readout"><span class="mono t">${pointed.t || fmt(pointed.m)}</span><span>${pointed.text}</span></span>` : ticks;
+  const zoomed = a > 0.5 || b < NOW - 0.5;
+  document.getElementById('whole').hidden = !zoomed;
+  document.getElementById('span').textContent = zoomed ? `${fmt(a)}–${fmt(b)} · ${bin}-minute bars` : '';
+}
+
+const chart = document.getElementById('chart');
+const at = e => { const r = chart.getBoundingClientRect(); return view[0] + (view[1] - view[0]) * ((e.clientX - r.left) / r.width); };
+chart.addEventListener('wheel', e => {
+  e.preventDefault();
+  const m = at(e), f = e.deltaY < 0 ? 0.8 : 1.25;
+  let span = Math.min(NOW, Math.max(15, (view[1] - view[0]) * f));
+  let a = m - (m - view[0]) * span / (view[1] - view[0]);
+  a = Math.max(0, Math.min(NOW - span, a));
+  view = [a, a + span]; render();
+}, { passive: false });
+let drag = null;
+chart.addEventListener('mousedown', e => { drag = { x: e.clientX, v: [...view] }; chart.classList.add('dragging'); });
+window.addEventListener('mouseup', () => { drag = null; chart.classList.remove('dragging'); });
+chart.addEventListener('mousemove', e => {
+  if (drag) {
+    const r = chart.getBoundingClientRect(), span = drag.v[1] - drag.v[0];
+    let a = drag.v[0] - span * (e.clientX - drag.x) / r.width;
+    a = Math.max(0, Math.min(NOW - span, a)); view = [a, a + span];
+  }
+  hover = at(e); render();
+});
+chart.addEventListener('mouseleave', () => { hover = null; render(); });
+chart.addEventListener('dblclick', () => { view = [0, NOW]; render(); });
+document.getElementById('whole').addEventListener('click', () => { view = [0, NOW]; render(); });
+render();
+</script>
+</body>
+</html>

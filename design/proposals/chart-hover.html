@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: reading Last hour</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+    --ink: #ECEDEE; --muted: #A9AEB4; --bars: #3E4246; --accent: #2DD4BF;
+  }
+  body.light {
+    --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8;
+    --ink: #1A1C1E; --muted: #5A5F64; --bars: #D8D9D5; --accent: #0F766E;
+  }
+  body { margin: 0; background: var(--desk); color: var(--ink);
+    font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  .page { padding: 32px 40px 40px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 980px; }
+  .intro b { color: var(--ink); }
+  .row { display: flex; gap: 28px; margin-top: 22px; flex-wrap: wrap; }
+  .case { width: 452px; }
+  .label { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 10px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px 16px; }
+  .head { display: flex; justify-content: space-between; align-items: baseline; }
+  .head .t { font-size: 13px; font-weight: 600; }
+  .legend { font-size: 12px; color: var(--muted); display: flex; align-items: center; }
+  .sq { display: inline-block; width: 10px; height: 10px; background: var(--bars); margin-right: 5px; }
+  .tk { display: inline-block; width: 3px; background: var(--accent); margin-right: 2px; }
+  .chart { margin-top: 8px; }
+  /* Under the chart: the time row, or (while pointing) one line about that minute. */
+  .under { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 4px; height: 18px; align-items: baseline; }
+  .readout { display: flex; gap: 8px; align-items: baseline; font-size: 13px; color: var(--ink); min-width: 0; }
+  .readout .time { font-size: 11px; color: var(--muted); flex: none; }
+  .readout .text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="page" id="page"></div>
+<script>
+const dark = !location.search.includes('dark=false');
+if (!dark) document.body.classList.add('light');
+
+// The design's chart (tray-panel.html): 416 x 72, baseline at 72.
+const X = i => 2 + i * 6.8;
+const bar = (x, top, base, w) => `M${(x - w / 2).toFixed(2)} ${base}V${(top + w / 2).toFixed(2)}a${w / 2} ${w / 2} 0 0 1 ${w} 0V${base}Z`;
+let s = 5; const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+const heights = [];
+for (let i = 0; i <= 60; i++) {
+  const busy = (i > 8 && i < 22) || (i > 40 && i < 52);
+  heights.push(3 + rnd() * (busy ? 22 : 9));
+}
+const css = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+
+// opts: { hover: minute or null, ticks: [{ i, n }], overlap: bool }
+function chart(opts) {
+  let svg = `<svg viewBox="0 0 416 74" style="display:block;width:100%;height:auto">`;
+  heights.forEach((h, i) => {
+    const on = opts.hover === i && opts.kind === 'bar';
+    svg += `<path d="M${X(i).toFixed(1)} 72V${(72 - h).toFixed(1)}" stroke="${on ? css('--muted') : css('--bars')}" stroke-width="3.6"/>`;
+  });
+  if (opts.hover != null) {
+    svg += `<line x1="${X(opts.hover)}" y1="2" x2="${X(opts.hover)}" y2="72" stroke="${css('--lineStrong')}" stroke-width="1" stroke-dasharray="2 3"/>`;
+  }
+  svg += `<line x1="0" y1="72.5" x2="416" y2="72.5" stroke="${css('--lineStrong')}" stroke-width="1"/>`;
+  for (const t of opts.ticks) {
+    svg += `<path d="${bar(X(t.i), 30, 72, 3.2)}${bar(X(t.i) + 5, 40, 72, 3.2)}" fill="${css('--accent')}"/>`;
+    if (t.n > 1) {
+      svg += `<text x="${X(t.i) + 2.5}" y="24" text-anchor="middle" font-family="Atkinson Hyperlegible Mono" font-size="11" fill="${css('--accent')}">${t.n}</text>`;
+    }
+  }
+  svg += `<circle cx="${X(38)}" cy="62" r="4.5" fill="${css('--panel')}" stroke="${css('--muted')}" stroke-width="1.6"/>`;
+  return svg + `</svg>`;
+}
+
+const axis = `<span class="mono">12:24</span><span class="mono">12:54</span><span class="mono">now</span>`;
+const readout = (time, text) => `<span class="readout"><span class="mono time">${time}</span><span class="text">${text}</span></span>`;
+
+const cases = [
+  { label: 'Not pointing (as today)', opts: { hover: null, ticks: [{ i: 57, n: 1 }] }, under: axis },
+  { label: 'Pointing at a grey bar', opts: { hover: 47, kind: 'bar', ticks: [{ i: 57, n: 1 }] },
+    under: readout('13:11', '6.7 MB went direct') },
+  { label: 'Pointing at a two-stroke tick', opts: { hover: 57, ticks: [{ i: 57, n: 1 }] },
+    under: readout('13:21', 'Sent git.acme.internal through ACME.') },
+  { label: 'Pointing at a hollow circle', opts: { hover: 38, ticks: [{ i: 57, n: 1 }] },
+    under: readout('13:02', 'Left 10.62.0.77 alone.') },
+  { label: 'Three hosts routed within two minutes: one tick', opts: { hover: null, ticks: [{ i: 56, n: 3 }] }, under: axis },
+  { label: '…pointing at it', opts: { hover: 56, ticks: [{ i: 56, n: 3 }] },
+    under: readout('13:20', 'Sent git, iam.intranet and wiki through ACME.') },
+];
+
+let html = `<div class="intro"><b>Proposal, not in DESIGN.md yet.</b> While you point at Last hour, a dotted hairline marks
+  the minute and the time row under the chart says what happened then, in the log's words. Nothing covers the chart and the
+  panel keeps its size. Decisions close together share one two-stroke tick, with how many above it.</div><div class="row">`;
+for (const c of cases) {
+  html += `
+  <div class="case">
+    <div class="label">${c.label}</div>
+    <div class="panel">
+      <div class="head"><span class="t">Last hour</span>
+        <span class="legend"><span class="sq"></span>direct&nbsp;&nbsp;&nbsp;<span class="tk" style="height:11px"></span><span class="tk" style="height:8px;margin-right:5px"></span>routed</span></div>
+      <div class="chart">${chart(c.opts)}</div>
+      <div class="under">${c.under}</div>
+    </div>
+  </div>`;
+}
+document.getElementById('page').innerHTML = html + `</div>`;
+</script>
+</body>
+</html>

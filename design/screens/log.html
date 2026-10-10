@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Crake log</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0F766E}a:hover{color:#0B5D57}
+button,input,select{font:inherit}
+.mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}
+</style>
+</helmet>
+<div style="min-height: 1000px; box-sizing: border-box; padding: 40px 16px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
+<div style="max-width: 980px; margin: 0 auto; background: {{c.panel}}; border: 1px solid {{c.line}}; border-radius: 12px; box-shadow: 0 30px 60px -30px rgba(0,0,0,0.35); overflow: hidden">
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px 10px 20px; border-bottom: 1px solid {{c.line}}">
+<span style="font-size: 17px; font-weight: 700">Log</span>
+<span style="font-size: 13px; color: {{c.muted}}">Kept for 30 days on this machine</span>
+<span style="flex: 1 1 auto"></span>
+<button type="button" style="height: 36px; padding: 0 12px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Copy for helpdesk</button>
+<button type="button" style="height: 36px; padding: 0 12px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Export…</button>
+<button type="button" aria-label="Close" style="width: 32px; height: 32px; margin-left: 4px; border: none; border-radius: 50%; background: {{c.surface}}; color: {{c.ink}}; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"></path></svg></button>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid {{c.line}}">
+<div style="position: relative; flex: 1 1 220px; max-width: 300px">
+<label for="ls" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search the log</label>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{c.muted}}" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="position: absolute; left: 11px; top: 12px"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>
+<input id="ls" type="search" placeholder="Host, address or tunnel" value="{{q}}" onChange="{{onQ}}" style="width: 100%; box-sizing: border-box; height: 40px; padding: 0 12px 0 34px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}">
+</div>
+<div role="radiogroup" aria-label="Show" style="display: inline-flex; border: 1px solid {{c.lineStrong}}; border-radius: 6px; overflow: hidden">
+<sc-for list="{{kinds}}" as="k" hint-placeholder-count="4">
+<button type="button" role="radio" aria-checked="{{k.aria}}" onClick="{{k.pick}}" style="height: 38px; padding: 0 12px; border: none; border-left: {{k.border}}; background: {{k.bg}}; color: {{k.fg}}; font-weight: 600; cursor: pointer">{{k.label}}</button>
+</sc-for>
+</div>
+<label for="lt" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Tunnel</label>
+<select id="lt" style="height: 40px; padding: 0 10px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}"><option>All tunnels</option><option>ACME</option><option>Nordbank</option><option>Home lab</option></select>
+</div>
+
+<div style="padding: 18px 20px 4px">
+<div style="display: flex; align-items: baseline; gap: 10px">
+<h2 style="margin: 0; font-size: 18px; font-weight: 700">Today</h2>
+<span style="font-size: 13px; color: {{c.muted}}">{{todaySummary}}</span>
+</div>
+<svg viewBox="0 0 940 84" role="img" aria-label="Today from midnight to now: direct traffic as grey bars, routed hosts as teal double ticks" style="display: block; width: 100%; height: auto; margin-top: 10px">
+<path d="{{chart.bars}}" stroke="{{c.bars}}" stroke-width="3"></path>
+<line x1="0" y1="62" x2="940" y2="62" stroke="{{c.lineStrong}}" stroke-width="1"></line>
+<path d="{{chart.ticks}}" fill="{{c.accent}}"></path>
+<path d="{{chart.holes}}" fill="{{c.panel}}" stroke="{{c.muted}}" stroke-width="1.6"></path>
+<g font-family="Atkinson Hyperlegible Mono, monospace" font-size="11" fill="{{c.muted}}">
+<text x="0" y="80">00:00</text><text x="268" y="80" text-anchor="middle">06:00</text><text x="537" y="80" text-anchor="middle">12:00</text><text x="940" y="80" text-anchor="end">now</text>
+</g>
+</svg>
+</div>
+
+<div style="padding: 0 20px">
+<sc-for list="{{today}}" as="e" hint-placeholder-count="8">
+<div style="display: grid; grid-template-columns: 52px 20px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 11px 0; border-top: 1px solid {{c.line}}">
+<span class="mono" style="font-size: 13px; color: {{c.muted}}; padding-top: 1px">{{e.t}}</span>
+<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="margin-top: 1px"><path d="{{e.icon}}" stroke="{{e.iconColor}}" stroke-width="2.4" stroke-linecap="round" fill="none"></path></svg>
+<div style="min-width: 0"><div>{{e.text}}</div><div style="font-size: 13px; color: {{c.muted}}">{{e.why}}</div></div>
+<span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}; white-space: nowrap">{{e.tunnel}}</span>
+</div>
+</sc-for>
+<sc-if value="{{emptyToday}}" hint-placeholder-val="{{false}}">
+<div style="padding: 20px 0; border-top: 1px solid {{c.line}}; color: {{c.muted}}">Nothing matches today.</div>
+</sc-if>
+</div>
+
+<div style="padding: 22px 20px 6px">
+<h2 style="margin: 0; font-size: 18px; font-weight: 700">Yesterday</h2>
+</div>
+<div style="padding: 0 20px 20px">
+<sc-for list="{{yesterday}}" as="e" hint-placeholder-count="3">
+<div style="display: grid; grid-template-columns: 52px 20px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 11px 0; border-top: 1px solid {{c.line}}">
+<span class="mono" style="font-size: 13px; color: {{c.muted}}; padding-top: 1px">{{e.t}}</span>
+<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="margin-top: 1px"><path d="{{e.icon}}" stroke="{{e.iconColor}}" stroke-width="2.4" stroke-linecap="round" fill="none"></path></svg>
+<div style="min-width: 0"><div>{{e.text}}</div><div style="font-size: 13px; color: {{c.muted}}">{{e.why}}</div></div>
+<span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}; white-space: nowrap">{{e.tunnel}}</span>
+</div>
+</sc-for>
+<button type="button" style="margin-top: 8px; height: 38px; padding: 0 14px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Show earlier days</button>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true},&quot;$preview&quot;:{&quot;width&quot;:1200,&quot;height&quot;:1000}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { kind: 'all', q: '' };
+  }
+  renderVals() {
+    const dark = this.props.dark ?? false;
+    const c = dark ? {
+      desk: '#121314', panel: '#1E2022', surface: '#2A2D30', line: '#33363A', lineStrong: '#4A4E53',
+      ink: '#ECEDEE', muted: '#A9AEB4', bars: '#3E4246', accent: '#2DD4BF', accentInk: '#0B1514'
+    } : {
+      desk: '#DCDCD8', panel: '#FFFFFF', surface: '#F1F1EE', line: '#E2E2DE', lineStrong: '#BDBDB8',
+      ink: '#1A1C1E', muted: '#5A5F64', bars: '#D8D9D5', accent: '#0F766E', accentInk: '#FFFFFF'
+    };
+    const tick = 'M6 15V4M12 15V8', dash = 'M4 9.5h10', undo = 'M7 5L3.5 8.5L7 12M3.5 8.5H11a3.5 3.5 0 0 1 0 7H9', sys = 'M9 3v6M5.5 5.5a5 5 0 1 0 7 0';
+    const col = { routed: c.accent, left: c.muted, undone: c.muted, sys: c.muted };
+    const ic = { routed: tick, left: dash, undone: undo, sys: sys };
+    const T = [
+      ['13:21', 'routed', 'Sent git.acme.internal through ACME.', 'No answer directly. ACME answered in 38 ms.', 'ACME', 13.35],
+      ['13:02', 'left', 'Left 10.62.0.77 alone.', 'No answer directly or through ACME. Probably down.', '—', 13.03],
+      ['11:30', 'routed', 'Sent 172.22.8.4 through Nordbank.', 'No answer directly. Nordbank answered in 70 ms.', 'Nordbank', 11.5],
+      ['11:04', 'routed', 'Sent sftp.nordbank.example through Nordbank.', 'Refused directly. Nordbank answered in 61 ms.', 'Nordbank', 11.07],
+      ['10:47', 'routed', 'Sent 10.62.0.18 through ACME.', 'No answer directly. ACME answered in 52 ms.', 'ACME', 10.78],
+      ['10:12', 'undone', 'You sent cdn.acme.example direct again.', 'It was public after all. Crake won’t relearn it on its own.', 'ACME', 10.2],
+      ['09:14', 'routed', 'Sent wiki.acme.internal through ACME.', 'Only ACME’s DNS knows the name. Routed before the first packet.', 'ACME', 9.23],
+      ['09:12', 'routed', 'Sent jira.acme.internal through ACME.', 'Only ACME’s DNS knows the name. Routed before the first packet.', 'ACME', 9.2],
+      ['08:40', 'routed', 'Sent builds.acme.example through ACME.', 'Public name, private address. ACME answered in 47 ms.', 'ACME', 8.67],
+      ['08:31', 'sys', 'ACME and Nordbank connected.', 'Started with your session.', 'System', 8.52]
+    ];
+    const Y = [
+      ['17:55', 'sys', 'Nordbank disconnected.', 'You switched it off.', 'System'],
+      ['16:20', 'left', 'Left status.nordbank.example alone.', 'No answer anywhere. It was down for 4 minutes.', '—'],
+      ['14:03', 'routed', 'Sent 172.22.8.4 through Nordbank.', 'No answer directly. Nordbank answered in 66 ms.', 'Nordbank']
+    ];
+    const st = this.state;
+    const q = (st.q || '').toLowerCase().trim();
+    const keep = (k, text, tunnel) => (st.kind === 'all' || st.kind === k) && (!q || (text + ' ' + tunnel).toLowerCase().includes(q));
+    const mk = r => ({ t: r[0], icon: ic[r[1]], iconColor: col[r[1]], text: r[2], why: r[3], tunnel: r[4] });
+    const today = T.filter(r => keep(r[1], r[2], r[4])).map(mk);
+    const yesterday = Y.filter(r => keep(r[1], r[2], r[4])).map(mk);
+    const X = h => h / 14 * 940 * (14 / 13.4) * (13.4 / 14);
+    const xs = h => (h / 13.4) * 936 + 2;
+    let s = 3; const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+    let bars = '';
+    for (let i = 0; i <= 160; i++) {
+      const h = i * 13.4 / 160, x = xs(h);
+      const work = h > 8.3 && h < 13.4;
+      const ht = work ? 3 + rnd() * 20 : (rnd() < 0.3 ? 2 + rnd() * 4 : 0);
+      if (ht > 0) bars += 'M' + x.toFixed(1) + ' 62V' + (62 - ht).toFixed(1);
+    }
+    const bar = (x, top, base, w) => 'M' + (x - w / 2).toFixed(2) + ' ' + base + 'V' + (top + w / 2).toFixed(2) + 'a' + (w / 2) + ' ' + (w / 2) + ' 0 0 1 ' + w + ' 0V' + base + 'Z';
+    let ticks = '', holes = '';
+    T.forEach(r => {
+      const x = xs(r[5]);
+      if (r[1] === 'routed') ticks += bar(x, 24, 62, 3) + bar(x + 4.5, 33, 62, 3);
+      if (r[1] === 'left') holes += 'M' + (x + 4).toFixed(1) + ' 54a4 4 0 1 0 -8 0a4 4 0 1 0 8 0';
+    });
+    const kinds = [['all', 'Everything'], ['routed', 'Routed'], ['left', 'Left alone'], ['undone', 'Undone']].map(([id, label], i) => {
+      const on = st.kind === id;
+      return { label, aria: on ? 'true' : 'false', bg: on ? c.accent : c.panel, fg: on ? c.accentInk : c.ink,
+        border: i === 0 ? 'none' : '1px solid ' + c.lineStrong, pick: () => this.setState({ kind: id }) };
+    });
+    const routedCount = T.filter(r => r[1] === 'routed').length;
+    return {
+      c, kinds, today, yesterday, q: st.q,
+      emptyToday: today.length === 0,
+      chart: { bars, ticks: ticks || 'M0 0', holes: holes || 'M0 0' },
+      todaySummary: routedCount + ' hosts routed, 1 left alone, 1 undone',
+      onQ: e => this.setState({ q: e.target.value })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,392 @@
+//! Drives the manager with a fake `openconnect` that calls the real hook binary.
+
+use std::os::unix::fs::PermissionsExt;
+use std::time::Duration;
+
+use crake_proto::TunnelState;
+use craked::config::{Config, Protocol, TunnelConfig};
+use craked::hook_server;
+use craked::manager::Manager;
+
+const FAKE: &str = r#"#!/bin/sh
+HOOK="$CRAKE_TEST_HOOK"
+export TUNDEV=crake-acme INTERNAL_IP4_ADDRESS=10.40.1.7 INTERNAL_IP4_NETMASK=255.255.255.0 \
+  INTERNAL_IP4_DNS="10.40.0.2" CISCO_DEF_DOMAIN=acme.internal \
+  CISCO_SPLIT_INC=1 CISCO_SPLIT_INC_0_ADDR=10.40.0.0 CISCO_SPLIT_INC_0_MASKLEN=16
+reason=pre-init "$HOOK" || exit 1
+reason=connect "$HOOK" || exit 1
+trap 'reason=disconnect "$HOOK"; exit 0' TERM
+while :; do sleep 0.1; done
+"#;
+
+async fn wait_for(mgr: &Manager, name: &str, want: TunnelState) {
+    for _ in 0..100 {
+        if mgr.get(name).unwrap().state == want {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    panic!(
+        "{name} never reached {want:?}; is {:?}",
+        mgr.get(name).unwrap().state
+    );
+}
+
+fn setup(dir: &std::path::Path, script: &str) -> Config {
+    let fake = dir.join("openconnect");
+    std::fs::write(&fake, script).unwrap();
+    std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+    // The fake finds the hook through the environment.
+    unsafe { std::env::set_var("CRAKE_TEST_HOOK", env!("CARGO_BIN_EXE_crake-hook")) };
+    Config {
+        hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
+        hook_socket: dir.join("hook.sock"),
+        openconnect: fake,
+        log_path: dir.join("log"),
+        state_path: dir.join("hosts.json"),
+        learned_expiry_days: 7,
+        probing: false,
+        probe_wait_secs: 3,
+        never: vec![],
+        use_resolved: false,
+        apply_network: false,
+        managed_dir: dir.join("managed.d"),
+        tunnels: vec![TunnelConfig {
+            name: "acme".into(),
+            display_name: Some("ACME".into()),
+            gateway: "vpn.acme.example".into(),
+            protocol: Protocol::Anyconnect,
+            user: None,
+            passwd_file: None,
+            dns_domains: vec![],
+            auth_args: vec![],
+            extra_args: vec![],
+            managed: None,
+            own: None,
+        }],
+    }
+}
+
+#[tokio::test]
+async fn connect_then_disconnect() {
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(dir.path(), FAKE);
+    let socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    let _srv = hook_server::serve(mgr.clone(), &socket).unwrap();
+
+    assert_eq!(mgr.get("acme").unwrap().state, TunnelState::Off);
+    mgr.connect("acme").unwrap();
+    assert!(
+        mgr.connect("acme").is_err(),
+        "second connect must be refused"
+    );
+    wait_for(&mgr, "acme", TunnelState::Connected).await;
+
+    let snap = mgr.get("acme").unwrap();
+    let info = snap.info.unwrap();
+    assert_eq!(info.address.unwrap().to_string(), "10.40.1.7");
+    assert_eq!(info.prefix, Some(24));
+    assert_eq!(info.domains, ["acme.internal"]);
+    assert_eq!(info.split_include, ["10.40.0.0/16"]);
+
+    mgr.disconnect("acme").unwrap();
+    wait_for(&mgr, "acme", TunnelState::Off).await;
+    assert!(mgr.get("acme").unwrap().info.is_none());
+
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(log.contains("ACME is up. Routing nothing yet."), "{log}");
+    assert!(log.contains("Switched ACME off."), "{log}");
+    for line in log.lines() {
+        serde_json::from_str::<crake_proto::LogEntry>(line).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn unexpected_exit_is_trouble() {
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(
+        dir.path(),
+        "#!/bin/sh\necho 'SSL negotiation failed' >&2\nexit 1\n",
+    );
+    let socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    let _srv = hook_server::serve(mgr.clone(), &socket).unwrap();
+
+    mgr.connect("acme").unwrap();
+    wait_for(&mgr, "acme", TunnelState::Trouble).await;
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(log.contains("ACME stopped unexpectedly."), "{log}");
+    assert!(log.contains("SSL negotiation failed"), "{log}");
+    // Trouble can be retried.
+    mgr.connect("acme").unwrap();
+}
+
+#[tokio::test]
+async fn hook_from_a_stopped_tunnel_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(dir.path(), FAKE);
+    let socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    let _srv = hook_server::serve(mgr.clone(), &socket).unwrap();
+
+    let msg = crake_proto::HookMessage {
+        tunnel: "acme".into(),
+        reason: "connect".into(),
+        env: Default::default(),
+    };
+    assert!(mgr.handle_hook(msg).await.is_err());
+}
+
+const FAKE_COOKIE: &str = r#"#!/bin/sh
+case "$*" in *--cookie-on-stdin*--servercert=pin-sha256:abc*" -- https://vpn.acme.example/"*) ;; *) echo "bad args: $*" >&2; exit 2 ;; esac
+read -r cookie
+[ "$cookie" = "s3cret" ] || { echo "bad cookie" >&2; exit 3; }
+export TUNDEV=crake-acme INTERNAL_IP4_ADDRESS=10.40.1.7
+reason=connect "$CRAKE_TEST_HOOK" || exit 1
+trap 'exit 0' TERM
+while :; do sleep 0.1; done
+"#;
+
+#[tokio::test]
+async fn connects_with_a_signed_in_session() {
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(dir.path(), FAKE_COOKIE);
+    let socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    let _srv = hook_server::serve(mgr.clone(), &socket).unwrap();
+
+    let session = craked::auth::parse(
+        "COOKIE='s3cret'\nCONNECT_URL='https://vpn.acme.example/'\nFINGERPRINT='pin-sha256:abc'\n",
+    )
+    .unwrap();
+    mgr.connect_with("acme", Some(session)).unwrap();
+    wait_for(&mgr, "acme", TunnelState::Connected).await;
+    mgr.disconnect("acme").unwrap();
+    wait_for(&mgr, "acme", TunnelState::Off).await;
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(!log.contains("s3cret"), "cookie leaked into the log");
+}
+
+/// UDP doesn't get through: DTLS never comes up unless told not to try.
+const FAKE_NO_UDP: &str = r#"#!/bin/sh
+echo "$*" >> "$CRAKE_TEST_CALLS"
+read -r cookie
+export TUNDEV=crake-acme INTERNAL_IP4_ADDRESS=10.40.1.7
+reason=connect "$CRAKE_TEST_HOOK" || exit 1
+case "$*" in *--no-dtls*) ;; *) echo "DTLS handshake timed out" >&2 ;; esac
+trap 'exit 0' TERM HUP
+while :; do sleep 0.1; done
+"#;
+
+#[tokio::test]
+async fn where_udp_is_blocked_it_carries_on_over_tcp() {
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(dir.path(), FAKE_NO_UDP);
+    let calls = dir.path().join("calls");
+    // SAFETY: only this test reads it.
+    unsafe { std::env::set_var("CRAKE_TEST_CALLS", &calls) };
+    let socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    let _srv = hook_server::serve(mgr.clone(), &socket).unwrap();
+
+    let session =
+        craked::auth::parse("COOKIE='s3cret'\nCONNECT_URL='https://vpn.acme.example/'\n").unwrap();
+    mgr.connect_with("acme", Some(session)).unwrap();
+    // Up, then restarted without DTLS on the same sign-in.
+    for _ in 0..100 {
+        let n = std::fs::read_to_string(&calls)
+            .unwrap_or_default()
+            .lines()
+            .count();
+        if n >= 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    wait_for(&mgr, "acme", TunnelState::Connected).await;
+    let runs = std::fs::read_to_string(&calls).unwrap();
+    let runs: Vec<&str> = runs.lines().collect();
+    assert_eq!(runs.len(), 2, "{runs:?}");
+    assert!(!runs[0].contains("--no-dtls"));
+    assert!(runs[1].contains("--no-dtls") && runs[1].contains("--cookie-on-stdin"));
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(
+        log.contains("UDP is blocked here. ACME runs over TCP on this network."),
+        "{log}"
+    );
+    assert_eq!(log.matches("ACME is up").count(), 1, "{log}");
+    assert!(log.contains("ACME is back."), "{log}");
+
+    // Next time on this network it starts over TCP straight away.
+    mgr.disconnect("acme").unwrap();
+    wait_for(&mgr, "acme", TunnelState::Off).await;
+    if craked::networks::current().is_some() {
+        mgr.connect("acme").unwrap();
+        wait_for(&mgr, "acme", TunnelState::Connected).await;
+        let runs = std::fs::read_to_string(&calls).unwrap();
+        assert!(runs.lines().nth(2).unwrap().contains("--no-dtls"), "{runs}");
+        mgr.disconnect("acme").unwrap();
+        wait_for(&mgr, "acme", TunnelState::Off).await;
+    }
+}
+
+#[tokio::test]
+async fn a_managed_tunnel_keeps_to_its_scope() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut cfg = setup(dir.path(), FAKE);
+    std::fs::create_dir_all(&cfg.managed_dir).unwrap();
+    std::fs::write(
+        cfg.managed_dir.join("corp.toml"),
+        "display_name = \"Corp\"\ngateway = \"vpn.corp.example\"\nlearn = [\"*.corp.internal\", \"10.40.0.0/16\"]\n",
+    )
+    .unwrap();
+    // The user's own "corp" gives way to IT's.
+    let mut own = cfg.tunnels[0].clone();
+    own.name = "corp".into();
+    cfg.tunnels.push(own);
+    cfg.add_managed();
+    cfg.validate().unwrap();
+    assert_eq!(cfg.tunnels[0].name, "corp", "IT's tunnels come first");
+    assert!(cfg.tunnels[0].managed.is_some());
+    assert_eq!(cfg.tunnels.iter().filter(|t| t.name == "corp").count(), 1);
+
+    let mgr = Manager::new(cfg).unwrap();
+    let refused = mgr.add_host("corp", "10.99.0.1").await.unwrap_err();
+    assert_eq!(
+        refused.to_string(),
+        "Corp IT only allows *.corp.internal and 10.40.0.0/16 through Corp."
+    );
+    assert!(mgr.pin("corp", "10.0.0.0/8").await.is_err(), "no widening");
+    mgr.add_host("corp", "10.40.0.5").await.unwrap();
+    mgr.pin("corp", "10.40.8.0/24").await.unwrap();
+    // The user's own tunnel learns anything.
+    mgr.add_host("acme", "10.99.0.1").await.unwrap();
+}
+
+#[tokio::test]
+async fn tunnels_added_in_the_app_can_be_changed_and_removed() {
+    use std::collections::HashMap;
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(dir.path(), FAKE);
+    let fields = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    };
+    let mgr = Manager::new(cfg.clone()).unwrap();
+    let name = mgr
+        .add_tunnel(&fields(&[
+            ("display_name", "Home lab"),
+            ("gateway", "203.0.113.7"),
+            ("protocol", "anyconnect"),
+            ("sign_in", "password"),
+            ("user", "me"),
+        ]))
+        .unwrap();
+    assert_eq!(name, "home-lab");
+    assert_eq!(
+        mgr.get("home-lab").unwrap().config.user.as_deref(),
+        Some("me")
+    );
+    assert!(
+        mgr.add_tunnel(&fields(&[("display_name", "X")])).is_err(),
+        "needs a gateway"
+    );
+
+    // Kept across a restart.
+    drop(mgr);
+    let mgr = Manager::new(cfg).unwrap();
+    assert!(mgr.get("home-lab").is_some());
+    mgr.update_tunnel(
+        "home-lab",
+        &fields(&[
+            ("display_name", "Lab"),
+            ("gateway", "203.0.113.7"),
+            ("mode", "full"),
+        ]),
+    )
+    .await
+    .unwrap();
+    let snap = mgr.get("home-lab").unwrap();
+    assert_eq!(snap.config.display(), "Lab");
+    assert_eq!(snap.config.learning(), craked::policy::Learning::FullTunnel);
+
+    // The config file's tunnels aren't the app's to change.
+    assert!(mgr.remove_tunnel("acme").await.is_err());
+    mgr.add_host("home-lab", "10.9.9.9").await.unwrap();
+    // Tunnel detail: when and how it was learned.
+    let rows = mgr.hosts("home-lab").await.unwrap();
+    let row = rows.iter().find(|r| r.target.to_string() == "10.9.9.9").unwrap();
+    assert_eq!(row.learned.as_ref().map(|l| l.1.as_str()), Some("you"));
+    // A name needs the tunnel up, to ask its DNS.
+    let off = mgr.add_host("home-lab", "wiki.lab.example").await.unwrap_err();
+    assert!(format!("{off:#}").contains("Switch Lab on first"), "{off:#}");
+    mgr.remove_tunnel("home-lab").await.unwrap();
+    assert!(mgr.get("home-lab").is_none());
+    assert!(mgr.hosts("home-lab").await.unwrap_or_default().is_empty());
+    let saved = std::fs::read_to_string(dir.path().join("tunnels.json")).unwrap();
+    assert!(!saved.contains("home-lab"), "{saved}");
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(
+        log.contains("Added Home lab.") && log.contains("Removed Lab."),
+        "{log}"
+    );
+}
+
+/// OpenVPN 3: the app runs the session; craked routes through its device.
+#[tokio::test]
+async fn an_openvpn3_session_attaches_and_detaches() {
+    use std::collections::HashMap;
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(dir.path(), FAKE);
+    let mgr = Manager::new(cfg).unwrap();
+    let name = mgr
+        .add_tunnel(&HashMap::from([
+            ("display_name".to_owned(), "GitLab".to_owned()),
+            ("gateway".to_owned(), "initech".to_owned()),
+            ("protocol".to_owned(), "openvpn3".to_owned()),
+        ]))
+        .unwrap();
+    assert!(mgr.connect(&name).is_err(), "the app switches it on");
+    mgr.attach(
+        &name,
+        &HashMap::from([
+            ("device".to_owned(), "tun0".to_owned()),
+            ("dns".to_owned(), "10.8.0.1".to_owned()),
+            ("domains".to_owned(), "gitlab.initech.internal".to_owned()),
+            ("gateway".to_owned(), "203.0.113.50".to_owned()),
+            ("transport".to_owned(), "udp".to_owned()),
+        ]),
+    )
+    .await
+    .unwrap();
+    let snap = mgr.get(&name).unwrap();
+    assert_eq!(snap.state, TunnelState::Connected);
+    assert!(snap.since.is_some(), "tunnel detail's \"connected for\"");
+    assert_eq!(snap.transport.as_deref(), Some("UDP"));
+    // Its DNS answers arrive on tun0: they're this tunnel's, not public.
+    assert_eq!(mgr.tunnel_of_device("tun0").as_deref(), Some(name.as_str()));
+    assert_eq!(mgr.tunnel_of_device("crake-acme").as_deref(), Some("acme"));
+    assert_eq!(mgr.tunnel_of_device("wlp0s20f3"), None);
+    let info = snap.info.unwrap();
+    assert_eq!(info.device, "tun0");
+    assert_eq!(info.domains, ["gitlab.initech.internal"]);
+    assert!(
+        mgr.attach(
+            &name,
+            &HashMap::from([("device".to_owned(), "../x".to_owned())])
+        )
+        .await
+        .is_err()
+    );
+    mgr.detach(&name, None).await.unwrap();
+    assert_eq!(mgr.get(&name).unwrap().state, TunnelState::Off);
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(
+        log.contains("GitLab is up.") && log.contains("Switched GitLab off."),
+        "{log}"
+    );
+}

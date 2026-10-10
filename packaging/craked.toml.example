@@ -1,0 +1,19 @@
+# /etc/crake/craked.toml
+# hook_path   = "/usr/libexec/crake/hook"
+# hook_socket = "/run/crake/hook.sock"
+# log_path    = "/var/lib/crake/log"
+# state_path  = "/var/lib/crake/hosts.json"
+# learned_expiry_days = 7
+# use_resolved = true
+# probing = true            # try connections that fail directly through the tunnels
+# probe_wait_secs = 3       # 1, 2, 3 or 5
+# never = ["203.0.113.0/24"] # never through any tunnel
+
+[[tunnel]]
+name = "acme"            # a-z, 0-9, '-', at most 9 characters; interface is crake-acme
+display_name = "ACME"
+gateway = "vpn.acme.example"
+protocol = "anyconnect"  # anyconnect | gp | pulse | nc | fortinet | f5 | array
+# user = "ondrej"
+# passwd_file = "/etc/crake/acme.pass"   # root-only; first line is the password
+# dns_domains = ["acme.internal"]         # names that belong here, besides what the gateway pushes

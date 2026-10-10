@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: acting as AnyConnect</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4;
+    --accent: #2DD4BF; --track: #4A4E53; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --ink: #1A1C1E; --muted: #5A5F64;
+    --accent: #0F766E; --track: #BDBDB8; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 40px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 760px; margin-bottom: 18px; }
+  .intro b { color: var(--ink); }
+  .panel { width: 452px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding-bottom: 8px; }
+  .sec { padding: 12px 18px 4px; font-size: 13px; font-weight: 600; }
+  .tun { display: flex; align-items: center; gap: 12px; padding: 9px 18px; }
+  .tun .n { font-size: 15px; font-weight: 700; }
+  .tun .s { font-size: 13px; color: var(--muted); margin-left: 8px; }
+  .tun .p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .sw { width: 46px; height: 26px; border-radius: 13px; background: var(--accent); position: relative; flex: none; margin-left: auto; }
+  .sw::after { content: ''; position: absolute; top: 3px; left: 23px; width: 20px; height: 20px; border-radius: 50%; background: #fff; }
+  .sw.off { background: var(--track); } .sw.off::after { left: 3px; }
+  /* The notice: under the tunnel it is about, until the user says "Got it". */
+  .note { margin: 0 18px 8px; padding: 10px 12px; background: var(--surface); border-radius: 8px; font-size: 13px;
+    display: flex; gap: 12px; align-items: flex-start; }
+  .note .got { flex: none; border: none; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>Proposal: acting as AnyConnect.</b> Some gateways only let Cisco's own client in. When sign-in is turned
+    away before the gateway asks anything, Crake tries once more introducing itself as AnyConnect, remembers that for the
+    gateway, and says so under the tunnel, in plain words, until the user dismisses it. It is never done silently.</div>
+  <div class="panel">
+    <div class="sec">Tunnels</div>
+    <div class="tun"><div><div><span class="n">ACME</span><span class="s">Connected · 3 hosts</span></div>
+      <div class="p">Your profile · learning on</div></div><div class="sw"></div></div>
+    <div class="note"><span>Crake introduces itself to ACME as Cisco AnyConnect, because ACME’s gateway only lets AnyConnect in.</span>
+      <button class="got">Got it</button></div>
+    <div class="tun"><div><div><span class="n">Home lab</span><span class="s">Off</span></div>
+      <div class="p">Your profile · learning on</div></div><div class="sw off"></div></div>
+  </div>
+</div>
+<script>if (location.search.includes('dark=false')) document.body.classList.add('light');</script>
+</body>
+</html>

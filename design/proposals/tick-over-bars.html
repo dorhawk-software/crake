@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: ticks over bars</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --line: #33363A; --lineStrong: #4A4E53;
+    --ink: #ECEDEE; --muted: #A9AEB4; --bars: #3E4246; --accent: #2DD4BF; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --line: #E2E2DE; --lineStrong: #BDBDB8;
+    --ink: #1A1C1E; --muted: #5A5F64; --bars: #D8D9D5; --accent: #0F766E; }
+  body { margin: 0; background: var(--desk); color: var(--ink);
+    font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  .page { padding: 32px 40px 40px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 980px; }
+  .intro b { color: var(--ink); }
+  .row { display: flex; gap: 28px; margin-top: 22px; flex-wrap: wrap; }
+  .case { width: 452px; }
+  .label { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 10px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px 16px; }
+  .t { font-size: 13px; font-weight: 600; }
+  .zoom { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .zoom .z { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<div class="page" id="page"></div>
+<script>
+if (location.search.includes('dark=false')) document.body.classList.add('light');
+const X = i => 2 + i * 6.8;
+const bar = (x, top, base, w) => `M${(x - w / 2).toFixed(2)} ${base}V${(top + w / 2).toFixed(2)}a${w / 2} ${w / 2} 0 0 1 ${w} 0V${base}Z`;
+let s = 7; const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+// Busy traffic around the ticks, so they meet tall bars.
+const heights = []; for (let i = 0; i <= 60; i++) heights.push(6 + rnd() * ((i > 36) ? 30 : 10));
+const css = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+const ticks = [42, 49, 57];
+const covered = i => ticks.some(t => X(i) > X(t) - 4 && X(i) < X(t) + 5 + 4);
+
+function chart(mode, viewBox) {
+  let svg = `<svg viewBox="${viewBox}" style="display:block;width:100%;height:auto">`;
+  heights.forEach((h, i) => {
+    if (mode === 'hide' && covered(i)) return;
+    svg += `<path d="M${X(i).toFixed(1)} 72V${(72 - h).toFixed(1)}" stroke="${css('--bars')}" stroke-width="3.6"/>`;
+  });
+  for (const t of ticks) {
+    const d = bar(X(t), 30, 72, 3.2) + bar(X(t) + 5, 40, 72, 3.2);
+    if (mode === 'gap') svg += `<path d="${d}" fill="none" stroke="${css('--panel')}" stroke-width="3" stroke-linejoin="round"/>`;
+  }
+  // The baseline after the gaps, so they don't cut it.
+  svg += `<line x1="0" y1="72.5" x2="416" y2="72.5" stroke="${css('--lineStrong')}" stroke-width="1"/>`;
+  for (const t of ticks) {
+    svg += `<path d="${bar(X(t), 30, 72, 3.2) + bar(X(t) + 5, 40, 72, 3.2)}" fill="${css('--accent')}"/>`;
+  }
+  return svg + `</svg>`;
+}
+
+const cases = [
+  { mode: 'now', label: 'Today: the tick sits on the bars' },
+  { mode: 'gap', label: 'A: a gap around the tick (bars stay)' },
+  { mode: 'hide', label: 'B: no bars under the tick' },
+];
+let html = `<div class="intro"><b>Proposal.</b> Busy traffic next to three routed moments. Below each chart, the same
+  three ticks at four times the size.</div><div class="row">`;
+for (const c of cases) {
+  html += `<div class="case"><div class="label">${c.label}</div><div class="panel"><div class="t">Last hour</div>
+    <div style="margin-top:8px">${chart(c.mode, '0 0 416 74')}</div>
+    <div class="zoom"><div class="z">Zoomed in</div>${chart(c.mode, '268 20 132 54')}</div></div></div>`;
+}
+document.getElementById('page').innerHTML = html + `</div>`;
+</script>
+</body>
+</html>

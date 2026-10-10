@@ -1,0 +1,6 @@
+/target
+/dev
+# Local notes about the user's real gateways; never committed.
+/CLAUDE.local.md
+# Personal Claude Code settings (the project's shared ones are committed).
+/.claude/settings.local.json

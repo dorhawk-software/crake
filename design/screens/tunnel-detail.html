@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Crake tunnel detail</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0F766E}a:hover{color:#0B5D57}
+button,input,select{font:inherit}
+.mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}
+</style>
+</helmet>
+<div style="min-height: 1040px; box-sizing: border-box; padding: 40px 16px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
+<div style="max-width: 900px; margin: 0 auto; background: {{c.panel}}; border: 1px solid {{c.line}}; border-radius: 12px; box-shadow: 0 30px 60px -30px rgba(0,0,0,0.35); overflow: hidden">
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px 10px 10px; border-bottom: 1px solid {{c.line}}">
+<button type="button" style="height: 36px; padding: 0 10px 0 6px; border: none; border-radius: 6px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>Tunnels</button>
+<span style="flex: 1 1 auto"></span>
+<button type="button" style="height: 36px; padding: 0 14px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Disconnect</button>
+<button type="button" aria-label="Close" style="width: 32px; height: 32px; border: none; border-radius: 50%; background: {{c.surface}}; color: {{c.ink}}; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"></path></svg></button>
+</div>
+
+<div style="padding: 24px 28px 0">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+<h1 style="margin: 0; font-size: 28px; font-weight: 700">ACME</h1>
+<span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="1.5"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>Managed</span>
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: {{c.muted}}"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{c.accent}}"></span>Connected</span>
+</div>
+
+<dl style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0; margin: 18px 0 0; border: 1px solid {{c.line}}; border-radius: 8px; overflow: hidden">
+<div style="padding: 12px 14px"><dt style="font-size: 12px; color: {{c.muted}}">Connected for</dt><dd style="margin: 2px 0 0; font-size: 15px; font-weight: 600">4 h 53 min</dd></div>
+<div style="padding: 12px 14px; border-left: 1px solid {{c.line}}"><dt style="font-size: 12px; color: {{c.muted}}">Your address</dt><dd class="mono" style="margin: 2px 0 0; font-size: 14px">10.40.12.7</dd></div>
+<div style="padding: 12px 14px; border-left: 1px solid {{c.line}}"><dt style="font-size: 12px; color: {{c.muted}}">Protocol</dt><dd style="margin: 2px 0 0; font-size: 15px; font-weight: 600">AnyConnect · DTLS</dd></div>
+<div style="padding: 12px 14px; border-left: 1px solid {{c.line}}"><dt style="font-size: 12px; color: {{c.muted}}">Gateway</dt><dd class="mono" style="margin: 2px 0 0; font-size: 14px">vpn.acme.example</dd></div>
+</dl>
+
+<div style="display: flex; gap: 12px; align-items: flex-start; margin-top: 14px; padding: 14px 16px; border-radius: 8px; background: {{c.surface}}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{c.ink}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 auto; margin-top: 1px"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"></path></svg>
+<div><div style="font-weight: 700">ACME IT allows learning for <span class="mono" style="font-size: 13px">*.acme.internal</span> and <span class="mono" style="font-size: 13px">10.40.0.0/16</span>.</div><div style="font-size: 13px; color: {{c.muted}}">Anything else stays direct, even if it doesn’t answer. You can pin and forget hosts, but not widen the rule.</div></div>
+</div>
+
+<div style="margin-top: 22px">
+<div style="display: flex; align-items: baseline; justify-content: space-between">
+<h2 style="margin: 0; font-size: 16px; font-weight: 700">Today through ACME</h2>
+<span class="mono" style="font-size: 12px; color: {{c.muted}}">6 hosts · 212 MB</span>
+</div>
+<svg viewBox="0 0 840 60" role="img" aria-label="ACME tunnel use today, busiest between 9 and 1" style="display: block; width: 100%; height: auto; margin-top: 8px">
+<path d="{{bars}}" stroke="{{c.bars}}" stroke-width="3"></path>
+<path d="{{ticks}}" fill="{{c.accent}}"></path>
+<line x1="0" y1="44" x2="840" y2="44" stroke="{{c.lineStrong}}" stroke-width="1"></line>
+<g font-family="Atkinson Hyperlegible Mono, monospace" font-size="11" fill="{{c.muted}}"><text x="0" y="58">00:00</text><text x="376" y="58" text-anchor="middle">06:00</text><text x="840" y="58" text-anchor="end">now</text></g>
+</svg>
+</div>
+</div>
+
+<div style="padding: 22px 28px 0">
+<div role="tablist" aria-label="Hosts" style="display: flex; gap: 22px; border-bottom: 1px solid {{c.line}}">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+<button type="button" role="tab" aria-selected="{{t.aria}}" onClick="{{t.pick}}" style="height: 42px; padding: 0; border: none; border-bottom: 2px solid {{t.bar}}; margin-bottom: -1px; background: transparent; color: {{t.fg}}; font-weight: {{t.weight}}; cursor: pointer">{{t.label}} <span class="mono" style="font-size: 12px; color: {{c.muted}}">{{t.n}}</span></button>
+</sc-for>
+</div>
+
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="5">
+<div style="display: grid; grid-template-columns: 18px minmax(0, 1fr) 120px auto; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid {{c.line}}">
+<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="{{r.icon}}" stroke="{{r.iconColor}}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+<div style="min-width: 0"><div class="mono" style="font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{r.host}}</div><div style="font-size: 13px; color: {{c.muted}}">{{r.how}}</div></div>
+<div style="font-size: 13px; color: {{c.muted}}">{{r.used}}</div>
+<div style="display: flex; gap: 6px; justify-content: flex-end">
+<sc-if value="{{r.editable}}" hint-placeholder-val="{{true}}">
+<button type="button" aria-pressed="{{r.pinAria}}" onClick="{{r.pin}}" style="height: 34px; padding: 0 12px; border: 1px solid {{r.pinBorder}}; border-radius: 6px; background: {{r.pinBg}}; color: {{r.pinFg}}; font-weight: 600; cursor: pointer">{{r.pinLabel}}</button>
+<button type="button" onClick="{{r.forget}}" style="height: 34px; padding: 0 12px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Forget</button>
+</sc-if>
+<sc-if value="{{r.locked}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 13px; color: {{c.muted}}">Set by the gateway</span>
+</sc-if>
+</div>
+</div>
+</sc-for>
+<sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+<div style="padding: 24px 0; color: {{c.muted}}; border-bottom: 1px solid {{c.line}}">Nothing here.</div>
+</sc-if>
+
+<form style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 16px 0 28px">
+<label for="addh" style="font-weight: 600">Add a host</label>
+<input id="addh" type="text" placeholder="name.acme.internal or 10.40.x.x" class="mono" style="flex: 1 1 240px; height: 40px; box-sizing: border-box; padding: 0 12px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-size: 13px">
+<button type="button" style="height: 40px; padding: 0 16px; border: none; border-radius: 6px; background: {{c.accent}}; color: {{c.accentInk}}; font-weight: 700; cursor: pointer">Send through ACME</button>
+</form>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true},&quot;$preview&quot;:{&quot;width&quot;:1100,&quot;height&quot;:1040}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'learned', pins: { wiki: true }, gone: {} };
+  }
+  renderVals() {
+    const dark = this.props.dark ?? false;
+    const c = dark ? {
+      desk: '#121314', panel: '#1E2022', surface: '#2A2D30', line: '#33363A', lineStrong: '#4A4E53',
+      ink: '#ECEDEE', muted: '#A9AEB4', accent: '#2DD4BF', accentInk: '#0B1514', accentSoft: '#17332F', bars: '#3E4246'
+    } : {
+      desk: '#DCDCD8', panel: '#FFFFFF', surface: '#F1F1EE', line: '#E2E2DE', lineStrong: '#BDBDB8',
+      ink: '#1A1C1E', muted: '#5A5F64', accent: '#0F766E', accentInk: '#FFFFFF', accentSoft: '#E2F1EF', bars: '#D8D9D5'
+    };
+    const st = this.state;
+    const tick = 'M6 15V4M12 15V8', lock = 'M4 9h10v7H4zM6.5 9V6.5a2.5 2.5 0 0 1 5 0V9', pinIcon = 'M6 3h6M7.5 3v4.5L5 10h8l-2.5-2.5V3M9 10v5.5';
+    const hosts = [
+      { id: 'git', host: 'git.acme.internal', how: 'Learned at 13:21 · no answer directly', used: 'Used now', src: 'learned' },
+      { id: 'db', host: '10.62.0.18', how: 'Learned at 10:47 · no answer directly', used: '12 min ago', src: 'learned' },
+      { id: 'wiki', host: 'wiki.acme.internal', how: 'Learned at 09:14 · name only exists inside', used: '1 h ago', src: 'learned' },
+      { id: 'jira', host: 'jira.acme.internal', how: 'Learned at 09:12 · name only exists inside', used: '3 min ago', src: 'learned' },
+      { id: 'ci', host: 'builds.acme.example', how: 'Learned at 08:40 · public name, private address', used: '2 h ago', src: 'learned' },
+      { id: 'dns', host: '10.40.0.53', how: 'ACME’s DNS server', used: 'Used now', src: 'gateway' },
+      { id: 'net', host: '10.40.0.0/16', how: 'Pushed when ACME connects', used: '—', src: 'gateway' }
+    ];
+    const live = hosts.filter(h => !st.gone[h.id]);
+    const pinned = h => !!st.pins[h.id];
+    const inTab = (h, t) => t === 'learned' ? h.src === 'learned' : t === 'pinned' ? pinned(h) : h.src === 'gateway';
+    const tabs = [['learned', 'Learned'], ['pinned', 'Pinned'], ['gateway', 'From the gateway']].map(([id, label]) => {
+      const on = st.tab === id;
+      return { label, n: live.filter(h => inTab(h, id)).length, aria: on ? 'true' : 'false', bar: on ? c.accent : 'transparent',
+        fg: on ? c.ink : c.muted, weight: on ? 700 : 600, pick: () => this.setState({ tab: id }) };
+    });
+    const rows = live.filter(h => inTab(h, st.tab)).map(h => {
+      const p = pinned(h), gw = h.src === 'gateway';
+      return {
+        host: h.host, how: p ? 'Pinned · kept until you forget it' : h.how, used: h.used,
+        icon: gw ? lock : (p ? pinIcon : tick), iconColor: gw ? c.muted : (p ? c.ink : c.accent),
+        editable: !gw, locked: gw,
+        pinAria: p ? 'true' : 'false', pinLabel: p ? 'Unpin' : 'Pin',
+        pinBg: c.panel, pinFg: c.ink, pinBorder: c.line,
+        pin: () => this.setState({ pins: Object.assign({}, this.state.pins, { [h.id]: !p }) }),
+        forget: () => this.setState({ gone: Object.assign({}, this.state.gone, { [h.id]: true }) })
+      };
+    });
+    let s = 9; const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+    let bars = '';
+    for (let i = 0; i <= 120; i++) {
+      const h = i * 13.4 / 120, x = 2 + h / 13.4 * 836;
+      const ht = h > 8.5 ? 2 + rnd() * 16 : 0;
+      if (ht) bars += 'M' + x.toFixed(1) + ' 44V' + (44 - ht).toFixed(1);
+    }
+    const bar = (x, top, base, w) => 'M' + (x - w / 2).toFixed(2) + ' ' + base + 'V' + (top + w / 2).toFixed(2) + 'a' + (w / 2) + ' ' + (w / 2) + ' 0 0 1 ' + w + ' 0V' + base + 'Z';
+    let ticks = '';
+    [13.35, 10.78, 9.23, 9.2, 8.67].forEach(h => { const x = 2 + h / 13.4 * 836; ticks += bar(x, 10, 44, 3) + bar(x + 4.5, 18, 44, 3); });
+    return { c, tabs, rows, empty: rows.length === 0, bars: bars || 'M0 0', ticks };
+  }
+}
+</script>
+</body>
+</html>

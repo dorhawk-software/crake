@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: Tunnels in Settings</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #26292C; --line: #33363A; --lineStrong: #4A4E53;
+    --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; --accentInk: #0B1514; --accentSoft: #17332F; --danger: #F97066; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F3F3F0; --line: #E2E2DE; --lineStrong: #BDBDB8;
+    --ink: #1A1C1E; --muted: #5A5F64; --accent: #0F766E; --accentInk: #FFFFFF; --accentSoft: #E2F1EF; --danger: #B42318; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  .intro { max-width: 1040px; margin: 24px auto 0; padding: 0 16px; color: var(--muted); font-size: 13px; }
+  .intro b { color: var(--ink); }
+  .page { padding: 16px 16px 40px; }
+  .card { max-width: 1040px; margin: 0 auto; display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; min-height: 820px; }
+  nav { width: 222px; flex: none; padding: 16px 12px; background: var(--surface); border-right: 1px solid var(--line); box-sizing: border-box; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 16px; font-size: 17px; font-weight: 700; }
+  .sec { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px; margin-bottom: 2px; border-radius: 6px; font-weight: 500; }
+  .sec.on { background: var(--panel); font-weight: 700; }
+  main { flex: 1; padding: 14px 16px 32px 36px; }
+  .close { display: flex; justify-content: flex-end; }
+  .close span { width: 32px; height: 32px; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; }
+  .content { max-width: 640px; padding-right: 20px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 700; }
+  .lede { margin: 4px 0 0; color: var(--muted); }
+  .group { margin-top: 22px; border: 1px solid var(--line); border-radius: 8px; }
+  .tun { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; }
+  .tun + .tun, .tun + .confirm, .confirm + .tun { border-top: 1px solid var(--line); }
+  .tun:hover { background: var(--surface); }
+  .grip { color: var(--muted); flex: none; cursor: grab; }
+  .num { font-size: 12px; color: var(--muted); width: 10px; flex: none; }
+  .name { font-size: 15px; font-weight: 700; }
+  .tag { font-size: 12px; padding: 1px 7px; border-radius: 4px; background: var(--surface); color: var(--muted); margin-left: 8px; }
+  .tun:hover .tag { background: var(--panel); }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .grow { flex: 1; min-width: 0; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink);
+    font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn.danger { border-color: var(--danger); color: var(--danger); background: transparent; }
+  .btn.solid-danger { border-color: var(--danger); background: var(--danger); color: var(--panel); }
+  .who { font-size: 13px; color: var(--muted); }
+  .chev { color: var(--muted); flex: none; }
+  .label { padding: 10px 16px 6px; font-size: 12px; font-weight: 600; color: var(--muted); border-top: 1px solid var(--line); }
+  .confirm { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface); }
+  .new { margin-top: 16px; height: 38px; padding: 0 14px; border: none; border-radius: 6px; background: var(--accent); color: var(--accentInk);
+    font: inherit; font-weight: 700; cursor: pointer; }
+  .hint { margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .note { margin-top: 28px; max-width: 640px; font-size: 13px; color: var(--muted); }
+  .note b { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="intro"><b>Proposal: Tunnels in Settings.</b> A first section that lists every tunnel in the order Crake
+  tries them (drag to change: this replaces “Try tunnels in this order” under Learning). <b>+ New tunnel</b> opens the
+  New tunnel window; a click on a tunnel opens its Tunnel detail. Your own tunnels have <b>Edit</b> (the New tunnel
+  steps, filled in) and <b>Remove…</b>, which asks first. Managed ones say who set them up and can’t be changed. The
+  list reads the way traffic goes: the numbered tunnels take what they learned, in order; a full tunnel comes last
+  and takes everything else. Try Remove… on Home lab.
+  <a href="?dark=false" style="color: var(--accent)">Light</a> · <a href="?" style="color: var(--accent)">Dark</a></div>
+<div class="page"><div class="card">
+  <nav>
+    <div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 20.5 5.3 15M6.2 20.5l.6-3.4M17.4 20.5l-.6-3.6M20.5 20.5l-1.7-5.2"/><path d="M8.5 20.5V12a3.75 3.75 0 0 1 7.5 0"/><path d="M16 10.4l4.3 1.2-4.3 1.2"/><path d="M16 12.8c0 2.7-.9 5-2.6 7.7"/><circle cx="12.4" cy="10.6" r="0.9" fill="currentColor" stroke="none"/><path d="M19.2 6.2l1.4-1.6M21 8.4l1.6-.7" stroke="var(--accent)"/></svg>Settings</div>
+    <div id="nav"></div>
+  </nav>
+  <main>
+    <div class="close"><span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg></span></div>
+    <div class="content">
+      <h1>Tunnels</h1>
+      <p class="lede">The VPNs Crake can use, in the order it tries them.</p>
+      <div class="group" id="list"></div>
+      <button class="new">+ New tunnel</button>
+      <div class="hint">Drag to change the order. A click on a tunnel shows what it learned.</div>
+    </div>
+    <div class="note"><b>Remove…</b> takes the tunnel out of Crake: what it learned and its saved sign-in in the keyring
+      go too. The log keeps its history. A tunnel that’s on is switched off first.</div>
+  </main>
+</div></div>
+<script>
+if (location.search.includes('dark=false')) document.body.classList.add('light');
+const sections = [
+  ['Tunnels', 'M4 20V12a8 8 0 0 1 16 0v8M8 20v-8a4 4 0 0 1 8 0v8'],
+  ['General', 'M12 15a3 3 0 1 0 0-6a3 3 0 1 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1'],
+  ['Learning', 'M6 18V6M12 18V10M18 18V4'],
+  ['Names', 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z'],
+  ['Privacy & log', 'M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z'],
+  ['Managed by IT', 'M6 11h12v10H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3'],
+  ['About', 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v6M12 7.5v.5'],
+];
+document.getElementById('nav').innerHTML = sections.map(([l, d], i) =>
+  `<div class="sec${i === 0 ? ' on' : ''}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>${l}</div>`).join('');
+
+const grip = `<svg class="grip" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>`;
+const trash = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="TRASH"/></svg>`.replace('TRASH', 'M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6');
+const chev = `<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;
+const tunnels = [
+  { name: 'ACME', meta: 'vpn.acme.example · AnyConnect', managed: 'ACME IT' },
+  { name: 'Nordbank', meta: 'vpn.nordbank.example · GlobalProtect' },
+  { name: 'Home lab', meta: '203.0.113.7 · AnyConnect' },
+];
+let confirming = null;
+function render() {
+  document.getElementById('list').innerHTML = tunnels.map((t, i) => {
+    const right = t.managed
+      ? `<span class="who">Set up by ${t.managed}</span>`
+      : `<button class="btn" onclick="event.stopPropagation()">Edit</button><button class="btn danger" onclick="event.stopPropagation(); confirming = ${i}; render()">${trash}Remove…</button>`;
+    const row = `<div class="tun">${grip}<span class="num mono">${i + 1}</span>
+      <div class="grow"><div><span class="name">${t.name}</span>${t.managed ? '<span class="tag">Managed</span>' : ''}</div>
+      <div class="meta mono">${t.meta}</div></div>${right}${chev}</div>`;
+    const ask = confirming === i ? `<div class="confirm"><div class="grow"><b>Remove ${t.name}?</b>
+      <div class="meta" style="font-size:13px">What Crake learned for it and its saved sign-in go too.</div></div>
+      <button class="btn" onclick="confirming = null; render()">Keep it</button>
+      <button class="btn solid-danger" onclick="tunnels.splice(${i}, 1); confirming = null; render()">${trash}Remove</button></div>` : '';
+    return row + ask;
+  }).join('');
+  document.getElementById('list').innerHTML += `<div class="label">Everything else goes through:</div><div class="tun"><span style="width:16px"></span><span class="num"></span>
+    <div class="grow"><div><span class="name">Globex</span><span class="tag">Managed</span></div>
+    <div class="meta mono">vpn.globex.example · AnyConnect</div>
+    <div class="meta" style="font-size:13px">A full tunnel: while it’s on, whatever the tunnels above don’t take goes through it.</div></div>
+    <span class="who">Set up by Globex IT</span>${chev}</div>`;
+}
+render();
+</script>
+</body>
+</html>

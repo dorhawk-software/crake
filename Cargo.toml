@@ -1,0 +1,40 @@
+[workspace]
+resolver = "3"
+members = ["crates/crake-proto", "crates/craked", "crates/crake"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+# Not on crates.io: built and shipped as Crake.
+publish = false
+
+# Lints are errors, not warnings: a build with any of them fails. (The
+# vendored GPUI patch isn't a member, so these apply to Crake's own code.)
+[workspace.lints.rust]
+warnings = "deny"
+unused_imports = "deny"
+unused_must_use = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+
+[workspace.dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "process", "signal", "sync", "time", "io-util", "io-std", "fs"] }
+tracing = "0.1"
+
+[patch.crates-io]
+# X11 placement for the tray panel; see vendor/gpui-pre-linux/CRAKE-PATCH.md.
+gpui-pre-linux = { path = "vendor/gpui-pre-linux" }
+
+[profile.dev]
+# The UI's own drawing code: unoptimised GPUI views stutter (same as tern).
+opt-level = 1
+
+[profile.dev.package."*"]
+# GPUI is painfully slow unoptimised; optimise dependencies even in dev builds.
+opt-level = 2

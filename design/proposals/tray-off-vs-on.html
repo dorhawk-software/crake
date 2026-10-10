@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: off vs on in the tray</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #121314; color: #ECEDEE; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; }
+  .page { padding: 24px 32px; }
+  .intro { color: #A9AEB4; font-size: 13px; max-width: 900px; margin-bottom: 14px; }
+  .intro b { color: #ECEDEE; }
+  table { border-collapse: separate; border-spacing: 0 8px; }
+  th { text-align: left; font-size: 12px; color: #A9AEB4; font-weight: 600; padding-right: 18px; }
+  td { vertical-align: middle; padding-right: 18px; white-space: nowrap; }
+  td:first-child { white-space: normal; width: 250px; }
+  .cap { font-weight: 600; font-size: 13px; }
+  .sub { font-size: 12px; color: #A9AEB4; max-width: 250px; }
+  .bar { background: #000; border-radius: 6px; padding: 7px 10px; display: inline-flex; align-items: center; gap: 12px; }
+  .bar.light { background: #f2f2f2; }
+  .bar .app { width: 16px; height: 16px; border-radius: 4px; background: #5e81ac; }
+  .bar .app2 { width: 16px; height: 16px; border-radius: 50%; background: #9a9a9a; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>Proposal: telling off from on at a glance.</b> Today only the eye changes (open dot vs closed
+    slit), which is too small at 16 px. Each option below shows <b>off</b> and <b>listening</b> side by side at bar size,
+    next to app icons, on a dark and a light bar, then larger.</div>
+  <table id="t"></table>
+</div>
+<script>
+const SIL = 'M8.5 20.5V12A3.75 3.75 0 0 1 15.95 11.4L16 10.4L20.6 11.6L16 12.8C16 15.5 15.1 17.8 13.4 20.5Z';
+let id = 0;
+// look: {fill, outline, eye: 'open'|'shut', tuck}
+function icon(look, size, ink) {
+  const m = 'm' + (id++);
+  const eye = look.eye === 'open'
+    ? `<circle cx="12.35" cy="11.4" r="1.55" fill="#000"/>`
+    : `<rect x="10.35" y="10.7" width="4" height="1.4" rx="0.7" fill="#000"/>`;
+  const t = look.tuck ? 'transform="rotate(30 14 13)"' : '';
+  const solid = look.fill > 0
+    ? `<defs><mask id="${m}" maskUnits="userSpaceOnUse" x="-5" y="-5" width="40" height="40"><g ${t}><path d="${SIL}" fill="#fff" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>${eye}</g></mask></defs><rect x="-5" y="-5" width="40" height="40" fill="${ink}" opacity="${look.fill}" mask="url(#${m})"/>`
+    : '';
+  const line = look.outline
+    ? `<g ${t}><path d="${SIL}" fill="none" stroke="${ink}" stroke-width="1.7" stroke-linejoin="round" ${look.dash ? 'stroke-dasharray="2.4 2"' : ''}/>${look.eye === 'shut' ? `<path d="M10.9 11.4h2.9" stroke="${ink}" stroke-width="1.4" stroke-linecap="round"/>` : `<circle cx="12.35" cy="11.4" r="1.1" fill="${ink}"/>`}</g>`
+    : '';
+  return `<svg width="${size}" height="${size}" viewBox="7.1 6.6 15.2 15.2">${solid}${line}</svg>`;
+}
+const on = { fill: 1, eye: 'open' };
+const options = [
+  ['Today', 'Only the eye changes.', { fill: 1, eye: 'shut' }],
+  ['A · hollow when off', 'Off is the outline only, eye shut. On is solid. (Connecting stays a dashed outline, drawing itself.)', { fill: 0, outline: true, eye: 'shut' }],
+  ['B · dimmed when off', 'Off is the same head at 40%, eye shut, like other inactive tray icons.', { fill: 0.4, eye: 'shut' }],
+  ['C · asleep: head tucked', 'Off tips the head down, beak low, eye shut: a sleeping bird. A shape change, not just a detail.', { fill: 1, eye: 'shut', tuck: true }],
+  ['D · tucked and dimmed', 'C and B together: the strongest difference.', { fill: 0.45, eye: 'shut', tuck: true }],
+];
+const connecting = { fill: 0, outline: true, eye: 'open', dash: true };
+document.getElementById('t').innerHTML =
+  `<tr><th></th><th>dark bar: off · listening · connecting</th><th>light bar</th><th>24 px</th><th>48 px</th></tr>` +
+  options.map(([cap, sub, off]) => `<tr><td><div class="cap">${cap}</div><div class="sub">${sub}</div></td>
+    <td><span class="bar"><span class="app"></span>${icon(off, 16, '#fff')}${icon(on, 16, '#fff')}${icon(connecting, 16, '#fff')}<span class="app2"></span></span></td>
+    <td><span class="bar light"><span class="app"></span>${icon(off, 16, '#2e3436')}${icon(on, 16, '#2e3436')}<span class="app2"></span></span></td>
+    <td>${icon(off, 24, '#fff')} ${icon(on, 24, '#fff')}</td>
+    <td>${icon(off, 48, '#fff')} ${icon(on, 48, '#fff')}</td></tr>`).join('');
+</script>
+</body>
+</html>

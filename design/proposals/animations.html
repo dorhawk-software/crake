@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: motion</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+    --ink: #ECEDEE; --muted: #A9AEB4; --bars: #3E4246; --accent: #2DD4BF; --accentInk: #0B1514; --track: #4A4E53; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8;
+    --ink: #1A1C1E; --muted: #5A5F64; --bars: #D8D9D5; --accent: #0F766E; --accentInk: #FFFFFF; --track: #BDBDB8; }
+  body { margin: 0; background: var(--desk); color: var(--ink);
+    font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  .page { padding: 28px 40px 48px; max-width: 1180px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 900px; }
+  .intro b { color: var(--ink); }
+  h3 { font-size: 15px; margin: 30px 0 10px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .cap { font-size: 13px; font-weight: 600; }
+  .sub { font-size: 12px; color: var(--muted); margin-top: 2px; max-width: 220px; }
+  .replay { margin-top: 10px; height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  /* The top bar is dark in both themes on Ubuntu. */
+  .bar { background: #000; border-radius: 6px; padding: 10px 14px; display: flex; align-items: center; gap: 16px; margin-top: 10px; }
+  .bar svg { color: #fff; }
+
+
+  /* The panel rises from the bar as it opens. */
+  .panel { width: 360px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .open { animation: rise .18s cubic-bezier(.2,0,0,1); }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+  .ph { padding: 12px 14px; font-weight: 700; font-size: 15px; display: flex; gap: 8px; align-items: center; }
+  .chart { padding: 0 14px; }
+  .sec { padding: 10px 14px 4px; font-size: 13px; font-weight: 600; border-top: 1px solid var(--line); margin-top: 8px; }
+  .row { display: flex; gap: 10px; padding: 7px 14px 9px; align-items: flex-start; }
+  .row .tx { flex: 1; min-width: 0; font-size: 13.5px; }
+  .row .wy { font-size: 12px; color: var(--muted); }
+  .row .tm { font-size: 12px; color: var(--muted); }
+  .arrive { animation: arrive .22s cubic-bezier(.2,0,0,1); }
+  @keyframes arrive { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: none } }
+  .grow1 { transform-box: fill-box; transform-origin: bottom; animation: grow .26s cubic-bezier(.2,0,0,1) both; }
+  .grow2 { transform-box: fill-box; transform-origin: bottom; animation: grow .26s .09s cubic-bezier(.2,0,0,1) both; }
+  @keyframes grow { from { transform: scaleY(0) } to { transform: scaleY(1) } }
+
+  .switch { width: 46px; height: 26px; border-radius: 13px; padding: 3px; box-sizing: border-box; display: flex;
+    background: var(--track); transition: background-color .15s; cursor: pointer; border: none; }
+  .switch .k { width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3);
+    transform: translateX(0); transition: transform .15s cubic-bezier(.2,0,0,1); }
+  .switch.on { background: var(--accent); }
+  .switch.on .k { transform: translateX(20px); }
+  .tun { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+  .tun b { font-size: 15px; }
+  .tun .st { font-size: 13px; color: var(--muted); }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: 1ms !important; transition-duration: 1ms !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>Proposal: motion.</b> Every animation says something happened; nothing moves just to look alive (no
+    breathing, no pulsing). Short, eased, no bounce. With GNOME's animations turned off, everything appears at once. Press
+    <b>Replay</b> under each.</div>
+
+  <h3>Tray icon</h3>
+  <div class="grid" id="tray"></div>
+
+  <h3>In the panel</h3>
+  <div class="grid">
+    <div class="card">
+      <div class="cap">The panel opens</div><div class="sub">It rises 8 px from the bar and fades in, 180 ms. (From a top bar it drops instead.)</div>
+      <div style="margin-top:12px" id="openHost"></div>
+      <button class="replay" onclick="openPanel()">Replay</button>
+    </div>
+    <div class="card">
+      <div class="cap">Crake routes a host</div><div class="sub">The row slides in at the top of What Crake did; its tick grows from the chart's baseline in two beats, crex crex.</div>
+      <div style="margin-top:12px" id="routeHost"></div>
+      <button class="replay" onclick="route()">Replay</button>
+    </div>
+    <div class="card">
+      <div class="cap">Switching a tunnel</div><div class="sub">The knob slides, the track turns teal, 150 ms. Click it.</div>
+      <div class="tun" style="margin-top:12px"><div style="flex:1"><b>ACME</b> <span class="st" id="st">Off</span></div>
+        <button class="switch" id="sw" onclick="this.classList.toggle('on'); document.getElementById('st').textContent = this.classList.contains('on') ? 'Connected · 4 hosts' : 'Off'"><span class="k"></span></button></div>
+    </div>
+  </div>
+</div>
+<script>
+if (location.search.includes('dark=false')) document.body.classList.add('light');
+// The tray at bar size: the head alone, solid, its eye cut out; only the state
+// marks are coloured (DESIGN.md, Tray icon). These frames are the app's own
+// (crates/crake/src/tray.rs: Art, transition, connecting_loop), one every 70 ms.
+const SIL = 'M8.5 20.5V12A3.75 3.75 0 0 1 15.95 11.4L16 10.4L20.6 11.6L16 12.8C16 15.5 15.1 17.8 13.4 20.5Z';
+const SIL_LENGTH = 44, MARK_1 = 'M17.95 9.65l1.6-1.8', MARK_2 = 'M19.2 11.25l1.9-.8', MARK_LENGTH = 2.45;
+let maskId = 0;
+function art(a, size) {
+  a = { outline: null, fill: 0, eye: 0, calls: null, badge: null, ...a };
+  let holes = '', over = '';
+  if (a.eye > 0.02) holes += `<circle cx="12.35" cy="11.4" r="${1.55 * a.eye}" fill="#000"/>`;
+  if (a.eye < 0.98) { const w = 3.9 * (1 - a.eye) + 0.1; holes += `<rect x="${12.35 - w / 2}" y="10.7" width="${w}" height="1.4" rx="0.7" fill="#000"/>`; }
+  if (a.calls) {
+    const [p, q, o] = a.calls;
+    holes += `<path d="${MARK_1}${MARK_2}" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round" opacity="${o}"/>`;
+    for (const [d, drawn] of [[MARK_1, p], [MARK_2, q]]) if (drawn > 0.02)
+      over += `<path d="${d}" fill="none" stroke="#2DD4BF" stroke-width="1.7" stroke-linecap="round" stroke-dasharray="${MARK_LENGTH}" stroke-dashoffset="${MARK_LENGTH * (1 - drawn)}" opacity="${o}"/>`;
+  }
+  if (a.badge != null) {
+    holes += `<circle cx="19.2" cy="9.75" r="${3.45 * a.badge}" fill="#000"/>`;
+    over += `<circle cx="19.2" cy="9.75" r="${2.75 * a.badge}" fill="#F97066"/>`;
+    if (a.badge > 0.8) over += `<path d="M19.2 8.25v1.7" fill="none" stroke="#0b1514" stroke-width="1.15" stroke-linecap="round"/><circle cx="19.2" cy="11.35" r="0.6" fill="#0b1514"/>`;
+  }
+  const outline = a.outline == null ? '' : `<path d="${SIL}" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="${SIL_LENGTH}" stroke-dashoffset="${SIL_LENGTH * (1 - a.outline)}"/>`;
+  const id = 'm' + (maskId++);
+  return `<svg width="${size}" height="${size}" viewBox="7.1 6.6 15.2 15.2"><defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="30" height="30"><path d="${SIL}" fill="#fff" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>${holes}</mask></defs><rect width="30" height="30" fill="#fff" opacity="${a.fill}" mask="url(#${id})"/>${outline}${over}</svg>`;
+}
+const ease = t => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
+const steps = n => Array.from({ length: n }, (_, i) => ease((i + 1) / n));
+const head = { fill: 1, eye: 1 };
+const loop = [...Array.from({ length: 12 }, (_, i) => ({ outline: ease((i + 1) / 12) })), ...Array(5).fill({ outline: 1 })];
+const crex = [];
+for (let k = 0; k < 2; k++) crex.push(...steps(2).map(p => ({ ...head, calls: [p, 0, 1] })), ...steps(2).map(q => ({ ...head, calls: [1, q, 1] })),
+  { ...head, calls: [1, 1, 1] }, { ...head, calls: [1, 1, 0.25] });
+crex.push({ ...head, calls: [1, 1, 1] });
+const trayStates = [
+  ['Connecting', 'The head’s outline draws itself, again and again, until the tunnel is up.', [...loop, ...loop, ...loop]],
+  ['Connected', 'The outline completes, the head fills in, then the eye opens.',
+    [...steps(3).map(f => ({ outline: 1, fill: f, eye: 0 })), ...steps(3).map(e => ({ ...head, eye: e }))]],
+  ['Routed a host', 'The two teal call marks draw out one after the other, twice: crex, crex. They stay a few seconds, then fade.',
+    [...crex, ...Array(58).fill({ ...head, calls: [1, 1, 1] }), ...[0.7, 0.4, 0.15].map(o => ({ ...head, calls: [1, 1, o] })), head]],
+  ['Trouble', 'The red badge grows once over the head. It stays still after that.', steps(4).map(b => ({ ...head, badge: b }))],
+  ['Switched off', 'The eye closes. The bird is asleep, not gone.', steps(3).map(c => ({ ...head, eye: 1 - c }))],
+];
+const timers = [];
+function tray() {
+  timers.splice(0).forEach(clearInterval);
+  document.getElementById('tray').innerHTML = trayStates.map(([cap, sub], i) => `
+    <div class="card"><div class="cap">${cap}</div><div class="sub">${sub}</div>
+      <div class="bar" id="bar${i}"></div>
+      <button class="replay" onclick="tray()">Replay</button></div>`).join('');
+  trayStates.forEach(([, , frames], i) => {
+    let n = 0; const bar = document.getElementById('bar' + i);
+    const show = () => { const f = frames[Math.min(n, frames.length - 1)]; bar.innerHTML = art(f, 16) + art(f, 24) + art(f, 72); };
+    show();
+    timers.push(setInterval(() => { if (++n < frames.length) show(); }, 70));
+  });
+}
+tray();
+
+const css = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+function miniChart(withNew) {
+  let s = 4, svg = `<svg viewBox="0 0 330 70" style="display:block;width:100%">`;
+  const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  for (let i = 0; i < 48; i++) { const x = 3 + i * 6.8, h = 3 + rnd() * 14; if (withNew && i > 44) continue;
+    svg += `<rect x="${x}" y="${56 - h}" width="3.6" height="${h}" fill="${css('--bars')}"/>`; }
+  svg += `<line x1="0" y1="56.5" x2="330" y2="56.5" stroke="${css('--lineStrong')}"/>`;
+  // The two-stroke tick: a taller and a shorter bar (about 75 %).
+  const tick = (x, top, cls) => `<path class="${cls || ''}" d="M${x - 1.6} 56V${top + 1.6}a1.6 1.6 0 0 1 3.2 0V56Z" fill="${css('--accent')}"/>`;
+  svg += tick(120, 22) + tick(125, 30);
+  if (withNew) svg += tick(312, 22, 'grow1') + tick(317, 30, 'grow2');
+  return svg + `</svg>`;
+}
+function row(text, why, cls) {
+  return `<div class="row ${cls || ''}"><svg width="16" height="16" viewBox="0 0 18 18"><path d="M6 15V4M12 15V8" stroke="${css('--accent')}" stroke-width="2.4" stroke-linecap="round"/></svg>
+    <div class="tx">${text}<div class="wy">${why}</div></div><span class="tm mono">now</span></div>`;
+}
+function panel(withNew, cls) {
+  return `<div class="panel ${cls || ''}"><div class="ph">Crake</div><div class="chart">${miniChart(withNew)}</div>
+    <div class="sec">What Crake did</div>
+    ${withNew ? row('Sent git.acme.internal through ACME.', 'Only ACME’s DNS knows it. Routed before the first packet.', 'arrive') : ''}
+    ${row('Sent iam.intranet.acme.internal through ACME.', 'Only ACME’s DNS knows it.')}</div>`;
+}
+function openPanel() { const h = document.getElementById('openHost'); h.innerHTML = ''; requestAnimationFrame(() => h.innerHTML = panel(false, 'open')); }
+function route() { const h = document.getElementById('routeHost'); h.innerHTML = panel(false); setTimeout(() => h.innerHTML = panel(true), 500); }
+openPanel(); route();
+</script>
+</body>
+</html>
