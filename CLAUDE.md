@@ -547,7 +547,8 @@ it doesn't, bundle, and own the updates.**
   Crake with no engine. openvpn3 isn't in Ubuntu's archive (OpenVPN's own
   repository), so it's never pulled in, only suggested. The tray extension
   and keyring are Recommends (KDE needs neither).
-- **Goal: a PPA on Launchpad** (the user's request), so Ubuntu users
+- **First idea: a PPA on Launchpad** (superseded by our own apt repository,
+  see the toolchain finding below), so Ubuntu users
   `sudo add-apt-repository ppa:…/crake && sudo apt install crake`.
   Launchpad builds from a *source* package, on its own builders, without
   network access: the Rust crates must be vendored into the source package
@@ -562,8 +563,8 @@ it doesn't, bundle, and own the updates.**
   practice (`std::hint::cold_path`, `slice::as_array`), whatever the
   crates declare. Ubuntu's archive has rustc-1.93 at most in 26.04 and 1.91
   in 24.04/22.04; only 26.10 has 1.95+. So a Launchpad PPA could build
-  Crake for 26.10 and newer only. Proposed instead (to decide with the
-  user): build the .deb ourselves (GitHub Actions, current Rust via
+  Crake for 26.10 and newer only. **Decided with the user** (who runs
+  26.04 LTS on purpose): build the .deb ourselves (GitHub Actions, current Rust via
   rustup) on the oldest Ubuntu supported (22.04), so one .deb runs on
   22.04, 24.04, 26.04, 26.10 and recent Debian, and publish it in our own
   signed apt repository (e.g. apt.dorhawk.software on Cloudflare) so
