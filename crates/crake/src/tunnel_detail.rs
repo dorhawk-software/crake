@@ -134,11 +134,20 @@ impl Render for TunnelDetail {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = Theme::current(cx);
         let model = self.model.read(cx);
-        let Some(tunnel) = model.tunnels.iter().find(|x| x.name == self.tunnel).cloned() else {
+        let Some(tunnel) = model
+            .tunnels
+            .iter()
+            .find(|x| x.name == self.tunnel)
+            .cloned()
+        else {
             // Removed meanwhile.
             return div().id("tunnel-detail").into_any_element();
         };
-        let rows = model.host_rows.get(&self.tunnel).cloned().unwrap_or_default();
+        let rows = model
+            .host_rows
+            .get(&self.tunnel)
+            .cloned()
+            .unwrap_or_default();
         let traffic = today(model.tunnel_traffic.get(&self.tunnel));
         let ticks = learned_today(model, &self.tunnel);
         let failed = model
@@ -218,7 +227,12 @@ impl Render for TunnelDetail {
                     .items_center()
                     .justify_center()
                     .cursor_pointer()
-                    .child(svg().path("crake/close.svg").size(px(14.)).text_color(t.ink))
+                    .child(
+                        svg()
+                            .path("crake/close.svg")
+                            .size(px(14.))
+                            .text_color(t.ink),
+                    )
                     .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
                         cx.stop_propagation()
                     })
@@ -297,11 +311,7 @@ impl TunnelDetail {
         let pinned: Vec<&HostRow> = rows.iter().filter(|r| r.kind == "pinned").collect();
         let counts = [learned.len(), pinned.len(), gateway.len()];
 
-        let mut bar = div()
-            .flex()
-            .gap(px(22.))
-            .border_b_1()
-            .border_color(t.line);
+        let mut bar = div().flex().gap(px(22.)).border_b_1().border_color(t.line);
         for (i, (tab, label)) in [
             (Tab::Learned, "Learned"),
             (Tab::Pinned, "Pinned"),
@@ -320,9 +330,17 @@ impl TunnelDetail {
                     .items_center()
                     .gap(px(4.))
                     .border_b_2()
-                    .border_color(if on { t.accent } else { gpui_kit::transparent_black().into() })
+                    .border_color(if on {
+                        t.accent
+                    } else {
+                        gpui_kit::transparent_black().into()
+                    })
                     .text_color(if on { t.ink } else { t.muted })
-                    .font_weight(if on { FontWeight::BOLD } else { FontWeight::SEMIBOLD })
+                    .font_weight(if on {
+                        FontWeight::BOLD
+                    } else {
+                        FontWeight::SEMIBOLD
+                    })
                     .cursor_pointer()
                     .child(label)
                     .child(
@@ -386,7 +404,11 @@ impl TunnelDetail {
             .or_else(|| (!tunnel.address.is_empty()).then(|| tunnel.address.clone()))
             .map(|a| {
                 let o: Vec<&str> = a.split(['.', '/']).collect();
-                format!("{}.{}.x.x", o.first().unwrap_or(&"10"), o.get(1).unwrap_or(&"0"))
+                format!(
+                    "{}.{}.x.x",
+                    o.first().unwrap_or(&"10"),
+                    o.get(1).unwrap_or(&"0")
+                )
             })
             .unwrap_or_else(|| "10.x.x.x".into());
         let hint = format!("name.{domain} or {net}");
@@ -449,25 +471,21 @@ impl TunnelDetail {
                                 .font_weight(FontWeight::BOLD)
                                 .cursor_pointer()
                                 .child(format!("Send through {display}"))
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    this.send_added(window, cx)
-                                })),
+                                .on_click(
+                                    cx.listener(|this, _, window, cx| this.send_added(window, cx)),
+                                ),
                         ),
                 )
             })
-            .child(
-                div()
-                    .pb(px(28.))
-                    .when_some(failed, |d, text| {
-                        d.child(
-                            div()
-                                .pt(px(10.))
-                                .text_size(px(13.))
-                                .text_color(t.danger)
-                                .child(text),
-                        )
-                    }),
-            )
+            .child(div().pb(px(28.)).when_some(failed, |d, text| {
+                d.child(
+                    div()
+                        .pt(px(10.))
+                        .text_size(px(13.))
+                        .text_color(t.danger)
+                        .child(text),
+                )
+            }))
     }
 
     fn host_row(&self, i: usize, r: &HostRow, t: &Theme, cx: &mut Context<Self>) -> Div {
@@ -542,7 +560,9 @@ fn header_button(id: &'static str, t: &Theme) -> Stateful<Div> {
 /// "ACME", the Managed tag, and the state.
 fn title_row(tunnel: &Tunnel, t: &Theme) -> impl IntoElement {
     let (dot, state) = match tunnel.state.as_str() {
-        "connected" if tunnel.dns_down => (t.danger, "Connected \u{b7} its DNS doesn\u{2019}t answer"),
+        "connected" if tunnel.dns_down => {
+            (t.danger, "Connected \u{b7} its DNS doesn\u{2019}t answer")
+        }
         "connected" => (t.accent, "Connected"),
         "connecting" => (t.accent, "Connecting\u{2026}"),
         "trouble" => (t.danger, "Couldn\u{2019}t stay connected"),
@@ -574,7 +594,12 @@ fn title_row(tunnel: &Tunnel, t: &Theme) -> impl IntoElement {
                     .text_size(px(12.))
                     .line_height(px(17.))
                     .font_weight(FontWeight::SEMIBOLD)
-                    .child(svg().path("crake/lock.svg").size(px(12.)).text_color(t.muted))
+                    .child(
+                        svg()
+                            .path("crake/lock.svg")
+                            .size(px(12.))
+                            .text_color(t.muted),
+                    )
                     .child("Managed"),
             )
         })
@@ -648,8 +673,16 @@ fn facts(tunnel: &Tunnel, t: &Theme) -> impl IntoElement {
         .border_color(t.line)
         .rounded(px(8.))
         .overflow_hidden()
-        .child(cell(true).child(label("Connected for")).child(strong(since)))
-        .child(cell(false).child(label("Your address")).child(mono(address)))
+        .child(
+            cell(true)
+                .child(label("Connected for"))
+                .child(strong(since)),
+        )
+        .child(
+            cell(false)
+                .child(label("Your address"))
+                .child(mono(address)),
+        )
         .child(cell(false).child(label("Protocol")).child(strong(protocol)))
         .child(
             cell(false)
@@ -669,14 +702,24 @@ fn policy(tunnel: &Tunnel, t: &Theme) -> impl IntoElement {
     };
     // The bold line: words and monospaced patterns.
     let mut line = div().flex().flex_wrap().font_weight(FontWeight::BOLD);
-    let mode = tunnel.own.get("mode").map(String::as_str).unwrap_or("learn");
+    let mode = tunnel
+        .own
+        .get("mode")
+        .map(String::as_str)
+        .unwrap_or("learn");
     let listed: Vec<String> = if tunnel.managed {
         tunnel.learn.clone()
     } else {
         tunnel
             .own
             .get("list")
-            .map(|l| l.lines().map(str::trim).filter(|x| !x.is_empty()).map(str::to_owned).collect())
+            .map(|l| {
+                l.lines()
+                    .map(str::trim)
+                    .filter(|x| !x.is_empty())
+                    .map(str::to_owned)
+                    .collect()
+            })
             .unwrap_or_default()
     };
     let words = |line: Div, text: String| line.child(text.replace(' ', "\u{a0}"));
@@ -694,14 +737,20 @@ fn policy(tunnel: &Tunnel, t: &Theme) -> impl IntoElement {
     };
     let sub = if tunnel.full_tunnel {
         let who = if tunnel.managed {
-            format!("{} sends everything through {display}.", organisation(tunnel))
+            format!(
+                "{} sends everything through {display}.",
+                organisation(tunnel)
+            )
         } else {
             format!("Everything goes through {display}.")
         };
         line = words(line, who);
         format!("Except your local network. Crake doesn\u{2019}t learn anything for {display}.")
     } else if tunnel.managed && !listed.is_empty() {
-        line = words(line, format!("{} allows learning for ", organisation(tunnel)));
+        line = words(
+            line,
+            format!("{} allows learning for ", organisation(tunnel)),
+        );
         line = patterns(line, &listed);
         "Anything else stays direct, even if it doesn\u{2019}t answer. You can pin and forget hosts, but not widen the rule.".to_owned()
     } else if mode == "list" && !listed.is_empty() {
@@ -709,7 +758,10 @@ fn policy(tunnel: &Tunnel, t: &Theme) -> impl IntoElement {
         line = patterns(line, &listed);
         "Anything else stays direct, even if it doesn\u{2019}t answer.".to_owned()
     } else if mode == "ask" {
-        line = words(line, format!("Crake asks before sending a host through {display}."));
+        line = words(
+            line,
+            format!("Crake asks before sending a host through {display}."),
+        );
         "A notification for each new host. You can pin, forget and add hosts.".to_owned()
     } else {
         line = words(line, format!("Crake learns what needs {display}."));
@@ -796,7 +848,10 @@ fn chart(tunnel: &Tunnel, traffic: &[(f32, u64)], ticks: &[f32], t: &Theme) -> i
                         .font_family(fonts::MONO)
                         .text_size(px(12.))
                         .text_color(t.muted)
-                        .child(format!("{hosts} \u{b7} {}", crate::model::human_bytes(total))),
+                        .child(format!(
+                            "{hosts} \u{b7} {}",
+                            crate::model::human_bytes(total)
+                        )),
                 ),
         )
         .child(
@@ -818,9 +873,13 @@ fn chart(tunnel: &Tunnel, traffic: &[(f32, u64)], ticks: &[f32], t: &Theme) -> i
                                     continue;
                                 }
                                 let h = 2. + 16. * (*bytes as f32 / max).sqrt();
-                                if let Some(p) =
-                                    crate::chart::bar(x_of(start + bin / 2.), 3., baseline, h, scale)
-                                {
+                                if let Some(p) = crate::chart::bar(
+                                    x_of(start + bin / 2.),
+                                    3.,
+                                    baseline,
+                                    h,
+                                    scale,
+                                ) {
                                     window.paint_path(p, bars);
                                 }
                             }
@@ -869,10 +928,7 @@ fn chart(tunnel: &Tunnel, traffic: &[(f32, u64)], ticks: &[f32], t: &Theme) -> i
                             .top_0()
                             .w(px(34.))
                             .h_full()
-                            .child(
-                                mono(format!("{:02}:00", (middle / 60.) as u32))
-                                    .left(px(-17.)),
-                            ),
+                            .child(mono(format!("{:02}:00", (middle / 60.) as u32)).left(px(-17.))),
                     )
                 })
                 .child(mono("now".into()).right_0()),
@@ -1079,10 +1135,7 @@ mod tests {
         };
         assert!(learned_how(&r).starts_with("Learned at "));
         assert!(learned_how(&r).ends_with("\u{b7} no answer directly"));
-        let old = HostRow {
-            learned: None,
-            ..r
-        };
+        let old = HostRow { learned: None, ..r };
         assert_eq!(learned_how(&old), "Learned earlier");
     }
 }

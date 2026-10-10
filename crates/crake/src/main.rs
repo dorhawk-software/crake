@@ -1096,7 +1096,8 @@ fn open_detail(tunnel: String, cx: &mut App) {
         },
         move |window, cx| {
             window.set_client_inset(px(0.));
-            let view = cx.new(|cx| tunnel_detail::TunnelDetail::new(name, model, requests, window, cx));
+            let view =
+                cx.new(|cx| tunnel_detail::TunnelDetail::new(name, model, requests, window, cx));
             let handle = window.window_handle();
             cx.subscribe(&view, move |_, _: &tunnel_detail::Close, cx| {
                 let _ = handle.update(cx, |_, window, _| window.remove_window());

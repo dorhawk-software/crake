@@ -880,9 +880,12 @@ impl Log {
                                     if *routed {
                                         let x = x_of(*m);
                                         for (dx, tip) in [(0., 24.), (4.5, 33.)] {
-                                            if let Some(p) =
-                                                crate::chart::rounded_bar(x + dx, top + tip - 1.5, baseline, 6.)
-                                            {
+                                            if let Some(p) = crate::chart::rounded_bar(
+                                                x + dx,
+                                                top + tip - 1.5,
+                                                baseline,
+                                                6.,
+                                            ) {
                                                 window.paint_path(p, panel);
                                             }
                                         }
@@ -913,9 +916,12 @@ impl Log {
                                     let x = x_of(*m);
                                     if *routed {
                                         for (dx, tip) in [(0., 24.), (4.5, 33.)] {
-                                            if let Some(p) =
-                                                crate::chart::rounded_bar(x + dx, top + tip, baseline, 3.)
-                                            {
+                                            if let Some(p) = crate::chart::rounded_bar(
+                                                x + dx,
+                                                top + tip,
+                                                baseline,
+                                                3.,
+                                            ) {
                                                 window.paint_path(p, accent);
                                             }
                                         }

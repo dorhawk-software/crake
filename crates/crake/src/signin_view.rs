@@ -729,11 +729,16 @@ fn explain_openvpn3(r: &str, at: usize, spec: &Spec) -> Why {
     if r.contains("no profile called") || r.contains("look up the profile") {
         return Why {
             title: format!("Couldn\u{2019}t start {display}"),
-            sentence: format!("OpenVPN 3 has no profile called {profile} for you. It may have been removed or renamed."),
+            sentence: format!(
+                "OpenVPN 3 has no profile called {profile} for you. It may have been removed or renamed."
+            ),
             row: format!("No profile {profile}"),
         };
     }
-    if r.contains("reach openvpn 3") || r.contains("start a session") || r.contains("wasn\u{2019}t ready") {
+    if r.contains("reach openvpn 3")
+        || r.contains("start a session")
+        || r.contains("wasn\u{2019}t ready")
+    {
         return Why {
             title: format!("Couldn\u{2019}t start {display}"),
             sentence: "OpenVPN 3 didn\u{2019}t start the session. Its own words are below.".into(),
@@ -743,14 +748,20 @@ fn explain_openvpn3(r: &str, at: usize, spec: &Spec) -> Why {
     if r.contains("accept the sign-in") {
         return Why {
             title: format!("Couldn\u{2019}t sign in to {display}"),
-            sentence: format!("{display} didn\u{2019}t accept the sign-in. Ask {display}\u{2019}s IT whether your account is allowed in."),
+            sentence: format!(
+                "{display} didn\u{2019}t accept the sign-in. Ask {display}\u{2019}s IT whether your account is allowed in."
+            ),
             row: "Sign-in not accepted".into(),
         };
     }
     Why {
         title: format!("{display} didn\u{2019}t come up"),
         sentence: format!("OpenVPN 3 couldn\u{2019}t connect {display}. Its own words are below."),
-        row: if at >= 2 { "Tunnel didn\u{2019}t come up".into() } else { "Connection failed".into() },
+        row: if at >= 2 {
+            "Tunnel didn\u{2019}t come up".into()
+        } else {
+            "Connection failed".into()
+        },
     }
 }
 

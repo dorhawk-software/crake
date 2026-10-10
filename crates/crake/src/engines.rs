@@ -18,8 +18,7 @@ pub struct Engines {
 impl Engines {
     /// Look (blocking, quick: a few file checks).
     pub fn find() -> Self {
-        let program =
-            std::env::var_os("CRAKE_OPENCONNECT").unwrap_or_else(|| "openconnect".into());
+        let program = std::env::var_os("CRAKE_OPENCONNECT").unwrap_or_else(|| "openconnect".into());
         Self {
             openconnect: runnable(Path::new(&program)),
             openvpn3: Path::new(OPENVPN3_SERVICE).exists(),
@@ -67,7 +66,11 @@ mod tests {
             openconnect: false,
             openvpn3: false,
         };
-        assert!(none.missing("gp").unwrap().contains("sudo apt install openconnect"));
+        assert!(
+            none.missing("gp")
+                .unwrap()
+                .contains("sudo apt install openconnect")
+        );
         assert!(none.missing("openvpn3").unwrap().contains("OpenVPN 3"));
         let both = Engines {
             openconnect: true,

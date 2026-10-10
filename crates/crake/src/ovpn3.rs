@@ -265,11 +265,19 @@ async fn run(
             SESS_AUTH_URL => open_once(&text, &mut opened),
             CONN_AUTH_FAILED => {
                 disconnect(&conn, &path).await;
-                return Err(format!("The gateway didn\u{2019}t accept the sign-in. {text}").trim().to_owned());
+                return Err(
+                    format!("The gateway didn\u{2019}t accept the sign-in. {text}")
+                        .trim()
+                        .to_owned(),
+                );
             }
             CONN_FAILED | CONN_DISCONNECTED | CONN_DONE | SESS_REMOVED => {
                 disconnect(&conn, &path).await;
-                return Err(if text.is_empty() { "The connection failed.".into() } else { text });
+                return Err(if text.is_empty() {
+                    "The connection failed.".into()
+                } else {
+                    text
+                });
             }
             _ => {}
         }
@@ -294,12 +302,18 @@ pub fn adopt(tunnel: String, path: String, requests: async_channel::Sender<Reque
                 return;
             };
             rt.block_on(async {
-                let Ok(conn) = Connection::system().await else { return };
-                let Ok(signals) = subscribe(&conn, &path).await else { return };
+                let Ok(conn) = Connection::system().await else {
+                    return;
+                };
+                let Ok(signals) = subscribe(&conn, &path).await else {
+                    return;
+                };
                 if !matches!(status(&conn, &path).await, Some((CONN_CONNECTED, _))) {
                     return;
                 }
-                let Ok(fields) = attached(&conn, &path).await else { return };
+                let Ok(fields) = attached(&conn, &path).await else {
+                    return;
+                };
                 let (control, replies) = async_channel::unbounded();
                 let _ = requests
                     .send(Request::Attach(tunnel.clone(), fields, control))
@@ -354,7 +368,10 @@ async fn session_of(conn: &Connection, profile: &str) -> Option<String> {
     for path in sessions(conn).await {
         let name = property::<String>(conn, SESSIONS, &path, SESSIONS, "config_name").await;
         let live = status(conn, &path).await.is_some_and(|(minor, _)| {
-            !matches!(minor, CONN_FAILED | CONN_DISCONNECTED | CONN_DONE | SESS_REMOVED | CONN_AUTH_FAILED)
+            !matches!(
+                minor,
+                CONN_FAILED | CONN_DISCONNECTED | CONN_DONE | SESS_REMOVED | CONN_AUTH_FAILED
+            )
         });
         if live && name.as_deref() == Ok(profile) {
             return Some(path);
@@ -395,8 +412,7 @@ async fn attached(conn: &Connection, path: &str) -> Result<HashMap<String, Strin
     {
         fields.insert("gateway".to_owned(), address);
     }
-    if let Ok(device_path) =
-        property::<String>(conn, SESSIONS, path, SESSIONS, "device_path").await
+    if let Ok(device_path) = property::<String>(conn, SESSIONS, path, SESSIONS, "device_path").await
     {
         if let Ok(dns) =
             property::<Vec<String>>(conn, NETCFG, &device_path, NETCFG, "dns_name_servers").await
@@ -449,13 +465,18 @@ async fn follow(
             }
             Some((minor, text)) => {
                 unseen = 0;
-                matches!(minor, CONN_FAILED | CONN_DISCONNECTED | CONN_DONE | SESS_REMOVED | CONN_AUTH_FAILED)
-                    .then(|| (!text.is_empty()).then_some(text))
+                matches!(
+                    minor,
+                    CONN_FAILED | CONN_DISCONNECTED | CONN_DONE | SESS_REMOVED | CONN_AUTH_FAILED
+                )
+                .then(|| (!text.is_empty()).then_some(text))
             }
         };
         if let Some(why) = ended {
             disconnect(conn, path).await;
-            let _ = requests.send(Request::Detached(tunnel.to_owned(), why)).await;
+            let _ = requests
+                .send(Request::Detached(tunnel.to_owned(), why))
+                .await;
             return;
         }
     }
@@ -464,7 +485,8 @@ async fn follow(
 /// Open a web sign-in page in the browser, once per URL.
 fn open_once(url: &str, opened: &mut HashSet<String>) {
     let url = url.trim();
-    if (url.starts_with("https://") || url.starts_with("http://")) && opened.insert(url.to_owned()) {
+    if (url.starts_with("https://") || url.starts_with("http://")) && opened.insert(url.to_owned())
+    {
         let _ = std::process::Command::new("xdg-open").arg(url).spawn();
     }
 }

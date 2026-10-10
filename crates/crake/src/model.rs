@@ -920,7 +920,14 @@ pub fn demo_detail() -> Model {
         ("10.62.0.18", "", 157, "probe", 12, false),
         ("10.40.8.4", "wiki.acme.internal", 250, "dns", 60, true),
         ("10.40.8.9", "jira.acme.internal", 252, "dns", 3, false),
-        ("10.40.9.30", "builds.acme.example", 284, "split", 120, false),
+        (
+            "10.40.9.30",
+            "builds.acme.example",
+            284,
+            "split",
+            120,
+            false,
+        ),
     ];
     m.host_rows.insert(
         "acme".into(),
@@ -1239,7 +1246,11 @@ mod tests {
             log: vec![
                 at(30, LogKind::LeftAlone, "Left 10.62.0.77 alone."),
                 at(10, LogKind::Routed, "Sent git.acme.internal through ACME."),
-                at(9, LogKind::Routed, "Sent iam.intranet.acme.internal through ACME."),
+                at(
+                    9,
+                    LogKind::Routed,
+                    "Sent iam.intranet.acme.internal through ACME.",
+                ),
                 at(9, LogKind::Routed, "Sent wiki.acme.internal through ACME."),
                 at(2, LogKind::Routed, "Sent 10.58.192.12 through ACME."),
             ],
