@@ -93,7 +93,8 @@ impl Panel {
                             Action::Send => Request::Send(tunnel.clone(), hosts.clone()),
                         };
                         this.send(r);
-                    })),
+                    }))
+                    .test_support(),
             );
         }
         div()

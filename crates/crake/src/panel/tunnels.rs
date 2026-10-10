@@ -119,11 +119,13 @@ impl Panel {
                                     .child(div().min_w_0().truncate().child(text))
                             }),
                     )
-                    .child(switch(("switch", i), on, t).on_click(cx.listener(
-                        move |this, _, _, _| {
-                            this.send(Request::Switch(name.clone(), !on));
-                        },
-                    ))),
+                    .child(
+                        switch(("switch", i), on, t)
+                            .on_click(cx.listener(move |this, _, _, _| {
+                                this.send(Request::Switch(name.clone(), !on));
+                            }))
+                            .test_support(),
+                    ),
             );
             // Said openly, under the tunnel, until the user has read it
             // (design/proposals/anyconnect-notice.html).
@@ -159,7 +161,8 @@ impl Panel {
                                 .child("Got it")
                                 .on_click(cx.listener(move |this, _, _, _| {
                                     this.send(Request::Dismiss(key.clone()));
-                                })),
+                                }))
+                                .test_support(),
                         ),
                 );
             }

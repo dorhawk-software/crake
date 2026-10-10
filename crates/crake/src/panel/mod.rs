@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use gpui_kit::prelude::*;
 use gpui_kit::{
     AnyElement, ClipboardItem, Context, Div, Entity, FontWeight, MouseButton, PathBuilder, Pixels,
-    Stateful, Subscription, Window, canvas, div, point, px, svg,
+    Stateful, Subscription, TestSupportExt, Window, canvas, div, point, px, svg,
 };
 
 use crate::Request;
@@ -20,6 +20,9 @@ use crate::theme::{Theme, fonts};
 mod chart;
 mod decisions;
 mod tunnels;
+
+#[cfg(test)]
+mod tests;
 
 pub const WIDTH: f32 = 452.;
 
@@ -412,7 +415,8 @@ impl Panel {
                     )
                     // Stop the header's window drag from taking the click.
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .on_click(cx.listener(|this, _, _, _| this.send(Request::Settings))),
+                    .on_click(cx.listener(|this, _, _, _| this.send(Request::Settings)))
+                    .test_support(),
             )
     }
 
@@ -435,7 +439,8 @@ impl Panel {
                 button("full-log", "Full log", t)
                     .flex_1()
                     .h(px(40.))
-                    .on_click(cx.listener(|this, _, _, _| this.send(Request::Log))),
+                    .on_click(cx.listener(|this, _, _, _| this.send(Request::Log)))
+                    .test_support(),
             )
             .child(
                 button(
@@ -463,7 +468,8 @@ impl Panel {
                         model.update(cx, |_, cx| cx.notify());
                     })
                     .detach();
-                })),
+                }))
+                .test_support(),
             )
     }
 }
