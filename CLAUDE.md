@@ -25,8 +25,9 @@ visual identity; Crake's is documented in `design/DESIGN.md`.
   (192.0.2.x, 198.51.100.x, 203.0.113.x). What was learned on the real
   gateways lives in `CLAUDE.local.md` (git-ignored). `scripts/check-private.sh`
   (run by `scripts/lint.sh` and the pre-commit hook) refuses the names
-  listed in `dev/private-terms` (git-ignored); install the hook with
-  `ln -s ../../scripts/check-private.sh .git/hooks/pre-commit`.
+  listed in `dev/private-terms` (git-ignored); install the hooks with
+  `ln -s ../../scripts/pre-commit.sh .git/hooks/pre-commit` and
+  `ln -s ../../scripts/check-private.sh .git/hooks/commit-msg`.
 
 ## Read first
 
@@ -502,6 +503,11 @@ Any lint stops the build; fix it and build again, never silence it.
   function's parts into named helpers.
 - `.claude/settings.json`: a PostToolUse hook runs `scripts/lint.sh` after
   every `cargo build` / `cargo test` from Claude Code and blocks on failure.
+- Coverage (`scripts/check-coverage.sh`, cargo-llvm-cov, about a minute):
+  each crate's share of lines run by the tests stays at or above its floor
+  (crake 55%, craked 63%, crake-proto 95% as of Oct 2026). The pre-commit
+  hook runs it when Rust files are committed. Raise a floor as tests grow;
+  never lower one to let a change through.
 
 ## Testing without installing anything
 

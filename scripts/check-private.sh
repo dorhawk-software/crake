@@ -6,8 +6,8 @@
 #   scripts/check-private.sh            # the files as they would be committed
 #   scripts/check-private.sh MSG_FILE   # a commit message (commit-msg hook)
 #
-# Used by scripts/lint.sh, and as git's pre-commit and commit-msg hooks:
-#   ln -s ../../scripts/check-private.sh .git/hooks/pre-commit
+# Used by scripts/lint.sh and scripts/pre-commit.sh, and as git's
+# commit-msg hook:
 #   ln -s ../../scripts/check-private.sh .git/hooks/commit-msg
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
