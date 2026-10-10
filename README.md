@@ -172,6 +172,23 @@ Crake sits between you and your network. It's built accordingly.
 
 <br/>
 
+## Nothing to clean up
+
+Switch it off, and your computer is as it was. Crake keeps to its own corner of the system and takes
+it with it when it goes.
+
+| What Crake uses | What it never touches |
+| --- | --- |
+| Its own firewall table, `inet crake`, marking only the hosts it learned | Your default route |
+| Its own routing tables, one per tunnel | `/etc/resolv.conf` |
+| Each tunnel's DNS, per link in systemd-resolved, gone with the tunnel | NetworkManager's connections and your firewall rules |
+| The tunnel device openconnect or OpenVPN 3 creates, there only while it's on | Kernel modules and drivers |
+
+**Stop Crake, and all of it goes.** A tunnel switched off takes its routes and DNS with it; stopping
+Crake removes its table, rules and links. The namespace tests check that nothing of Crake's is left.
+
+<br/>
+
 ## What Crake isn't
 
 |                                       |                                                                                            |
