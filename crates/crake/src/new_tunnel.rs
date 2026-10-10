@@ -157,6 +157,8 @@ pub struct NewTunnel {
     /// OpenVPN 3 profiles on this computer (loaded when the window opens),
     /// and the one chosen.
     profiles: Vec<String>,
+    /// Which VPN engines are installed (None until looked; all in demo).
+    engines: Option<crate::engines::Engines>,
     profile: Option<String>,
     focus: FocusHandle,
     _subscriptions: Vec<Subscription>,
@@ -267,14 +269,16 @@ impl NewTunnel {
             .and_then(|v| v.split(':').nth(2))
             .filter(|_| demo)
             .map(|p| static_of(&PROTOCOLS, p, |p| p.0));
-        // openvpn3's profiles, without holding the window up.
+        // openvpn3's profiles and the installed engines, without holding the
+        // window up.
         cx.spawn(async move |this, cx| {
-            let found = cx
+            let (found, engines) = cx
                 .background_executor()
-                .spawn(async { crate::ovpn3::profiles() })
+                .spawn(async { (crate::ovpn3::profiles(), crate::engines::Engines::find()) })
                 .await;
             let _ = this.update(cx, |this: &mut Self, cx| {
                 this.profiles = found;
+                this.engines.get_or_insert(engines);
                 cx.notify();
             });
         })
@@ -337,6 +341,10 @@ impl NewTunnel {
                 .first()
                 .map_or(1000., |m| m.h - 120.),
             profiles: Vec::new(),
+            engines: demo.then_some(crate::engines::Engines {
+                openconnect: true,
+                openvpn3: true,
+            }),
             profile: (field("protocol") == "openvpn3")
                 .then(|| field("gateway"))
                 .filter(|g| !g.is_empty()),
@@ -397,10 +405,16 @@ impl NewTunnel {
         }
     }
 
+    /// The engine `protocol` needs isn't installed: what to do about it.
+    fn missing(&self, protocol: &str) -> Option<&'static str> {
+        self.engines.and_then(|e| e.missing(protocol))
+    }
+
     /// Can step `step` be left? Says what's missing if not.
     fn check(&mut self, step: usize, cx: &Context<Self>) -> bool {
         let problem = match step {
             1 if self.display_name(cx).is_empty() => Some("Give it a name."),
+            1 if self.missing(self.protocol).is_some() => self.missing(self.protocol),
             1 if self.protocol == "openvpn3" && self.profile.is_none() => {
                 Some("Which OpenVPN 3 profile?")
             }
@@ -873,7 +887,10 @@ impl NewTunnel {
                                                 .child("Recommended"),
                                         )
                                     })
-                                    .when(beta(id), |d| d.child(beta_tag(t))),
+                                    .when(beta(id), |d| d.child(beta_tag(t)))
+                                    .when(id != "auto" && self.missing(id).is_some(), |d| {
+                                        d.child(tag("Not installed", t))
+                                    }),
                             )
                             .child(
                                 div()
@@ -1018,6 +1035,16 @@ impl NewTunnel {
                     .child("Protocol"),
             )
             .child(protocols)
+            .when_some(self.missing(self.protocol), |d, why| {
+                d.child(
+                    div()
+                        .mt(px(10.))
+                        .text_size(px(13.))
+                        .line_height(px(19.))
+                        .text_color(t.ink)
+                        .child(why),
+                )
+            })
             .when_some(
                 PROTOCOLS
                     .iter()
@@ -1562,6 +1589,11 @@ impl NewTunnel {
 
 /// "Beta": a protocol not yet tried against a real gateway.
 pub fn beta_tag(t: &Theme) -> impl IntoElement {
+    tag("Beta", t)
+}
+
+/// A small grey tag beside a name.
+fn tag(text: &'static str, t: &Theme) -> impl IntoElement {
     div()
         .px(px(6.))
         .rounded(px(4.))
@@ -1570,7 +1602,7 @@ pub fn beta_tag(t: &Theme) -> impl IntoElement {
         .line_height(px(17.))
         .font_weight(FontWeight::SEMIBOLD)
         .text_color(t.muted)
-        .child("Beta")
+        .child(text)
 }
 
 fn heading(text: &'static str) -> impl IntoElement {

@@ -522,10 +522,13 @@ it doesn't, bundle, and own the updates.**
   Crake with no engine. openvpn3 isn't in Ubuntu's archive (OpenVPN's own
   repository), so it's never pulled in, only suggested. The tray extension
   and keyring are Recommends (KDE needs neither).
-- **At runtime:** craked and the app check which engines exist. New tunnel
-  shows every protocol; one whose engine is missing says how to get it
-  ("Needs openconnect: sudo apt install openconnect") instead of failing at
-  connect.
+- **At runtime (built, `engines.rs`):** the app checks which engines exist
+  (openconnect on PATH, or `CRAKE_OPENCONNECT`; openvpn3's D-Bus
+  configuration service file). New tunnel shows every protocol; one whose
+  engine is missing is tagged "Not installed", says how to get it ("Needs
+  openconnect, which isn't installed: sudo apt install openconnect") and
+  can't be continued with. Sign-in that can't start openconnect says
+  "openconnect isn't installed" with the same command.
 - **Fedora/RPM:** the same with rich dependencies,
   `Requires: (openconnect or openvpn3)`, `Recommends:` as above.
 - **Arch:** no alternatives in pacman: `optdepends` for both engines plus

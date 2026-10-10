@@ -760,6 +760,15 @@ fn explain(raw: &str, at: usize, spec: &Spec) -> Why {
     if spec.protocol == "openvpn3" {
         return explain_openvpn3(&r, at, spec);
     }
+    if r.contains("couldn't start openconnect") || r.contains("couldn\u{2019}t start openconnect") {
+        return Why {
+            title: "openconnect isn\u{2019}t installed".into(),
+            sentence: format!(
+                "Crake uses openconnect to talk to {display}\u{2019}s gateway. Install it with: sudo apt install openconnect"
+            ),
+            row: "openconnect not installed".into(),
+        };
+    }
     let unreachable = at == 0
         || [
             "connect to",

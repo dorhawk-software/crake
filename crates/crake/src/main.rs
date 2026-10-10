@@ -7,6 +7,7 @@ mod chart;
 mod client;
 mod controls;
 mod detect;
+mod engines;
 mod keyring;
 mod log_view;
 mod model;
