@@ -147,7 +147,8 @@ pub(super) fn select(
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.open_select = if open { None } else { Some(id) };
                 cx.notify();
-            })),
+            }))
+            .test_support(),
     );
     if open {
         let mut menu = div()
@@ -178,7 +179,8 @@ pub(super) fn select(
                         this.open_select = None;
                         pick(this, value.clone(), cx);
                         cx.notify();
-                    })),
+                    }))
+                    .test_support(),
             );
         }
         picker = picker.child(gpui_kit::deferred(menu.occlude()).with_priority(1));

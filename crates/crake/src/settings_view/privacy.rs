@@ -30,12 +30,12 @@ impl Settings {
                 .flex()
                 .gap(px(8.))
                 .child(
-                    outline("cancel-clear", "Keep it", t.line_strong, t.ink, None).on_click(
-                        cx.listener(|this, _, _, cx| {
+                    outline("cancel-clear", "Keep it", t.line_strong, t.ink, None)
+                        .on_click(cx.listener(|this, _, _, cx| {
                             this.confirm_clear = false;
                             cx.notify();
-                        }),
-                    ),
+                        }))
+                        .test_support(),
                 )
                 .child(
                     outline(
@@ -50,7 +50,8 @@ impl Settings {
                         this.requests.send_blocking(Request::ClearLog).ok();
                         this.confirm_clear = false;
                         cx.notify();
-                    })),
+                    }))
+                    .test_support(),
                 )
                 .into_any_element()
         } else {
@@ -65,6 +66,7 @@ impl Settings {
                 this.confirm_clear = true;
                 cx.notify();
             }))
+            .test_support()
             .into_any_element()
         };
         div()
@@ -129,7 +131,7 @@ impl Settings {
                         Some("\u{201c}Copy for helpdesk\u{201d} replaces names with tunnel and timing only."),
                         toggle("hide-hosts", hide, t).on_click(cx.listener(move |_, _, _, cx| {
                             Self::pref(cx, |p| p.hide_hosts = !hide);
-                        })),
+                        })).test_support(),
                         true,
                         t,
                     ))

@@ -8,8 +8,8 @@ use std::time::Duration;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyElement, Context, Div, Entity, FocusHandle, FontWeight, Stateful, Subscription, Window, div,
-    px, svg,
+    AnyElement, Context, Div, Entity, FocusHandle, FontWeight, Stateful, Subscription,
+    TestSupportExt, Window, div, px, svg,
 };
 
 use crate::Request;
@@ -25,6 +25,9 @@ mod names;
 mod privacy;
 mod tunnels;
 mod widgets;
+
+#[cfg(test)]
+mod tests;
 
 // What the sections share.
 use self::about::{about, bird};
@@ -467,7 +470,8 @@ impl Settings {
                         Some(label)
                     };
                     cx.notify();
-                })),
+                }))
+                .test_support(),
         );
         if open {
             let mut card = div()
@@ -554,7 +558,8 @@ impl Settings {
                         this.adding_never = false;
                         this.confirm_clear = false;
                         cx.notify();
-                    })),
+                    }))
+                    .test_support(),
             );
         }
         nav

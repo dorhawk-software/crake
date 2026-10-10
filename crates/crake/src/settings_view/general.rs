@@ -45,10 +45,12 @@ impl Settings {
                     .child(row(
                         self.title("Start when you log in", t, cx),
                         Some("The bird is there when you need it."),
-                        toggle("startup", starts, t).on_click(cx.listener(move |_, _, _, cx| {
-                            crate::autostart::set(!starts);
-                            cx.notify();
-                        })),
+                        toggle("startup", starts, t)
+                            .on_click(cx.listener(move |_, _, _, cx| {
+                                crate::autostart::set(!starts);
+                                cx.notify();
+                            }))
+                            .test_support(),
                         false,
                         t,
                     ))
@@ -77,13 +79,13 @@ impl Settings {
                     .child(row(
                         self.title("Show the bird in the top bar", t, cx),
                         Some("Without it, open Crake from your apps."),
-                        toggle("bird", prefs.show_bird, t).on_click(cx.listener(
-                            move |this, _, _, cx| {
+                        toggle("bird", prefs.show_bird, t)
+                            .on_click(cx.listener(move |this, _, _, cx| {
                                 let on = !prefs.show_bird;
                                 Self::pref(cx, |p| p.show_bird = on);
                                 this.requests.send_blocking(Request::ShowBird(on)).ok();
-                            },
-                        )),
+                            }))
+                            .test_support(),
                         true,
                         t,
                     ))

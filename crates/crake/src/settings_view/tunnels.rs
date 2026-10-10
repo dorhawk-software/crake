@@ -91,7 +91,8 @@ impl Settings {
                         .child("+ New tunnel")
                         .on_click(cx.listener(|this, _, _, _| {
                             this.requests.send_blocking(Request::NewTunnel(None)).ok();
-                        })),
+                        }))
+                        .test_support(),
                 ),
             )
             .when(tried.len() > 1, |d| {
@@ -145,7 +146,8 @@ impl Settings {
                             this.requests
                                 .send_blocking(Request::NewTunnel(Some(edit.clone())))
                                 .ok();
-                        })),
+                        }))
+                        .test_support(),
                     )
                     .child(
                         small_button(
@@ -159,7 +161,8 @@ impl Settings {
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.removing = Some(remove.clone());
                             cx.notify();
-                        })),
+                        }))
+                        .test_support(),
                     )
                     .into_any_element()
             }
@@ -216,7 +219,7 @@ impl Settings {
                                 .send_blocking(Request::OpenDetail(name.clone()))
                                 .ok();
                         })
-                    })
+                    }).test_support()
                     .child(
                         div()
                             .flex()
@@ -290,7 +293,7 @@ impl Settings {
                                 .send_blocking(Request::OpenDetail(name.clone()))
                                 .ok();
                         })
-                    }),
+                    }).test_support(),
             )
     }
 
@@ -327,12 +330,12 @@ impl Settings {
                         )),
                 )
                 .child(
-                    small_button("keep-tunnel", "Keep it", None, t.line, t.ink, t).on_click(
-                        cx.listener(|this, _, _, cx| {
+                    small_button("keep-tunnel", "Keep it", None, t.line, t.ink, t)
+                        .on_click(cx.listener(|this, _, _, cx| {
                             this.removing = None;
                             cx.notify();
-                        }),
-                    ),
+                        }))
+                        .test_support(),
                 )
                 .child(
                     small_button(
@@ -350,7 +353,8 @@ impl Settings {
                             .ok();
                         this.removing = None;
                         cx.notify();
-                    })),
+                    }))
+                    .test_support(),
                 )
         })
     }

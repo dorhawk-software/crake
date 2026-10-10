@@ -27,7 +27,8 @@ impl Settings {
                     .child(format!("{n} s"))
                     .on_click(cx.listener(move |this, _, _, _| {
                         this.set("probe_wait_secs", n.to_owned());
-                    })),
+                    }))
+                    .test_support(),
             );
         }
 
@@ -103,7 +104,8 @@ impl Settings {
                             )
                             .on_click(cx.listener(move |this, _, _, _| {
                                 this.set("never", rest.join("\n"));
-                            })),
+                            }))
+                            .test_support(),
                     ),
             );
         }
@@ -141,7 +143,8 @@ impl Settings {
                         this.adding_never = true;
                         this.never_input.update(cx, |f, cx| f.focus(window, cx));
                         cx.notify();
-                    })),
+                    }))
+                    .test_support(),
             );
         }
 

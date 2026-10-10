@@ -52,18 +52,22 @@ impl Settings {
             .child(row(
                 self.title("Keep internal names private", t, cx),
                 Some("Names like *.acme.internal never go to your internet provider\u{2019}s DNS."),
-                toggle("private", private, t).on_click(cx.listener(move |this, _, _, _| {
-                    this.set("keep_private", (!private).to_string());
-                })),
+                toggle("private", private, t)
+                    .on_click(cx.listener(move |this, _, _, _| {
+                        this.set("keep_private", (!private).to_string());
+                    }))
+                    .test_support(),
                 true,
                 t,
             ))
             .child(row(
                 self.title("Ask every tunnel when a name is unknown", t, cx),
                 Some("How Crake finds internal names nobody told it about."),
-                toggle("ask-unknown", ask, t).on_click(cx.listener(move |this, _, _, _| {
-                    this.set("ask_unknown", (!ask).to_string());
-                })),
+                toggle("ask-unknown", ask, t)
+                    .on_click(cx.listener(move |this, _, _, _| {
+                        this.set("ask_unknown", (!ask).to_string());
+                    }))
+                    .test_support(),
                 true,
                 t,
             ))
