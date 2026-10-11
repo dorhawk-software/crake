@@ -28,7 +28,7 @@ use self::widgets::{Look, button, buttons, checkbox, lower_first, para, steps, t
 pub const WIDTH: f32 = 340.;
 
 #[derive(Clone, Debug, PartialEq)]
-enum Stage {
+pub(crate) enum Stage {
     Reaching,
     SigningIn,
     Asking(Prompt),
@@ -218,6 +218,12 @@ fn fit_window() -> impl IntoElement {
 }
 
 impl SignIn {
+    /// Where sign-in is (journey tests).
+    #[cfg(test)]
+    pub(crate) fn stage(&self) -> &Stage {
+        &self.stage
+    }
+
     pub fn new(
         spec: Spec,
         model: Entity<Model>,

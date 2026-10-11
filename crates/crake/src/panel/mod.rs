@@ -33,7 +33,7 @@ const CHART_WIDTH: f32 = WIDTH - 2. - 36.;
 pub const MARGIN: f32 = 0.;
 
 /// Decisions shown in the panel; the full log has the rest.
-const DECISIONS: usize = 3;
+pub(crate) const DECISIONS: usize = 3;
 
 /// What moves in the panel (design/proposals/animations.html). It outlives a
 /// refit (the window reopened at its measured height), so nothing replays.

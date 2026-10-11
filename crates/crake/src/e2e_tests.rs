@@ -20,14 +20,14 @@ use crate::client::Command;
 use crate::signin::{self, Ask, Event, Reply, Spec};
 use crate::wire_tests::{self, App};
 
-const GATEWAY: &str = "https://198.51.100.10";
+pub(crate) const GATEWAY: &str = "https://198.51.100.10";
 
-fn sh(cmd: &str) -> String {
+pub(crate) fn sh(cmd: &str) -> String {
     let out = Run::new("sh").args(["-c", cmd]).output().unwrap();
     String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr)
 }
 
-fn config(dir: &std::path::Path) -> Config {
+pub(crate) fn config(dir: &std::path::Path) -> Config {
     let hook = std::env::var("CRAKE_E2E_HOOK").expect("CRAKE_E2E_HOOK: craked's crake-hook");
     Config {
         hook_path: hook.into(),
@@ -113,7 +113,7 @@ async fn sign_in() -> crake_proto::Session {
 }
 
 /// An HTTP GET on a fresh connection, as an app would.
-fn get(ip: &str, within: Duration) -> std::io::Result<String> {
+pub(crate) fn get(ip: &str, within: Duration) -> std::io::Result<String> {
     let addr: SocketAddr = format!("{ip}:80").parse().unwrap();
     let mut s = TcpStream::connect_timeout(&addr, within)?;
     s.set_read_timeout(Some(Duration::from_secs(5)))?;
@@ -159,7 +159,7 @@ struct Crake {
     app: App,
 }
 
-fn enabled() -> bool {
+pub(crate) fn enabled() -> bool {
     if std::env::var("CRAKE_E2E").as_deref() == Ok("1") {
         return true;
     }

@@ -544,6 +544,24 @@ The user doesn't want development builds installed on their machine.
   builds; the dev-dependency turns on gpui-kit's `test-support`). Nothing
   of this computer's in a test: `look_around` returns fixed profiles and
   engines, `Prefs { scratch: true }` writes nothing.
+- **The journey suite: the regression suite. It stays green; every change
+  (refactors above all) runs it, and every new entry point of the app gets
+  a step in it.** `crates/crake/src/journey_tests.rs`, run by
+  `scripts/e2e-test.sh` (and CI): the real app shell (`start(cx, Setup)`,
+  what `main()` runs: model, request router, windows, D-Bus client) on
+  GPUI's headless test platform, a real craked behind a real D-Bus socket,
+  real openconnect against ocserv, real nftables. One day in the app: the
+  panel's switch → sign-in (trust, password) → connected, tray included; a
+  host probed → "What Crake did" → Undo/Redo down to nftables; Settings;
+  tunnel detail's Add a host; the log's Copy for helpdesk; New tunnel →
+  added → its sign-in cancelled; switching off; craked stopping and
+  coming back under the app. Mutations it catches: Undo sending no hosts,
+  logged decisions dropped. Two test-platform stand-ins, each said where
+  it's done: frames are drawn by hand and a window's resize delivered as a
+  window system would (`settle`), and New tunnel gets a full-HD height
+  (its own fit-to-step runs on a next frame the test platform never
+  sends). `CRAKE_JOURNEY_DEBUG=1` prints every click's target,
+  `CRAKE_DEBUG=1` the app's own debug lines.
 - `scripts/netns-test.sh`: real nftables and policy routing inside a
   disposable container with no network (host filesystem read-only).
 - `scripts/e2e-test.sh` (`crates/crake/src/e2e_tests.rs`, skipped unless
@@ -741,6 +759,26 @@ it doesn't, bundle, and own the updates.**
   separate library with its licence and a pointer to its source. OpenVPN 3
   there: its core library, or OpenVPN Connect when installed; to decide.
   A Homebrew formula could depend on Homebrew's openconnect instead.
+
+## Other platforms: Windows first (decided with the user, 2026-10-11)
+
+The user asked for macOS and Windows after Linux. Decided: **Windows
+first** (testable here: a Windows VM under KVM next to a Linux gateway VM,
+wired by a socket file, no network); **macOS after**, with no Mac (the
+user has none): built and tested on GitHub's macOS runners only, real
+gateway tests by someone with a Mac. **Signing:** the user has the paid
+Apple Developer Program (ask for the details when a macOS build is signed
+and notarized); no Windows code signing yet: development builds stay
+unsigned, and a certificate (e.g. Azure Trusted Signing) is decided with
+the user before a Windows release. Phases: (1) craked's OS-specific parts behind
+interfaces, Linux unchanged and all its tests green; (2) build both
+binaries for Windows in a container; (3) Windows implementations:
+openconnect + Wintun with crake-hook as its script, per-host routes (IP
+Helper API), tunnel DNS via NRPT rules to craked's own DNS forwarder
+(which routes an answer's addresses before replying), probing from the
+TCP table (GetTcpTable2), craked as a Windows service, the app over a local
+socket, the tray (notification area); (4) the VM test; (5) a signed
+installer that bundles openconnect and Wintun.
 
 ## Someday: other platforms
 

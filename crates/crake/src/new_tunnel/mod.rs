@@ -206,6 +206,14 @@ fn static_of<const N: usize, T>(
 }
 
 impl NewTunnel {
+    /// The name, gateway and username fields (journey tests).
+    #[cfg(test)]
+    pub(crate) fn fields_for_tests(
+        &self,
+    ) -> (Entity<InputState>, Entity<InputState>, Entity<InputState>) {
+        (self.name.clone(), self.gateway.clone(), self.user.clone())
+    }
+
     pub fn new(
         model: Entity<Model>,
         requests: async_channel::Sender<Request>,

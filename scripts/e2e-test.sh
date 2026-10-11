@@ -23,4 +23,4 @@ docker run -d --rm --name "$GW" --network none --cap-add NET_ADMIN --device /dev
 docker run --rm --network none --cap-add NET_ADMIN --device /dev/net/tun \
   -v /:/host:ro -v "$WORK/tmp:/host/mnt" -v "$WORK/link:/link" \
   crake-e2e-gateway sh /client.sh env CRAKE_E2E_HOOK="$HOOK" \
-  "$BIN" e2e_tests --test-threads=1 --nocapture "$@"
+  env ${CRAKE_JOURNEY_DEBUG:+CRAKE_JOURNEY_DEBUG=$CRAKE_JOURNEY_DEBUG} ${CRAKE_DEBUG:+CRAKE_DEBUG=$CRAKE_DEBUG} "$BIN" e2e_tests journey_tests --test-threads=1 --nocapture "$@"

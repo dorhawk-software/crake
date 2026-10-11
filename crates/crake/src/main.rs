@@ -52,6 +52,8 @@ mod tray;
 
 #[cfg(test)]
 mod e2e_tests;
+#[cfg(test)]
+mod journey_tests;
 mod tunnel_detail;
 #[cfg(test)]
 mod wire_tests;
@@ -282,85 +284,29 @@ fn main() {
 
             // CRAKE_DEMO=1: the design's sample, no craked needed.
             let demo = std::env::var_os("CRAKE_DEMO").is_some();
-            let model = cx.new(|_| {
-                if std::env::var("CRAKE_DEMO").as_deref() == Ok("log") {
-                    model::demo_log()
-                } else if demo
-                    && std::env::var("CRAKE_SHOW").is_ok_and(|v| v.starts_with("detail:"))
-                {
-                    model::demo_detail()
-                } else if demo {
-                    model::demo()
-                } else {
-                    Model::default()
-                }
-            });
-            let (requests, incoming_requests) = async_channel::unbounded();
-            // One Crake per session (not in demo mode, so a demo can run
-            // beside the real one): a second start opens this one's panel.
-            if !demo {
-                let again = requests.clone();
-                if single::claim(move || {
-                    again.send_blocking(Request::Panel(None)).ok();
-                }) {
-                    std::process::exit(0);
-                }
-            }
-            let (updates, incoming_updates) = async_channel::unbounded();
-            let commands = if demo {
-                async_channel::unbounded().0
+            let model = if std::env::var("CRAKE_DEMO").as_deref() == Ok("log") {
+                model::demo_log()
+            } else if demo && std::env::var("CRAKE_SHOW").is_ok_and(|v| v.starts_with("detail:")) {
+                model::demo_detail()
+            } else if demo {
+                model::demo()
             } else {
-                client::start(updates)
+                Model::default()
             };
-            // Settings: "Show the bird in the top bar".
-            let tray = if cx.global::<prefs::Prefs>().show_bird {
-                tray::start(requests.clone())
-            } else {
-                None
-            };
-            cx.set_global(Shell {
+            let setup = Setup {
                 model,
-                commands,
-                requests,
-                panel: None,
-                panel_blurred: None,
-                last_click: None,
-                panel_height: None,
                 x11,
                 demo,
-                tray,
-                log: None,
-                settings: None,
-                detail: None,
-                autostart_pending: std::env::args().any(|a| a == autostart::FLAG),
-                adding: None,
-                new_tunnel: None,
-                sessions: Default::default(),
-                adopting: Default::default(),
-                tray_shape: tray::Shape::Off,
-                tray_motion: None,
-                panel_motion: None,
-            });
-            // The tray follows the model, whatever changed it: craked, or a
-            // sign-in in this app.
-            let model = cx.global::<Shell>().model.clone();
-            cx.observe(&model, |_, cx| refresh_tray(cx)).detach();
-            if !demo {
-                watch_openvpn3(cx);
+                connect: (!demo).then(|| Box::new(client::start) as Connect),
+                // Settings: "Show the bird in the top bar".
+                tray: cx.global::<prefs::Prefs>().show_bird,
+                single_instance: !demo,
+                openvpn3: !demo,
+                autostart: std::env::args().any(|a| a == autostart::FLAG),
+            };
+            if !start(cx, setup) {
+                std::process::exit(0);
             }
-
-            cx.spawn(async move |cx| {
-                while let Ok(update) = incoming_updates.recv().await {
-                    cx.update(|cx| on_update(update, cx));
-                }
-            })
-            .detach();
-            cx.spawn(async move |cx| {
-                while let Ok(request) = incoming_requests.recv().await {
-                    cx.update(|cx| on_request(request, cx));
-                }
-            })
-            .detach();
 
             debug("ready; the panel opens from the tray icon");
             // CRAKE_SHOW=detail:<tunnel> (development): open tunnel detail.
@@ -434,6 +380,112 @@ fn main() {
                 }
             }
         });
+}
+
+/// craked as the app reaches it: given where to send its updates, the
+/// channel for commands (client::start; a test's own socket).
+pub(crate) type Connect =
+    Box<dyn FnOnce(async_channel::Sender<client::Update>) -> async_channel::Sender<Command>>;
+
+/// What the app starts with: the real things (main), or a test's.
+pub(crate) struct Setup {
+    pub model: Model,
+    /// Running through XWayland, where the panel can be placed at the icon.
+    pub x11: bool,
+    /// CRAKE_DEMO: the design's sample data, no craked.
+    pub demo: bool,
+    /// None: no craked (demo mode).
+    pub connect: Option<Connect>,
+    /// The tray icon (StatusNotifierItem on the session bus).
+    pub tray: bool,
+    /// One Crake per session: a second start opens the first one's panel.
+    pub single_instance: bool,
+    /// Follow and take over OpenVPN 3 sessions.
+    pub openvpn3: bool,
+    /// Started at login (--autostart).
+    pub autostart: bool,
+}
+
+/// The app: its model, craked's client, the tray, and the loops that apply
+/// craked's updates and the windows' requests. False when another Crake
+/// is already running (it was told to open its panel).
+pub(crate) fn start(cx: &mut App, setup: Setup) -> bool {
+    let Setup {
+        model,
+        x11,
+        demo,
+        connect,
+        tray,
+        single_instance,
+        openvpn3,
+        autostart,
+    } = setup;
+    let model = cx.new(|_| model);
+    let (requests, incoming_requests) = async_channel::unbounded();
+    // One Crake per session (not in demo mode, so a demo can run
+    // beside the real one): a second start opens this one's panel.
+    if single_instance {
+        let again = requests.clone();
+        if single::claim(move || {
+            again.send_blocking(Request::Panel(None)).ok();
+        }) {
+            return false;
+        }
+    }
+    let (updates, incoming_updates) = async_channel::unbounded();
+    let commands = match connect {
+        Some(connect) => connect(updates),
+        None => async_channel::unbounded().0,
+    };
+    let tray = if tray {
+        tray::start(requests.clone())
+    } else {
+        None
+    };
+    cx.set_global(Shell {
+        model,
+        commands,
+        requests,
+        panel: None,
+        panel_blurred: None,
+        last_click: None,
+        panel_height: None,
+        x11,
+        demo,
+        tray,
+        log: None,
+        settings: None,
+        detail: None,
+        autostart_pending: autostart,
+        adding: None,
+        new_tunnel: None,
+        sessions: Default::default(),
+        adopting: Default::default(),
+        tray_shape: tray::Shape::Off,
+        tray_motion: None,
+        panel_motion: None,
+    });
+    // The tray follows the model, whatever changed it: craked, or a
+    // sign-in in this app.
+    let model = cx.global::<Shell>().model.clone();
+    cx.observe(&model, |_, cx| refresh_tray(cx)).detach();
+    if openvpn3 {
+        watch_openvpn3(cx);
+    }
+
+    cx.spawn(async move |cx| {
+        while let Ok(update) = incoming_updates.recv().await {
+            cx.update(|cx| on_update(update, cx));
+        }
+    })
+    .detach();
+    cx.spawn(async move |cx| {
+        while let Ok(request) = incoming_requests.recv().await {
+            cx.update(|cx| on_request(request, cx));
+        }
+    })
+    .detach();
+    true
 }
 
 /// With CRAKE_DEBUG set: a line on stderr.
