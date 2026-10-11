@@ -8,6 +8,7 @@
 use std::collections::BTreeMap;
 use std::net::Ipv4Addr;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Result, bail};
 use windows_sys::Win32::Foundation::ERROR_SUCCESS;
@@ -27,6 +28,29 @@ type Link = (Vec<Ipv4Addr>, Vec<String>, bool);
 
 /// Each link craked registered, by device.
 static LINKS: Mutex<BTreeMap<String, Link>> = Mutex::new(BTreeMap::new());
+
+/// Public names come to craked's server too (while a tunnel is up): it
+/// asks Windows' own DNS servers and can rescue what they don't know.
+static PUBLIC: AtomicBool = AtomicBool::new(false);
+/// The public rule's name (`Crake public`).
+const PUBLIC_RULE: &str = "public";
+
+/// Whether public names come to craked's server now.
+pub fn public() -> bool {
+    PUBLIC.load(Ordering::Relaxed)
+}
+
+/// Send every name that isn't a link's to craked's server (Linux watches
+/// public answers in nftables instead), or stop.
+pub fn set_public(on: bool) -> Result<()> {
+    PUBLIC.store(on, Ordering::Relaxed);
+    if on {
+        write_rule(PUBLIC_RULE, &[], true)
+    } else {
+        delete(&format!("{POLICY}\\{PREFIX}{PUBLIC_RULE}"));
+        Ok(())
+    }
+}
 
 /// The link that answers for `name` (its most specific domain; failing
 /// that, a full tunnel's), with that link's servers.

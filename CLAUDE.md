@@ -573,8 +573,10 @@ The user doesn't want development builds installed on their machine.
   every package test's container after the tunnel phase (`check.sh
   journey`: the service steps aside, the journey runs its own craked with
   the packaged hook and the system's openconnect, nft and ip). Passes on
-  Ubuntu 22.04/24.04/26.04, Debian 12/13, Fedora 43/44/45 and Arch; NixOS in its VM test. Still to do: Windows (its VM test,
-  phase 4), macOS (GitHub's runners).
+  Ubuntu 22.04/24.04/26.04, Debian 12/13, Fedora 43/44/45 and Arch; NixOS in its VM test.
+  Windows: `scripts/windows-vm-test.sh` (its basics through the app's
+  client and sign-in, not the windows yet). Still to do: macOS (GitHub's
+  runners).
 - `scripts/netns-test.sh`: real nftables and policy routing inside a
   disposable container with no network (host filesystem read-only).
 - `scripts/e2e-test.sh` (`crates/crake/src/e2e_tests.rs`, skipped unless
@@ -877,11 +879,42 @@ on 127.53.0.1:53, where NRPT rules (volatile registry keys) send each
 tunnel's domains: it asks the tunnel's DNS through the tunnel, routes the
 answer, then replies (routed before the first packet), and answers
 craked's own links (crake-hush refuses: names kept private while a
-tunnel is off; crake-keep answers from memory). To do: DNS over TCP to
-it, a full tunnel, the public-DNS rescue and split-horizon (craked would
-have to be Windows' default DNS), then the installer (phase 5). A fresh
+tunnel is off; crake-keep answers from memory). Over TCP too (a question that
+came over TCP is asked of the tunnel's DNS over TCP). While a tunnel is
+up, an NRPT rule for the root (`Crake public`) sends every other name to
+craked's server too: it asks Windows' own DNS servers (the adapters' that
+are up, Crake's left out) and hands the answer to the manager's
+`rescue_answer` (the public-NXDOMAIN rescue and split-horizon, shared
+with Linux, which wraps it for NFQUEUE's packets). A full tunnel: 0/1
+and 128/1 through the tunnel (more specific than the LAN's default route
+whatever its metric), each exception that went by the default route (the
+gateway) routed the way it went before (GetBestRoute2), and every name
+to its DNS (an NRPT rule for the root). Nothing on Windows says "isn't
+built for Windows yet" any more. Then the installer (phase 5). A fresh
 probe's first connection fails on Windows (its retry works): Linux's
-retransmitted SYN takes the new route, Windows' stuck one is reset.
+retransmitted SYN takes the new route and is NATed to the tunnel's
+address; Windows' stuck connection keeps the LAN's source address, so
+craked resets it. Making the first one work would need a WFP callout
+driver (holding the SYN), not planned.
+
+**Phase 4: built** (`scripts/windows-vm-test.sh`). A Windows 11 VM with
+Crake installed as a person would have it (Program Files\Crake, the
+craked service, openconnect beside it) and a gateway VM (Ubuntu's cloud
+image, ocserv, ACME's network behind it, and the LAN's own DNS, which
+knows no name), wired by a socket file only (qemu's stream netdev); the
+gateway's second card reaches Ubuntu's archive for ocserv, nothing is
+forwarded. The Windows image is installed once, unattended, from
+Microsoft's evaluation ISO (`scripts/windows-vm-test/autounattend.xml`:
+no network, no TPM or Secure Boot asked for, a sign-in task that runs the
+test disc's `run.ps1`), cached in target/vm (delete it after the 90-day
+evaluation). `run.ps1` installs Crake, waits for the gateway, runs the
+Windows test (`crates/crake/src/windows_tests.rs`, the app's client and
+sign-in against the installed service: probing, a name only ACME's DNS
+knows, over TCP too, a public name rescued, the charts' counters, names
+refused at once when off, a full tunnel) and checks craked stops
+leaving no adapters or NRPT rules; it reports on the serial port. The
+test binary and craked are cross-built with MinGW in
+`crake-windows-build`. Not in GitHub's CI (KVM).
 
 **OpenVPN on Windows (open decision, noted for the user):** OpenVPN 3
 Linux (the D-Bus service Crake drives there) doesn't exist on Windows, so

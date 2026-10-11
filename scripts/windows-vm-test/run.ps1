@@ -24,6 +24,7 @@ $nic = Get-NetAdapter | Where-Object Status -eq Up | Select-Object -First 1
 Check "the LAN (198.51.100.20)" {
     New-NetIPAddress -InterfaceIndex $nic.ifIndex -IPAddress 198.51.100.20 -PrefixLength 24 `
         -DefaultGateway 198.51.100.10 -ErrorAction Stop | Out-Null
+    Set-DnsClientServerAddress -InterfaceIndex $nic.ifIndex -ServerAddresses 198.51.100.10 -ErrorAction Stop
     $true
 }
 

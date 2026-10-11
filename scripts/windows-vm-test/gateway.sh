@@ -25,7 +25,7 @@ echo crex > /srv/www/index.html
 
 ip link add acme type dummy
 ip link set acme up
-for a in 10.40.0.2 10.40.1.10 10.40.1.11; do ip addr add "$a/32" dev acme; done
+for a in 10.40.0.2 10.40.1.10 10.40.1.11 10.40.1.12; do ip addr add "$a/32" dev acme; done
 nft -f - <<NFT
 table ip lan {
   chain input {
@@ -34,8 +34,12 @@ table ip lan {
   }
 }
 NFT
+# ACME's DNS, which also knows a name outside its domain: files.acme.example.
 dnsmasq --no-resolv --no-hosts --listen-address=10.40.0.2 --bind-interfaces \
-    --address=/git.acme.internal/10.40.1.10 --address=/wiki.acme.internal/10.40.1.11
+    --address=/git.acme.internal/10.40.1.10 --address=/wiki.acme.internal/10.40.1.11 \
+    --address=/files.acme.example/10.40.1.12
+# The LAN's own (public) DNS, which knows no name at all.
+dnsmasq --no-resolv --no-hosts --listen-address=198.51.100.10 --bind-interfaces --local=/#/
 busybox httpd -p 80 -h /srv/www
 systemctl stop ocserv.socket ocserv.service 2>/dev/null || true
 ocserv --config /etc/ocserv/ocserv.conf

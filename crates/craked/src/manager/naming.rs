@@ -23,18 +23,26 @@ impl Manager {
         self.learn_answer(name, &answer, Why::TunnelDomain).await;
     }
 
-    /// Called with each public DNS answer, before it's let through. When it
-    /// says a name doesn't exist, ask each tunnel that is up, in order. If one
-    /// knows the name, route its addresses and return the packet carrying the
-    /// tunnel's answer instead.
+    /// Called with each public DNS answer (a whole packet), before it's let
+    /// through: `rescue_answer`'s packet carrying the tunnel's answer instead.
     pub async fn rescue(&self, packet: &[u8]) -> Option<Vec<u8>> {
         let payload = dns::dns_payload(packet)?;
+        let answer = self.rescue_answer(payload).await?;
+        dns::replace_payload(packet, &answer)
+    }
+
+    /// Called with each public DNS answer (the DNS message), before it's let
+    /// through. When it says a name doesn't exist, ask each tunnel that is
+    /// up, in order. If one knows the name, route its addresses and return
+    /// the tunnel's answer instead (as is a public name with a private
+    /// address, `split_horizon`).
+    pub async fn rescue_answer(&self, payload: &[u8]) -> Option<Vec<u8>> {
         if let Some(answer) = dns::parse_message(payload) {
             self.remember_names(&answer);
             if !self.settings.lock().unwrap().ask_unknown {
                 return None;
             }
-            return self.split_horizon(packet, payload).await;
+            return self.split_horizon(payload).await;
         }
         // Settings: "Ask every tunnel when a name is unknown".
         if !self.settings.lock().unwrap().ask_unknown {
@@ -79,7 +87,7 @@ impl Manager {
                 };
                 self.learn_answer(&tunnel, &answer, Why::PublicFailed).await;
             }
-            return dns::replace_payload(packet, &dns::rewrite(&failure, reply)?);
+            return dns::rewrite(&failure, reply);
         }
         self.unknown.lock().unwrap().insert(key, Instant::now());
         None
@@ -90,7 +98,7 @@ impl Manager {
     /// knows a private address the public DNS doesn't, that is the one that
     /// works (the public one often only lets the company's addresses in):
     /// route it and hand the app the tunnel's answer instead.
-    pub(super) async fn split_horizon(&self, packet: &[u8], payload: &[u8]) -> Option<Vec<u8>> {
+    pub(super) async fn split_horizon(&self, payload: &[u8]) -> Option<Vec<u8>> {
         let (question, public) = dns::public_answer(payload)?;
         let tunnels: Vec<_> = self
             .routed_tunnels()
@@ -168,7 +176,7 @@ impl Manager {
             if !routed {
                 return None;
             }
-            return dns::replace_payload(packet, &dns::rewrite(&question, reply)?);
+            return dns::rewrite(&question, reply);
         }
         self.no_split
             .lock()

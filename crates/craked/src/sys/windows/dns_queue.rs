@@ -95,6 +95,9 @@ async fn write_message(stream: &mut TcpStream, msg: &[u8]) -> std::io::Result<()
 async fn answer(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> {
     let (name, _) = crate::keep::question(query)?;
     let Some((device, servers)) = super::resolved::owner(&name) else {
+        if super::resolved::public() {
+            return public(mgr, query, tcp).await;
+        }
         // Not a name of any link now: say so at once.
         return crate::hush::refuse(query);
     };
@@ -103,9 +106,9 @@ async fn answer(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> 
         crate::keep::DEVICE => mgr.keep_answer(query).await,
         _ => {
             let reply = if tcp {
-                ask_tcp(query, &device, &servers).await
+                ask_tcp(query, Some(&device), &servers).await
             } else {
-                ask(query, &device, &servers).await
+                ask(query, Some(&device), &servers).await
             };
             let Some(reply) = reply else {
                 // SERVFAIL: the tunnel's DNS didn't answer.
@@ -122,13 +125,31 @@ async fn answer(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> 
     }
 }
 
-/// Ask the tunnel's DNS servers in turn, through the tunnel.
-async fn ask(query: &[u8], device: &str, servers: &[Ipv4Addr]) -> Option<Vec<u8>> {
+/// A public name: asked of Windows' own DNS servers, whose answer the
+/// manager may rescue (a name only a tunnel knows, a public name with a
+/// private address).
+async fn public(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> {
+    let servers = super::system_dns();
+    let reply = if tcp {
+        ask_tcp(query, None, &servers).await
+    } else {
+        ask(query, None, &servers).await
+    };
+    let Some(reply) = reply else {
+        return crate::hush::reply_code(query, 2);
+    };
+    Some(mgr.rescue_answer(&reply).await.unwrap_or(reply))
+}
+
+/// Ask DNS servers in turn: a tunnel's through the tunnel (`device`).
+async fn ask(query: &[u8], device: Option<&str>, servers: &[Ipv4Addr]) -> Option<Vec<u8>> {
     for server in servers {
         let Ok(sock) = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).await else {
             continue;
         };
-        if super::bind_device(&sock, device).is_err() {
+        if let Some(device) = device
+            && super::bind_device(&sock, device).is_err()
+        {
             continue;
         }
         let to = SocketAddr::from((*server, 53));
@@ -144,13 +165,15 @@ async fn ask(query: &[u8], device: &str, servers: &[Ipv4Addr]) -> Option<Vec<u8>
     None
 }
 
-/// The same over TCP, through the tunnel.
-async fn ask_tcp(query: &[u8], device: &str, servers: &[Ipv4Addr]) -> Option<Vec<u8>> {
+/// The same over TCP.
+async fn ask_tcp(query: &[u8], device: Option<&str>, servers: &[Ipv4Addr]) -> Option<Vec<u8>> {
     for server in servers {
         let Ok(sock) = TcpSocket::new_v4() else {
             continue;
         };
-        if super::bind_device(&sock, device).is_err() {
+        if let Some(device) = device
+            && super::bind_device(&sock, device).is_err()
+        {
             continue;
         }
         let exchange = async {

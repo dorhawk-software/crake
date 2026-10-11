@@ -6,8 +6,8 @@
 //! tunnel comes up). A full tunnel is two halves of the address space
 //! through the tunnel (0/1 and 128/1: more specific than the LAN's default
 //! route, whatever its metric), with its exceptions (the gateway, the LAN)
-//! kept on the way they went before. Not yet: the public DNS watch
-//! (craked's DNS forwarder will do that).
+//! kept on the way they went before. Public DNS answers aren't watched
+//! here: craked's own DNS server gets public names (`resolved::set_public`).
 
 use std::collections::{BTreeSet, HashMap};
 use std::net::Ipv4Addr;
@@ -96,13 +96,19 @@ impl Routing {
         Ok(())
     }
 
-    /// Linux watches public DNS answers in nftables; on Windows craked's own
-    /// DNS forwarder will see them.
+    /// Public names to craked's own DNS server, which can rescue what
+    /// public DNS doesn't know (Linux watches the answers in nftables).
     pub async fn public_up(&self, _probing: bool) -> Result<()> {
+        if self.real {
+            super::resolved::set_public(true)?;
+        }
         Ok(())
     }
 
     pub async fn public_down(&self) -> Result<()> {
+        if self.real {
+            super::resolved::set_public(false)?;
+        }
         Ok(())
     }
 

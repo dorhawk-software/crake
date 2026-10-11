@@ -21,13 +21,64 @@ use windows_sys::Win32::System::Threading::CREATE_NEW_CONSOLE;
 /// Every IPv4 address on the machine: interface (its alias, as `crake-acme`
 /// for a tunnel), address, netmask.
 pub fn interfaces() -> Vec<(String, Ipv4Addr, u32)> {
+    let mut found = Vec::new();
+    each_adapter(|a, name| {
+        // SAFETY: Windows' list of the adapter's addresses, walked by its
+        // own links.
+        unsafe {
+            let mut unicast = a.FirstUnicastAddress;
+            while !unicast.is_null() {
+                let u = &*unicast;
+                if let Some(addr) = ipv4(u.Address.lpSockaddr) {
+                    let prefix = u32::from(u.OnLinkPrefixLength.min(32));
+                    let mask = u32::MAX.checked_shl(32 - prefix).unwrap_or(0);
+                    found.push((name.to_owned(), addr, mask));
+                }
+                unicast = u.Next;
+            }
+        }
+    });
+    found
+}
+
+/// The DNS servers Windows was given (DHCP, or by hand) on the adapters
+/// that are up, Crake's own tunnels left out: where public names go.
+pub fn system_dns() -> Vec<Ipv4Addr> {
+    let mut found = Vec::new();
+    each_adapter(|a, name| {
+        // 1: IfOperStatusUp.
+        if a.OperStatus != 1 || name.starts_with("crake-") {
+            return;
+        }
+        // SAFETY: as in `interfaces`.
+        unsafe {
+            let mut server = a.FirstDnsServerAddress;
+            while !server.is_null() {
+                let s = &*server;
+                if let Some(addr) = ipv4(s.Address.lpSockaddr)
+                    && !addr.is_loopback()
+                    && !found.contains(&addr)
+                {
+                    found.push(addr);
+                }
+                server = s.Next;
+            }
+        }
+    });
+    found
+}
+
+/// Each IPv4 adapter, with its alias.
+fn each_adapter(
+    mut f: impl FnMut(&windows_sys::Win32::NetworkManagement::IpHelper::IP_ADAPTER_ADDRESSES_LH, &str),
+) {
     use windows_sys::Win32::NetworkManagement::IpHelper::{
-        GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_DNS_SERVER, GAA_FLAG_SKIP_MULTICAST,
-        GetAdaptersAddresses, IP_ADAPTER_ADDRESSES_LH,
+        GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_MULTICAST, GetAdaptersAddresses,
+        IP_ADAPTER_ADDRESSES_LH,
     };
-    use windows_sys::Win32::Networking::WinSock::{AF_INET, SOCKADDR_IN};
+    use windows_sys::Win32::Networking::WinSock::AF_INET;
     const ERROR_BUFFER_OVERFLOW: u32 = 111;
-    let flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER;
+    let flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST;
     let mut size: u32 = 16 * 1024;
     let mut buf: Vec<u64>;
     loop {
@@ -45,33 +96,34 @@ pub fn interfaces() -> Vec<(String, Ipv4Addr, u32)> {
         match err {
             0 => break,
             ERROR_BUFFER_OVERFLOW => continue,
-            _ => return Vec::new(),
+            _ => return,
         }
     }
-    let mut found = Vec::new();
     // SAFETY: a list Windows wrote into `buf`, walked by its own links.
     unsafe {
         let mut adapter = buf.as_ptr().cast::<IP_ADAPTER_ADDRESSES_LH>();
         while !adapter.is_null() {
             let a = &*adapter;
-            let name = wide(a.FriendlyName);
-            let mut unicast = a.FirstUnicastAddress;
-            while !unicast.is_null() {
-                let u = &*unicast;
-                let sa = u.Address.lpSockaddr;
-                if !sa.is_null() && (*sa).sa_family == AF_INET {
-                    let sin = &*sa.cast::<SOCKADDR_IN>();
-                    let addr = Ipv4Addr::from(sin.sin_addr.S_un.S_addr.to_ne_bytes());
-                    let prefix = u32::from(u.OnLinkPrefixLength.min(32));
-                    let mask = u32::MAX.checked_shl(32 - prefix).unwrap_or(0);
-                    found.push((name.clone(), addr, mask));
-                }
-                unicast = u.Next;
-            }
+            f(a, &wide(a.FriendlyName));
             adapter = a.Next;
         }
     }
-    found
+}
+
+/// An IPv4 socket address's address.
+///
+/// # Safety
+/// `sa` is null or points to a socket address Windows filled in.
+unsafe fn ipv4(sa: *const windows_sys::Win32::Networking::WinSock::SOCKADDR) -> Option<Ipv4Addr> {
+    use windows_sys::Win32::Networking::WinSock::{AF_INET, SOCKADDR_IN};
+    // SAFETY: as the caller promises; AF_INET means a SOCKADDR_IN.
+    unsafe {
+        if sa.is_null() || (*sa).sa_family != AF_INET {
+            return None;
+        }
+        let sin = &*sa.cast::<SOCKADDR_IN>();
+        Some(Ipv4Addr::from(sin.sin_addr.S_un.S_addr.to_ne_bytes()))
+    }
 }
 
 /// A NUL-terminated UTF-16 string Windows owns, copied.

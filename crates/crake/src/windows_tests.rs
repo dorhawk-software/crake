@@ -154,6 +154,29 @@ async fn the_installed_service_end_to_end() {
         "wiki.acme.internal's page at once"
     );
 
+    // 3. A name public DNS doesn't know but ACME's does (outside its
+    //    domains): rescued, routed before the first packet.
+    let rescued = tokio::task::spawn_blocking(|| {
+        let addrs = resolve("files.acme.example")?;
+        assert!(
+            addrs.contains(&IpAddr::from([10, 40, 1, 12])),
+            "files.acme.example is {addrs:?}"
+        );
+        get("10.40.1.12", Duration::from_millis(800)).map_err(|e| e.to_string())
+    })
+    .await
+    .unwrap();
+    assert!(
+        rescued.is_ok_and(|b| b.contains("crex")),
+        "files.acme.example's page at once"
+    );
+    app.until("the rescue's decision", |m| {
+        m.log
+            .iter()
+            .any(|e| e.message == "Sent files.acme.example through ACME.")
+    })
+    .await;
+
     // Over TCP too (Windows asks again over TCP when an answer was cut).
     let tcp = ps("(Resolve-DnsName -Name git.acme.internal -Type A -TcpOnly -DnsOnly).IPAddress");
     assert!(
@@ -169,6 +192,24 @@ async fn the_installed_service_end_to_end() {
                 .iter()
                 .all(|h| rows.iter().any(|r| r.target == *h && r.kind == "learned"))
         })
+    })
+    .await;
+
+    // The charts' numbers (GetIfTable2's counters, sampled every 10 s):
+    // bytes through ACME for tunnel detail, direct ones for the panel.
+    let end = Instant::now() + Duration::from_secs(40);
+    let through = |m: &crate::model::Model| {
+        m.tunnel_traffic
+            .get("acme")
+            .is_some_and(|t| t.iter().map(|(_, b)| b).sum::<u64>() > 0)
+    };
+    while !through(&app.model) && Instant::now() < end {
+        app.send(Command::TunnelTraffic("acme".into()));
+        app.settle(Duration::from_secs(3)).await;
+    }
+    assert!(through(&app.model), "no bytes through ACME in its chart");
+    app.within(Duration::from_secs(45), "direct bytes in the chart", |m| {
+        m.traffic.iter().map(|(_, b)| b).sum::<u64>() > 0
     })
     .await;
 
