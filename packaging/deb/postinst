@@ -13,6 +13,12 @@ if [ "$1" = configure ]; then
     deb-systemd-helper unmask craked.service >/dev/null || true
     deb-systemd-helper enable craked.service >/dev/null || true
     if [ -d /run/systemd/system ]; then
+        # An upgrade: the running craked hands its tunnels to the new one,
+        # signed in (craked's manager/handover.rs), instead of logging off.
+        if [ -n "$2" ] && systemctl is-active --quiet craked.service; then
+            mkdir -p /run/crake
+            : > /run/crake/handover
+        fi
         deb-systemd-invoke restart craked.service >/dev/null || true
     fi
 fi

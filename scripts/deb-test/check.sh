@@ -78,6 +78,14 @@ tunnel() {
     check "resolved asks ACME's DNS for acme.internal" sh -c 'resolvectl query wiki.acme.internal | grep -q 10.40.1.11'
     check "the name's address is routed at once" sh -c 'curl -s -m 1 http://10.40.1.11/ | grep -q crex'
     check "both learned" sh -c "nft list set inet crake learned_acme | grep -q 10.40.1.10 && nft list set inet crake learned_acme | grep -q 10.40.1.11"
+    # A package upgrade (reinstalling runs the same scripts): ACME is
+    # handed to the new craked, stays signed in and comes back by itself.
+    check "upgrades" dpkg -i /pkg/crake.deb
+    for _ in $(seq 1 40); do call GetTunnel s acme | grep -q '"connected"' && break; sleep 0.5; done
+    check "ACME is back after the upgrade" sh -c "busctl --system call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 GetTunnel s acme | grep -q '\"connected\"'"
+    check "the log says Crake was updated" grep -q "Crake was updated. Your tunnels are reconnecting with your sign-ins." /var/lib/crake/log
+    check "what it learned still goes through" sh -c 'curl -s -m 3 http://10.40.1.11/ | grep -q crex'
+    check "no sessions left lying around" test ! -e /run/crake/resume.json
     check "switches off" call Disconnect s acme
     sleep 2
     # Keeping names private: with ACME off, its names are answered at once

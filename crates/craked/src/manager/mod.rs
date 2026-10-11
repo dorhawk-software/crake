@@ -26,6 +26,7 @@ use hickory_proto::rr::RecordType;
 
 mod app_tunnels;
 mod clash;
+mod handover;
 mod host_ops;
 mod naming;
 mod outage;
@@ -109,6 +110,11 @@ struct Entry {
     /// Refused because it clashes with a tunnel that's up: it's stopping,
     /// already said why, and goes Off quietly.
     refused: bool,
+    /// Handed over to the new craked of a package upgrade (`handover`): it
+    /// stops, and starts again there, without a line in the log.
+    handover: bool,
+    /// OpenVPN 3: what the app attached it with, for a handover.
+    attached: Option<HashMap<String, String>>,
 }
 
 pub struct Manager {
@@ -255,6 +261,8 @@ impl Manager {
                     resumed: false,
                     up_since: None,
                     refused: false,
+                    handover: false,
+                    attached: None,
                 };
                 (t.name.clone(), e)
             })

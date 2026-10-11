@@ -663,3 +663,88 @@ async fn hosts_learned_under_a_name_are_answered_too() {
         vec!["10.81.1.9".parse::<std::net::Ipv4Addr>().unwrap()]
     );
 }
+
+/// Records each run (the cookie it was given) and how it was stopped.
+const FAKE_HANDOVER: &str = r#"#!/bin/sh
+read -r cookie
+echo "run cookie=$cookie" >> "$CRAKE_TEST_HANDOVER"
+export TUNDEV=crake-acme INTERNAL_IP4_ADDRESS=10.40.1.7
+reason=connect "$CRAKE_TEST_HOOK" || exit 1
+trap 'echo hup >> "$CRAKE_TEST_HANDOVER"; exit 0' HUP
+trap 'echo term >> "$CRAKE_TEST_HANDOVER"; exit 0' TERM
+while :; do sleep 0.1; done
+"#;
+
+/// A package upgrade: the old craked hands its tunnels to the new one
+/// (handover.rs). They stay signed in and come back without a sign-in; the
+/// log says so once, instead of "Switched off" and "Switched on".
+#[tokio::test]
+async fn an_upgrade_hands_the_tunnels_to_the_new_craked() {
+    use std::collections::HashMap;
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(dir.path(), FAKE_HANDOVER);
+    let calls = dir.path().join("calls");
+    // SAFETY: only this test reads it.
+    unsafe { std::env::set_var("CRAKE_TEST_HANDOVER", &calls) };
+    let socket = cfg.hook_socket.clone();
+    let log = || std::fs::read_to_string(dir.path().join("log")).unwrap();
+
+    let old = Manager::new(cfg.clone()).unwrap();
+    old.init().await.unwrap();
+    let srv = hook_server::serve(old.clone(), &socket).unwrap();
+    let session =
+        craked::auth::parse("COOKIE='s3cret'\nCONNECT_URL='https://vpn.acme.example/'\n").unwrap();
+    old.connect_with("acme", Some(session)).unwrap();
+    wait_for(&old, "acme", TunnelState::Connected).await;
+    let initech = old
+        .add_tunnel(&HashMap::from([
+            ("display_name".to_owned(), "Initech".to_owned()),
+            ("gateway".to_owned(), "initech".to_owned()),
+            ("protocol".to_owned(), "openvpn3".to_owned()),
+        ]))
+        .unwrap();
+    let tun0 = HashMap::from([
+        ("device".to_owned(), "tun0".to_owned()),
+        ("dns".to_owned(), "10.8.0.1".to_owned()),
+    ]);
+    old.attach(&initech, &tun0).await.unwrap();
+
+    // postinst's flag, then the restart.
+    std::fs::write(dir.path().join("handover"), "").unwrap();
+    old.shutdown().await;
+    srv.abort();
+    let resume = dir.path().join("resume.json");
+    let mode = std::fs::metadata(&resume).unwrap().permissions().mode();
+    assert_eq!(mode & 0o777, 0o600, "the sessions are root's alone");
+    assert!(!dir.path().join("handover").exists(), "the flag is taken");
+    let runs = std::fs::read_to_string(&calls).unwrap();
+    assert!(
+        runs.contains("hup") && !runs.contains("term"),
+        "kept signed in: {runs}"
+    );
+
+    let new = Manager::new(cfg).unwrap();
+    new.init().await.unwrap();
+    let _srv = hook_server::serve(new.clone(), &socket).unwrap();
+    new.resume_after_update().await;
+    wait_for(&new, "acme", TunnelState::Connected).await;
+    wait_for(&new, &initech, TunnelState::Connected).await;
+    assert!(!resume.exists(), "read once");
+    let runs = std::fs::read_to_string(&calls).unwrap();
+    assert_eq!(runs.matches("run cookie=s3cret").count(), 2, "{runs}");
+    let said = log();
+    assert!(
+        said.contains("Crake was updated. Your tunnels are reconnecting with your sign-ins."),
+        "{said}"
+    );
+    assert_eq!(said.matches("Switched ACME on.").count(), 1, "{said}");
+    assert!(!said.contains("Switched ACME off."), "{said}");
+    assert!(!said.contains("s3cret"), "the cookie stays out of the log");
+
+    // An ordinary stop (no flag) logs off, as always, and leaves nothing.
+    new.shutdown().await;
+    assert!(std::fs::read_to_string(&calls).unwrap().contains("term"));
+    assert!(!resume.exists());
+    assert!(log().contains("Switched ACME off."));
+}

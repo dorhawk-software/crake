@@ -10,7 +10,7 @@ impl Manager {
 
     /// Connect with a session from a separate sign-in ([`crate::auth`]).
     pub fn connect_with(self: &Arc<Self>, name: &str, session: Option<Session>) -> Result<()> {
-        let (config, stop_rx, session) = {
+        let (config, stop_rx, session, quiet) = {
             let mut map = self.tunnels.lock().unwrap();
             let e = map
                 .get_mut(name)
@@ -35,14 +35,18 @@ impl Manager {
                 e.session = session.clone();
             }
             let session = session.or_else(|| e.session.clone());
-            (e.config.clone(), rx, session)
+            (
+                e.config.clone(),
+                rx,
+                session,
+                std::mem::take(&mut e.handover),
+            )
         };
         let _ = self.changes.send(name.to_owned());
-        self.log.system(
-            Some(name),
-            format!("Switched {} on.", config.display()),
-            None,
-        );
+        if !quiet {
+            let line = format!("Switched {} on.", config.display());
+            self.log.system(Some(name), line, None);
+        }
         let this = Arc::clone(self);
         tokio::spawn(async move { this.supervise(config, session, stop_rx).await });
         Ok(())
@@ -80,16 +84,9 @@ impl Manager {
     pub async fn shutdown(&self) {
         self.traffic
             .save(&self.cfg.state_path.with_file_name("traffic.json"));
-        {
-            // Leaving: log every session off.
-            let mut map = self.tunnels.lock().unwrap();
-            for e in map.values_mut() {
-                e.session = None;
-                if let Some(tx) = e.stop.take() {
-                    let _ = tx.send(Stop::LogOff);
-                }
-            }
-        }
+        // Leaving: log every session off, unless a package upgrade asked
+        // for them to be handed to the new craked.
+        self.stop_all();
         for _ in 0..120 {
             let busy = self.tunnels.lock().unwrap().values().any(|e| e.running);
             if !busy {
@@ -288,7 +285,11 @@ impl Manager {
             split_include: list("routes"),
             split_exclude: Vec::new(),
         };
-        self.tunnel_up(name, &display, info, true).await
+        self.tunnel_up(name, &display, info, true).await?;
+        if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
+            e.attached = Some(fields.clone());
+        }
+        Ok(())
     }
 
     /// OpenVPN 3: the session ended (switched off in the app, or it dropped).
@@ -313,6 +314,7 @@ impl Manager {
         self.remove_routing(name).await;
         if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
             e.info = None;
+            e.attached = None;
         }
         let state = if failed.is_some() {
             TunnelState::Trouble
@@ -507,13 +509,14 @@ impl Manager {
                     if state == TunnelState::Trouble && !e.refused {
                         e.session = None;
                     }
-                    std::mem::take(&mut e.refused)
+                    std::mem::take(&mut e.refused) | std::mem::take(&mut e.handover)
                 }
                 None => false,
             }
         };
         if refused {
-            // Already said why ("Turn ACME off to use Nordbank.").
+            // Already said why ("Turn ACME off to use Nordbank."), or handed
+            // over to the new craked.
             self.set_state(name, TunnelState::Off, true);
             return;
         }

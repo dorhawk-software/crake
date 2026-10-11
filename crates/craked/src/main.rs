@@ -103,6 +103,8 @@ async fn main() -> Result<()> {
 
     let _bus = dbus::serve(mgr.clone(), !args.session_bus).await?;
     tracing::info!("craked {} ready", env!("CARGO_PKG_VERSION"));
+    // A package upgrade: the tunnels the previous craked handed over.
+    mgr.resume_after_update().await;
     tokio::select! {
         _ = term.recv() => {}
         _ = int.recv() => {}

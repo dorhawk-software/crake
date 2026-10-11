@@ -55,6 +55,8 @@ impl Manager {
                     resumed: false,
                     up_since: None,
                     refused: false,
+                    handover: false,
+                    attached: None,
                 },
             );
         }

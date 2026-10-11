@@ -652,6 +652,19 @@ it doesn't, bundle, and own the updates.**
   22.04, 24.04 and 26.04. Not in CI (needs KVM). Still
   to do, with the user: the signed apt repository (their key) and its
   publishing.
+- **Upgrades keep tunnels up (requested).** postinst, upgrading a running
+  craked, leaves `/run/crake/handover` and restarts it; craked, stopping,
+  then hangs up each openconnect tunnel without logging off (SIGHUP) and
+  writes their sessions, and the OpenVPN 3 devices the app attached, to
+  `/run/crake/resume.json` (0600, tmpfs); the new craked reads it once,
+  deletes it and switches them on again ("Crake was updated. Your tunnels
+  are reconnecting with your sign-ins."; no "Switched off/on" lines). A
+  flag older than 2 min or a file older than 10 min is ignored. The unit
+  needs `RuntimeDirectoryPreserve=restart` and `KillMode=mixed` (without
+  it systemd SIGTERMs openconnect itself, which logs off). Tested: lifecycle
+  (`an_upgrade_hands_the_tunnels_to_the_new_craked`) and the package test
+  (`dpkg -i` over a connected ACME: back, signed in, learned hosts still
+  routed), containers and AppArmor VMs.
 - **Ubuntu 22.04 (decided with the user): supported, with password and
   certificate sign-in only.** Its openconnect is 8.20, without
   `--external-browser` (openconnect 9+). `engines.rs` asks openconnect's

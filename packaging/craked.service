@@ -9,7 +9,13 @@ Type=dbus
 BusName=software.dorhawk.Crake1
 ExecStart=/usr/sbin/craked
 Restart=on-failure
+# Stopping signals craked alone: it stops each openconnect itself (logging
+# the session off, or keeping it for a package upgrade's handover);
+# whatever is left after it exits is killed.
+KillMode=mixed
 RuntimeDirectory=crake
+# Kept across a restart: a package upgrade hands the tunnels over in it.
+RuntimeDirectoryPreserve=restart
 StateDirectory=crake
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_KILL
