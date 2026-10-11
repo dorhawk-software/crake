@@ -152,7 +152,20 @@ async fn a_tunnel_on_a_utun_device() {
         .unwrap();
     assert_ne!(way("10.40.1.11"), dev, "forgotten");
     // A connection that started before its host was routed: its next SYN
-    // goes through the tunnel, NATed to the tunnel's address (pf).
+    // goes through the tunnel, NATed to the tunnel's address (pf). Its
+    // first SYN vanishes (a blackhole, as a firewall that drops it: the
+    // runner's own network may refuse it at once instead).
+    sh(
+        "route",
+        &[
+            "-n",
+            "add",
+            "-net",
+            "10.40.1.0/24",
+            "127.0.0.1",
+            "-blackhole",
+        ],
+    );
     let early = tokio::net::TcpSocket::new_v4().unwrap();
     let connecting = tokio::spawn(early.connect("10.40.1.99:80".parse().unwrap()));
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
@@ -172,6 +185,7 @@ async fn a_tunnel_on_a_utun_device() {
         "the retried SYN, from the tunnel's address"
     );
     connecting.abort();
+    sh("route", &["-n", "delete", "-net", "10.40.1.0/24"]);
     // A socket bound to the tunnel finds its way out through it (probes).
     let probe = tokio::net::TcpSocket::new_v4().unwrap();
     craked::sys::mark(&probe, craked::routing::ids(0).mark).unwrap();
