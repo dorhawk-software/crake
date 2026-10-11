@@ -1,25 +1,41 @@
-# Crake built by Nix from Cargo.lock (every crate from crates.io).
-{ lib, rustPlatform, pkg-config, cmake, libxcb, libxkbcommon, fontconfig
+# Crake built by Nix with crane: its crates.io dependencies in a derivation
+# of their own (unchanged while Cargo.lock is, so CI keeps it cached), then
+# Crake itself on top.
+{ lib, craneLib, pkg-config, cmake, libxcb, libxkbcommon, fontconfig
 , freetype, wayland, vulkan-loader, libGL }:
 
-rustPlatform.buildRustPackage {
-  pname = "crake";
-  version = "0.1.0";
-
-  src = lib.fileset.toSource {
-    root = ../..;
-    fileset = lib.fileset.unions [
-      ../../Cargo.toml ../../Cargo.lock ../../crates ../../vendor
-      ../../assets ../../packaging ../../LICENSE
-    ];
+let
+  commonArgs = {
+    pname = "crake";
+    version = "0.1.0";
+    src = lib.fileset.toSource {
+      root = ../..;
+      fileset = lib.fileset.unions [
+        ../../Cargo.toml ../../Cargo.lock ../../crates ../../vendor
+        ../../assets ../../packaging ../../LICENSE
+      ];
+    };
+    strictDeps = true;
+    cargoExtraArgs = "--locked -p crake -p craked";
+    # The tests need namespaces and containers (scripts/netns-test.sh, CI).
+    doCheck = false;
+    nativeBuildInputs = [ pkg-config cmake ];
+    buildInputs = [ libxcb libxkbcommon fontconfig freetype wayland ];
   };
-  cargoLock.lockFile = ../../Cargo.lock;
-  cargoBuildFlags = [ "-p" "crake" "-p" "craked" ];
-  # The tests need namespaces and containers (scripts/netns-test.sh, CI).
-  doCheck = false;
-
-  nativeBuildInputs = [ pkg-config cmake ];
-  buildInputs = [ libxcb libxkbcommon fontconfig freetype wayland ];
+  cargoArtifacts = craneLib.buildDepsOnly (removeAttrs commonArgs [ "src" ] // {
+    dummySrc = craneLib.mkDummySrc {
+      inherit (commonArgs) src;
+      # The vendored, patched GPUI X11 backend is a dependency, not Crake's
+      # own code: whole, not a dummy (vendor/gpui-pre-linux/CRAKE-PATCH.md).
+      extraDummyScript = ''
+        rm -rf $out/vendor
+        cp -r ${../../vendor} $out/vendor
+      '';
+    };
+  });
+in
+craneLib.buildPackage (commonArgs // {
+  inherit cargoArtifacts;
 
   postInstall = ''
     install -Dm755 $out/bin/crake-hook $out/libexec/crake/hook
@@ -45,4 +61,4 @@ rustPlatform.buildRustPackage {
     mainProgram = "crake";
     platforms = [ "x86_64-linux" ];
   };
-}
+})

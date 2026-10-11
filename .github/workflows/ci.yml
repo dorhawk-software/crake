@@ -2,8 +2,9 @@
 # floors; Crake for Windows (scripts/windows-check.sh, then built and its
 # portable tests run on a Windows runner); the tests that
 # need real networking, each in throwaway containers with no network
-# (scripts/netns-test.sh, scripts/e2e-test.sh); and the .deb and RPM, built
-# once and installed and used on every supported release.
+# (scripts/netns-test.sh, scripts/e2e-test.sh); and the packages, built once
+# and installed and used on every supported release, in parallel, with the
+# journey on each.
 name: CI
 
 on:
@@ -101,34 +102,83 @@ jobs:
 
   nixos:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      # cache-nix-action removes its old caches.
+      actions: write
     steps:
       - uses: actions/checkout@v5
       - name: Let the test's VMs use KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
-      - uses: cachix/install-nix-action@v31
+      - uses: nixbuild/nix-quick-install-action@v30
         with:
-          extra_nix_config: system-features = kvm nixos-test benchmark big-parallel
+          nix_conf: |
+            system-features = kvm nixos-test benchmark big-parallel
+      # The Nix store between runs: Crake's crates.io dependencies are a
+      # derivation of their own (crane), rebuilt only when Cargo.lock changes.
+      - uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock', '**/*.nix') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          gc-max-store-size-linux: 8G
+          purge: true
+          purge-prefixes: nix-${{ runner.os }}-
+          purge-created: 0
+          purge-last-accessed: P2D
+          purge-primary-key: never
       - name: Build Crake with Nix
         run: nix build --print-build-logs .#default
       - name: The NixOS module, end to end (a gateway and a client VM)
         run: nix build --print-build-logs .#checks.x86_64-linux.vm
 
-  package:
+  # The packages, built once (with the journey's test binary), then each
+  # system tested in a job of its own, all at once.
+  packages:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Build the .deb on Ubuntu 22.04, and the RPM from the same files
-        run: scripts/build-deb.sh && scripts/build-rpm.sh
+      - name: This week (the cache starts afresh each week, with its Rust)
+        id: week
+        run: echo "week=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
+      # rustup, Cargo's downloads and both builds (the .deb's on 22.04 and
+      # Arch's with Arch's Rust), as the Windows and check jobs keep theirs.
+      - uses: actions/cache@v4
+        with:
+          path: ~/crake-cache
+          key: packages-${{ steps.week.outputs.week }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            packages-${{ steps.week.outputs.week }}-
+            packages-
+      - name: Build the .deb on Ubuntu 22.04 with the journey, and the RPM from the same files
+        run: CRAKE_CACHE=$HOME/crake-cache scripts/build-deb.sh && scripts/build-rpm.sh
       - name: Build the Arch package from source with Arch's Rust
-        run: scripts/build-arch.sh
-      - name: Install and use them on Ubuntu, Debian, Fedora and Arch
-        run: scripts/deb-test.sh 22.04 24.04 26.04 debian:12 debian:13 fedora:43 fedora:44 fedora:45 archlinux:latest
+        run: CRAKE_CACHE=$HOME/crake-cache scripts/build-arch.sh
       - uses: actions/upload-artifact@v4
         with:
           name: crake-packages
           path: |
             target/deb/*.deb
+            target/deb/journey
             target/rpm/*.rpm
             target/arch/crake-[0-9]*.pkg.tar.zst
+
+  package-test:
+    needs: packages
+    runs-on: ubuntu-24.04
+    name: package-test (${{ matrix.system }})
+    strategy:
+      fail-fast: false
+      matrix:
+        system: ["22.04", "24.04", "26.04", "debian:12", "debian:13", "fedora:43", "fedora:44", "fedora:45", "archlinux:latest"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: crake-packages
+          path: target
+      # Artifacts don't keep the executable bit.
+      - run: chmod +x target/deb/journey
+      - name: Install it, a tunnel through the service, the journey, an upgrade, removal
+        run: scripts/deb-test.sh ${{ matrix.system }}

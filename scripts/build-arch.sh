@@ -13,13 +13,22 @@ B=$PWD/target/arch
 rm -rf "$B" && mkdir -p "$B/build"
 git archive --format=tar.gz --prefix="crake-$VERSION/" HEAD > "$B/build/crake-$VERSION.tar.gz"
 cp packaging/arch/PKGBUILD packaging/arch/crake.install "$B/build/"
-docker run --rm -v "$B:/arch" -v crake-arch-cargo:/cargo -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+# Cargo's downloads and build: Docker volumes here, a folder when CRAKE_CACHE
+# names one (CI keeps it between runs).
+if [ -n "${CRAKE_CACHE:-}" ]; then
+  mkdir -p "$CRAKE_CACHE/arch-cargo" "$CRAKE_CACHE/arch-target"
+  CACHES="-v $CRAKE_CACHE/arch-cargo:/cargo -v $CRAKE_CACHE/arch-target:/cargo-target"
+else
+  CACHES="-v crake-arch-cargo:/cargo -v crake-arch-target:/cargo-target"
+fi
+# shellcheck disable=SC2086
+docker run --rm -v "$B:/arch" $CACHES -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
   archlinux:latest sh -euc '
     pacman -Syu --noconfirm --needed base-devel rust cmake pkgconf fontconfig freetype2 \
       libxcb libxkbcommon libxkbcommon-x11 nftables iproute2 polkit >/dev/null 2>&1
     useradd -m builder
-    chown -R builder /arch /cargo
-    su builder -c "cd /arch/build && CARGO_HOME=/cargo makepkg -f --noconfirm --skipchecksums" >/arch/makepkg.log 2>&1 \
+    chown -R builder /arch /cargo /cargo-target
+    su builder -c "cd /arch/build && CARGO_HOME=/cargo CARGO_TARGET_DIR=/cargo-target CARGO_INCREMENTAL=0 makepkg -f --noconfirm --skipchecksums" >/arch/makepkg.log 2>&1 \
       || { tail -n 40 /arch/makepkg.log; exit 1; }
     mv /arch/build/*.pkg.tar.zst /arch/
     chown -R "$HOST_UID:$HOST_GID" /arch'

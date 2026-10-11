@@ -3,14 +3,18 @@
 
   # GPUI needs a recent Rust (1.95+): nixos-unstable has it.
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  # Builds the crates.io dependencies on their own, so they're cached.
+  inputs.crane.url = "github:ipetkov/crane";
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, crane }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
     in {
       packages.${system} = rec {
-        crake = pkgs.callPackage ./packaging/nix/package.nix { };
+        crake = pkgs.callPackage ./packaging/nix/package.nix {
+          craneLib = crane.mkLib pkgs;
+        };
         default = crake;
       };
       # services.crake.enable = true;

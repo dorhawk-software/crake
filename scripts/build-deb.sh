@@ -10,9 +10,16 @@ set -eu
 cd "$(dirname "$0")/.."
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
 mkdir -p target/deb
-docker run --rm -v "$PWD:/src:ro" -v "$PWD/target/deb:/out" \
-  -v crake-deb-cargo:/root/.cargo -v crake-deb-rustup:/root/.rustup \
-  -v crake-deb-target:/target \
+# rustup, Cargo's downloads and build: Docker volumes here, a folder when
+# CRAKE_CACHE names one (CI keeps it between runs).
+if [ -n "${CRAKE_CACHE:-}" ]; then
+  mkdir -p "$CRAKE_CACHE/deb-cargo" "$CRAKE_CACHE/deb-rustup" "$CRAKE_CACHE/deb-target"
+  CACHES="-v $CRAKE_CACHE/deb-cargo:/root/.cargo -v $CRAKE_CACHE/deb-rustup:/root/.rustup -v $CRAKE_CACHE/deb-target:/target"
+else
+  CACHES="-v crake-deb-cargo:/root/.cargo -v crake-deb-rustup:/root/.rustup -v crake-deb-target:/target"
+fi
+# shellcheck disable=SC2086
+docker run --rm -v "$PWD:/src:ro" -v "$PWD/target/deb:/out" $CACHES \
   -e VERSION="$VERSION" -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
   ubuntu:22.04 sh -eu /src/packaging/deb/build-inside.sh
 echo "target/deb/crake_${VERSION}_amd64.deb"

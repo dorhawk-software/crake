@@ -591,9 +591,19 @@ The user doesn't want development builds installed on their machine.
   and stopping leaving nothing; and a network that blocks UDP (7b: noticed,
   over TCP on the same session, remembered). Keep both containers without a
   network: a gateway on a Docker network would be a service on this machine.
-- CI (`.github/workflows/ci.yml`, on every push): the lint gate, `cargo
-  test`, the coverage floors, craked for Windows, the netns and e2e
-  scripts, the NixOS VM test, and the packages built and tested.
+- CI (`.github/workflows/ci.yml`, on every push; a new push cancels the
+  branch's run still going): the lint gate, `cargo test`, the coverage
+  floors, Crake for Windows (checked, then built and tested on a Windows
+  runner), the netns and e2e scripts, the NixOS VM test, and the packages:
+  built once (`packages`), then one `package-test` job per system, all at
+  once, the journey included. Caches (asked for: quick feedback): Rust's
+  (rust-cache) for check and Windows; `~/crake-cache` for the packages
+  (`CRAKE_CACHE`: build-deb.sh and build-arch.sh use a folder instead of
+  their Docker volumes; a new key each week and Cargo.lock), about 35 s
+  instead of 14 min for the .deb, 37 s instead of 10 for Arch; the Nix store
+  (cache-nix-action), where crane keeps the crates.io dependencies a
+  derivation of their own (packaging/nix/package.nix; the vendored GPUI
+  backend stays whole in it).
 - Daily use, nothing installed: `sudo ./target/debug/craked --config dev/<yours>.toml --dev`
   (serves the app on `/run/user/<uid>/crake-dev.sock`), then `./target/debug/crake`.
   The app signs in as the user (`openconnect --authenticate`, questions in

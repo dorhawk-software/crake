@@ -33,16 +33,18 @@ prepare() {
 
 build() {
   cd "$pkgname-$pkgver"
-  export CARGO_TARGET_DIR=target
+  # target in the source tree, unless the builder keeps one elsewhere
+  # (scripts/build-arch.sh in CI, between runs).
+  export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target}"
   cargo build --frozen --release -p crake -p craked
 }
 
 package() {
   cd "$pkgname-$pkgver"
-  install -Dm755 target/release/crake "$pkgdir/usr/bin/crake"
-  install -Dm755 target/release/craked "$pkgdir/usr/bin/craked"
+  install -Dm755 "${CARGO_TARGET_DIR:-target}"/release/crake "$pkgdir/usr/bin/crake"
+  install -Dm755 "${CARGO_TARGET_DIR:-target}"/release/craked "$pkgdir/usr/bin/craked"
   # Arch keeps helpers in /usr/lib/<package>, not /usr/libexec.
-  install -Dm755 target/release/crake-hook "$pkgdir/usr/lib/crake/hook"
+  install -Dm755 "${CARGO_TARGET_DIR:-target}"/release/crake-hook "$pkgdir/usr/lib/crake/hook"
   install -Dm644 packaging/craked.service "$pkgdir/usr/lib/systemd/system/craked.service"
   install -Dm644 packaging/software.dorhawk.Crake1.conf "$pkgdir/usr/share/dbus-1/system.d/software.dorhawk.Crake1.conf"
   install -Dm644 packaging/software.dorhawk.crake.policy "$pkgdir/usr/share/polkit-1/actions/software.dorhawk.crake.policy"
