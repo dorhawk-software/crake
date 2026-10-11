@@ -167,6 +167,11 @@ impl Routing {
         if apply { Self::Real } else { Self::Noop }
     }
 
+    /// Changes the system (not development's no-op).
+    pub fn is_real(&self) -> bool {
+        matches!(self, Self::Real)
+    }
+
     /// At startup and at shutdown: clear everything Crake sets up (its
     /// nftables table, policy rules and routing tables), whatever is left.
     pub async fn reset_all(&self) -> Result<()> {

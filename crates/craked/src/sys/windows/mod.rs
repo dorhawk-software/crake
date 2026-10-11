@@ -11,6 +11,7 @@ pub mod resolved;
 pub mod routing;
 
 mod host;
+mod iphelper;
 pub use host::*;
 
 /// What every Windows part says until it's built.

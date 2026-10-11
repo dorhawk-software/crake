@@ -323,22 +323,20 @@ impl Manager {
         });
         self.traffic
             .spawn(self.cfg.state_path.with_file_name("traffic.json"));
-        if let Routing::Real = self.routing
+        if self.routing.is_real()
             && let Err(e) = crate::dns_queue::spawn(Arc::clone(self))
         {
             // Not fatal: names still resolve, they're just not routed ahead.
             tracing::error!("DNS learning is off: {e:#}");
         }
-        if let Routing::Real = self.routing
+        if self.routing.is_real()
             && self.cfg.probing
             && let Err(e) = crate::probe::spawn(Arc::clone(self))
         {
             tracing::error!("connection probing is off: {e:#}");
         }
         // Each tunnel's DNS, asked now and then whether it still answers.
-        if let Routing::Real = self.routing
-            && self.cfg.use_resolved
-        {
+        if self.routing.is_real() && self.cfg.use_resolved {
             let this = Arc::clone(self);
             tokio::spawn(async move {
                 loop {
