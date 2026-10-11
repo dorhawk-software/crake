@@ -217,7 +217,8 @@ impl Render for NewTunnel {
                                 .text_color(t.danger)
                                 .child(p),
                         )
-                    }),
+                    })
+                    .test_support(),
             )
             // Footer: Back, "Step n of 3", Continue.
             .child(

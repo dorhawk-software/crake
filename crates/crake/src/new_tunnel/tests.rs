@@ -225,3 +225,36 @@ fn without_browser_sign_in_a_password_still_works(cx: &mut TestAppContext) {
     w.click("next", cx);
     assert_eq!(w.added()["sign_in"], "password");
 }
+
+/// A small screen (a 768 px laptop: the window gets 648 px): the step body
+/// scrolls inside it, and Continue stays in view.
+#[gpui_kit::test]
+fn on_a_small_screen_continue_stays_in_view(cx: &mut TestAppContext) {
+    let w = open(cx);
+    w.view.update(cx, |t, _| t.max_height = 648.);
+    cx.simulate_window_resize(
+        w.window,
+        gpui_kit::size(gpui_kit::px(WIDTH), gpui_kit::px(648.)),
+    );
+    cx.run_until_parked();
+    let visible = |cx: &mut TestAppContext, id: gpui_kit::ElementId| {
+        cx.update_window(w.window, |_, window, cx| {
+            window.render_frame(cx);
+            window.try_find(id).is_some_and(|e| e.visible())
+        })
+        .unwrap()
+    };
+    assert!(visible(cx, "next".into()), "Continue in view");
+    let last: gpui_kit::ElementId = ("protocol", OPENVPN3).into();
+    assert!(!visible(cx, last.clone()), "the list runs past the window");
+    cx.update_window(w.window, |_, window, cx| {
+        window.render_frame(cx);
+        let down =
+            gpui_kit::ScrollDelta::Pixels(gpui_kit::point(gpui_kit::px(0.), gpui_kit::px(-2000.)));
+        window.scroll("body", down, cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert!(visible(cx, last), "scrolled to the last protocol");
+    assert!(visible(cx, "next".into()), "and Continue still in view");
+}
