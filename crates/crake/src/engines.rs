@@ -123,13 +123,16 @@ pub fn openconnect() -> OsString {
 
 /// Where openconnect may be besides PATH. Linux: the administrators'
 /// folders (Debian installs it in /usr/sbin, which its users' PATH leaves
-/// out). Windows: the copy Crake ships in its own folder.
+/// out). Windows: the copy Crake ships in its own folder. macOS:
+/// Homebrew's (an app started from the Finder has no Homebrew on PATH).
 fn extra_dirs() -> Vec<PathBuf> {
     if cfg!(windows) {
         std::env::current_exe()
             .ok()
             .and_then(|exe| Some(vec![exe.parent()?.join("openconnect")]))
             .unwrap_or_default()
+    } else if cfg!(target_os = "macos") {
+        vec!["/opt/homebrew/bin".into(), "/usr/local/bin".into()]
     } else {
         vec!["/usr/sbin".into(), "/sbin".into()]
     }

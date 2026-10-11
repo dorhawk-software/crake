@@ -260,13 +260,25 @@ fn default_hook_path() -> PathBuf {
 fn default_hook_socket() -> PathBuf {
     DEFAULT_HOOK_SOCKET.into()
 }
-/// openconnect on PATH; on Windows, the copy Crake ships beside craked.
+/// openconnect on PATH; on Windows, the copy Crake ships beside craked;
+/// on macOS, Homebrew's (launchd's PATH has no Homebrew).
 fn default_openconnect() -> PathBuf {
     if cfg!(windows)
         && let Ok(exe) = std::env::current_exe()
         && let Some(dir) = exe.parent()
     {
         return dir.join("openconnect").join("openconnect.exe");
+    }
+    if cfg!(target_os = "macos")
+        && let Some(found) = [
+            "/opt/homebrew/bin/openconnect",
+            "/usr/local/bin/openconnect",
+        ]
+        .iter()
+        .map(PathBuf::from)
+        .find(|p| p.exists())
+    {
+        return found;
     }
     "openconnect".into()
 }
