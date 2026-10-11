@@ -88,6 +88,48 @@ pub fn executable(path: &Path) -> bool {
     path.is_file() || (path.extension().is_none() && path.with_extension("exe").is_file())
 }
 
+/// Crake's windows draw their own rounded card on a transparent window:
+/// Windows 11 mustn't add its square outline or round the window itself.
+pub fn plain_frame(window: &gpui_kit::Window) {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    use windows_sys::Win32::Graphics::Dwm::{
+        DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND,
+        DwmSetWindowAttribute,
+    };
+    let Ok(handle) = HasWindowHandle::window_handle(window) else {
+        return;
+    };
+    let RawWindowHandle::Win32(win32) = handle.as_raw() else {
+        return;
+    };
+    let hwnd = win32.hwnd.get() as windows_sys::Win32::Foundation::HWND;
+    let none: u32 = DWMWA_COLOR_NONE;
+    let square = DWMWCP_DONOTROUND;
+    // SAFETY: a live window of this process; each value is the size given.
+    unsafe {
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_BORDER_COLOR as u32,
+            (&raw const none).cast(),
+            size_of::<u32>() as u32,
+        );
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE as u32,
+            (&raw const square).cast(),
+            size_of_val(&square) as u32,
+        );
+    }
+}
+
+/// A command-line program started from the app (openconnect): without a
+/// console window of its own popping up.
+pub fn no_console(cmd: &mut std::process::Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
 /// craked's private socket: Linux's development setup only.
 pub async fn connect_dev(_path: &Path) -> zbus::Result<zbus::Connection> {
     Err(zbus::Error::Unsupported)

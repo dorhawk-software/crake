@@ -311,6 +311,7 @@ fn attempt(
         None => crate::engines::openconnect(),
     };
     let mut cmd = Command::new(program);
+    crate::sys::no_console(&mut cmd);
     cmd.arg("--authenticate")
         .arg(format!("--protocol={}", spec.protocol));
     if !spec.user.is_empty() {

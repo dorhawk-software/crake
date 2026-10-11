@@ -39,6 +39,7 @@ pub fn gateway(gateway: &str, wait: Duration) -> Found {
 fn ask(gateway: &str, servercert: Option<&str>, wait: Duration) -> String {
     let program = crate::engines::openconnect();
     let mut cmd = Command::new(program);
+    crate::sys::no_console(&mut cmd);
     cmd.args([
         "--authenticate",
         "--non-inter",

@@ -83,8 +83,14 @@ pub(super) fn open_panel(at: Option<(i32, i32)>, cx: &mut App) {
         .unwrap_or_else(|| Panel::height(model.read(cx)));
     let m = panel::MARGIN;
     let (w, h) = (panel::WIDTH + 2. * m, height + 2. * m);
-    // The real monitors from XRandR; GPUI's own list if that fails.
-    let mut screens = if x11 { place::monitors() } else { Vec::new() };
+    // Where Crake may place it: through XWayland, and on Windows.
+    let placeable = x11 || cfg!(windows);
+    // The real monitors (XRandR, or Windows'); GPUI's own list if that fails.
+    let mut screens = if placeable {
+        place::monitors()
+    } else {
+        Vec::new()
+    };
     if screens.is_empty() {
         screens = cx
             .displays()
@@ -101,7 +107,7 @@ pub(super) fn open_panel(at: Option<(i32, i32)>, cx: &mut App) {
             .collect();
     }
     let panel_size = (panel::WIDTH, height);
-    let placed = match (x11, at) {
+    let placed = match (placeable, at) {
         (true, Some((x, y))) => place::place((x as f32, y as f32), panel_size, &screens),
         // No position from the tray (Dash to Panel sends none): work out
         // where the tray is from the desktop's bar.
@@ -142,6 +148,7 @@ pub(super) fn open_panel(at: Option<(i32, i32)>, cx: &mut App) {
             ..Default::default()
         },
         move |window, cx| {
+            crate::sys::plain_frame(window);
             // The visible panel, without the shadow margin, is the window for the desktop.
             window.set_client_inset(px(panel::MARGIN));
             cx.new(|cx| Panel::new(model, requests, motion, upward, window, cx))
@@ -193,6 +200,7 @@ pub(super) fn open_settings(cx: &mut App) {
             ..Default::default()
         },
         move |window, cx| {
+            crate::sys::plain_frame(window);
             window.set_client_inset(px(0.));
             let view =
                 cx.new(|cx| settings_view::Settings::new(model, requests, section, window, cx));
@@ -249,6 +257,7 @@ pub(super) fn open_detail(tunnel: String, cx: &mut App) {
             ..Default::default()
         },
         move |window, cx| {
+            crate::sys::plain_frame(window);
             window.set_client_inset(px(0.));
             let view =
                 cx.new(|cx| tunnel_detail::TunnelDetail::new(name, model, requests, window, cx));
@@ -306,6 +315,7 @@ pub(super) fn open_new_tunnel(editing: Option<String>, cx: &mut App) {
             ..Default::default()
         },
         move |window, cx| {
+            crate::sys::plain_frame(window);
             window.set_client_inset(px(0.));
             let view = cx.new(|cx| new_tunnel::NewTunnel::new(model, requests, tunnel, window, cx));
             let handle = window.window_handle();
@@ -361,6 +371,7 @@ pub(super) fn open_sign_in(tunnel: client::Tunnel, cx: &mut App) {
             ..Default::default()
         },
         move |window, cx| {
+            crate::sys::plain_frame(window);
             window.set_client_inset(px(0.));
             let view = cx.new(|cx| signin_view::SignIn::new(spec, model, requests, window, cx));
             let handle = window.window_handle();
@@ -423,6 +434,7 @@ pub(super) fn open_log(cx: &mut App) {
             ..Default::default()
         },
         move |window, cx| {
+            crate::sys::plain_frame(window);
             window.set_client_inset(px(0.));
             let view = cx.new(|cx| log_view::Log::new(model, window, cx));
             let handle = window.window_handle();

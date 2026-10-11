@@ -77,6 +77,13 @@ impl Bar {
     /// Stock GNOME: the top bar. With Dash to Panel: its panel, at the
     /// bottom unless it's been moved, at its configured size.
     pub fn of_desktop() -> Bar {
+        // Windows: the taskbar, at the bottom unless moved.
+        if cfg!(windows) {
+            return Bar {
+                bottom: true,
+                thickness: 48.,
+            };
+        }
         let read = |key: &str| {
             std::process::Command::new("dconf")
                 .args(["read", key])

@@ -35,8 +35,9 @@ impl Engines {
         let program = openconnect();
         let openconnect = runnable(Path::new(&program));
         let said = |arg: &str| {
-            std::process::Command::new(&program)
-                .arg(arg)
+            let mut cmd = std::process::Command::new(&program);
+            crate::sys::no_console(&mut cmd);
+            cmd.arg(arg)
                 .env("LC_ALL", "C")
                 .output()
                 .map(|o| {

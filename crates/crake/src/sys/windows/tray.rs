@@ -100,7 +100,7 @@ pub fn start(requests: async_channel::Sender<Request>) -> Option<Handle> {
             ..
         } = e
         {
-            let at = (position.x as i32, position.y as i32);
+            let at = logical(position.x, position.y);
             clicks.send_blocking(Request::Panel(Some(at))).ok();
         }
     }));
@@ -121,6 +121,26 @@ pub fn start(requests: async_channel::Sender<Request>) -> Option<Handle> {
     };
     shown.show();
     Some(Handle(Rc::new(RefCell::new(shown))))
+}
+
+/// A click's screen position in the logical pixels windows are placed in
+/// (the tray reports physical ones): scaled by its monitor's DPI.
+fn logical(x: f64, y: f64) -> (i32, i32) {
+    use windows_sys::Win32::Foundation::POINT;
+    use windows_sys::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromPoint};
+    use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
+    let point = POINT {
+        x: x as i32,
+        y: y as i32,
+    };
+    let (mut dpi, mut _y) = (96, 96);
+    // SAFETY: a monitor handle from Windows, out pointers for the call.
+    unsafe {
+        let monitor = MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST);
+        GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &raw mut dpi, &raw mut _y);
+    }
+    let scale = f64::from(dpi.max(1)) / 96.;
+    ((x / scale) as i32, (y / scale) as i32)
 }
 
 /// Windows' own setting for the taskbar: "Choose your Windows mode".

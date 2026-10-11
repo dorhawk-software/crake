@@ -35,7 +35,9 @@ x11rb = { version = "0.13", features = ["randr"] }
 # The notification area's icon and its menu.
 tray-icon = "0.21"
 # Credential Manager, the monitors, the taskbar's theme.
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging", "Win32_Security_Credentials", "Win32_System_Registry", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_Services"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging", "Win32_Security_Credentials", "Win32_System_Registry", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_Services", "Win32_Graphics_Dwm"] }
+# The windows' HWND, for DWM (sys::plain_frame).
+raw-window-handle = "0.6"
 # The single-instance pipe is read a line at a time.
 tokio = { version = "1", features = ["io-util"] }
 

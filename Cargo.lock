@@ -1434,6 +1434,7 @@ dependencies = [
  "ksni",
  "notify-rust",
  "oo7",
+ "raw-window-handle",
  "resvg 0.45.1",
  "serde",
  "serde_json",

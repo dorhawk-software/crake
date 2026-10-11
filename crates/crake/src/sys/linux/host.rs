@@ -75,6 +75,12 @@ pub fn executable(path: &Path) -> bool {
         .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
 }
 
+/// Linux windows need nothing more: Crake's own frame is the frame.
+pub fn plain_frame(_window: &gpui_kit::Window) {}
+
+/// A command-line program started from the app: on Linux it has no window.
+pub fn no_console(_cmd: &mut std::process::Command) {}
+
 /// The installed craked, on the system bus (not peer to peer).
 pub async fn connect_craked() -> zbus::Result<(zbus::Connection, bool)> {
     Ok((zbus::Connection::system().await?, false))
