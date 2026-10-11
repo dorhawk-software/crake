@@ -43,6 +43,9 @@ sed -e "s/@VERSION@/$VERSION/" -e "s/@SHLIBS@/$shlibs/" /src/packaging/deb/contr
 echo "Installed-Size: $(du -sk --exclude=DEBIAN "$root" | cut -f1)" >> "$root/DEBIAN/control"
 printf '/etc/crake/craked.toml\n/etc/apparmor.d/usr.sbin.craked\n' > "$root/DEBIAN/conffiles"
 install -m755 /src/packaging/deb/postinst /src/packaging/deb/prerm /src/packaging/deb/postrm "$root/DEBIAN/"
+# The same tree for the RPM (scripts/build-rpm.sh): one build, two packages.
+rm -rf /out/root && cp -a "$root" /out/root && rm -rf /out/root/DEBIAN
+chown -R "$HOST_UID:$HOST_GID" /out/root
 deb="/out/crake_${VERSION}_amd64.deb"
 dpkg-deb --root-owner-group -Zxz --build "$root" "$deb" >/dev/null
 chown "$HOST_UID:$HOST_GID" "$deb"

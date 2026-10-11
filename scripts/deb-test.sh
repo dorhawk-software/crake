@@ -8,18 +8,24 @@
 # this machine. The containers reach Ubuntu's archive for the Depends.
 #
 #   scripts/deb-test.sh [release...]     # default: 22.04 24.04 26.04
-#                                        # (Ubuntu), or e.g. debian:12
+#                                        # (Ubuntu), or e.g. debian:12,
+#                                        # fedora:44 (the RPM)
 set -eu
 cd "$(dirname "$0")/.."
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
 DEB=$PWD/target/deb/crake_${VERSION}_amd64.deb
-[ -f "$DEB" ] || { echo "no $DEB: run scripts/build-deb.sh" >&2; exit 1; }
+RPMF=$PWD/target/rpm/crake-${VERSION}-1.x86_64.rpm
 [ $# -gt 0 ] || set -- 22.04 24.04 26.04
 fail=0
 NAME=
 trap '[ -z "$NAME" ] || docker rm -f "$NAME" >/dev/null 2>&1' EXIT
 for REL in "$@"; do
   case "$REL" in *:*) IMAGE=$REL ;; *) IMAGE=ubuntu:$REL ;; esac
+  case "$IMAGE" in
+    fedora:*) PKG=$RPMF; AS=/pkg/crake.rpm; HINT=scripts/build-rpm.sh ;;
+    *) PKG=$DEB; AS=/pkg/crake.deb; HINT=scripts/build-deb.sh ;;
+  esac
+  [ -f "$PKG" ] || { echo "no $PKG: run $HINT" >&2; exit 1; }
   TAG=$(echo "$IMAGE" | tr ':' '-')
   echo "== $IMAGE"
   docker build -q --build-arg IMAGE="$IMAGE" -t "crake-deb-test:$TAG" scripts/deb-test >/dev/null
@@ -28,7 +34,7 @@ for REL in "$@"; do
   docker run -d --name "$NAME" --cgroupns=private --tmpfs /run --tmpfs /run/lock --tmpfs /tmp \
     --cap-add SYS_ADMIN --cap-add NET_ADMIN --device /dev/net/tun --security-opt apparmor=unconfined \
     --sysctl net.ipv4.ip_unprivileged_port_start=1024 \
-    -v "$DEB:/pkg/crake.deb:ro" -v "$PWD/scripts/deb-test:/deb-test:ro" -v "$PWD/scripts/e2e:/e2e:ro" \
+    -v "$PKG:$AS:ro" -v "$PWD/scripts/deb-test:/deb-test:ro" -v "$PWD/scripts/e2e:/e2e:ro" \
     "crake-deb-test:$TAG" sh -c 'mount -o remount,rw /sys/fs/cgroup && exec /sbin/init' >/dev/null
   until docker exec "$NAME" systemctl is-system-running --wait >/dev/null 2>&1 \
      || [ "$(docker exec "$NAME" systemctl is-system-running 2>/dev/null)" = degraded ]; do sleep 1; done

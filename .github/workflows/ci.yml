@@ -1,7 +1,7 @@
 # Every push and pull request: the lint gate, the tests and the coverage
 # floors; the tests that need real networking, each in throwaway containers
-# with no network (scripts/netns-test.sh, scripts/e2e-test.sh); and the .deb,
-# built on 22.04 and installed and used on every supported release.
+# with no network (scripts/netns-test.sh, scripts/e2e-test.sh); and the .deb
+# and RPM, built once and installed and used on every supported release.
 name: CI
 
 on:
@@ -56,11 +56,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Build the .deb on Ubuntu 22.04
-        run: scripts/build-deb.sh
-      - name: Install and use it on 22.04, 24.04 and 26.04
-        run: scripts/deb-test.sh
+      - name: Build the .deb on Ubuntu 22.04, and the RPM from the same files
+        run: scripts/build-deb.sh && scripts/build-rpm.sh
+      - name: Install and use them on Ubuntu, Debian and Fedora
+        run: scripts/deb-test.sh 22.04 24.04 26.04 debian:12 debian:13 fedora:43 fedora:44 fedora:45
       - uses: actions/upload-artifact@v4
         with:
-          name: crake-deb
-          path: target/deb/*.deb
+          name: crake-packages
+          path: |
+            target/deb/*.deb
+            target/rpm/*.rpm

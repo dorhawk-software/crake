@@ -14,12 +14,18 @@ ok() { echo "  ok    $1"; }
 bad() { echo "  FAIL  $1"; fail=1; }
 check() { name=$1; shift; if "$@" >/tmp/out 2>&1; then ok "$name"; else bad "$name"; sed 's/^/        /' /tmp/out; fi; }
 call() { busctl --system call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 "$@"; }
-as_nobody() { setpriv --reuid=nobody --regid=nogroup --clear-groups "$@"; }
+as_nobody() { setpriv --reuid=nobody --regid=$(id -g nobody) --clear-groups "$@"; }
 export DEBIAN_FRONTEND=noninteractive
+# Ubuntu and Debian (apt, the .deb) or Fedora (dnf, the RPM).
+if command -v apt-get >/dev/null; then RPM=; else RPM=1; fi
 
 install() {
-    apt-get update -qq >/dev/null
-    check "installs with its Depends only" apt-get install -y -qq --no-install-recommends /pkg/crake.deb
+    if [ -n "$RPM" ]; then
+        check "installs with its Requires only" dnf install -y -q --setopt=install_weak_deps=False /pkg/crake.rpm
+    else
+        apt-get update -qq >/dev/null
+        check "installs with its Depends only" apt-get install -y -qq --no-install-recommends /pkg/crake.deb
+    fi
     echo "  engine: $(openconnect --version 2>/dev/null | head -n1)"
     check "every library the app needs is there" sh -c '! ldd /usr/bin/crake | grep "not found"'
     check "the hook is where craked looks" test -x /usr/libexec/crake/hook
@@ -35,10 +41,14 @@ install() {
     check "kept in craked's state directory" test -s /var/lib/crake/tunnels.json
     # Someone without an active session at this computer: craked asked
     # polkit, which said no (craked's own words, not the bus's).
-    check "polkit refuses others" sh -c "setpriv --reuid=nobody --regid=nogroup --clear-groups dbus-send --system --print-reply --dest=software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1.RemoveTunnel string:globex 2>&1 | grep 'not authorized to switch tunnels'"
+    check "polkit refuses others" sh -c "setpriv --reuid=nobody --regid=$(id -g nobody) --clear-groups dbus-send --system --print-reply --dest=software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1.RemoveTunnel string:globex 2>&1 | grep 'not authorized to switch tunnels'"
     check "anyone may read" as_nobody busctl --system call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 Settings
     # For the tunnel phase, while the archive can still be reached.
-    check "the gateway's software" apt-get install -y -qq --no-install-recommends ocserv gnutls-bin dnsmasq-base busybox curl
+    if [ -n "$RPM" ]; then
+        check "the gateway's software" dnf install -y -q ocserv gnutls-utils dnsmasq busybox curl
+    else
+        check "the gateway's software" apt-get install -y -qq --no-install-recommends ocserv gnutls-bin dnsmasq-base busybox curl
+    fi
     # systemd-resolved, when apt just pulled it in (24.04 and newer), started
     # before D-Bus read its policy and isn't on the bus; on a real desktop
     # it was there all along. Restarted, as a reboot would.
@@ -80,7 +90,11 @@ tunnel() {
     check "both learned" sh -c "nft list set inet crake learned_acme | grep -q 10.40.1.10 && nft list set inet crake learned_acme | grep -q 10.40.1.11"
     # A package upgrade (reinstalling runs the same scripts): ACME is
     # handed to the new craked, stays signed in and comes back by itself.
-    check "upgrades" dpkg -i /pkg/crake.deb
+    if [ -n "$RPM" ]; then
+        check "upgrades" dnf reinstall -y -q /pkg/crake.rpm
+    else
+        check "upgrades" dpkg -i /pkg/crake.deb
+    fi
     for _ in $(seq 1 40); do call GetTunnel s acme | grep -q '"connected"' && break; sleep 0.5; done
     check "ACME is back after the upgrade" sh -c "busctl --system call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 GetTunnel s acme | grep -q '\"connected\"'"
     check "the log says Crake was updated" grep -q "Crake was updated. Your tunnels are reconnecting with your sign-ins." /var/lib/crake/log
@@ -103,12 +117,17 @@ tunnel() {
 }
 
 remove() {
-    check "removes" apt-get remove -y -qq crake
+    if [ -n "$RPM" ]; then
+        check "removes" dnf remove -y -q crake
+    else
+        check "removes" apt-get remove -y -qq crake
+    fi
     check "craked stopped" sh -c '! systemctl is-active -q craked'
     check "and stopped without an error" sh -c '! journalctl -b -u craked --no-pager -o cat | grep -E "ERROR|panicked"'
     check "no crake links left" sh -c '! ip -o link | grep -q crake-'
     check "no nftables table left" sh -c '! nft list tables 2>/dev/null | grep -q crake'
-    check "purges" apt-get purge -y -qq crake
+    # rpm has no purge: removing takes craked's state too.
+    [ -n "$RPM" ] || check "purges" apt-get purge -y -qq crake
     check "its state is gone" test ! -e /var/lib/crake
 }
 

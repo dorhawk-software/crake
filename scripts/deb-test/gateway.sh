@@ -10,7 +10,9 @@ printf 'cn = vpn.acme.example\nexpiration_days = 30\ntls_www_server\nsigning_key
 certtool --generate-self-signed --load-privkey /etc/ocserv/key.pem --template /tmp/cert.cfg \
   --outfile /etc/ocserv/cert.pem 2>/dev/null
 printf 'hunter2\nhunter2\n' | ocpasswd -c /etc/ocserv/passwd alice
-sed 's#^socket-file = .*#socket-file = /run/ocserv-gw.socket#' /e2e/ocserv.conf > /etc/ocserv/ocserv.conf
+# Ubuntu's nogroup is Fedora's nobody: whatever nobody's group is here.
+sed -e 's#^socket-file = .*#socket-file = /run/ocserv-gw.socket#' \
+    -e "s#^run-as-group = .*#run-as-group = $(id -gn nobody)#" /e2e/ocserv.conf > /etc/ocserv/ocserv.conf
 echo crex > /srv/www/index.html
 
 ip netns add gw

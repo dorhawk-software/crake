@@ -686,8 +686,17 @@ it doesn't, bundle, and own the updates.**
   openconnect, which isn't installed: sudo apt install openconnect") and
   can't be continued with. Sign-in that can't start openconnect says
   "openconnect isn't installed" with the same command.
-- **Fedora/RPM:** the same with rich dependencies,
-  `Requires: (openconnect or openvpn3)`, `Recommends:` as above.
+- **Fedora/RPM: built.** `scripts/build-rpm.sh` packs the files
+  `build-deb.sh` staged (`target/deb/root`: the same binaries, built on
+  22.04, run on Fedora's newer glibc) with `packaging/rpm/crake.spec`:
+  `Requires: (openconnect or openvpn3)`, nftables, iproute,
+  systemd-resolved, polkit, dbus; `Recommends:` as above; no AppArmor
+  profile (Fedora confines services with SELinux; craked runs as an
+  unconfined service there, not yet tested under SELinux enforcing in a
+  VM). %post enables craked, or on an upgrade leaves the handover flag and
+  restarts it; removing takes /var/lib/crake (rpm has no purge).
+  `scripts/deb-test.sh fedora:43 fedora:44 fedora:45` runs the same
+  package test with dnf and rpm.
 - **Arch:** no alternatives in pacman: `optdepends` for both engines plus
   the runtime check.
 - **Not Flatpak or Snap:** craked needs root-level network control on the
