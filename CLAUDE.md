@@ -562,6 +562,16 @@ The user doesn't want development builds installed on their machine.
   (its own fit-to-step runs on a next frame the test platform never
   sends). `CRAKE_JOURNEY_DEBUG=1` prints every click's target,
   `CRAKE_DEBUG=1` the app's own debug lines.
+  **Everywhere Crake ships (requested, 2026-10-11): the journey, at least
+  its basics, runs on every supported system after every change**, so an
+  implementation change can't quietly break one of them: each Linux
+  distribution (Ubuntu 22.04/24.04/26.04, Debian 12/13, Fedora 43–45,
+  Arch, NixOS) with its own openconnect, resolved and libraries, Windows,
+  and macOS when it comes. Today it runs in one place only (this machine's
+  Ubuntu tools, in e2e-test.sh's container, and CI's `network` job). Plan:
+  the test binary built on 22.04 like the packages, run in each package
+  test's container after the package is installed (and in the NixOS VM
+  test); Windows in its VM test (phase 4); macOS on GitHub's runners.
 - `scripts/netns-test.sh`: real nftables and policy routing inside a
   disposable container with no network (host filesystem read-only).
 - `scripts/e2e-test.sh` (`crates/crake/src/e2e_tests.rs`, skipped unless
