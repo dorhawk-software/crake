@@ -386,7 +386,8 @@ fn main() {
             // rows arrive, ticks grow and the tray call.
             if std::env::var("CRAKE_DEMO").as_deref() == Ok("arrive") {
                 cx.spawn(async move |cx| {
-                    for n in 1.. {
+                    // 1 to 250, over and over: the hosts stay valid addresses.
+                    for n in (1..=250u8).cycle() {
                         cx.background_executor().timer(Duration::from_secs(8)).await;
                         let entry = crake_proto::LogEntry {
                             ts: jiff::Timestamp::now().to_string(),
