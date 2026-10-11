@@ -15,7 +15,7 @@ cd "$(dirname "$0")/.."
 declare -A floor=(
     [crake]=66
     [craked]=63
-    [crake-proto]=95
+    [crake-proto]=98
 )
 
 if ! summary=$(cargo llvm-cov --workspace --summary-only 2>&1); then

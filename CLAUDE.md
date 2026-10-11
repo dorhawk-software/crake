@@ -520,7 +520,7 @@ Any lint stops the build; fix it and build again, never silence it.
   every `cargo build` / `cargo test` from Claude Code and blocks on failure.
 - Coverage (`scripts/check-coverage.sh`, cargo-llvm-cov, about a minute):
   each crate's share of lines run by the tests stays at or above its floor
-  (crake 66%, craked 63%, crake-proto 95% as of Oct 2026). The pre-commit
+  (crake 66%, craked 63%, crake-proto 98% as of Oct 2026). The pre-commit
   hook runs it when Rust files are committed. Raise a floor as tests grow;
   never lower one to let a change through.
 
