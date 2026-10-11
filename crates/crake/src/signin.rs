@@ -120,18 +120,6 @@ impl Drop for TempCert {
     }
 }
 
-fn private_dir() -> Result<PathBuf, String> {
-    use std::os::unix::fs::DirBuilderExt;
-    let base = std::env::var_os("XDG_RUNTIME_DIR").ok_or("no XDG_RUNTIME_DIR")?;
-    let dir = PathBuf::from(base).join("crake");
-    std::fs::DirBuilder::new()
-        .recursive(true)
-        .mode(0o700)
-        .create(&dir)
-        .map_err(|e| e.to_string())?;
-    Ok(dir)
-}
-
 fn certificate_arg(args: &[String]) -> Option<(usize, PathBuf)> {
     args.iter().enumerate().find_map(|(i, a)| {
         a.strip_prefix("--certificate=")
@@ -156,16 +144,9 @@ fn run(
         None
     };
     if let Some(bytes) = stored_certificate {
-        use std::os::unix::fs::OpenOptionsExt;
-        let path = private_dir()?.join(format!("{}-{}.p12", spec.tunnel, std::process::id()));
-        let mut f = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&path)
-            .map_err(|e| e.to_string())?;
-        f.write_all(&bytes).map_err(|e| e.to_string())?;
+        let path =
+            crate::sys::private_dir()?.join(format!("{}-{}.p12", spec.tunnel, std::process::id()));
+        crate::sys::write_private(&path, &bytes)?;
         let arg = format!("--certificate={}", path.display());
         match certificate_arg(&auth_args) {
             Some((i, _)) => auth_args[i] = arg,
@@ -667,6 +648,8 @@ mod tests {
 
     /// A gateway like ACME's: 404 to openconnect's own user agent, a session
     /// to "AnyConnect".
+    // Against a fake openconnect, a shell script.
+    #[cfg(target_os = "linux")]
     #[test]
     fn signs_in_as_anyconnect_where_only_that_is_let_in() {
         let dir = std::env::temp_dir().join(format!("crake-ua-{}", std::process::id()));

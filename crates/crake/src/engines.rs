@@ -104,11 +104,7 @@ fn version(said: &str) -> Option<(u16, u16)> {
 
 /// `program` can be run: a path that exists, or a name found on PATH.
 fn runnable(program: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-    let executable = |p: &Path| {
-        p.metadata()
-            .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
-    };
+    let executable = crate::sys::executable;
     if program.components().count() > 1 {
         return executable(program);
     }
@@ -148,8 +144,13 @@ mod tests {
 
     #[test]
     fn finds_programs_on_the_path() {
-        assert!(runnable(Path::new("sh")));
-        assert!(runnable(Path::new("/bin/sh")));
+        // The system's shell, by name and by path.
+        #[cfg(unix)]
+        let (name, path) = ("sh", "/bin/sh");
+        #[cfg(windows)]
+        let (name, path) = ("cmd", r"C:\Windows\System32\cmd.exe");
+        assert!(runnable(Path::new(name)));
+        assert!(runnable(Path::new(path)));
         assert!(!runnable(Path::new("surely-not-a-program-here")));
     }
 

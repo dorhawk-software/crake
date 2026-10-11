@@ -19,7 +19,8 @@ mod explain;
 mod question;
 mod widgets;
 
-#[cfg(test)]
+// Against a fake openconnect, a shell script.
+#[cfg(all(test, target_os = "linux"))]
 mod tests;
 
 use self::explain::explain;
@@ -219,7 +220,7 @@ fn fit_window() -> impl IntoElement {
 
 impl SignIn {
     /// Where sign-in is (journey tests).
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn stage(&self) -> &Stage {
         &self.stage
     }

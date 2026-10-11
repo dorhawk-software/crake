@@ -4,7 +4,7 @@
 //! one with the bird's call ("crex crex").
 
 use crake_proto::{LogEntry, LogKind};
-use notify_rust::{Hint, Notification, Timeout, Urgency};
+use notify_rust::{Notification, Timeout, Urgency};
 
 use crate::Request;
 
@@ -15,19 +15,26 @@ pub fn worth_telling(entry: &LogEntry) -> bool {
         && !entry.reason.as_deref().unwrap_or("").starts_with("You ")
 }
 
-pub fn routed(entry: &LogEntry, requests: async_channel::Sender<Request>) {
-    let (Some(tunnel), hosts) = (entry.tunnel.clone(), entry.hosts.clone()) else {
-        return;
-    };
+/// What every notification starts from: the entry's message and reason.
+fn note(entry: &LogEntry, urgency: Urgency, timeout_ms: u32) -> Notification {
     let mut n = Notification::new();
     n.appname("Crake")
         .summary(&entry.message)
         .body(entry.reason.as_deref().unwrap_or(""))
-        .action("undo", "Undo")
-        .action("default", "Open Crake")
-        .hint(Hint::Category("network".into()))
-        .urgency(Urgency::Low)
-        .timeout(Timeout::Milliseconds(8000));
+        .urgency(urgency)
+        .timeout(Timeout::Milliseconds(timeout_ms));
+    // The desktop's notification category (freedesktop only).
+    #[cfg(target_os = "linux")]
+    n.hint(notify_rust::Hint::Category("network".into()));
+    n
+}
+
+pub fn routed(entry: &LogEntry, requests: async_channel::Sender<Request>) {
+    let (Some(tunnel), hosts) = (entry.tunnel.clone(), entry.hosts.clone()) else {
+        return;
+    };
+    let mut n = note(entry, Urgency::Low, 8000);
+    n.action("undo", "Undo").action("default", "Open Crake");
     std::thread::spawn(move || {
         let Ok(handle) = n.show() else { return };
         handle.wait_for_action(|action| match action {
@@ -52,13 +59,7 @@ pub fn also_answered(
     let (Some(from), hosts) = (entry.tunnel.clone(), entry.hosts.clone()) else {
         return;
     };
-    let mut n = Notification::new();
-    n.appname("Crake")
-        .summary(&entry.message)
-        .body(entry.reason.as_deref().unwrap_or(""))
-        .hint(Hint::Category("network".into()))
-        .urgency(Urgency::Normal)
-        .timeout(Timeout::Milliseconds(15000));
+    let mut n = note(entry, Urgency::Normal, 15000);
     for (name, display) in &others {
         n.action(name, &format!("Use {display}"));
     }
@@ -84,15 +85,9 @@ pub fn asked(entry: &LogEntry, display: String, requests: async_channel::Sender<
     let (Some(tunnel), hosts) = (entry.tunnel.clone(), entry.hosts.clone()) else {
         return;
     };
-    let mut n = Notification::new();
-    n.appname("Crake")
-        .summary(&entry.message)
-        .body(entry.reason.as_deref().unwrap_or(""))
-        .action("send", &format!("Send through {display}"))
-        .action("leave", "Leave it")
-        .hint(Hint::Category("network".into()))
-        .urgency(Urgency::Normal)
-        .timeout(Timeout::Milliseconds(20000));
+    let mut n = note(entry, Urgency::Normal, 20000);
+    n.action("send", &format!("Send through {display}"))
+        .action("leave", "Leave it");
     std::thread::spawn(move || {
         let Ok(handle) = n.show() else { return };
         handle.wait_for_action(|action| {

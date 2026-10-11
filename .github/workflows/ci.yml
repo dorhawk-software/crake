@@ -1,5 +1,6 @@
 # Every push and pull request: the lint gate, the tests and the coverage
-# floors; craked for Windows (scripts/windows-check.sh); the tests that
+# floors; Crake for Windows (scripts/windows-check.sh, then built and its
+# portable tests run on a Windows runner); the tests that
 # need real networking, each in throwaway containers with no network
 # (scripts/netns-test.sh, scripts/e2e-test.sh); and the .deb and RPM, built
 # once and installed and used on every supported release.
@@ -45,13 +46,32 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends mingw-w64
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-gnu
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - name: craked compiles for Windows, lint-clean
+      - name: Crake compiles for Windows, lint-clean
         run: scripts/windows-check.sh
+
+  windows-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: The tests that aren't Linux's own, on Windows
+        run: cargo test --workspace --locked
+      - name: crake.exe, craked.exe and crake-hook.exe (unsigned)
+        run: cargo build --release --locked -p crake -p craked
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crake-windows
+          path: |
+            target/release/crake.exe
+            target/release/craked.exe
+            target/release/crake-hook.exe
 
   network:
     runs-on: ubuntu-24.04

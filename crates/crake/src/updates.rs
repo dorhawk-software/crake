@@ -159,7 +159,7 @@ pub(super) fn animate_tray(from: tray::Shape, to: tray::Shape, cx: &mut App) {
         return;
     }
     let looping = to == tray::Shape::Connecting;
-    let frames: Vec<ksni::Icon> = if looping {
+    let frames: Vec<tray::Icon> = if looping {
         tray::connecting_loop()
             .iter()
             .map(tray::Art::icon)

@@ -20,14 +20,24 @@ zbus = { version = "5", default-features = false, features = ["tokio", "p2p"] }
 futures-util = { version = "0.3", default-features = false }
 async-channel = "2"
 jiff = "0.2"
-# The tray icon (StatusNotifierItem; GNOME shows it with the AppIndicator extension).
-ksni = { version = "0.3", features = ["blocking"] }
 resvg = "0.45"
 notify-rust = "4"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# The tray icon (StatusNotifierItem; GNOME shows it with the AppIndicator extension).
+ksni = { version = "0.3", features = ["blocking"] }
 # Certificate passwords and certificates, in the GNOME keyring (Secret Service).
 oo7 = { version = "0.6", default-features = false, features = ["async-std", "native_crypto"] }
 # The real monitors (GPUI's X11 backend reports one screen spanning them all).
 x11rb = { version = "0.13", features = ["randr"] }
+
+[target.'cfg(windows)'.dependencies]
+# The notification area's icon and its menu.
+tray-icon = "0.21"
+# Credential Manager, the monitors, the taskbar's theme.
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging", "Win32_Security_Credentials", "Win32_System_Registry"] }
+# The single-instance pipe is read a line at a time.
+tokio = { version = "1", features = ["io-util"] }
 
 [dev-dependencies]
 # The integration test (src/wire_tests.rs): craked itself, serving its API.

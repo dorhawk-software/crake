@@ -1,16 +1,19 @@
 #!/bin/sh
-# craked compiles for Windows, lint-clean (the Windows plan in CLAUDE.md:
-# its OS parts live in crates/craked/src/sys/, Windows ones are stubs until
-# phase 3). Uses the installed x86_64-pc-windows-gnu target when there is
-# one (CI); otherwise a throwaway container, so nothing is installed here.
+# Crake compiles for Windows, lint-clean, tests included (the Windows plan
+# in CLAUDE.md: the OS parts live in crates/*/src/sys/). Uses the installed
+# x86_64-pc-windows-gnu target when there is one (CI, with MinGW's windres
+# for GPUI's manifest); otherwise a throwaway container
+# (scripts/windows/Dockerfile), so nothing is installed here. The .exe
+# files are built on a Windows runner (CI job windows-build): GPUI's
+# release shaders need the Windows SDK's fxc.
 set -eu
 cd "$(dirname "$0")/.."
 TARGET=x86_64-pc-windows-gnu
-CHECK="cargo clippy --target $TARGET -p craked -p crake-proto --all-targets"
+CHECK="cargo clippy --target $TARGET --workspace --all-targets"
 if rustup target list --installed 2>/dev/null | grep -qx "$TARGET"; then
   exec $CHECK
 fi
+docker build -q -t crake-windows-build scripts/windows >/dev/null
 exec docker run --rm -v "$PWD:/src:ro" -v crake-win-cargo:/usr/local/cargo/registry \
-  -v crake-win-target:/target -e CARGO_TARGET_DIR=/target rust:1-bookworm sh -c "
-    rustup target add $TARGET >/dev/null 2>&1 && rustup component add clippy >/dev/null 2>&1 &&
-    cd /src && $CHECK"
+  -v crake-win-target:/target -e CARGO_TARGET_DIR=/target crake-windows-build \
+  sh -c "cd /src && $CHECK"

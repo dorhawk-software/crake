@@ -1,11 +1,12 @@
 //! The top-bar icon. States change shape, never colour (design/DESIGN.md):
 //! off, connecting, listening, routed (a few seconds), trouble. A click opens
 //! the panel; the menu is the plain fallback: tunnels with check marks, Open
-//! Crake, Quit.
+//! Crake, Quit. What it shows and how it's drawn lives here; each system's
+//! tray shows it (`sys::tray`).
 
 use std::sync::LazyLock;
 
-use crate::Request;
+pub use crate::sys::tray::{Handle, start};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Shape {
@@ -30,19 +31,49 @@ pub struct MenuTunnel {
     pub on: bool,
 }
 
-pub struct Tray {
+/// What the tray shows.
+#[derive(Clone, Debug)]
+pub struct State {
     pub shape: Shape,
     /// A frame of an animation, shown instead of the shape's icon.
-    pub frame: Option<ksni::Icon>,
+    pub frame: Option<Icon>,
     pub summary: String,
     pub tunnels: Vec<MenuTunnel>,
-    requests: async_channel::Sender<Request>,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            shape: Shape::Off,
+            frame: None,
+            summary: "Crake".into(),
+            tunnels: Vec::new(),
+        }
+    }
+}
+
+impl State {
+    /// The image to show now: the animation's frame, or the shape's.
+    pub fn icon(&self) -> Icon {
+        self.frame
+            .clone()
+            .unwrap_or_else(|| ICONS[self.shape.index()].clone())
+    }
+}
+
+/// An image for the tray: `SIZE` px square, ARGB (StatusNotifierItem's
+/// order), drawn white for a dark bar.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Icon {
+    pub width: u32,
+    pub height: u32,
+    pub data: Vec<u8>,
 }
 
 /// The image size sent to the tray; the desktop scales it into its slot.
 const SIZE: u32 = 64;
 
-static ICONS: LazyLock<[ksni::Icon; 5]> = LazyLock::new(|| {
+static ICONS: LazyLock<[Icon; 5]> = LazyLock::new(|| {
     // The head alone, solid with the eye cut out: it holds its own next to app
     // icons in a small bar (DESIGN.md, Tray icon). CRAKE_TRAY=bird: the whole
     // bird, as in design/icons/crake-*-symbolic.svg.
@@ -77,13 +108,13 @@ static ICONS: LazyLock<[ksni::Icon; 5]> = LazyLock::new(|| {
 });
 
 /// An icon already cropped and weighted for the bar: only made white.
-fn draw_as_is(svg: &str) -> ksni::Icon {
+fn draw_as_is(svg: &str) -> Icon {
     render(&svg.replace("#2e3436", "#ffffff"))
 }
 
 /// A symbolic SVG drawn white, for the top bar (dark on Ubuntu in both light
 /// and dark).
-fn draw(svg: &str) -> ksni::Icon {
+fn draw(svg: &str) -> Icon {
     // White, as the top bar is dark. Bolder and cropped to the drawing for
     // the bar's small size (DESIGN.md: icons at 12–16 px get thicker
     // strokes): GNOME scales the whole image into the icon slot, so empty
@@ -96,7 +127,7 @@ fn draw(svg: &str) -> ksni::Icon {
 }
 
 /// An SVG as the tray's 64 px ARGB image.
-fn render(svg: &str) -> ksni::Icon {
+fn render(svg: &str) -> Icon {
     let tree = resvg::usvg::Tree::from_data(svg.as_bytes(), &resvg::usvg::Options::default())
         .expect("tray icons are valid SVG");
     let mut pixmap = resvg::tiny_skia::Pixmap::new(SIZE, SIZE).expect("non-zero size");
@@ -112,117 +143,11 @@ fn render(svg: &str) -> ksni::Icon {
         let c = p.demultiply();
         data.extend_from_slice(&[c.alpha(), c.red(), c.green(), c.blue()]);
     }
-    ksni::Icon {
-        width: SIZE as i32,
-        height: SIZE as i32,
+    Icon {
+        width: SIZE,
+        height: SIZE,
         data,
     }
-}
-
-impl ksni::Tray for Tray {
-    fn id(&self) -> String {
-        "crake".into()
-    }
-
-    fn title(&self) -> String {
-        "Crake".into()
-    }
-
-    fn icon_pixmap(&self) -> Vec<ksni::Icon> {
-        vec![
-            self.frame
-                .clone()
-                .unwrap_or_else(|| ICONS[self.shape.index()].clone()),
-        ]
-    }
-
-    fn tool_tip(&self) -> ksni::ToolTip {
-        ksni::ToolTip {
-            title: "Crake".into(),
-            description: self.summary.clone(),
-            ..Default::default()
-        }
-    }
-
-    /// A click on the icon; GNOME's tray extension passes where it was.
-    fn activate(&mut self, x: i32, y: i32) {
-        let at = (x != 0 || y != 0).then_some((x, y));
-        self.requests.send_blocking(Request::Panel(at)).ok();
-    }
-
-    fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
-        use ksni::menu::{CheckmarkItem, StandardItem};
-        let mut items: Vec<ksni::MenuItem<Self>> = vec![
-            StandardItem {
-                label: self.summary.clone(),
-                enabled: false,
-                ..Default::default()
-            }
-            .into(),
-        ];
-        for t in &self.tunnels {
-            let name = t.name.clone();
-            let on = t.on;
-            items.push(
-                CheckmarkItem {
-                    label: t.display.clone(),
-                    checked: t.on,
-                    activate: Box::new(move |this: &mut Self| {
-                        this.requests
-                            .send_blocking(Request::Switch(name.clone(), !on))
-                            .ok();
-                    }),
-                    ..Default::default()
-                }
-                .into(),
-            );
-        }
-        items.push(ksni::MenuItem::Separator);
-        items.push(
-            StandardItem {
-                label: "Open Crake".into(),
-                activate: Box::new(|this: &mut Self| {
-                    this.requests.send_blocking(Request::Panel(None)).ok();
-                }),
-                ..Default::default()
-            }
-            .into(),
-        );
-        items.push(
-            StandardItem {
-                label: "Settings\u{2026}".into(),
-                activate: Box::new(|this: &mut Self| {
-                    this.requests.send_blocking(Request::Settings).ok();
-                }),
-                ..Default::default()
-            }
-            .into(),
-        );
-        items.push(
-            StandardItem {
-                label: "Quit".into(),
-                activate: Box::new(|this: &mut Self| {
-                    this.requests.send_blocking(Request::Quit).ok();
-                }),
-                ..Default::default()
-            }
-            .into(),
-        );
-        items
-    }
-}
-
-pub fn start(requests: async_channel::Sender<Request>) -> Option<ksni::blocking::Handle<Tray>> {
-    use ksni::blocking::TrayMethods;
-    Tray {
-        shape: Shape::Off,
-        frame: None,
-        summary: "Crake".into(),
-        tunnels: Vec::new(),
-        requests,
-    }
-    .spawn()
-    .ok()
 }
 
 /// One frame of the head in motion (DESIGN.md, Tray icon; animations.html).
@@ -327,7 +252,7 @@ impl Art {
         )
     }
 
-    pub fn icon(&self) -> ksni::Icon {
+    pub fn icon(&self) -> Icon {
         render(&self.svg())
     }
 }
@@ -482,7 +407,7 @@ mod tests {
     #[test]
     fn the_eye_is_a_hole_the_bar_shows_through() {
         // viewBox 7.1 6.6 15.2 15.2 at 64 px: 4.21 px a unit.
-        let at = |icon: &ksni::Icon, x: f32, y: f32| {
+        let at = |icon: &Icon, x: f32, y: f32| {
             let (px, py) = (
                 ((x - 7.1) * 64. / 15.2) as usize,
                 ((y - 6.6) * 64. / 15.2) as usize,
@@ -493,7 +418,7 @@ mod tests {
         assert_eq!(at(listening, 12.35, 11.4), 0, "the eye is see-through");
         assert_eq!(at(listening, 11., 17.), 255, "the head is solid");
         // Routed: teal marks over the corner; trouble: a red badge there.
-        let px = |icon: &ksni::Icon, x: f32, y: f32| {
+        let px = |icon: &Icon, x: f32, y: f32| {
             let (px, py) = (
                 ((x - 7.1) * 64. / 15.2) as usize,
                 ((y - 6.6) * 64. / 15.2) as usize,
@@ -513,7 +438,7 @@ mod tests {
     #[test]
     fn motion_ends_where_the_state_rests() {
         // The last frame of each transition looks like the resting icon.
-        let close = |a: &ksni::Icon, b: &ksni::Icon| {
+        let close = |a: &Icon, b: &Icon| {
             a.data
                 .iter()
                 .zip(&b.data)
@@ -558,7 +483,7 @@ mod tests {
     #[test]
     fn asleep_is_plain_at_a_glance() {
         // Off is far dimmer than listening, not just a different eye.
-        let ink = |i: &ksni::Icon| i.data.chunks(4).map(|p| u64::from(p[0])).sum::<u64>();
+        let ink = |i: &Icon| i.data.chunks(4).map(|p| u64::from(p[0])).sum::<u64>();
         let (off, on) = (
             ink(&ICONS[Shape::Off.index()]),
             ink(&ICONS[Shape::Listening.index()]),

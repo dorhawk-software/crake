@@ -123,7 +123,7 @@ pub fn start(updates: async_channel::Sender<Update>) -> async_channel::Sender<Co
 }
 
 /// The same, always on this socket (tests: a craked of their own).
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 pub fn start_on(
     socket: PathBuf,
     updates: async_channel::Sender<Update>,
@@ -161,14 +161,7 @@ fn dev_socket() -> Option<PathBuf> {
 
 async fn connect(socket: Option<&Path>) -> zbus::Result<(Connection, bool)> {
     match socket.map(Path::to_path_buf).or_else(dev_socket) {
-        Some(path) => {
-            let stream = tokio::net::UnixStream::connect(&path).await?;
-            let conn = zbus::connection::Builder::unix_stream(stream)
-                .p2p()
-                .build()
-                .await?;
-            Ok((conn, true))
-        }
+        Some(path) => Ok((crate::sys::connect_dev(&path).await?, true)),
         None => Ok((Connection::system().await?, false)),
     }
 }

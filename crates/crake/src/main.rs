@@ -44,18 +44,20 @@ mod signin;
 
 mod signin_view;
 
-mod single;
+mod sys;
+use sys::single;
 
 mod theme;
 
 mod tray;
 
-#[cfg(test)]
+// With craked over its socket, openconnect and nftables: Linux.
+#[cfg(all(test, target_os = "linux"))]
 mod e2e_tests;
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod journey_tests;
 mod tunnel_detail;
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod wire_tests;
 
 // What the parts of the app call on each other.
@@ -155,7 +157,7 @@ struct Shell {
     x11: bool,
     /// CRAKE_DEMO: the design's sample data, no craked.
     demo: bool,
-    tray: Option<ksni::blocking::Handle<tray::Tray>>,
+    tray: Option<tray::Handle>,
     /// The log window, while it's open.
     log: Option<AnyWindowHandle>,
     /// The Settings window, while it's open.
