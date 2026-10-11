@@ -209,3 +209,29 @@ fn answer(query: &[u8]) -> Vec<u8> {
     a.extend_from_slice(&[0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 30, 0, 4, 10, 40, 1, 10]);
     a
 }
+
+/// Probing's view of the machine: a new connection that gets no answer
+/// shows up as one stuck in SYN_SENT (no root needed).
+#[tokio::test]
+async fn the_connection_table_sees_a_stuck_connection() {
+    use craked::conntrack::{Events, Kind, TcpState};
+    let mut events = Events::open().unwrap();
+    // TEST-NET-1: nothing answers there.
+    let socket = tokio::net::TcpSocket::new_v4().unwrap();
+    let connecting = tokio::spawn(socket.connect("192.0.2.1:9".parse().unwrap()));
+    let seen = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            let batch = events.next().await.unwrap();
+            if let Some(e) = batch
+                .iter()
+                .find(|e| e.flow.dst == Ipv4Addr::new(192, 0, 2, 1) && e.flow.dport == 9)
+            {
+                return (e.kind, e.state);
+            }
+        }
+    })
+    .await
+    .expect("the new connection in the table");
+    assert_eq!(seen, (Kind::New, Some(TcpState::SynSent)));
+    connecting.abort();
+}
