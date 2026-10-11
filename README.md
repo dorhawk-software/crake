@@ -240,7 +240,6 @@ Tests and checks:
 cargo test                                    # unit, lifecycle, D-Bus and headless window tests
 scripts/e2e-test.sh                           # the app and craked end to end, the journey suite included
 scripts/netns-test.sh                         # real nftables and routing, in a throwaway container
-scripts/e2e-test.sh                           # sign in and connect to a real ocserv, in containers with no network
 scripts/lint.sh                               # rustfmt, clippy, cargo-deny, cargo-machete, private names, sizes
 scripts/check-coverage.sh                     # each crate's tested share of lines stays above its floor
 scripts/build-deb.sh                          # the .deb, built in an Ubuntu 22.04 container
