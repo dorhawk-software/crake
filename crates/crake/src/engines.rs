@@ -4,7 +4,7 @@
 //! missing says how to get it, instead of failing at connect.
 
 use std::ffi::{OsStr, OsString};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// openvpn3's configuration service, which Crake talks to over D-Bus.
 const OPENVPN3_SERVICE: &str =
@@ -92,22 +92,39 @@ impl Engines {
     }
 }
 
-/// Where distributions put openconnect outside a user's PATH: Debian
-/// installs it in /usr/sbin, which its users' PATH leaves out.
-const ADMIN_DIRS: &[&str] = &["/usr/sbin", "/sbin"];
+/// openconnect's file name.
+const PROGRAM: &str = if cfg!(windows) {
+    "openconnect.exe"
+} else {
+    "openconnect"
+};
 
 /// The openconnect to run: CRAKE_OPENCONNECT (development), openconnect on
-/// PATH, or one in the administrators' folders (Debian).
+/// PATH, or one where Crake knows to look (`extra_dirs`).
 pub fn openconnect() -> OsString {
     let path = std::env::var_os("PATH");
     find_openconnect(
         std::env::var_os("CRAKE_OPENCONNECT"),
         path.as_deref(),
-        ADMIN_DIRS,
+        &extra_dirs(),
     )
 }
 
-fn find_openconnect(given: Option<OsString>, path: Option<&OsStr>, admin: &[&str]) -> OsString {
+/// Where openconnect may be besides PATH. Linux: the administrators'
+/// folders (Debian installs it in /usr/sbin, which its users' PATH leaves
+/// out). Windows: the copy Crake ships in its own folder.
+fn extra_dirs() -> Vec<PathBuf> {
+    if cfg!(windows) {
+        std::env::current_exe()
+            .ok()
+            .and_then(|exe| Some(vec![exe.parent()?.join("openconnect")]))
+            .unwrap_or_default()
+    } else {
+        vec!["/usr/sbin".into(), "/sbin".into()]
+    }
+}
+
+fn find_openconnect(given: Option<OsString>, path: Option<&OsStr>, extra: &[PathBuf]) -> OsString {
     if let Some(program) = given {
         return program;
     }
@@ -115,9 +132,9 @@ fn find_openconnect(given: Option<OsString>, path: Option<&OsStr>, admin: &[&str
         std::env::split_paths(p).any(|dir| crate::sys::executable(&dir.join("openconnect")))
     });
     if !on_path
-        && let Some(found) = admin
+        && let Some(found) = extra
             .iter()
-            .map(|dir| Path::new(dir).join("openconnect"))
+            .map(|dir| dir.join(PROGRAM))
             .find(|p| crate::sys::executable(p))
     {
         return found.into_os_string();
@@ -199,7 +216,7 @@ mod tests {
         let program = sbin.join("openconnect");
         std::fs::write(&program, "#!/bin/sh\n").unwrap();
         std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
-        let admin = [sbin.to_str().unwrap()];
+        let admin = [sbin.clone()];
         // A user's PATH without sbin (Debian): found there, by its path.
         assert_eq!(
             find_openconnect(None, Some(bin.as_os_str()), &admin),

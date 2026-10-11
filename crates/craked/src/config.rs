@@ -257,7 +257,14 @@ fn default_hook_path() -> PathBuf {
 fn default_hook_socket() -> PathBuf {
     DEFAULT_HOOK_SOCKET.into()
 }
+/// openconnect on PATH; on Windows, the copy Crake ships beside craked.
 fn default_openconnect() -> PathBuf {
+    if cfg!(windows)
+        && let Ok(exe) = std::env::current_exe()
+        && let Some(dir) = exe.parent()
+    {
+        return dir.join("openconnect").join("openconnect.exe");
+    }
     "openconnect".into()
 }
 fn default_log_path() -> PathBuf {
