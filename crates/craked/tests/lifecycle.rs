@@ -746,7 +746,17 @@ async fn an_upgrade_hands_the_tunnels_to_the_new_craked() {
 
     // An ordinary stop (no flag) logs off, as always, and leaves nothing.
     new.shutdown().await;
-    assert!(std::fs::read_to_string(&calls).unwrap().contains("term"));
+    // The fake openconnect writes "term" as it goes: give it a moment (on a
+    // busy machine shutdown can return first).
+    let mut termed = false;
+    for _ in 0..50 {
+        termed = std::fs::read_to_string(&calls).unwrap().contains("term");
+        if termed {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert!(termed, "openconnect was told to log off");
     assert!(!resume.exists());
     assert!(log().contains("Switched ACME off."));
 }
