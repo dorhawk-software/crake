@@ -14,6 +14,10 @@ use crate::place::Rect;
 
 /// The monitors, primary first, in the logical pixels windows are sized in.
 pub fn monitors() -> Vec<Rect> {
+    // Tests see a machine without a display, whatever this one has.
+    if cfg!(test) {
+        return Vec::new();
+    }
     let mut found: Vec<(bool, Rect)> = Vec::new();
     // SAFETY: the callback only runs during the call, with `found` alive.
     unsafe {

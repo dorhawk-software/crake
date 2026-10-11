@@ -9,6 +9,10 @@ use crate::place::Rect;
 /// The monitors as X11 (XRandR) knows them, primary first. GPUI's X11 backend
 /// reports one screen spanning them all, which can't tell where one ends.
 pub fn monitors() -> Vec<Rect> {
+    // Tests see a machine without a display, whatever this one has.
+    if cfg!(test) {
+        return Vec::new();
+    }
     use x11rb::connection::Connection;
     use x11rb::protocol::randr::ConnectionExt;
     let Ok((conn, screen)) = x11rb::connect(None) else {
