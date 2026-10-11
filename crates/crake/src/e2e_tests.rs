@@ -20,7 +20,11 @@ use crate::client::Command;
 use crate::signin::{self, Ask, Event, Reply, Spec};
 use crate::wire_tests::{self, App};
 
-pub(crate) const GATEWAY: &str = "https://198.51.100.10";
+/// The test gateway: scripts/e2e's container, or wherever CRAKE_E2E_GATEWAY
+/// says (the NixOS VM test's gateway VM).
+pub(crate) fn gateway() -> String {
+    std::env::var("CRAKE_E2E_GATEWAY").unwrap_or_else(|_| "https://198.51.100.10".into())
+}
 
 pub(crate) fn sh(cmd: &str) -> String {
     let out = Run::new("sh").args(["-c", cmd]).output().unwrap();
@@ -45,7 +49,7 @@ pub(crate) fn config(dir: &std::path::Path) -> Config {
         tunnels: vec![TunnelConfig {
             name: "acme".into(),
             display_name: Some("ACME".into()),
-            gateway: GATEWAY.into(),
+            gateway: gateway(),
             protocol: Protocol::Anyconnect,
             user: Some("alice".into()),
             passwd_file: None,
@@ -64,7 +68,7 @@ async fn sign_in() -> crake_proto::Session {
     let spec = Spec {
         tunnel: "acme".into(),
         display: "ACME".into(),
-        gateway: GATEWAY.into(),
+        gateway: gateway(),
         protocol: "anyconnect".into(),
         user: "alice".into(),
         auth_args: vec![],

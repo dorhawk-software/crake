@@ -369,7 +369,7 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
     let (name, gateway, user) = view.read_with(cx, |v, _| v.fields_for_tests());
     type_into(cx, n, name, "Globex");
     click(cx, n, ("protocol", 1usize));
-    type_into(cx, n, gateway, crate::e2e_tests::GATEWAY);
+    type_into(cx, n, gateway, &crate::e2e_tests::gateway());
     click(cx, n, "next");
     click(cx, n, ("method", 1usize));
     type_into(cx, n, user, "alice");

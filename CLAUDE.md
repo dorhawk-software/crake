@@ -869,7 +869,19 @@ tunnel is off; crake-keep answers from memory). To do: DNS over TCP to
 it, a full tunnel, the public-DNS rescue and split-horizon (craked would
 have to be Windows' default DNS), then the installer (phase 5). A fresh
 probe's first connection fails on Windows (its retry works): Linux's
-retransmitted SYN takes the new route, Windows' stuck one is reset. **Also noted (user):** the panel has no shadow on
+retransmitted SYN takes the new route, Windows' stuck one is reset.
+
+**OpenVPN on Windows (open decision, noted for the user):** OpenVPN 3
+Linux (the D-Bus service Crake drives there) doesn't exist on Windows, so
+Crake on Windows speaks only openconnect's protocols today. Options:
+OpenVPN Connect when installed (Crake can't drive it), OpenVPN's community
+openvpn.exe (2.6, bundled like openconnect), or OpenVPN 3's core library.
+If Crake starts OpenVPN itself, the Linux `tun0` problem (openvpn3 names
+its own devices, so craked maps them back with `tunnel_of_device`) goes
+away: on Windows OpenVPN lets the starter name its Wintun adapter
+(`--dev-node crake-<name>`).
+
+**Also noted (user):** the panel has no shadow on
 Windows (Linux draws one in its transparent margin), and a few white
 pixels show outside the rounded top corners; both look like GPUI's
 DirectX drawing of transparent windows.
