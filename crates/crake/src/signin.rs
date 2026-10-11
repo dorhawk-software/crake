@@ -29,8 +29,7 @@ pub struct Spec {
     pub user_agent: Option<String>,
     /// Read and write the keyring (off in demo mode: nothing real is stored).
     pub keyring: bool,
-    /// The openconnect to run (tests: a fake). None: CRAKE_OPENCONNECT
-    /// (development), or openconnect on PATH.
+    /// The openconnect to run (tests: a fake). None: `engines::openconnect`.
     pub openconnect: Option<PathBuf>,
 }
 
@@ -294,10 +293,10 @@ fn attempt(
     events: &async_channel::Sender<Event>,
     replies: &async_channel::Receiver<Reply>,
 ) -> Result<Result<String, Vec<String>>, String> {
-    // CRAKE_OPENCONNECT (development): another openconnect to run.
+    // A fake in tests; otherwise where engines finds it.
     let program = match &spec.openconnect {
         Some(p) => p.clone().into_os_string(),
-        None => std::env::var_os("CRAKE_OPENCONNECT").unwrap_or_else(|| "openconnect".into()),
+        None => crate::engines::openconnect(),
     };
     let mut cmd = Command::new(program);
     cmd.arg("--authenticate")

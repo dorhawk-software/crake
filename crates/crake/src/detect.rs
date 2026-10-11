@@ -19,7 +19,7 @@ pub enum Found {
 
 /// Ask `gateway` (blocking, at most `wait`).
 pub fn gateway(gateway: &str, wait: Duration) -> Found {
-    let program = std::env::var_os("CRAKE_OPENCONNECT").unwrap_or_else(|| "openconnect".into());
+    let program = crate::engines::openconnect();
     let Ok(mut child) = Command::new(program)
         .args([
             "--authenticate",

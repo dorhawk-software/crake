@@ -3,6 +3,7 @@
 //! protocols, OpenVPN 3 runs its own profiles. A protocol whose engine is
 //! missing says how to get it, instead of failing at connect.
 
+use std::ffi::{OsStr, OsString};
 use std::path::Path;
 
 /// openvpn3's configuration service, which Crake talks to over D-Bus.
@@ -31,7 +32,7 @@ impl Engines {
 
     /// Look (blocking, quick: a few file checks and openconnect's --help).
     pub fn find() -> Self {
-        let program = std::env::var_os("CRAKE_OPENCONNECT").unwrap_or_else(|| "openconnect".into());
+        let program = openconnect();
         let openconnect = runnable(Path::new(&program));
         let said = |arg: &str| {
             std::process::Command::new(&program)
@@ -89,6 +90,39 @@ impl Engines {
             _ => None,
         }
     }
+}
+
+/// Where distributions put openconnect outside a user's PATH: Debian
+/// installs it in /usr/sbin, which its users' PATH leaves out.
+const ADMIN_DIRS: &[&str] = &["/usr/sbin", "/sbin"];
+
+/// The openconnect to run: CRAKE_OPENCONNECT (development), openconnect on
+/// PATH, or one in the administrators' folders (Debian).
+pub fn openconnect() -> OsString {
+    let path = std::env::var_os("PATH");
+    find_openconnect(
+        std::env::var_os("CRAKE_OPENCONNECT"),
+        path.as_deref(),
+        ADMIN_DIRS,
+    )
+}
+
+fn find_openconnect(given: Option<OsString>, path: Option<&OsStr>, admin: &[&str]) -> OsString {
+    if let Some(program) = given {
+        return program;
+    }
+    let on_path = path.is_some_and(|p| {
+        std::env::split_paths(p).any(|dir| crate::sys::executable(&dir.join("openconnect")))
+    });
+    if !on_path
+        && let Some(found) = admin
+            .iter()
+            .map(|dir| Path::new(dir).join("openconnect"))
+            .find(|p| crate::sys::executable(p))
+    {
+        return found.into_os_string();
+    }
+    "openconnect".into()
 }
 
 /// openconnect's version from `openconnect --version` ("OpenConnect version
@@ -152,6 +186,38 @@ mod tests {
         assert!(runnable(Path::new(name)));
         assert!(runnable(Path::new(path)));
         assert!(!runnable(Path::new("surely-not-a-program-here")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn finds_openconnect_where_debian_puts_it() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tempfile::tempdir().unwrap();
+        let (bin, sbin) = (root.path().join("bin"), root.path().join("sbin"));
+        std::fs::create_dir_all(&bin).unwrap();
+        std::fs::create_dir_all(&sbin).unwrap();
+        let program = sbin.join("openconnect");
+        std::fs::write(&program, "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let admin = [sbin.to_str().unwrap()];
+        // A user's PATH without sbin (Debian): found there, by its path.
+        assert_eq!(
+            find_openconnect(None, Some(bin.as_os_str()), &admin),
+            program.as_os_str()
+        );
+        // On PATH (Ubuntu's users have sbin): by name, as PATH finds it.
+        let path = std::env::join_paths([&bin, &sbin]).unwrap();
+        assert_eq!(find_openconnect(None, Some(&path), &admin), "openconnect");
+        // Nowhere: by name, so the error names it.
+        assert_eq!(
+            find_openconnect(None, Some(bin.as_os_str()), &[]),
+            "openconnect"
+        );
+        // CRAKE_OPENCONNECT wins.
+        assert_eq!(
+            find_openconnect(Some("/opt/oc".into()), Some(&path), &admin),
+            "/opt/oc"
+        );
     }
 
     #[test]

@@ -702,7 +702,10 @@ it doesn't, bundle, and own the updates.**
   Sign-in turns openconnect 8's "unrecognized option '--external-browser'"
   into the same sentence. Checked against 22.04's real openconnect.
 - **At runtime (built, `engines.rs`):** the app checks which engines exist
-  (openconnect on PATH, or `CRAKE_OPENCONNECT`; openvpn3's D-Bus
+  (`engines::openconnect()`: `CRAKE_OPENCONNECT`, openconnect on PATH,
+  or /usr/sbin and /sbin: Debian installs it in /usr/sbin, which its
+  users' PATH leaves out, so the app called it missing there; found in a
+  Debian 13 VM, the package test runs as root and missed it; openvpn3's D-Bus
   configuration service file). New tunnel shows every protocol; one whose
   engine is missing is tagged "Not installed", says how to get it ("Needs
   openconnect, which isn't installed: sudo apt install openconnect") and
@@ -792,10 +795,27 @@ transports are gated too: the hook's socket and the app's private socket
 are `cfg(unix)`, with Windows stubs (named pipes in phase 3; `crake-hook`
 already opens a pipe like a file there); `main.rs` stops on SIGTERM or
 Ctrl+C (`Stop`). The integration tests are Linux-only.
-`scripts/windows-check.sh` (CI job `windows`) keeps craked compiling,
-clippy-clean, for x86_64-pc-windows-gnu; locally in a container. The app
-crate isn't checked for Windows yet (phase 2: gpui's build needs mingw's
-windres; ksni, oo7 and the X11 placement need gating).
+`scripts/windows-check.sh` (CI job `windows`) keeps the workspace
+compiling, clippy-clean, tests included, for x86_64-pc-windows-gnu;
+locally in a MinGW container (`scripts/windows/Dockerfile`).
+
+**Phase 2: done.** The app has the same layout, `crates/crake/src/sys/`:
+`linux/` (the StatusNotifierItem tray, the GNOME keyring, X11's
+monitors, one Crake per session, private files, the dev socket) and
+`windows/`, real rather than stubs (a stub left the portable code that
+feeds it dead, and lints are errors): the notification area's icon and
+menu (`tray-icon`; the head drawn dark on a light taskbar), Credential
+Manager (2560 bytes a credential, so a certificate is kept in parts
+`Crake/<tunnel>/<kind>/<n>`), monitors in logical pixels, a named pipe
+for one Crake per session, private files in LOCALAPPDATA. Only the
+connection to craked waits for phase 3. The tray's art stays portable
+(`tray::State`, `tray::Icon`). Tests see no monitors on any system (the
+Windows runner's small screen hid buttons the window tests click). The
+.exe files are built on a Windows runner (CI job `windows-build`, which
+also runs the portable tests there and uploads `crake-windows`): GPUI's
+release shaders need the Windows SDK's fxc (vkd3d can't compile them:
+no `SV_ClipDistance`; GPUI's debug path reads the shader source from the
+build machine at run time). Not yet tried on a real Windows.
 
 ## Someday: other platforms
 
