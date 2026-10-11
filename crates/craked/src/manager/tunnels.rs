@@ -354,8 +354,7 @@ impl Manager {
             "pre-init" => Ok(()),
             "connect" | "reconnect" => {
                 let info = TunnelInfo::from_env(&msg.env)?;
-                let expected = interface_name(name);
-                if info.device != expected {
+                if !crate::sys::tunnel_device(name, &info.device) {
                     bail!("device {} does not belong to {display}", info.device);
                 }
                 if let Some(addr) = info.address {
@@ -532,9 +531,11 @@ impl Manager {
         no_dtls: bool,
     ) -> Result<Child> {
         let mut cmd = Command::new(&self.cfg.openconnect);
-        cmd.arg(format!("--protocol={}", t.protocol.as_str()))
-            .arg(format!("--interface={}", interface_name(&t.name)))
-            .arg(format!("--script={}", self.cfg.hook_path.display()))
+        cmd.arg(format!("--protocol={}", t.protocol.as_str()));
+        if crate::sys::NAMES_DEVICES {
+            cmd.arg(format!("--interface={}", interface_name(&t.name)));
+        }
+        cmd.arg(format!("--script={}", self.cfg.hook_path.display()))
             .arg("--non-inter");
         if let Some(user) = &t.user {
             cmd.arg(format!("--user={user}"));

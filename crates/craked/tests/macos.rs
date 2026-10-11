@@ -1,0 +1,211 @@
+//! macOS, as root (CI job `macos`, GitHub's runner): craked's macOS parts
+//! on a real utun device this test makes itself (openconnect makes one the
+//! same way): the tunnel's address, its DNS route, learned and pinned hosts
+//! as routes, and /etc/resolver files sending a domain's names to craked's
+//! server (a stand-in that answers every A question with 10.40.1.10).
+//! Skipped unless CRAKE_MACOS_ROOT=1. Not a full tunnel: routing
+//! everything into a device nobody reads would cut the runner off.
+#![cfg(target_os = "macos")]
+
+use std::net::{Ipv4Addr, UdpSocket};
+use std::os::fd::{FromRawFd, OwnedFd};
+use std::process::Command;
+
+use craked::hosts::Target;
+use craked::net::Net;
+use craked::resolved::Resolved;
+use craked::routing::{Plan, Routing};
+
+fn enabled() -> bool {
+    if std::env::var("CRAKE_MACOS_ROOT").as_deref() == Ok("1") {
+        return true;
+    }
+    eprintln!("skipped: needs root (CRAKE_MACOS_ROOT=1)");
+    false
+}
+
+/// A utun device of our own: gone when the socket closes.
+fn utun() -> (OwnedFd, String) {
+    // SAFETY: the kernel control API as openconnect uses it; every buffer
+    // is the size the call is told.
+    unsafe {
+        let fd = libc::socket(libc::PF_SYSTEM, libc::SOCK_DGRAM, libc::SYSPROTO_CONTROL);
+        assert!(fd >= 0, "a kernel control socket");
+        let fd = OwnedFd::from_raw_fd(fd);
+        let mut info: libc::ctl_info = std::mem::zeroed();
+        for (i, b) in b"com.apple.net.utun_control".iter().enumerate() {
+            info.ctl_name[i] = *b as libc::c_char;
+        }
+        assert_eq!(
+            libc::ioctl(
+                std::os::fd::AsRawFd::as_raw_fd(&fd),
+                libc::CTLIOCGINFO,
+                &raw mut info
+            ),
+            0,
+            "utun's control id"
+        );
+        let addr = libc::sockaddr_ctl {
+            sc_len: size_of::<libc::sockaddr_ctl>() as u8,
+            sc_family: libc::AF_SYSTEM as u8,
+            ss_sysaddr: libc::AF_SYS_CONTROL as u16,
+            sc_id: info.ctl_id,
+            sc_unit: 0,
+            sc_reserved: [0; 5],
+        };
+        assert_eq!(
+            libc::connect(
+                std::os::fd::AsRawFd::as_raw_fd(&fd),
+                (&raw const addr).cast(),
+                size_of::<libc::sockaddr_ctl>() as u32,
+            ),
+            0,
+            "a new utun device"
+        );
+        let mut name = [0u8; 32];
+        let mut len = name.len() as libc::socklen_t;
+        assert_eq!(
+            libc::getsockopt(
+                std::os::fd::AsRawFd::as_raw_fd(&fd),
+                libc::SYSPROTO_CONTROL,
+                libc::UTUN_OPT_IFNAME,
+                name.as_mut_ptr().cast(),
+                &raw mut len,
+            ),
+            0,
+            "its name"
+        );
+        let name = std::ffi::CStr::from_bytes_until_nul(&name)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        (fd, name)
+    }
+}
+
+fn sh(program: &str, args: &[&str]) -> String {
+    let out = Command::new(program).args(args).output().unwrap();
+    String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr)
+}
+
+/// The interface `route -n get` sends `addr` out of.
+fn way(addr: &str) -> String {
+    sh("route", &["-n", "get", addr])
+        .lines()
+        .find_map(|l| {
+            l.trim()
+                .strip_prefix("interface:")
+                .map(|s| s.trim().to_owned())
+        })
+        .unwrap_or_default()
+}
+
+#[tokio::test]
+async fn a_tunnel_on_a_utun_device() {
+    if !enabled() {
+        return;
+    }
+    let (_fd, dev) = utun();
+    assert!(craked::sys::tunnel_device("acme", &dev), "{dev}");
+
+    // Its address, and the one route Crake adds up front: its DNS.
+    let net = Net::new(true);
+    net.assign(&dev, Ipv4Addr::new(10, 40, 255, 5), 32, Some(1400))
+        .await
+        .unwrap();
+    let shown = sh("ifconfig", &[&dev]);
+    assert!(shown.contains("inet 10.40.255.5"), "{shown}");
+    assert!(shown.contains("mtu 1400"), "{shown}");
+    net.route_dns(&dev, Ipv4Addr::new(10, 40, 0, 2))
+        .await
+        .unwrap();
+    assert_eq!(way("10.40.0.2"), dev);
+
+    // Pinned and learned hosts: routes through it; nothing else.
+    let routing = Routing::new(true);
+    let pinned: Vec<Target> = vec!["10.40.2.0/24".parse().unwrap()];
+    let learned = [(Ipv4Addr::new(10, 40, 1, 10), 600)];
+    routing
+        .up(&Plan {
+            name: "acme",
+            index: 0,
+            device: &dev,
+            timeout: 600,
+            dns: &[Ipv4Addr::new(10, 40, 0, 2)],
+            pinned: &pinned,
+            learned: &learned,
+            full_except: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(way("10.40.1.10"), dev);
+    assert_eq!(way("10.40.2.7"), dev);
+    assert_ne!(way("10.40.1.11"), dev, "not learned: not routed");
+    routing
+        .add_learned("acme", Ipv4Addr::new(10, 40, 1, 11), 600)
+        .await
+        .unwrap();
+    assert_eq!(way("10.40.1.11"), dev);
+    routing
+        .remove_learned("acme", Ipv4Addr::new(10, 40, 1, 11))
+        .await
+        .unwrap();
+    assert_ne!(way("10.40.1.11"), dev, "forgotten");
+    // A socket bound to the tunnel finds its way out through it (probes).
+    let probe = tokio::net::TcpSocket::new_v4().unwrap();
+    craked::sys::mark(&probe, craked::routing::ids(0).mark).unwrap();
+
+    // DNS: acme.internal's names go to craked's server (here a stand-in).
+    let server = UdpSocket::bind((Ipv4Addr::LOCALHOST, craked::dns_queue::PORT)).unwrap();
+    std::thread::spawn(move || {
+        let mut buf = [0u8; 512];
+        while let Ok((n, from)) = server.recv_from(&mut buf) {
+            let _ = server.send_to(&answer(&buf[..n]), from);
+        }
+    });
+    let resolved = Resolved::new(true);
+    resolved
+        .set_link(
+            &dev,
+            &[Ipv4Addr::new(10, 40, 0, 2)],
+            &["acme.internal".into()],
+            false,
+        )
+        .await
+        .unwrap();
+    let file = std::fs::read_to_string("/etc/resolver/acme.internal").unwrap();
+    assert!(file.contains(&format!("for {dev}")), "{file}");
+    resolved.flush().await;
+    let found = sh(
+        "dscacheutil",
+        &["-q", "host", "-a", "name", "git.acme.internal"],
+    );
+    assert!(
+        found.contains("10.40.1.10"),
+        "macOS asked craked's server: {found}"
+    );
+
+    // Switched off: its files and routes go.
+    resolved.revert(&dev).await;
+    assert!(!std::path::Path::new("/etc/resolver/acme.internal").exists());
+    routing.down("acme", 0, Some(&dev)).await.unwrap();
+    assert_ne!(way("10.40.1.10"), dev);
+    assert_ne!(way("10.40.2.7"), dev);
+}
+
+/// A DNS answer to `query`: its question, one A record, 10.40.1.10.
+fn answer(query: &[u8]) -> Vec<u8> {
+    // The question ends after its name's labels, its type and class.
+    let mut end = 12;
+    while query[end] != 0 {
+        end += 1 + usize::from(query[end]);
+    }
+    let mut a = query[..end + 5].to_vec();
+    a[2] = 0x81; // a response, recursion desired
+    a[3] = 0x80; // recursion available, no error
+    a[6..8].copy_from_slice(&1u16.to_be_bytes()); // one answer
+    a[8..12].fill(0); // nothing else (an EDNS record left behind)
+    // The name by pointer to the question, A, IN, TTL 30, 4 bytes.
+    a.extend_from_slice(&[0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 30, 0, 4, 10, 40, 1, 10]);
+    a
+}

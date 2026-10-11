@@ -11,6 +11,12 @@ mod unix;
 #[cfg(unix)]
 pub use unix::*;
 
+// Windows and macOS: craked's own DNS server, and whose a name is.
+#[cfg(any(windows, target_os = "macos"))]
+mod dns_links;
+#[cfg(any(windows, target_os = "macos"))]
+mod dns_server;
+
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]

@@ -104,7 +104,7 @@ impl Manager {
             return;
         }
         self.sync_learned(name).await;
-        self.resolved.revert(&interface_name(name)).await;
+        self.resolved.revert(&self.device_of(name)).await;
         self.dns_misses.lock().unwrap().remove(name);
         if self.dns_down.lock().unwrap().remove(name).is_some() {
             self.apply_keep().await;

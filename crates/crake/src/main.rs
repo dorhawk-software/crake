@@ -60,7 +60,8 @@ mod tray;
 mod e2e_tests;
 #[cfg(all(test, target_os = "linux"))]
 mod journey_tests;
-#[cfg(test)]
+// The app's side against a real craked: the Linux and Windows tests'.
+#[cfg(all(test, any(target_os = "linux", windows)))]
 mod test_app;
 mod tunnel_detail;
 #[cfg(all(test, target_os = "linux"))]

@@ -476,6 +476,17 @@ impl Manager {
             .map_or_else(|| name.to_owned(), |e| e.config.display().to_owned())
     }
 
+    /// The tunnel's device: the one it came up on, or the one openconnect is
+    /// told to make (`crake-<name>`).
+    pub(crate) fn device_of(&self, name: &str) -> String {
+        self.tunnels
+            .lock()
+            .unwrap()
+            .get(name)
+            .and_then(|e| e.info.as_ref().map(|i| i.device.clone()))
+            .unwrap_or_else(|| interface_name(name))
+    }
+
     /// The tunnel whose device this is: `crake-<name>` for openconnect's,
     /// the attached device (tun0, ...) for OpenVPN 3's.
     pub fn tunnel_of_device(&self, device: &str) -> Option<String> {

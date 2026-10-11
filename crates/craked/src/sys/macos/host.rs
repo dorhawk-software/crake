@@ -11,7 +11,6 @@ use std::sync::Mutex;
 static PATHS: Mutex<BTreeMap<u32, String>> = Mutex::new(BTreeMap::new());
 
 /// Filled by `routing` as tunnels come up and go down.
-#[expect(dead_code, reason = "macOS routing isn't built yet")]
 pub(crate) fn set_path(mark: u32, device: Option<&str>) {
     let mut paths = PATHS
         .lock()
@@ -95,4 +94,10 @@ pub fn counters(devices: &HashMap<String, String>) -> (u64, u64, HashMap<String,
         libc::freeifaddrs(head);
     }
     (physical, tunnels, each)
+}
+
+/// The system's own DNS servers, for public names craked's server would
+/// forward: none yet, as public names don't come to it on macOS.
+pub fn system_dns() -> Vec<std::net::Ipv4Addr> {
+    Vec::new()
 }

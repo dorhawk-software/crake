@@ -62,8 +62,10 @@ jobs:
       - name: Crake compiles for Windows, lint-clean
         run: scripts/windows-check.sh
 
-  # macOS, phase 1 (CLAUDE.md): Crake compiles there, lint-clean, and the
-  # portable tests pass. Only on GitHub's runners: no Mac here.
+  # macOS (CLAUDE.md): Crake compiles there, lint-clean, the portable tests
+  # pass, and craked's macOS parts work as root on a utun device of the
+  # test's own (crates/craked/tests/macos.rs). Only on GitHub's runners:
+  # no Mac here.
   macos:
     runs-on: macos-latest
     steps:
@@ -76,6 +78,11 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked
       - name: The tests that aren't Linux's own, on macOS
         run: cargo test --workspace --locked
+      - name: craked's macOS parts on a real utun device, as root
+        run: |
+          BIN=$(cargo test -p craked --test macos --no-run --locked --message-format=json |
+            jq -r 'select(.executable != null and .target.name == "macos") | .executable')
+          sudo CRAKE_MACOS_ROOT=1 "$BIN" --nocapture
 
   windows-build:
     runs-on: windows-latest

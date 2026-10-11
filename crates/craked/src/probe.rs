@@ -152,7 +152,7 @@ impl Local {
     pub fn load() -> Self {
         let nets = crate::sys::interfaces()
             .into_iter()
-            .filter(|(name, _, _)| !name.starts_with("crake-"))
+            .filter(|(name, _, _)| !crate::sys::is_tunnel_device(name))
             .map(|(_, a, m)| (a, m))
             .collect();
         Self { nets }

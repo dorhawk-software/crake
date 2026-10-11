@@ -917,30 +917,35 @@ leaving no adapters or NRPT rules; it reports on the serial port. The
 test binary and craked are cross-built with MinGW in
 `crake-windows-build`. Not in GitHub's CI (KVM).
 
-**macOS, phase 1: built** (started 2026-10-11, after Windows' phase 4,
-as the user suggested). Same layout as Windows: craked's
-`sys/macos/` (honest stubs, "… isn't built for macOS yet", for routing,
-the tunnel's address, DNS, the connection table and the DNS server;
-real: sockets bound to a tunnel with IP_BOUND_IF, the byte counters from
-getifaddrs' AF_LINK `if_data`), and the app's `sys/macos/` (the Keychain
-through security-framework; the menu bar through `sys/menu_tray.rs`, the
-tray-icon code Windows used, now shared; the private folder in the
-user's $TMPDIR; no connection to craked yet). What Linux and macOS do
-alike moved to `sys/unix.rs` in both crates (getifaddrs, openconnect's
-process group and signals, private files, the dev socket). craked
-type-checks for macOS in a plain Linux container (`cargo clippy --target
-aarch64-apple-darwin -p craked`, rust:1-bookworm with the target added);
-the app needs a Mac's toolchain (C parts), so CI job `macos`
-(macos-latest) runs clippy and the portable tests there. Next, as
-Windows did: (2) a build, (3) the real parts: per-host routes on the
-utun interface openconnect creates (`route`, or the routing socket),
-/etc/resolver/<domain> files pointing at craked's own DNS server (the
-Windows server, `dns_queue`, made shared; /etc/resolver takes a port),
-the connection table for probing, craked as a launchd daemon serving the
-app on a Unix socket (peer credentials as `--dev` does). openconnect
-can't name utun devices: craked maps utunN to the tunnel as it does
-openvpn3's tun0 (`tunnel_of_device`). Tested on GitHub's macOS runners
-(sudo works there); a real gateway test needs someone with a Mac.
+**macOS (started 2026-10-11, after Windows' phase 4, as the user
+suggested).** Same layout as Windows. craked's `sys/macos/`: the
+tunnel's address and routes with `ifconfig` and `route` (`cmd.rs`;
+learned and pinned hosts, its DNS, a default route scoped to the device
+for probes, a full tunnel's halves and kept gateway), /etc/resolver
+files (one per domain, marked as Crake's and whose; others' files left
+alone) sending the tunnels' domains to craked's own DNS server, which is
+now shared with Windows (`sys/dns_server.rs`, on 127.0.0.1:53530 there;
+whose a name is: `sys/dns_links.rs`), sockets bound with IP_BOUND_IF,
+byte counters from getifaddrs. openconnect can't name utun devices, so
+on macOS craked doesn't pass `--interface` and takes the utunN it
+reports (`sys::NAMES_DEVICES`, `sys::tunnel_device`; `device_of`).
+Not built yet (says so): the connection table for probing; public names
+(no root resolver in /etc/resolver: no rescue, no full tunnel's DNS for
+every name); craked as a launchd daemon serving the app on a Unix
+socket. The app's `sys/macos/`: the Keychain (security-framework,
+labelled items), the menu bar through `sys/menu_tray.rs` (the tray-icon
+code Windows used, now shared), the private folder in the user's
+$TMPDIR, plain notifications (notify-rust has no actions there); no
+connection to craked yet. What Linux and macOS do alike lives in
+`sys/unix.rs` in both crates. craked type-checks for macOS in a plain
+Linux container (`cargo clippy --target aarch64-apple-darwin -p craked
+--all-targets`, rust:1-bookworm with the target added); the app needs a
+Mac's toolchain, so CI job `macos` (macos-latest) runs clippy, the
+portable tests, and `crates/craked/tests/macos.rs` as root: a utun
+device the test makes itself, its address, DNS route, learned and pinned
+routes, and an /etc/resolver file that macOS really follows to a
+stand-in server. A real gateway test needs someone with a Mac (Homebrew
+has openconnect, not ocserv).
 
 **OpenVPN on Windows (open decision, noted for the user):** OpenVPN 3
 Linux (the D-Bus service Crake drives there) doesn't exist on Windows, so

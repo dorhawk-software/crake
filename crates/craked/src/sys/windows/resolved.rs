@@ -1,14 +1,10 @@
 //! Windows: a link's DNS and domains (Linux: systemd-resolved's per-link
 //! DNS) as NRPT rules, which send the link's domains to craked's own DNS
-//! server (`dns_queue::ADDR`). The server looks up here which link a name
-//! belongs to: a tunnel (asked through it), or craked's own `crake-hush`
-//! (refused) and `crake-keep` (answered from memory). The rules are
-//! volatile registry keys: gone at the latest when Windows restarts.
+//! server (`dns_queue::ADDR`), which looks up whose a name is in
+//! `sys::dns_links`. The rules are volatile registry keys: gone at the
+//! latest when Windows restarts.
 
-use std::collections::BTreeMap;
 use std::net::Ipv4Addr;
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Result, bail};
 use windows_sys::Win32::Foundation::ERROR_SUCCESS;
@@ -22,55 +18,21 @@ const POLICY: &str = r"SYSTEM\CurrentControlSet\Services\Dnscache\Parameters\Dns
 /// Crake's rules are named after it and the link.
 const PREFIX: &str = "Crake ";
 
-/// A link's DNS servers and domains, and whether every other name goes
-/// to it too (a full tunnel's DNS).
-type Link = (Vec<Ipv4Addr>, Vec<String>, bool);
-
-/// Each link craked registered, by device.
-static LINKS: Mutex<BTreeMap<String, Link>> = Mutex::new(BTreeMap::new());
-
-/// Public names come to craked's server too (while a tunnel is up): it
-/// asks Windows' own DNS servers and can rescue what they don't know.
-static PUBLIC: AtomicBool = AtomicBool::new(false);
 /// The public rule's name (`Crake public`).
 const PUBLIC_RULE: &str = "public";
 
-/// Whether public names come to craked's server now.
-pub fn public() -> bool {
-    PUBLIC.load(Ordering::Relaxed)
-}
+pub use super::super::dns_links::{owner, public};
 
 /// Send every name that isn't a link's to craked's server (Linux watches
 /// public answers in nftables instead), or stop.
 pub fn set_public(on: bool) -> Result<()> {
-    PUBLIC.store(on, Ordering::Relaxed);
+    super::super::dns_links::set_public(on);
     if on {
         write_rule(PUBLIC_RULE, &[], true)
     } else {
         delete(&format!("{POLICY}\\{PREFIX}{PUBLIC_RULE}"));
         Ok(())
     }
-}
-
-/// The link that answers for `name` (its most specific domain; failing
-/// that, a full tunnel's), with that link's servers.
-pub fn owner(name: &str) -> Option<(String, Vec<Ipv4Addr>)> {
-    let links = LINKS
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    links
-        .iter()
-        .filter_map(|(device, (servers, domains, everything))| {
-            let best = domains
-                .iter()
-                .filter(|d| crate::dns::in_domains(name, std::slice::from_ref(*d)))
-                .map(|d| d.len() + 1)
-                .max()
-                .or(everything.then_some(0))?;
-            Some((best, device, servers))
-        })
-        .max_by_key(|(len, _, _)| *len)
-        .map(|(_, device, servers)| (device.clone(), servers.clone()))
 }
 
 pub enum Resolved {
@@ -104,13 +66,7 @@ impl Resolved {
         if let Self::Noop = self {
             return Ok(());
         }
-        LINKS
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(
-                device.to_owned(),
-                (servers.to_vec(), domains.to_vec(), everything),
-            );
+        super::super::dns_links::set(device, servers, domains, everything);
         write_rule(device, domains, everything)
     }
 
@@ -133,10 +89,7 @@ impl Resolved {
 
     /// The link's rule removed: its domains go back to the usual DNS.
     pub async fn revert(&self, device: &str) {
-        LINKS
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .remove(device);
+        super::super::dns_links::remove(device);
         if let Self::Real = self {
             delete(&format!("{POLICY}\\{PREFIX}{device}"));
         }

@@ -10,3 +10,16 @@ pub mod routing;
 
 mod host;
 pub use host::*;
+
+/// openconnect names the tunnel's device as told: `crake-<name>`.
+pub const NAMES_DEVICES: bool = true;
+
+/// The device openconnect reported is the tunnel's own.
+pub fn tunnel_device(tunnel: &str, device: &str) -> bool {
+    device == crake_proto::interface_name(tunnel)
+}
+
+/// One of Crake's tunnels' devices.
+pub fn is_tunnel_device(name: &str) -> bool {
+    name.starts_with("crake-")
+}
