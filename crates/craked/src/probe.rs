@@ -6,7 +6,6 @@
 
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddrV4};
-use std::os::fd::AsRawFd;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -126,19 +125,7 @@ pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
 /// Returns how long the handshake took.
 pub async fn through_tunnel(addr: SocketAddrV4, mark: u32, timeout: Duration) -> Option<Duration> {
     let sock = TcpSocket::new_v4().ok()?;
-    // SAFETY: plain setsockopt with a u32 on a socket we own.
-    let r = unsafe {
-        libc::setsockopt(
-            sock.as_raw_fd(),
-            libc::SOL_SOCKET,
-            libc::SO_MARK,
-            (&mark as *const u32).cast(),
-            std::mem::size_of::<u32>() as u32,
-        )
-    };
-    if r != 0 {
-        return None;
-    }
+    crate::sys::mark(&sock, mark).ok()?;
     let start = Instant::now();
     match tokio::time::timeout(timeout, sock.connect(addr.into())).await {
         Ok(Ok(_stream)) => Some(start.elapsed()),
@@ -149,34 +136,10 @@ pub async fn through_tunnel(addr: SocketAddrV4, mark: u32, timeout: Duration) ->
 /// A device's IPv4 address and prefix (an OpenVPN 3 tunnel's, which
 /// openvpn3 sets, not craked).
 pub fn ipv4_of(device: &str) -> Option<(Ipv4Addr, u8)> {
-    let mut found = None;
-    // SAFETY: getifaddrs/freeifaddrs pair; we only read the list.
-    unsafe {
-        let mut head: *mut libc::ifaddrs = std::ptr::null_mut();
-        if libc::getifaddrs(&mut head) == 0 {
-            let mut p = head;
-            while !p.is_null() {
-                let ifa = &*p;
-                let name = std::ffi::CStr::from_ptr(ifa.ifa_name).to_string_lossy();
-                if found.is_none()
-                    && name == device
-                    && !ifa.ifa_addr.is_null()
-                    && i32::from((*ifa.ifa_addr).sa_family) == libc::AF_INET
-                    && !ifa.ifa_netmask.is_null()
-                {
-                    let a = &*(ifa.ifa_addr as *const libc::sockaddr_in);
-                    let m = &*(ifa.ifa_netmask as *const libc::sockaddr_in);
-                    found = Some((
-                        Ipv4Addr::from(u32::from_be(a.sin_addr.s_addr)),
-                        u32::from_be(m.sin_addr.s_addr).leading_ones() as u8,
-                    ));
-                }
-                p = ifa.ifa_next;
-            }
-            libc::freeifaddrs(head);
-        }
-    }
-    found
+    crate::sys::interfaces()
+        .into_iter()
+        .find(|(name, _, _)| name == device)
+        .map(|(_, a, m)| (a, m.leading_ones() as u8))
 }
 
 /// The machine's own IPv4 addresses and the networks they're on, excluding
@@ -187,32 +150,11 @@ pub struct Local {
 
 impl Local {
     pub fn load() -> Self {
-        let mut nets = Vec::new();
-        // SAFETY: getifaddrs/freeifaddrs pair; we only read the list.
-        unsafe {
-            let mut head: *mut libc::ifaddrs = std::ptr::null_mut();
-            if libc::getifaddrs(&mut head) == 0 {
-                let mut p = head;
-                while !p.is_null() {
-                    let ifa = &*p;
-                    let name = std::ffi::CStr::from_ptr(ifa.ifa_name).to_string_lossy();
-                    if !ifa.ifa_addr.is_null()
-                        && i32::from((*ifa.ifa_addr).sa_family) == libc::AF_INET
-                        && !ifa.ifa_netmask.is_null()
-                        && !name.starts_with("crake-")
-                    {
-                        let a = &*(ifa.ifa_addr as *const libc::sockaddr_in);
-                        let m = &*(ifa.ifa_netmask as *const libc::sockaddr_in);
-                        nets.push((
-                            Ipv4Addr::from(u32::from_be(a.sin_addr.s_addr)),
-                            u32::from_be(m.sin_addr.s_addr),
-                        ));
-                    }
-                    p = ifa.ifa_next;
-                }
-                libc::freeifaddrs(head);
-            }
-        }
+        let nets = crate::sys::interfaces()
+            .into_iter()
+            .filter(|(name, _, _)| !name.starts_with("crake-"))
+            .map(|(_, a, m)| (a, m))
+            .collect();
         Self { nets }
     }
 

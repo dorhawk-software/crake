@@ -34,16 +34,7 @@ const CTA_PROTO_DST_PORT: u16 = 3;
 const CTA_PROTOINFO_TCP: u16 = 1;
 const CTA_PROTOINFO_TCP_STATE: u16 = 1;
 
-/// The parts of a TCP state we care about.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TcpState {
-    SynSent,
-    /// Any state after a reply: the other side answered.
-    Answered,
-    /// Reset before it was ever established: refused.
-    Close,
-    Other,
-}
+pub use crate::flows::{Event, Flow, Kind, TcpState};
 
 impl TcpState {
     fn from_raw(s: u8) -> Self {
@@ -54,28 +45,6 @@ impl TcpState {
             _ => Self::Other,
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Flow {
-    pub src: Ipv4Addr,
-    pub dst: Ipv4Addr,
-    pub sport: u16,
-    pub dport: u16,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Kind {
-    New,
-    Update,
-    Destroy,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Event {
-    pub kind: Kind,
-    pub flow: Flow,
-    pub state: Option<TcpState>,
 }
 
 /// Subscribed to conntrack events (needs CAP_NET_ADMIN).

@@ -438,11 +438,8 @@ impl Manager {
                     Err(e) => (TunnelState::Trouble, Some(e.to_string())),
                 },
                 how = &mut stop_rx => {
-                    let signal = match how {
-                        Ok(Stop::KeepSession) => libc::SIGHUP,
-                        _ => libc::SIGTERM,
-                    };
-                    terminate(&mut child, signal).await;
+                    let keep = matches!(how, Ok(Stop::KeepSession));
+                    crate::sys::stop(&mut child, keep).await;
                     break (TunnelState::Off, None);
                 }
                 Some(()) = udp_rx.recv(), if !no_dtls => {
@@ -467,11 +464,8 @@ impl Manager {
                                 Err(e) => (TunnelState::Trouble, Some(e.to_string())),
                             },
                             how = &mut stop_rx => {
-                                let signal = match how {
-                                    Ok(Stop::KeepSession) => libc::SIGHUP,
-                                    _ => libc::SIGTERM,
-                                };
-                                terminate(&mut child, signal).await;
+                                let keep = matches!(how, Ok(Stop::KeepSession));
+                                crate::sys::stop(&mut child, keep).await;
                                 (TunnelState::Off, None)
                             }
                         };
@@ -485,7 +479,7 @@ impl Manager {
                     if let Some(e) = self.tunnels.lock().unwrap().get_mut(&name) {
                         e.resumed = true;
                     }
-                    terminate(&mut child, libc::SIGHUP).await;
+                    crate::sys::stop(&mut child, true).await;
                     no_dtls = true;
                 }
             }
@@ -590,10 +584,8 @@ impl Manager {
             })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            // Its own process group: Ctrl+C on a terminal reaches craked only,
-            // which then stops openconnect in order.
-            .process_group(0)
             .kill_on_drop(true);
+        crate::sys::own_group(&mut cmd);
         let mut child = cmd
             .spawn()
             .with_context(|| format!("starting {}", self.cfg.openconnect.display()))?;
@@ -674,19 +666,5 @@ pub(super) async fn pump<R: tokio::io::AsyncRead + Unpin>(r: BufReader<R>, o: Ou
                 .insert(o.tunnel.clone(), how.to_owned());
         }
         *o.last.lock().unwrap() = line;
-    }
-}
-
-/// SIGTERM lets openconnect call the hook with `disconnect`; kill after a grace period.
-pub(super) async fn terminate(child: &mut Child, signal: i32) {
-    if let Some(pid) = child.id() {
-        // SAFETY: plain signal to a child we own.
-        unsafe { libc::kill(pid as i32, signal) };
-    }
-    if tokio::time::timeout(Duration::from_secs(10), child.wait())
-        .await
-        .is_err()
-    {
-        let _ = child.kill().await;
     }
 }

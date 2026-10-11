@@ -6,6 +6,8 @@
 //! (the test plays everything behind the tunnel). A responder thread drops,
 //! refuses or answers TCP handshakes on each, per destination.
 
+#![cfg(target_os = "linux")]
+
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};

@@ -139,15 +139,9 @@ impl Manager {
     }
 }
 
-/// Written for root alone (mode 0600), replacing any older one.
+/// Written for root alone, replacing any older one.
 fn write_private(path: &std::path::Path, resume: &Resume) -> anyhow::Result<()> {
-    use std::os::unix::fs::OpenOptionsExt;
-    let _ = std::fs::remove_file(path);
-    let mut f = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(path)?;
+    let mut f = crate::sys::create_private(path)?;
     f.write_all(&serde_json::to_vec(resume)?)?;
     Ok(())
 }

@@ -8,7 +8,6 @@ use craked::config::{Config, DEFAULT_CONFIG};
 use craked::manager::Manager;
 use craked::{auth, dbus, hook_server};
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::signal::unix::{SignalKind, signal};
 
 #[derive(Parser)]
 #[command(version, about = "Crake system daemon")]
@@ -54,8 +53,7 @@ async fn main() -> Result<()> {
     mgr.init().await?;
     let _hook = hook_server::serve(mgr.clone(), &socket)?;
 
-    let mut term = signal(SignalKind::terminate())?;
-    let mut int = signal(SignalKind::interrupt())?;
+    let mut stop = Stop::new()?;
 
     if let Some(name) = args.connect {
         // The Crake app (run as the user who ran sudo) talks to this run over
@@ -67,7 +65,7 @@ async fn main() -> Result<()> {
                 Err(e) => eprintln!("No app connection: {e:#}"),
             }
         }
-        let result = try_tunnel(&mgr, &name, &mut term, &mut int).await;
+        let result = try_tunnel(&mgr, &name, &mut stop).await;
         mgr.shutdown().await;
         let _ = std::fs::remove_file(&socket);
         if let Some((path, _)) = &ui_socket {
@@ -89,10 +87,7 @@ async fn main() -> Result<()> {
         };
         dbus::serve_p2p(mgr.clone(), &path, uid)?;
         println!("Crake is running for the app (cargo run -p crake). Ctrl+C stops it.");
-        tokio::select! {
-            _ = term.recv() => {}
-            _ = int.recv() => {}
-        }
+        stop.recv().await;
         println!("Switching everything off...");
         mgr.shutdown().await;
         let _ = std::fs::remove_file(&socket);
@@ -105,14 +100,49 @@ async fn main() -> Result<()> {
     tracing::info!("craked {} ready", env!("CARGO_PKG_VERSION"));
     // A package upgrade: the tunnels the previous craked handed over.
     mgr.resume_after_update().await;
-    tokio::select! {
-        _ = term.recv() => {}
-        _ = int.recv() => {}
-    }
+    stop.recv().await;
     tracing::info!("shutting down");
     mgr.shutdown().await;
     let _ = std::fs::remove_file(&socket);
     Ok(())
+}
+
+/// What stops craked: SIGTERM (systemd) or Ctrl+C. Windows: Ctrl+C until
+/// craked runs as a service (phase 3 of the Windows plan in CLAUDE.md).
+struct Stop {
+    #[cfg(unix)]
+    term: tokio::signal::unix::Signal,
+    #[cfg(unix)]
+    int: tokio::signal::unix::Signal,
+}
+
+impl Stop {
+    #[cfg(unix)]
+    fn new() -> Result<Self> {
+        use tokio::signal::unix::{SignalKind, signal};
+        Ok(Self {
+            term: signal(SignalKind::terminate())?,
+            int: signal(SignalKind::interrupt())?,
+        })
+    }
+
+    #[cfg(windows)]
+    fn new() -> Result<Self> {
+        Ok(Self {})
+    }
+
+    #[cfg(unix)]
+    async fn recv(&mut self) {
+        tokio::select! {
+            _ = self.term.recv() => {}
+            _ = self.int.recv() => {}
+        }
+    }
+
+    #[cfg(windows)]
+    async fn recv(&mut self) {
+        let _ = tokio::signal::ctrl_c().await;
+    }
 }
 
 /// `/run/user/<uid>/crake-dev.sock` for the user who ran sudo.
@@ -122,12 +152,7 @@ fn ui_socket() -> Option<(PathBuf, u32)> {
     dir.is_dir().then(|| (dir.join("crake-dev.sock"), uid))
 }
 
-async fn try_tunnel(
-    mgr: &Arc<Manager>,
-    name: &str,
-    term: &mut tokio::signal::unix::Signal,
-    int: &mut tokio::signal::unix::Signal,
-) -> Result<()> {
+async fn try_tunnel(mgr: &Arc<Manager>, name: &str, stop: &mut Stop) -> Result<()> {
     let Some(snap) = mgr.get(name) else {
         bail!("no tunnel named {name} in the config");
     };
@@ -138,7 +163,7 @@ async fn try_tunnel(
     );
     let session = tokio::select! {
         s = auth::authenticate_on_terminal(&mgr.config().openconnect, &snap.config) => s?,
-        _ = int.recv() => return Ok(()),
+        () = stop.recv() => return Ok(()),
     };
     println!("Signed in. Connecting {label}...");
 
@@ -148,8 +173,7 @@ async fn try_tunnel(
     let mut input = BufReader::new(tokio::io::stdin()).lines();
     loop {
         tokio::select! {
-            _ = term.recv() => break,
-            _ = int.recv() => break,
+            () = stop.recv() => break,
             line = input.next_line() => match line {
                 Ok(Some(line)) => command(mgr, name, &line).await,
                 // stdin closed: keep running until a signal.

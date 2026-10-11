@@ -1,5 +1,7 @@
 //! Drives the manager with a fake `openconnect` that calls the real hook binary.
 
+#![cfg(target_os = "linux")]
+
 use std::os::unix::fs::PermissionsExt;
 use std::time::Duration;
 

@@ -6,8 +6,6 @@ use std::net::Ipv4Addr;
 
 use anyhow::{Context, Result};
 
-use crate::net::prefix_from_mask;
-
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TunnelInfo {
     pub device: String,
@@ -94,9 +92,27 @@ fn split_list(env: &BTreeMap<String, String>, base: &str) -> Vec<String> {
         .collect()
 }
 
+/// `255.255.255.0` -> 24. Rejects non-contiguous masks.
+pub fn prefix_from_mask(mask: Ipv4Addr) -> Option<u8> {
+    let bits = u32::from(mask);
+    let ones = bits.leading_ones();
+    (bits.checked_shl(ones).unwrap_or(0) == 0).then_some(ones as u8)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn masks() {
+        assert_eq!(prefix_from_mask("255.255.255.0".parse().unwrap()), Some(24));
+        assert_eq!(
+            prefix_from_mask("255.255.255.255".parse().unwrap()),
+            Some(32)
+        );
+        assert_eq!(prefix_from_mask("0.0.0.0".parse().unwrap()), Some(0));
+        assert_eq!(prefix_from_mask("255.0.255.0".parse().unwrap()), None);
+    }
 
     fn env(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
         pairs

@@ -550,6 +550,7 @@ pub async fn serve(mgr: Arc<Manager>, system_bus: bool) -> zbus::Result<Connecti
 /// The same API without a bus: a private socket only `owner` can open
 /// (development, where nothing is installed). Polkit isn't asked; the
 /// socket's permissions are the guard.
+#[cfg(unix)]
 pub fn serve_p2p(mgr: Arc<Manager>, path: &std::path::Path, owner: u32) -> anyhow::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     let _ = std::fs::remove_file(path);
@@ -583,6 +584,12 @@ pub fn serve_p2p(mgr: Arc<Manager>, path: &std::path::Path, owner: u32) -> anyho
         }
     });
     Ok(())
+}
+
+/// Windows: the app's named pipe (phase 3 of the Windows plan in CLAUDE.md).
+#[cfg(windows)]
+pub fn serve_p2p(_mgr: Arc<Manager>, _path: &std::path::Path, _owner: u32) -> anyhow::Result<()> {
+    Err(crate::sys::not_yet("the app's pipe"))
 }
 
 /// Tunnel state changes and new log entries, as signals on `conn`.

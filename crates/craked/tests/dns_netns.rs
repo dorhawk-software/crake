@@ -5,6 +5,8 @@
 //! server: it reads the query that leaves through the tunnel and writes the
 //! answer back in. The answer then passes craked's queue on its way in.
 
+#![cfg(target_os = "linux")]
+
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::net::{Ipv4Addr, UdpSocket};

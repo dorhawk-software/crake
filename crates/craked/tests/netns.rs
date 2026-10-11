@@ -2,6 +2,8 @@
 //! Skipped unless CRAKE_NETNS_TEST=1; run it with `scripts/netns-test.sh`,
 //! which uses a disposable container with no network.
 
+#![cfg(target_os = "linux")]
+
 use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
 use std::time::Duration;

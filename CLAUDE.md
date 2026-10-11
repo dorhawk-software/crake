@@ -577,8 +577,9 @@ The user doesn't want development builds installed on their machine.
   and stopping leaving nothing; and a network that blocks UDP (7b: noticed,
   over TCP on the same session, remembered). Keep both containers without a
   network: a gateway on a Docker network would be a service on this machine.
-- CI (`.github/workflows/ci.yml`, not yet run: nothing is pushed): the lint
-  gate, `cargo test`, the coverage floors, then the netns and e2e scripts.
+- CI (`.github/workflows/ci.yml`, on every push): the lint gate, `cargo
+  test`, the coverage floors, craked for Windows, the netns and e2e
+  scripts, the NixOS VM test, and the packages built and tested.
 - Daily use, nothing installed: `sudo ./target/debug/craked --config dev/<yours>.toml --dev`
   (serves the app on `/run/user/<uid>/crake-dev.sock`), then `./target/debug/crake`.
   The app signs in as the user (`openconnect --authenticate`, questions in
@@ -779,6 +780,22 @@ Helper API), tunnel DNS via NRPT rules to craked's own DNS forwarder
 TCP table (GetTcpTable2), craked as a Windows service, the app over a local
 socket, the tray (notification area); (4) the VM test; (5) a signed
 installer that bundles openconnect and Wintun.
+
+**Phase 1: done.** craked's OS parts live in `crates/craked/src/sys/`:
+`linux/` (conntrack, dns_queue, net, resolved, routing, and `host.rs`:
+interfaces, fwmark and bound sockets, openconnect's process group and
+stop, root-only files) and `windows/` (the same names, each returning
+"… isn't built for Windows yet"); lib.rs re-exports them, so the rest
+of craked says `crate::routing` etc. on every system. Portable types moved
+out: `flows.rs` (connection events), `plan.rs` (marks and tables). The
+transports are gated too: the hook's socket and the app's private socket
+are `cfg(unix)`, with Windows stubs (named pipes in phase 3; `crake-hook`
+already opens a pipe like a file there); `main.rs` stops on SIGTERM or
+Ctrl+C (`Stop`). The integration tests are Linux-only.
+`scripts/windows-check.sh` (CI job `windows`) keeps craked compiling,
+clippy-clean, for x86_64-pc-windows-gnu; locally in a container. The app
+crate isn't checked for Windows yet (phase 2: gpui's build needs mingw's
+windres; ksni, oo7 and the X11 placement need gating).
 
 ## Someday: other platforms
 

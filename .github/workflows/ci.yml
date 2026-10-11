@@ -1,7 +1,8 @@
 # Every push and pull request: the lint gate, the tests and the coverage
-# floors; the tests that need real networking, each in throwaway containers
-# with no network (scripts/netns-test.sh, scripts/e2e-test.sh); and the .deb
-# and RPM, built once and installed and used on every supported release.
+# floors; craked for Windows (scripts/windows-check.sh); the tests that
+# need real networking, each in throwaway containers with no network
+# (scripts/netns-test.sh, scripts/e2e-test.sh); and the .deb and RPM, built
+# once and installed and used on every supported release.
 name: CI
 
 on:
@@ -39,6 +40,18 @@ jobs:
         run: cargo test --workspace
       - name: Coverage floors
         run: scripts/check-coverage.sh
+
+  windows:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: craked compiles for Windows, lint-clean
+        run: scripts/windows-check.sh
 
   network:
     runs-on: ubuntu-24.04

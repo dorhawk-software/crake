@@ -320,7 +320,7 @@ pub(super) async fn ask_within(
     for server in servers {
         let id = std::collections::hash_map::RandomState::new().hash_one(Instant::now()) as u16;
         let sock = tokio::net::UdpSocket::bind("0.0.0.0:0").await.ok()?;
-        sock.bind_device(Some(device.as_bytes())).ok()?;
+        crate::sys::bind_device(&sock, device).ok()?;
         if sock.connect((*server, 53)).await.is_err() {
             continue;
         }
