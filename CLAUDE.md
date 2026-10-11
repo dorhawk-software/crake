@@ -856,11 +856,20 @@ built by `scripts/build-openconnect-windows.sh` (unbuffered output, else
 its questions never reach sign-in); the app: no console windows, plain
 DWM frames (no square outline), the panel at the tray. Sign-in, switch
 on and off, and DNS through the tunnel work in the VM.
-To do, in order: learning (connection probing from the TCP table, and
-craked's own DNS server for the tunnels' domains through NRPT rules, so
-names are routed before the first packet), keeping names private and
-answering from memory (the same server), the public-DNS rescue, then the
-installer (phase 5). **Also noted (user):** the panel has no shadow on
+Learning, built and tried in the VM: **connection probing** (the TCP
+table polled four times a second, `flows::changes` makes conntrack's
+events of it; the probe's socket bound to the tunnel, which finds the
+tunnel's own default route, metric 9000, never taken by normal traffic;
+a stuck connection reset with SetTcpEntry) and **craked's own DNS server**
+on 127.53.0.1:53, where NRPT rules (volatile registry keys) send each
+tunnel's domains: it asks the tunnel's DNS through the tunnel, routes the
+answer, then replies (routed before the first packet), and answers
+craked's own links (crake-hush refuses: names kept private while a
+tunnel is off; crake-keep answers from memory). To do: DNS over TCP to
+it, a full tunnel, the public-DNS rescue and split-horizon (craked would
+have to be Windows' default DNS), then the installer (phase 5). A fresh
+probe's first connection fails on Windows (its retry works): Linux's
+retransmitted SYN takes the new route, Windows' stuck one is reset. **Also noted (user):** the panel has no shadow on
 Windows (Linux draws one in its transparent margin), and a few white
 pixels show outside the rounded top corners; both look like GPUI's
 DirectX drawing of transparent windows.
