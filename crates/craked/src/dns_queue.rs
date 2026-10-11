@@ -73,7 +73,7 @@ pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
     Ok(())
 }
 
-async fn handle(mgr: &Manager, mut msg: Message) -> Message {
+async fn handle(mgr: &Arc<Manager>, mut msg: Message) -> Message {
     match device_of(msg.get_indev()).and_then(|d| mgr.tunnel_of_device(&d)) {
         Some(tunnel) => {
             if let Some(answer) = dns::parse_packet(msg.get_payload()) {
@@ -81,7 +81,12 @@ async fn handle(mgr: &Manager, mut msg: Message) -> Message {
             }
         }
         None => {
-            if let Some(packet) = mgr.rescue(msg.get_payload()).await {
+            if let Some(flow) = crate::probe::unreachable(msg.get_payload()) {
+                let mgr = Arc::clone(mgr);
+                tokio::spawn(
+                    async move { mgr.probe(flow, crate::probe::Direct::Unreachable).await },
+                );
+            } else if let Some(packet) = mgr.rescue(msg.get_payload()).await {
                 msg.set_payload(packet);
             }
         }

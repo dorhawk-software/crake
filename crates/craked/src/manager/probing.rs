@@ -112,8 +112,7 @@ impl Manager {
             let took = results[i].flatten().unwrap_or_default();
             if self.asks(name) {
                 let ms = took.as_millis().max(1);
-                let why =
-                    format!("It didn't answer directly. Through {label} it answered in {ms} ms.");
+                let why = format!("{} Through {label} it answered in {ms} ms.", why.said());
                 self.ask_first(name, label, &shown, why, &[dst]);
                 return;
             }
@@ -130,14 +129,7 @@ impl Manager {
             // The app's stuck attempt: forget it, so its next retry is routed afresh.
             let _ = tokio::task::spawn_blocking(move || crate::conntrack::delete(flow)).await;
             let ms = took.as_millis().max(1);
-            let mut reason = match why {
-                Direct::NoAnswer => {
-                    format!("It didn't answer directly. Through {label} it answered in {ms} ms.")
-                }
-                Direct::Refused => {
-                    format!("Refused directly. Through {label} it answered in {ms} ms.")
-                }
-            };
+            let mut reason = format!("{} Through {label} it answered in {ms} ms.", why.said());
             if both == crate::settings::Both::Faster
                 && results
                     .iter()
@@ -194,6 +186,9 @@ impl Manager {
                 format!("It didn't answer directly or through {through}. Probably down.")
             }
             Direct::Refused => format!("Refused directly, and no answer through {through}."),
+            Direct::Unreachable => {
+                format!("Unreachable directly, and no answer through {through}.")
+            }
         };
         let log_tunnel = candidates[0].0.clone();
         self.record_hosts(

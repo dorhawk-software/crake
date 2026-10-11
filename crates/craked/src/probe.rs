@@ -22,6 +22,46 @@ use crate::manager::Manager;
 pub enum Direct {
     NoAnswer,
     Refused,
+    /// A router said it can't reach the host (ICMP), noticed at once
+    /// (`unreachable`), without waiting.
+    Unreachable,
+}
+
+impl Direct {
+    /// How the direct attempt went, for the log's reason.
+    pub fn said(self) -> &'static str {
+        match self {
+            Self::NoAnswer => "It didn't answer directly.",
+            Self::Refused => "Refused directly.",
+            Self::Unreachable => "Unreachable directly.",
+        }
+    }
+}
+
+/// The connection an ICMP "unreachable" is about, when it is about one of
+/// this machine's TCP connections: network or host unreachable, or
+/// prohibited (never "fragmentation needed", which path MTU discovery uses).
+/// It carries the start of the packet that couldn't be delivered.
+pub fn unreachable(packet: &[u8]) -> Option<Flow> {
+    const CODES: [u8; 5] = [0, 1, 9, 10, 13];
+    if packet.len() < 20 || packet[0] >> 4 != 4 || packet[9] != 1 {
+        return None;
+    }
+    let icmp = packet.get(usize::from(packet[0] & 0x0f) * 4..)?;
+    if *icmp.first()? != 3 || !CODES.contains(icmp.get(1)?) {
+        return None;
+    }
+    let inner = icmp.get(8..)?;
+    if inner.len() < 20 || inner[0] >> 4 != 4 || inner[9] != 6 {
+        return None;
+    }
+    let tcp = inner.get(usize::from(inner[0] & 0x0f) * 4..)?;
+    Some(Flow {
+        src: Ipv4Addr::new(inner[12], inner[13], inner[14], inner[15]),
+        dst: Ipv4Addr::new(inner[16], inner[17], inner[18], inner[19]),
+        sport: u16::from_be_bytes([*tcp.first()?, *tcp.get(1)?]),
+        dport: u16::from_be_bytes([*tcp.get(2)?, *tcp.get(3)?]),
+    })
 }
 
 /// Watch for the daemon's lifetime.
@@ -206,6 +246,64 @@ impl Local {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An ICMP "destination unreachable" (`code`) about a SYN from
+    /// 192.168.0.242:40000 to 10.70.0.8:443, as a router sends it.
+    fn icmp(code: u8, inner_proto: u8) -> Vec<u8> {
+        let mut p = vec![
+            0x45, 0, 0, 56, 0, 0, 0, 0, 64, 1, 0, 0, 192, 168, 0, 1, 192, 168, 0, 242,
+        ];
+        p.extend_from_slice(&[3, code, 0, 0, 0, 0, 0, 0]);
+        p.extend_from_slice(&[
+            0x45,
+            0,
+            0,
+            60,
+            0,
+            0,
+            0x40,
+            0,
+            63,
+            inner_proto,
+            0,
+            0,
+            192,
+            168,
+            0,
+            242,
+            10,
+            70,
+            0,
+            8,
+        ]);
+        p.extend_from_slice(&[0x9c, 0x40, 0x01, 0xbb, 0, 0, 0, 1]);
+        p
+    }
+
+    #[test]
+    fn reads_the_connection_an_unreachable_is_about() {
+        let flow = unreachable(&icmp(1, 6)).unwrap();
+        assert_eq!(
+            (flow.src, flow.dst, flow.sport, flow.dport),
+            (
+                Ipv4Addr::new(192, 168, 0, 242),
+                Ipv4Addr::new(10, 70, 0, 8),
+                40000,
+                443
+            )
+        );
+        assert!(unreachable(&icmp(13, 6)).is_some(), "prohibited");
+        assert!(
+            unreachable(&icmp(4, 6)).is_none(),
+            "fragmentation needed: path MTU"
+        );
+        assert!(
+            unreachable(&icmp(3, 6)).is_none(),
+            "port unreachable: not TCP's"
+        );
+        assert!(unreachable(&icmp(1, 17)).is_none(), "about UDP");
+        assert!(unreachable(b"short").is_none());
+    }
 
     #[test]
     fn local_networks() {

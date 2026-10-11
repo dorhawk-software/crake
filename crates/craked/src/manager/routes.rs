@@ -63,7 +63,7 @@ impl Manager {
             })
             .await?;
         self.set_routed(name, true);
-        self.routing.public_up().await?;
+        self.routing.public_up(self.cfg.probing).await?;
         // A tunnel that just came up may know names that failed before.
         self.unknown.lock().unwrap().clear();
         Ok(pinned.len() + learned.len())

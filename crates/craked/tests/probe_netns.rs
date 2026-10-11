@@ -103,6 +103,22 @@ fn tcp_reply(syn: &[u8], flags: u8) -> Vec<u8> {
     ip
 }
 
+/// The router's (192.168.0.1) ICMP "host unreachable" about `syn`.
+fn host_unreachable(syn: &[u8]) -> Vec<u8> {
+    let ihl = usize::from(syn[0] & 0x0f) * 4;
+    let mut icmp = vec![3, 1, 0, 0, 0, 0, 0, 0];
+    icmp.extend_from_slice(&syn[..ihl + 8]);
+    let c = fold(sum16(&icmp));
+    icmp[2..4].copy_from_slice(&c.to_be_bytes());
+    let mut ip = vec![0x45, 0, 0, 0, 0, 0, 0, 0, 64, 1, 0, 0, 192, 168, 0, 1];
+    ip.extend_from_slice(&syn[12..16]);
+    ip[2..4].copy_from_slice(&((20 + icmp.len()) as u16).to_be_bytes());
+    let c = fold(sum16(&ip));
+    ip[10..12].copy_from_slice(&c.to_be_bytes());
+    ip.extend_from_slice(&icmp);
+    ip
+}
+
 /// A SYN (no ACK) in this packet: (destination, port).
 fn syn_of(p: &[u8]) -> Option<(Ipv4Addr, u16)> {
     if p.len() < 40 || p[0] >> 4 != 4 || p[9] != 6 {
@@ -122,6 +138,8 @@ fn syn_of(p: &[u8]) -> Option<(Ipv4Addr, u16)> {
 struct World {
     /// Refused on the internet (RST); everything else there is dropped.
     refuse_direct: HashSet<Ipv4Addr>,
+    /// The router says it can't reach these (ICMP host unreachable).
+    unreachable_direct: HashSet<Ipv4Addr>,
     /// Answered behind the tunnel; everything else there is dropped.
     behind_tunnel: HashSet<Ipv4Addr>,
     /// Every SYN seen leaving through the tunnel.
@@ -134,10 +152,13 @@ fn responder(mut uplink: File, mut tun: File, world: Arc<Mutex<World>>, stop: Ar
         let mut idle = true;
         if let Ok(n) = uplink.read(&mut buf) {
             idle = false;
-            if let Some((dst, _)) = syn_of(&buf[..n])
-                && world.lock().unwrap().refuse_direct.contains(&dst)
-            {
-                uplink.write_all(&tcp_reply(&buf[..n], 0x14)).unwrap();
+            if let Some((dst, _)) = syn_of(&buf[..n]) {
+                let w = world.lock().unwrap();
+                if w.refuse_direct.contains(&dst) {
+                    uplink.write_all(&tcp_reply(&buf[..n], 0x14)).unwrap();
+                } else if w.unreachable_direct.contains(&dst) {
+                    uplink.write_all(&host_unreachable(&buf[..n])).unwrap();
+                }
             }
         }
         if let Ok(n) = tun.read(&mut buf) {
@@ -183,9 +204,11 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
     let world = Arc::new(Mutex::new(World::default()));
     {
         let mut w = world.lock().unwrap();
-        w.behind_tunnel
-            .extend(["10.70.0.5", "10.70.0.6"].map(|a| a.parse::<Ipv4Addr>().unwrap()));
+        w.behind_tunnel.extend(
+            ["10.70.0.5", "10.70.0.6", "10.70.0.8"].map(|a| a.parse::<Ipv4Addr>().unwrap()),
+        );
         w.refuse_direct.insert("10.70.0.6".parse().unwrap());
+        w.unreachable_direct.insert("10.70.0.8".parse().unwrap());
     }
     let stop = Arc::new(AtomicBool::new(false));
     let responder = {
@@ -237,19 +260,31 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
 
-    let (silent, refused, down, lan, never) = tokio::task::spawn_blocking(|| {
+    let (silent, refused, unreachable, down, lan, never) = tokio::task::spawn_blocking(|| {
         // 1. No answer directly: the app's own attempt ends up connected.
         let silent = connect("10.70.0.5", 5432, Duration::from_secs(12));
         // 2. Refused directly: that attempt fails, the next goes through.
         let refused_first = connect("10.70.0.6", 443, Duration::from_secs(5));
         std::thread::sleep(Duration::from_millis(1500));
         let refused_again = connect("10.70.0.6", 443, Duration::from_secs(5));
+        // 2b. The router says unreachable: tried through the tunnel at once,
+        //     sooner than the wait (1 s), so the next attempt goes through.
+        let unreachable_first = connect("10.70.0.8", 443, Duration::from_secs(2));
+        std::thread::sleep(Duration::from_millis(400));
+        let unreachable_again = connect("10.70.0.8", 443, Duration::from_millis(500));
         // 3. Down everywhere. 4. The local network. 5. The never list.
         let down = connect("10.70.0.7", 22, Duration::from_secs(1));
         let lan = connect("192.168.0.50", 80, Duration::from_secs(1));
         let never = connect("10.70.9.9", 80, Duration::from_secs(1));
         std::thread::sleep(Duration::from_secs(5)); // probe wait + probe timeout
-        (silent, (refused_first, refused_again), down, lan, never)
+        (
+            silent,
+            (refused_first, refused_again),
+            (unreachable_first, unreachable_again),
+            down,
+            lan,
+            never,
+        )
     })
     .await
     .unwrap();
@@ -274,6 +309,17 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
         again.0,
         world.lock().unwrap().tunnel_syns,
         std::fs::read_to_string(dir.path().join("log")).unwrap_or_default()
+    );
+    let (first, again) = unreachable;
+    assert!(
+        first.0.is_err(),
+        "the router said unreachable: {:?}",
+        first.0
+    );
+    assert!(
+        again.0.is_ok(),
+        "probed at once, before the wait: {:?}",
+        again.0
     );
     assert!(down.0.is_err() && lan.0.is_err() && never.0.is_err());
 
@@ -314,6 +360,8 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
         "It didn't answer directly. Through ACME it answered in",
         "Sent 10.70.0.6 through ACME.",
         "Refused directly. Through ACME it answered in",
+        "Sent 10.70.0.8 through ACME.",
+        "Unreachable directly. Through ACME it answered in",
         "Left 10.70.0.7 alone.",
         "It didn't answer directly or through ACME. Probably down.",
         "10.70.0.5 goes direct again.",

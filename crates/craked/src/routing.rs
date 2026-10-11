@@ -271,9 +271,20 @@ impl Routing {
     }
 
     /// Watch public DNS answers (everything not from a tunnel or loopback) so
-    /// names that fail publicly can be asked of the tunnels. Idempotent.
-    pub async fn public_up(&self) -> Result<()> {
+    /// names that fail publicly can be asked of the tunnels; with `probing`,
+    /// also routers' "unreachable" notices, so a host one can't reach is
+    /// tried through the tunnels at once (`probe::unreachable`). Idempotent.
+    pub async fn public_up(&self, probing: bool) -> Result<()> {
         let Self::Real = self else { return Ok(()) };
+        let unreachable = if probing {
+            format!(
+                "add rule inet {TABLE} public_dns meta nfproto ipv4 icmp type destination-unreachable \
+                 icmp code {{ net-unreachable, host-unreachable, net-prohibited, host-prohibited, admin-prohibited }} \
+                 queue num {QUEUE_NUM} bypass\n"
+            )
+        } else {
+            String::new()
+        };
         nft(&format!(
             "add table inet {TABLE}\n\
              add chain inet {TABLE} public_dns {{ type filter hook input priority filter; policy accept; }}\n\
@@ -282,7 +293,8 @@ impl Routing {
              add rule inet {TABLE} public_dns iifname \"lo\" return\n\
              add rule inet {TABLE} public_dns iifname \"crake-*\" return\n\
              add rule inet {TABLE} public_dns iifname @{TUNNEL_DEVICES} return\n\
-             add rule inet {TABLE} public_dns meta nfproto ipv4 udp sport 53 queue num {QUEUE_NUM} bypass\n"
+             add rule inet {TABLE} public_dns meta nfproto ipv4 udp sport 53 queue num {QUEUE_NUM} bypass\n\
+             {unreachable}"
         ))
         .await
     }

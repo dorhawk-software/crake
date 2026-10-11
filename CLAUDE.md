@@ -214,7 +214,11 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    gateway, already-routed hosts, the `never` list, hosts probed in the last
    10 min. Undo = send direct and keep direct (per tunnel) until redo; DNS
    learning respects it too. Recent public DNS answers give log lines a name.
-   Still open: UDP, IPv6, ICMP-unreachable is only noticed after the wait.
+   A router's ICMP "unreachable" (net, host, prohibited; never
+   "fragmentation needed") from outside the tunnels goes to the same queue
+   as DNS answers and starts the probe at once: "Unreachable directly.
+   Through ACME it answered in 31 ms." (netns-tested).
+   Still open: UDP, IPv6.
 5. Multiple simultaneous tunnels, try order, conflict handling.
    **Requested:** detect tunnels that can't be up together. When switching a
    tunnel on, compare what it pushes with the tunnels already up: its own
