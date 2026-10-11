@@ -4,7 +4,21 @@ use anyhow::{Context, Result, bail};
 use crake_proto::{DEFAULT_HOOK_PATH, DEFAULT_HOOK_SOCKET, valid_tunnel_name};
 use serde::Deserialize;
 
+#[cfg(unix)]
 pub const DEFAULT_CONFIG: &str = "/etc/crake/craked.toml";
+#[cfg(windows)]
+pub const DEFAULT_CONFIG: &str = r"C:\ProgramData\Crake\craked.toml";
+
+/// Where craked keeps its state and log.
+#[cfg(unix)]
+const STATE_DIR: &str = "/var/lib/crake";
+#[cfg(windows)]
+const STATE_DIR: &str = r"C:\ProgramData\Crake";
+/// IT's managed tunnels.
+#[cfg(unix)]
+const MANAGED_DIR: &str = "/etc/crake/managed.d";
+#[cfg(windows)]
+const MANAGED_DIR: &str = r"C:\ProgramData\Crake\managed.d";
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -247,13 +261,13 @@ fn default_openconnect() -> PathBuf {
     "openconnect".into()
 }
 fn default_log_path() -> PathBuf {
-    "/var/lib/crake/log".into()
+    PathBuf::from(STATE_DIR).join("log")
 }
 fn default_state_path() -> PathBuf {
-    "/var/lib/crake/hosts.json".into()
+    PathBuf::from(STATE_DIR).join("hosts.json")
 }
 fn default_managed_dir() -> PathBuf {
-    "/etc/crake/managed.d".into()
+    MANAGED_DIR.into()
 }
 fn default_expiry_days() -> u64 {
     7

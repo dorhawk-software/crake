@@ -8,6 +8,7 @@ use craked::config::{Config, DEFAULT_CONFIG};
 use craked::manager::Manager;
 use craked::{auth, dbus, hook_server};
 use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::sync::oneshot;
 
 #[derive(Parser)]
 #[command(version, about = "Crake system daemon")]
@@ -26,17 +27,40 @@ struct Args {
     /// and switches tunnels; Ctrl+C or SIGTERM switches everything off.
     #[arg(long, conflicts_with = "connect")]
     dev: bool,
+    /// Windows: run in this console rather than as the craked service.
+    #[cfg(windows)]
+    #[arg(long)]
+    console: bool,
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
-        )
-        .init();
+fn main() -> Result<()> {
     let args = Args::parse();
+    #[cfg(windows)]
+    if !args.console && args.connect.is_none() {
+        return service::run(args);
+    }
+    log_to(None);
+    run(args, None)
+}
 
+/// Log to stderr, or to `file` (a service has no console).
+fn log_to(file: Option<std::fs::File>) {
+    let filter =
+        tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
+    match file {
+        Some(file) => tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .with_ansi(false)
+            .with_writer(std::sync::Mutex::new(file))
+            .init(),
+        None => tracing_subscriber::fmt().with_env_filter(filter).init(),
+    }
+}
+
+/// The daemon, until it's stopped: SIGTERM or Ctrl+C, or `external` (the
+/// Windows service manager).
+#[tokio::main]
+async fn run(args: Args, external: Option<oneshot::Receiver<()>>) -> Result<()> {
     let cfg = if args.config.exists() {
         Config::load(&args.config)?
     } else if args.connect.is_some() {
@@ -53,22 +77,23 @@ async fn main() -> Result<()> {
     mgr.init().await?;
     let _hook = hook_server::serve(mgr.clone(), &socket)?;
 
-    let mut stop = Stop::new()?;
+    let mut stop = Stop::new(external)?;
 
     if let Some(name) = args.connect {
-        // The Crake app (run as the user who ran sudo) talks to this run over
-        // a private socket in their runtime directory.
-        let ui_socket = ui_socket();
-        if let Some((path, uid)) = &ui_socket {
-            match dbus::serve_p2p(mgr.clone(), path, *uid) {
-                Ok(()) => println!("The Crake app can connect now (cargo run -p crake)."),
-                Err(e) => eprintln!("No app connection: {e:#}"),
+        let app = match serve_app(&mgr).await {
+            Ok(app) => {
+                println!("The Crake app can connect now (cargo run -p crake).");
+                app
             }
-        }
+            Err(e) => {
+                eprintln!("No app connection: {e:#}");
+                None
+            }
+        };
         let result = try_tunnel(&mgr, &name, &mut stop).await;
         mgr.shutdown().await;
         let _ = std::fs::remove_file(&socket);
-        if let Some((path, _)) = &ui_socket {
+        if let Some(path) = &app {
             let _ = std::fs::remove_file(path);
         }
         println!("Log: {}", mgr.config().log_path.display());
@@ -82,21 +107,23 @@ async fn main() -> Result<()> {
     }
 
     if args.dev {
-        let Some((path, uid)) = ui_socket() else {
-            bail!("--dev needs sudo (SUDO_UID) and the user's /run/user directory");
-        };
-        dbus::serve_p2p(mgr.clone(), &path, uid)?;
+        let app = serve_app(&mgr).await?;
         println!("Crake is running for the app (cargo run -p crake). Ctrl+C stops it.");
         stop.recv().await;
         println!("Switching everything off...");
         mgr.shutdown().await;
         let _ = std::fs::remove_file(&socket);
-        let _ = std::fs::remove_file(&path);
+        if let Some(path) = &app {
+            let _ = std::fs::remove_file(path);
+        }
         // The runtime would wait for nothing useful; end here.
         std::process::exit(0);
     }
 
+    #[cfg(unix)]
     let _bus = dbus::serve(mgr.clone(), !args.session_bus).await?;
+    #[cfg(windows)]
+    dbus::serve_local(mgr.clone(), crake_proto::APP_ADDRESS).await?;
     tracing::info!("craked {} ready", env!("CARGO_PKG_VERSION"));
     // A package upgrade: the tunnels the previous craked handed over.
     mgr.resume_after_update().await;
@@ -107,28 +134,30 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// What stops craked: SIGTERM (systemd) or Ctrl+C. Windows: Ctrl+C until
-/// craked runs as a service (phase 3 of the Windows plan in CLAUDE.md).
+/// What stops craked: SIGTERM (systemd) or Ctrl+C, or the service manager
+/// (Windows).
 struct Stop {
     #[cfg(unix)]
     term: tokio::signal::unix::Signal,
     #[cfg(unix)]
     int: tokio::signal::unix::Signal,
+    external: Option<oneshot::Receiver<()>>,
 }
 
 impl Stop {
     #[cfg(unix)]
-    fn new() -> Result<Self> {
+    fn new(external: Option<oneshot::Receiver<()>>) -> Result<Self> {
         use tokio::signal::unix::{SignalKind, signal};
         Ok(Self {
             term: signal(SignalKind::terminate())?,
             int: signal(SignalKind::interrupt())?,
+            external,
         })
     }
 
     #[cfg(windows)]
-    fn new() -> Result<Self> {
-        Ok(Self {})
+    fn new(external: Option<oneshot::Receiver<()>>) -> Result<Self> {
+        Ok(Self { external })
     }
 
     #[cfg(unix)]
@@ -136,16 +165,49 @@ impl Stop {
         tokio::select! {
             _ = self.term.recv() => {}
             _ = self.int.recv() => {}
+            () = external(&mut self.external) => {}
         }
     }
 
     #[cfg(windows)]
     async fn recv(&mut self) {
-        let _ = tokio::signal::ctrl_c().await;
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            () = external(&mut self.external) => {}
+        }
     }
 }
 
+/// The service manager's stop, or never.
+async fn external(rx: &mut Option<oneshot::Receiver<()>>) {
+    match rx {
+        Some(rx) => {
+            let _ = rx.await;
+        }
+        None => std::future::pending().await,
+    }
+}
+
+/// Serve the Crake app for a run started by hand. Linux: a private socket
+/// for the user who ran sudo, returned to be removed when done. Windows:
+/// the loopback port, as the service does.
+#[cfg(unix)]
+async fn serve_app(mgr: &Arc<Manager>) -> Result<Option<PathBuf>> {
+    let Some((path, uid)) = ui_socket() else {
+        bail!("the app needs sudo (SUDO_UID) and the user's /run/user directory");
+    };
+    dbus::serve_p2p(mgr.clone(), &path, uid)?;
+    Ok(Some(path))
+}
+
+#[cfg(windows)]
+async fn serve_app(mgr: &Arc<Manager>) -> Result<Option<PathBuf>> {
+    dbus::serve_local(mgr.clone(), crake_proto::APP_ADDRESS).await?;
+    Ok(None)
+}
+
 /// `/run/user/<uid>/crake-dev.sock` for the user who ran sudo.
+#[cfg(unix)]
 fn ui_socket() -> Option<(PathBuf, u32)> {
     let uid: u32 = std::env::var("SUDO_UID").ok()?.parse().ok()?;
     let dir = PathBuf::from(format!("/run/user/{uid}"));
@@ -275,5 +337,96 @@ fn human(secs: u64) -> String {
         s if s >= 86_400 => format!("{}d {}h", s / 86_400, s % 86_400 / 3600),
         s if s >= 3600 => format!("{}h {}m", s / 3600, s % 3600 / 60),
         s => format!("{}m", s.div_ceil(60)),
+    }
+}
+
+/// Windows: craked as a service (`crake_proto::SERVICE_NAME`), logging to
+/// craked.log beside its config.
+#[cfg(windows)]
+mod service {
+    use std::ffi::OsString;
+    use std::sync::Mutex;
+    use std::time::Duration;
+
+    use anyhow::Result;
+    use crake_proto::SERVICE_NAME;
+    use windows_service::service::{
+        ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
+        ServiceType,
+    };
+    use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
+    use windows_service::{define_windows_service, service_dispatcher};
+
+    /// The arguments, from `run` to the service's own thread.
+    static ARGS: Mutex<Option<super::Args>> = Mutex::new(None);
+
+    define_windows_service!(ffi_service_main, service_main);
+
+    /// Run under the service manager. Started any other way (a console),
+    /// run there instead.
+    pub fn run(args: super::Args) -> Result<()> {
+        *ARGS.lock().unwrap() = Some(args);
+        match service_dispatcher::start(SERVICE_NAME, ffi_service_main) {
+            Ok(()) => Ok(()),
+            // ERROR_FAILED_SERVICE_CONTROLLER_CONNECT: not a service.
+            Err(windows_service::Error::Winapi(e)) if e.raw_os_error() == Some(1063) => {
+                super::log_to(None);
+                let args = ARGS.lock().unwrap().take().expect("set above");
+                super::run(args, None)
+            }
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    fn service_main(_: Vec<OsString>) {
+        let log = std::path::Path::new(super::DEFAULT_CONFIG).with_file_name("craked.log");
+        if let Some(dir) = log.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        super::log_to(
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&log)
+                .ok(),
+        );
+        if let Err(e) = serve() {
+            tracing::error!("craked: {e:#}");
+        }
+    }
+
+    fn serve() -> Result<()> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let tx = Mutex::new(Some(tx));
+        let status =
+            service_control_handler::register(SERVICE_NAME, move |control| match control {
+                ServiceControl::Stop | ServiceControl::Shutdown => {
+                    if let Some(tx) = tx.lock().unwrap().take() {
+                        let _ = tx.send(());
+                    }
+                    ServiceControlHandlerResult::NoError
+                }
+                ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
+                _ => ServiceControlHandlerResult::NotImplemented,
+            })?;
+        let report = |state, accept| {
+            status.set_service_status(ServiceStatus {
+                service_type: ServiceType::OWN_PROCESS,
+                current_state: state,
+                controls_accepted: accept,
+                exit_code: ServiceExitCode::Win32(0),
+                checkpoint: 0,
+                wait_hint: Duration::from_secs(15),
+                process_id: None,
+            })
+        };
+        report(
+            ServiceState::Running,
+            ServiceControlAccept::STOP | ServiceControlAccept::SHUTDOWN,
+        )?;
+        let args = ARGS.lock().unwrap().take().expect("set by run");
+        let result = super::run(args, Some(rx));
+        report(ServiceState::Stopped, ServiceControlAccept::empty())?;
+        result
     }
 }

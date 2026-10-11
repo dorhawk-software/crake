@@ -75,6 +75,11 @@ pub fn executable(path: &Path) -> bool {
         .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
 }
 
+/// The installed craked, on the system bus (not peer to peer).
+pub async fn connect_craked() -> zbus::Result<(zbus::Connection, bool)> {
+    Ok((zbus::Connection::system().await?, false))
+}
+
 /// craked's private socket (development: `craked --dev`).
 pub async fn connect_dev(path: &Path) -> zbus::Result<zbus::Connection> {
     let stream = tokio::net::UnixStream::connect(path).await?;

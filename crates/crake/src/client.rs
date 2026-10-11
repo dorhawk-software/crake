@@ -162,7 +162,7 @@ fn dev_socket() -> Option<PathBuf> {
 async fn connect(socket: Option<&Path>) -> zbus::Result<(Connection, bool)> {
     match socket.map(Path::to_path_buf).or_else(dev_socket) {
         Some(path) => Ok((crate::sys::connect_dev(&path).await?, true)),
-        None => Ok((Connection::system().await?, false)),
+        None => crate::sys::connect_craked().await,
     }
 }
 

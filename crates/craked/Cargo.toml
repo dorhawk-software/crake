@@ -39,5 +39,10 @@ hickory-proto = { version = "0.26", default-features = false, features = ["std"]
 [target.'cfg(target_os = "linux")'.dependencies]
 nfq-updated = "0.2.6"
 
+# Windows: the service, openconnect's console, the console session.
+[target.'cfg(windows)'.dependencies]
+windows-service = "0.8"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Console", "Win32_System_RemoteDesktop", "Win32_System_Threading"] }
+
 [dev-dependencies]
 tempfile = "3"

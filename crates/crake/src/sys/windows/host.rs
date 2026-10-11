@@ -88,7 +88,113 @@ pub fn executable(path: &Path) -> bool {
     path.is_file() || (path.extension().is_none() && path.with_extension("exe").is_file())
 }
 
-/// craked's private socket: not on Windows yet (phase 3).
+/// craked's private socket: Linux's development setup only.
 pub async fn connect_dev(_path: &Path) -> zbus::Result<zbus::Connection> {
     Err(zbus::Error::Unsupported)
+}
+
+/// The craked service, on its loopback port (`APP_ADDRESS`), peer to peer.
+/// Only once the port is the service's: any program may listen on a
+/// loopback port, and Crake tells craked its sign-ins. `CRAKE_DEV`: a
+/// craked started by hand (`craked --console`) is trusted too.
+pub async fn connect_craked() -> zbus::Result<(zbus::Connection, bool)> {
+    let address: std::net::SocketAddrV4 = crake_proto::APP_ADDRESS
+        .parse()
+        .map_err(|_| zbus::Error::Address(crake_proto::APP_ADDRESS.into()))?;
+    let stream = tokio::net::TcpStream::connect(address).await?;
+    if std::env::var_os("CRAKE_DEV").is_none() {
+        let listener = listening_pid(address);
+        let service = service_pid(crake_proto::SERVICE_NAME);
+        if listener.is_none() || listener != service {
+            return Err(zbus::Error::Failure(format!(
+                "{address} isn't the craked service's"
+            )));
+        }
+    }
+    let conn = zbus::connection::Builder::tcp_stream(stream)
+        .p2p()
+        .build()
+        .await?;
+    Ok((conn, true))
+}
+
+/// The process listening on `address` (TCP, IPv4).
+fn listening_pid(address: std::net::SocketAddrV4) -> Option<u32> {
+    use windows_sys::Win32::NetworkManagement::IpHelper::{
+        GetExtendedTcpTable, MIB_TCPROW_OWNER_PID, MIB_TCPTABLE_OWNER_PID,
+        TCP_TABLE_OWNER_PID_LISTENER,
+    };
+    use windows_sys::Win32::Networking::WinSock::AF_INET;
+    let mut size = 0;
+    // SAFETY: a size query (null table); then a table of that size.
+    unsafe {
+        GetExtendedTcpTable(
+            std::ptr::null_mut(),
+            &raw mut size,
+            0,
+            u32::from(AF_INET),
+            TCP_TABLE_OWNER_PID_LISTENER,
+            0,
+        );
+    }
+    let mut buf = vec![0u64; (size as usize).div_ceil(8)];
+    // SAFETY: `buf` holds `size` bytes, 8-byte aligned.
+    let got = unsafe {
+        GetExtendedTcpTable(
+            buf.as_mut_ptr().cast(),
+            &raw mut size,
+            0,
+            u32::from(AF_INET),
+            TCP_TABLE_OWNER_PID_LISTENER,
+            0,
+        )
+    };
+    if got != 0 {
+        return None;
+    }
+    // SAFETY: Windows filled `buf` with a MIB_TCPTABLE_OWNER_PID.
+    let table = unsafe { &*buf.as_ptr().cast::<MIB_TCPTABLE_OWNER_PID>() };
+    // SAFETY: `dwNumEntries` rows follow the header in `buf`.
+    let rows: &[MIB_TCPROW_OWNER_PID] =
+        unsafe { std::slice::from_raw_parts(table.table.as_ptr(), table.dwNumEntries as usize) };
+    rows.iter()
+        .find(|r| {
+            // Network byte order: the address as it sits in memory, the
+            // port in the low 16 bits.
+            std::net::Ipv4Addr::from(r.dwLocalAddr.to_ne_bytes()) == *address.ip()
+                && u16::from_be(r.dwLocalPort as u16) == address.port()
+        })
+        .map(|r| r.dwOwningPid)
+}
+
+/// The process of a running service.
+fn service_pid(name: &str) -> Option<u32> {
+    use windows_sys::Win32::System::Services::{
+        CloseServiceHandle, OpenSCManagerW, OpenServiceW, QueryServiceStatusEx, SC_MANAGER_CONNECT,
+        SC_STATUS_PROCESS_INFO, SERVICE_QUERY_STATUS, SERVICE_STATUS_PROCESS,
+    };
+    let name: Vec<u16> = name.encode_utf16().chain([0]).collect();
+    // SAFETY: handles are closed before returning; `status` is sized.
+    unsafe {
+        let manager = OpenSCManagerW(std::ptr::null(), std::ptr::null(), SC_MANAGER_CONNECT);
+        if manager.is_null() {
+            return None;
+        }
+        let service = OpenServiceW(manager, name.as_ptr(), SERVICE_QUERY_STATUS);
+        let mut status: SERVICE_STATUS_PROCESS = std::mem::zeroed();
+        let mut needed = 0;
+        let ok = !service.is_null()
+            && QueryServiceStatusEx(
+                service,
+                SC_STATUS_PROCESS_INFO,
+                (&raw mut status).cast(),
+                size_of::<SERVICE_STATUS_PROCESS>() as u32,
+                &raw mut needed,
+            ) != 0;
+        if !service.is_null() {
+            CloseServiceHandle(service);
+        }
+        CloseServiceHandle(manager);
+        (ok && status.dwProcessId != 0).then_some(status.dwProcessId)
+    }
 }

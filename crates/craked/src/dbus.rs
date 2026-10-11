@@ -16,8 +16,21 @@ pub const POLKIT_ACTION: &str = "software.dorhawk.crake.manage-tunnels";
 
 pub struct Service {
     mgr: Arc<Manager>,
-    /// Off on the session bus (development), where there is no polkit to ask.
-    polkit: bool,
+    guard: Guard,
+}
+
+/// Who may change things (reading is open to every caller that got in).
+#[derive(Clone, Copy)]
+enum Guard {
+    /// Whoever can open the socket (the session bus, or a development
+    /// socket only its owner can open).
+    Open,
+    /// Linux's system bus: polkit's `manage-tunnels`.
+    Polkit,
+    /// Windows' loopback port: a process in the console session (the
+    /// counterpart of polkit's active session).
+    #[cfg(windows)]
+    ConsoleSession,
 }
 
 #[interface(name = "software.dorhawk.Crake1")]
@@ -367,8 +380,11 @@ impl Service {
 
 impl Service {
     async fn authorize(&self, hdr: &Header<'_>, conn: &Connection) -> fdo::Result<()> {
-        if !self.polkit {
-            return Ok(());
+        match self.guard {
+            Guard::Open => return Ok(()),
+            Guard::Polkit => {}
+            #[cfg(windows)]
+            Guard::ConsoleSession => return in_console_session(conn).await,
         }
         let sender = hdr
             .sender()
@@ -380,6 +396,19 @@ impl Service {
             )),
             Err(e) => Err(fdo::Error::AccessDenied(format!("polkit: {e}"))),
         }
+    }
+}
+
+/// The caller runs in the console session (Windows).
+#[cfg(windows)]
+async fn in_console_session(conn: &Connection) -> fdo::Result<()> {
+    let pid = conn.peer_creds().await.ok().and_then(|c| c.process_id());
+    if pid.is_some_and(crate::sys::in_console_session) {
+        Ok(())
+    } else {
+        Err(fdo::Error::AccessDenied(
+            "only the signed-in user can switch tunnels".into(),
+        ))
     }
 }
 
@@ -531,7 +560,11 @@ fn to_dict(s: &Snapshot) -> HashMap<String, OwnedValue> {
 pub async fn serve(mgr: Arc<Manager>, system_bus: bool) -> zbus::Result<Connection> {
     let service = Service {
         mgr: Arc::clone(&mgr),
-        polkit: system_bus,
+        guard: if system_bus {
+            Guard::Polkit
+        } else {
+            Guard::Open
+        },
     };
     let builder = if system_bus {
         zbus::connection::Builder::system()?
@@ -566,7 +599,7 @@ pub fn serve_p2p(mgr: Arc<Manager>, path: &std::path::Path, owner: u32) -> anyho
             tokio::spawn(async move {
                 let service = Service {
                     mgr: Arc::clone(&mgr),
-                    polkit: false,
+                    guard: Guard::Open,
                 };
                 let built = async {
                     zbus::connection::Builder::unix_stream(stream)
@@ -586,10 +619,39 @@ pub fn serve_p2p(mgr: Arc<Manager>, path: &std::path::Path, owner: u32) -> anyho
     Ok(())
 }
 
-/// Windows: the app's named pipe (phase 3 of the Windows plan in CLAUDE.md).
+/// Windows: the same API on a loopback port (`crake_proto::APP_ADDRESS`).
+/// zbus learns each caller's account from the connection (EXTERNAL with
+/// the process's SID); changes need the console session.
 #[cfg(windows)]
-pub fn serve_p2p(_mgr: Arc<Manager>, _path: &std::path::Path, _owner: u32) -> anyhow::Result<()> {
-    Err(crate::sys::not_yet("the app's pipe"))
+pub async fn serve_local(mgr: Arc<Manager>, address: &str) -> anyhow::Result<()> {
+    let listener = tokio::net::TcpListener::bind(address).await?;
+    tokio::spawn(async move {
+        loop {
+            let Ok((stream, _)) = listener.accept().await else {
+                return;
+            };
+            let mgr = Arc::clone(&mgr);
+            tokio::spawn(async move {
+                let service = Service {
+                    mgr: Arc::clone(&mgr),
+                    guard: Guard::ConsoleSession,
+                };
+                let built = async {
+                    zbus::connection::Builder::tcp_stream(stream)
+                        .server(zbus::Guid::generate())?
+                        .p2p()
+                        .serve_at(BUS_PATH, service)?
+                        .build()
+                        .await
+                };
+                match built.await {
+                    Ok(conn) => relay(conn, mgr),
+                    Err(e) => tracing::warn!("app connection: {e}"),
+                }
+            });
+        }
+    });
+    Ok(())
 }
 
 /// Tunnel state changes and new log entries, as signals on `conn`.

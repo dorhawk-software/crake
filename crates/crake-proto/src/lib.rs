@@ -5,9 +5,26 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 /// Where `craked` listens for the hook, unless configured otherwise.
+#[cfg(unix)]
 pub const DEFAULT_HOOK_SOCKET: &str = "/run/crake/hook.sock";
+/// Windows: a named pipe.
+#[cfg(windows)]
+pub const DEFAULT_HOOK_SOCKET: &str = r"\\.\pipe\crake-hook";
 /// Where the hook binary is installed.
+#[cfg(unix)]
 pub const DEFAULT_HOOK_PATH: &str = "/usr/libexec/crake/hook";
+/// Windows: openconnect runs its script through cscript.exe, so the hook
+/// is a JScript shim that starts crake-hook.exe beside it.
+#[cfg(windows)]
+pub const DEFAULT_HOOK_PATH: &str = r"C:\Program Files\Crake\crake-hook.js";
+/// Windows: where craked serves the app (D-Bus, loopback only; the app
+/// checks it's the `craked` service listening, craked that the caller is
+/// in the console session).
+#[cfg(windows)]
+pub const APP_ADDRESS: &str = "127.0.0.1:47366";
+/// Windows: craked's service name.
+#[cfg(windows)]
+pub const SERVICE_NAME: &str = "craked";
 /// Set by `craked` in openconnect's environment so the hook knows which tunnel it serves.
 pub const ENV_TUNNEL: &str = "CRAKE_TUNNEL";
 /// Overrides the hook socket path (used by the hook and by tests).
