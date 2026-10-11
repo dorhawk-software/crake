@@ -632,12 +632,18 @@ pub(super) fn forward_output(child: &mut Child, output: Output) {
     }
 }
 
+/// Windows: cscript.exe, which runs the hook's script, greets each time.
+fn script_host_banner(line: &str) -> bool {
+    line.starts_with("Microsoft (R) Windows Script Host")
+        || line.starts_with("Copyright (C) Microsoft Corporation")
+}
+
 pub(super) async fn pump<R: tokio::io::AsyncRead + Unpin>(r: BufReader<R>, o: Output) {
     let mut lines = r.lines();
     // Once UDP has worked here, a later hiccup isn't a blocked network.
     let mut udp_worked = false;
     while let Ok(Some(line)) = lines.next_line().await {
-        if line.trim().is_empty() {
+        if line.trim().is_empty() || script_host_banner(&line) {
             continue;
         }
         tracing::info!(target: "openconnect", tunnel = %o.tunnel, "{line}");

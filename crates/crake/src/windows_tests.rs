@@ -1,0 +1,284 @@
+//! Windows, end to end: the installed craked service (Program Files\Crake,
+//! as a person would have it), the app's own client and sign-in with the
+//! openconnect beside it, against a real gateway: ocserv with ACME's
+//! network behind it, as in `e2e_tests.rs`.
+//!
+//! Skipped unless CRAKE_E2E=1; run it with `scripts/windows-vm-test.sh`,
+//! which installs Crake in a throwaway Windows VM wired only to a gateway VM.
+
+use std::collections::HashMap;
+use std::net::{IpAddr, ToSocketAddrs};
+use std::time::{Duration, Instant};
+
+use crate::client::{self, Command};
+use crate::test_app::{App, connected, enabled, get, off, sign_in};
+
+/// The craked service's own log.
+const LOG: &str = r"C:\ProgramData\Crake\craked.log";
+
+/// PowerShell's answer to `cmd`.
+fn ps(cmd: &str) -> String {
+    let out = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", cmd])
+        .output()
+        .unwrap();
+    String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr)
+}
+
+/// The addresses Windows' own resolver gives `name` (as any app asks), or
+/// why it gave none.
+fn resolve(name: &str) -> Result<Vec<IpAddr>, String> {
+    (name, 80)
+        .to_socket_addrs()
+        .map(|a| a.map(|a| a.ip()).collect())
+        .map_err(|e| e.to_string())
+}
+
+/// `get` until it answers or `wait` is over: an app retrying.
+fn get_within(ip: &str, wait: Duration) -> (Option<String>, u32) {
+    let end = Instant::now() + wait;
+    let mut tries = 0;
+    while Instant::now() < end {
+        tries += 1;
+        match get(ip, Duration::from_secs(4)) {
+            Ok(body) => return (Some(body), tries),
+            Err(e) => eprintln!("  {ip}: {e}"),
+        }
+    }
+    (None, tries)
+}
+
+/// The routes on an interface, one prefix a line.
+fn routes(alias: &str) -> String {
+    ps(&format!(
+        "Get-NetRoute -InterfaceAlias {alias} -AddressFamily IPv4 -ErrorAction SilentlyContinue | \
+         ForEach-Object {{ $_.DestinationPrefix }}"
+    ))
+}
+
+/// The app connected to the craked service, with a tunnel `name` freshly
+/// added (New tunnel's "Add") to the test gateway, with `more` fields.
+async fn added(name: &str, display: &str, more: &[(&str, &str)]) -> App {
+    let (tx, updates) = async_channel::unbounded();
+    let mut app = App::new(client::start(tx), updates);
+    app.within(Duration::from_secs(30), "the craked service", |m| {
+        m.reachable == Some(true) && !m.settings.is_empty()
+    })
+    .await;
+    if app.state(name).is_some() {
+        app.send(Command::RemoveTunnel(name.into()));
+        app.until("an old one gone", |m| {
+            !m.tunnels.iter().any(|t| t.name == name)
+        })
+        .await;
+    }
+    let gateway = crate::test_app::gateway();
+    let fields: HashMap<String, String> = [
+        ("display_name", display),
+        ("gateway", &gateway),
+        ("protocol", "anyconnect"),
+        ("user", "alice"),
+    ]
+    .iter()
+    .chain(more)
+    .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+    .collect();
+    app.send(Command::AddTunnel(fields));
+    app.until("added", |m| m.tunnels.iter().any(|t| t.name == name))
+        .await;
+    app
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_installed_service_end_to_end() {
+    if !enabled() {
+        return;
+    }
+    let log_from = std::fs::metadata(LOG).map_or(0, |m| m.len());
+    let mut app = added("acme", "ACME", &[]).await;
+
+    // Nothing reaches ACME's network before the tunnel.
+    let before = tokio::task::spawn_blocking(|| get("10.40.1.10", Duration::from_secs(1)))
+        .await
+        .unwrap();
+    assert!(before.is_err(), "10.40.1.10 answered without a tunnel");
+
+    // Sign in as the app does, then switch on with that session.
+    let session = sign_in().await;
+    app.send(Command::ConnectWithSession("acme".into(), session));
+    app.within(Duration::from_secs(30), "ACME connected", connected)
+        .await;
+
+    // Its address on its own adapter; nothing routed but its DNS, although
+    // the gateway pushes 10.40.0.0/16.
+    let addr = ps("(Get-NetIPAddress -InterfaceAlias crake-acme -AddressFamily IPv4).IPAddress");
+    assert!(addr.contains("10.40.255."), "crake-acme's address: {addr}");
+    let routes = routes("crake-acme");
+    assert!(!routes.contains("10.40.0.0/16"), "routes: {routes}");
+    assert!(routes.contains("10.40.0.2/32"), "routes: {routes}");
+
+    // 1. A host that doesn't answer directly: probed, and the app gets
+    //    through on a retry at the latest.
+    let (probed, tries) =
+        tokio::task::spawn_blocking(|| get_within("10.40.1.10", Duration::from_secs(20)))
+            .await
+            .unwrap();
+    assert!(
+        probed.is_some_and(|b| b.contains("crex")),
+        "git.acme.internal's page"
+    );
+    eprintln!("  10.40.1.10 answered on try {tries}");
+    app.until("the probe's decision", |m| {
+        m.log
+            .iter()
+            .any(|e| e.message == "Sent 10.40.1.10 through ACME.")
+    })
+    .await;
+
+    // 2. A name only ACME's DNS knows, asked of Windows' resolver (NRPT →
+    //    craked's DNS): routed before the first packet.
+    let named = tokio::task::spawn_blocking(|| {
+        let addrs = resolve("wiki.acme.internal")?;
+        assert!(
+            addrs.contains(&IpAddr::from([10, 40, 1, 11])),
+            "wiki.acme.internal is {addrs:?}"
+        );
+        // Shorter than the probe wait: only a route in place before the
+        // first packet gets through this fast.
+        get("10.40.1.11", Duration::from_millis(800)).map_err(|e| e.to_string())
+    })
+    .await
+    .unwrap();
+    assert!(
+        named.is_ok_and(|b| b.contains("crex")),
+        "wiki.acme.internal's page at once"
+    );
+
+    // Over TCP too (Windows asks again over TCP when an answer was cut).
+    let tcp = ps("(Resolve-DnsName -Name git.acme.internal -Type A -TcpOnly -DnsOnly).IPAddress");
+    assert!(
+        tcp.contains("10.40.1.10"),
+        "git.acme.internal over TCP: {tcp}"
+    );
+
+    // Tunnel detail's list: both, learned by Crake.
+    app.send(Command::Hosts("acme".into()));
+    app.until("both hosts in the list", |m| {
+        m.host_rows.get("acme").is_some_and(|rows| {
+            ["10.40.1.10", "10.40.1.11"]
+                .iter()
+                .all(|h| rows.iter().any(|r| r.target == *h && r.kind == "learned"))
+        })
+    })
+    .await;
+
+    // Switched off: the hosts go direct again, and ACME's names are refused
+    // at once by craked's DNS (kept private), never asked publicly.
+    app.send(Command::Disconnect("acme".into()));
+    app.within(Duration::from_secs(15), "ACME off", off).await;
+    let after = tokio::task::spawn_blocking(|| get("10.40.1.10", Duration::from_secs(1)))
+        .await
+        .unwrap();
+    assert!(after.is_err(), "10.40.1.10 still answered with ACME off");
+    let (refused, took) = tokio::task::spawn_blocking(|| {
+        let start = Instant::now();
+        (resolve("git.acme.internal"), start.elapsed())
+    })
+    .await
+    .unwrap();
+    assert!(refused.is_err(), "git.acme.internal resolved: {refused:?}");
+    assert!(
+        took < Duration::from_millis(1500),
+        "refused at once, not after a timeout ({took:?})"
+    );
+
+    app.send(Command::RemoveTunnel("acme".into()));
+    app.until("ACME removed", |m| {
+        !m.tunnels.iter().any(|t| t.name == "acme")
+    })
+    .await;
+    // What craked logged meanwhile: no errors.
+    let log = std::fs::read(LOG).unwrap_or_default();
+    let log = String::from_utf8_lossy(
+        log.get(usize::try_from(log_from).unwrap()..)
+            .unwrap_or_default(),
+    );
+    let trouble: Vec<&str> = log
+        .lines()
+        .filter(|l| l.contains("ERROR") || l.contains("panicked"))
+        .collect();
+    assert!(trouble.is_empty(), "craked.log: {trouble:#?}");
+}
+
+/// A full tunnel (New tunnel's "Everything"): all traffic through it but
+/// its own gateway and the LAN, every name asked of its DNS.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_full_tunnel() {
+    if !enabled() {
+        return;
+    }
+    let mut app = added("globex", "Globex", &[("mode", "full")]).await;
+    let session = sign_in().await;
+    app.send(Command::ConnectWithSession("globex".into(), session));
+    let up = |m: &crate::model::Model| {
+        m.tunnels
+            .iter()
+            .any(|t| t.name == "globex" && t.state == "connected")
+    };
+    app.within(Duration::from_secs(30), "Globex connected", up)
+        .await;
+
+    // The two halves through the tunnel; its gateway kept on the LAN.
+    let through = routes("crake-globex");
+    assert!(
+        through.contains("0.0.0.0/1") && through.contains("128.0.0.0/1"),
+        "routes: {through}"
+    );
+    let gateway = ps("(Get-NetRoute -DestinationPrefix 198.51.100.10/32).InterfaceAlias");
+    assert!(
+        !gateway.trim().is_empty() && !gateway.contains("crake-"),
+        "the gateway's own route: {gateway}"
+    );
+
+    // Everything goes through at once: no probing needed.
+    let at_once = tokio::task::spawn_blocking(|| get("10.40.1.10", Duration::from_millis(800)))
+        .await
+        .unwrap();
+    assert!(
+        at_once.is_ok_and(|b| b.contains("crex")),
+        "10.40.1.10 at once"
+    );
+    // Every name to its DNS: the root's rule.
+    let rule = ps(
+        r"(Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters\DnsPolicyConfig\Crake crake-globex').Name",
+    );
+    assert!(
+        rule.lines().any(|l| l.trim() == "."),
+        "the NRPT rule: {rule}"
+    );
+    let named = tokio::task::spawn_blocking(|| resolve("wiki.acme.internal"))
+        .await
+        .unwrap();
+    assert!(
+        named.is_ok_and(|a| a.contains(&IpAddr::from([10, 40, 1, 11]))),
+        "wiki.acme.internal through Globex's DNS"
+    );
+    // Still up a while later: its own packets didn't loop into it.
+    app.settle(Duration::from_secs(5)).await;
+    assert_eq!(app.state("globex").as_deref(), Some("connected"));
+
+    app.send(Command::Disconnect("globex".into()));
+    app.within(Duration::from_secs(15), "Globex off", |m| {
+        m.tunnels
+            .iter()
+            .any(|t| t.name == "globex" && t.state == "off")
+    })
+    .await;
+    let left = ps("Get-NetRoute -DestinationPrefix 198.51.100.10/32 -ErrorAction SilentlyContinue");
+    assert!(left.trim().is_empty(), "the gateway's route stayed: {left}");
+    app.send(Command::RemoveTunnel("globex".into()));
+    app.until("Globex removed", |m| {
+        !m.tunnels.iter().any(|t| t.name == "globex")
+    })
+    .await;
+}

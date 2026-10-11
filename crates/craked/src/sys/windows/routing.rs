@@ -3,7 +3,10 @@
 //! or a pinned network is a route through `crake-<name>`; craked keeps
 //! which it added per tunnel, to take them away again. Routes don't expire
 //! on Windows: expiry is craked's store's (it expires hosts when the
-//! tunnel comes up). Not yet: a full tunnel, and the public DNS watch
+//! tunnel comes up). A full tunnel is two halves of the address space
+//! through the tunnel (0/1 and 128/1: more specific than the LAN's default
+//! route, whatever its metric), with its exceptions (the gateway, the LAN)
+//! kept on the way they went before. Not yet: the public DNS watch
 //! (craked's DNS forwarder will do that).
 
 use std::collections::{BTreeSet, HashMap};
@@ -28,6 +31,13 @@ pub struct Routing {
 struct Routes {
     device: String,
     targets: BTreeSet<Target>,
+    /// A full tunnel's exceptions, routed the way they went before it.
+    kept: Vec<iphelper::Route>,
+}
+
+/// A full tunnel's two halves.
+fn halves() -> [Target; 2] {
+    ["0.0.0.0/1", "128.0.0.0/1"].map(|s| s.parse().expect("a network"))
 }
 
 impl Routing {
@@ -50,9 +60,12 @@ impl Routing {
 
     /// A tunnel's pinned networks and learned hosts, as routes through it.
     pub async fn up(&self, plan: &Plan<'_>) -> Result<()> {
-        if plan.full_except.is_some() && self.real {
-            return Err(super::not_yet("a full tunnel"));
-        }
+        // A full tunnel's exceptions first, while their way is still the
+        // one they had.
+        let kept = match plan.full_except {
+            Some(except) if self.real => keep_ways(except)?,
+            _ => Vec::new(),
+        };
         // Probes name the tunnel by its mark: which interface that is.
         super::set_path(ids(plan.index).mark, Some(plan.device));
         self.tunnels.lock().unwrap().insert(
@@ -60,6 +73,7 @@ impl Routing {
             Routes {
                 device: plan.device.to_owned(),
                 targets: BTreeSet::new(),
+                kept,
             },
         );
         // A default route through the tunnel that normal traffic never
@@ -75,7 +89,8 @@ impl Routing {
             )?;
         }
         let learned = plan.learned.iter().map(|(a, _)| Target::host(*a));
-        for t in plan.pinned.iter().copied().chain(learned) {
+        let full = plan.full_except.map(|_| halves()).into_iter().flatten();
+        for t in plan.pinned.iter().copied().chain(learned).chain(full) {
             self.add(plan.name, t)?;
         }
         Ok(())
@@ -108,6 +123,9 @@ impl Routing {
             iphelper::delete_route(luid, t.addr(), t.prefix_len())?;
         }
         iphelper::delete_route(luid, Ipv4Addr::UNSPECIFIED, 0)?;
+        for r in routes.kept {
+            iphelper::delete(r)?;
+        }
         Ok(())
     }
 
@@ -156,4 +174,22 @@ impl Routing {
         }
         Ok(())
     }
+}
+
+/// Each exception whose way is the default route (which the halves would
+/// take over) gets a route of its own along that way: the gateway, above
+/// all. The LAN's networks, loopback and the like have routes more
+/// specific than a half already.
+fn keep_ways(except: &[Target]) -> Result<Vec<iphelper::Route>> {
+    let mut kept = Vec::new();
+    for t in except {
+        let (mut way, prefix) = iphelper::best_route(t.addr())?;
+        if prefix > 0 {
+            continue;
+        }
+        way.prefix = t.prefix_len();
+        iphelper::add(way)?;
+        kept.push(way);
+    }
+    Ok(kept)
 }

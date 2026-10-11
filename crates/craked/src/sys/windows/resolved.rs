@@ -21,26 +21,28 @@ const POLICY: &str = r"SYSTEM\CurrentControlSet\Services\Dnscache\Parameters\Dns
 /// Crake's rules are named after it and the link.
 const PREFIX: &str = "Crake ";
 
-/// A link's DNS servers and domains.
-type Link = (Vec<Ipv4Addr>, Vec<String>);
+/// A link's DNS servers and domains, and whether every other name goes
+/// to it too (a full tunnel's DNS).
+type Link = (Vec<Ipv4Addr>, Vec<String>, bool);
 
 /// Each link craked registered, by device.
 static LINKS: Mutex<BTreeMap<String, Link>> = Mutex::new(BTreeMap::new());
 
-/// The link that answers for `name` (its most specific domain), with that
-/// link's servers.
+/// The link that answers for `name` (its most specific domain; failing
+/// that, a full tunnel's), with that link's servers.
 pub fn owner(name: &str) -> Option<(String, Vec<Ipv4Addr>)> {
     let links = LINKS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     links
         .iter()
-        .filter_map(|(device, (servers, domains))| {
+        .filter_map(|(device, (servers, domains, everything))| {
             let best = domains
                 .iter()
                 .filter(|d| crate::dns::in_domains(name, std::slice::from_ref(*d)))
-                .map(String::len)
-                .max()?;
+                .map(|d| d.len() + 1)
+                .max()
+                .or(everything.then_some(0))?;
             Some((best, device, servers))
         })
         .max_by_key(|(len, _, _)| *len)
@@ -66,14 +68,14 @@ impl Resolved {
     }
 
     /// `domains` go to craked's server, which asks `servers` (or answers
-    /// itself for its own links). `everything` (a full tunnel's DNS for
-    /// every name) isn't built for Windows yet: its domains only.
+    /// itself for its own links); with `everything` (a full tunnel's DNS),
+    /// every other name too.
     pub async fn set_link(
         &self,
         device: &str,
         servers: &[Ipv4Addr],
         domains: &[String],
-        _everything: bool,
+        everything: bool,
     ) -> Result<()> {
         if let Self::Noop = self {
             return Ok(());
@@ -81,8 +83,11 @@ impl Resolved {
         LINKS
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(device.to_owned(), (servers.to_vec(), domains.to_vec()));
-        write_rule(device, domains)
+            .insert(
+                device.to_owned(),
+                (servers.to_vec(), domains.to_vec(), everything),
+            );
+        write_rule(device, domains, everything)
     }
 
     /// What another program registered for the device (OpenVPN 3 on Linux).
@@ -119,8 +124,9 @@ fn wide(s: &str) -> Vec<u16> {
 }
 
 /// One rule: the domains (each with and without a leading dot: the name
-/// itself and everything under it) to craked's server.
-fn write_rule(device: &str, domains: &[String]) -> Result<()> {
+/// itself and everything under it) to craked's server; with `everything`,
+/// the root (".", every name) too.
+fn write_rule(device: &str, domains: &[String], everything: bool) -> Result<()> {
     let path = wide(&format!("{POLICY}\\{PREFIX}{device}"));
     let mut key: HKEY = std::ptr::null_mut();
     // SAFETY: a NUL-terminated path; `key` is closed below.
@@ -141,11 +147,11 @@ fn write_rule(device: &str, domains: &[String]) -> Result<()> {
         bail!("writing the DNS rule for {device}: error {err}");
     }
     let mut names: Vec<u16> = Vec::new();
-    for d in domains {
-        for n in [d.clone(), format!(".{d}")] {
-            names.extend(n.encode_utf16());
-            names.push(0);
-        }
+    let root = everything.then(|| ".".to_owned());
+    let each = domains.iter().flat_map(|d| [d.clone(), format!(".{d}")]);
+    for n in each.chain(root) {
+        names.extend(n.encode_utf16());
+        names.push(0);
     }
     names.push(0);
     let server = wide(&super::dns_queue::ADDR.to_string());

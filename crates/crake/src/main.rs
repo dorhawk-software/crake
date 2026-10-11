@@ -60,9 +60,14 @@ mod tray;
 mod e2e_tests;
 #[cfg(all(test, target_os = "linux"))]
 mod journey_tests;
+#[cfg(test)]
+mod test_app;
 mod tunnel_detail;
 #[cfg(all(test, target_os = "linux"))]
 mod wire_tests;
+// With the installed craked service and openconnect: Windows.
+#[cfg(all(test, windows))]
+mod windows_tests;
 
 // What the parts of the app call on each other.
 use requests::{keep_certificate, on_request, start_left_on};

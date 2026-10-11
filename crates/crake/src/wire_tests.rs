@@ -15,66 +15,7 @@ use craked::config::{Config, Protocol, TunnelConfig};
 use craked::manager::Manager;
 
 use crate::client::{self, Command, Update};
-use crate::model::Model;
-
-/// The app's side: its model, fed by the client's updates.
-pub(crate) struct App {
-    pub model: Model,
-    pub updates: async_channel::Receiver<Update>,
-    commands: async_channel::Sender<Command>,
-}
-
-impl App {
-    pub fn send(&self, c: Command) {
-        self.commands.send_blocking(c).unwrap();
-    }
-
-    /// Apply updates until `done` holds for the model (5 s at most).
-    pub async fn until(&mut self, what: &str, done: impl Fn(&Model) -> bool) {
-        self.within(Duration::from_secs(5), what, done).await;
-    }
-
-    pub async fn within(&mut self, wait: Duration, what: &str, done: impl Fn(&Model) -> bool) {
-        let end = Instant::now() + wait;
-        while !done(&self.model) {
-            let left = end.saturating_duration_since(Instant::now());
-            match tokio::time::timeout(left, self.updates.recv()).await {
-                Ok(Ok(Update::Failed(text))) => {
-                    panic!("craked refused while waiting for {what}: {text}")
-                }
-                Ok(Ok(u)) => {
-                    self.model.apply(u);
-                }
-                _ => panic!("never saw {what}"),
-            }
-        }
-    }
-
-    /// Apply whatever arrives for `wait`.
-    pub async fn settle(&mut self, wait: Duration) {
-        let end = Instant::now() + wait;
-        while let Ok(Ok(u)) = tokio::time::timeout(
-            end.saturating_duration_since(Instant::now()),
-            self.updates.recv(),
-        )
-        .await
-        {
-            self.model.apply(u);
-        }
-    }
-
-    pub fn state(&self, tunnel: &str) -> Option<String> {
-        self.model
-            .tunnels
-            .iter()
-            .find(|t| t.name == tunnel)
-            .map(|t| t.state.clone())
-    }
-
-    fn logged(&self, message: &str) -> bool {
-        self.model.log.iter().any(|e| e.message == message)
-    }
-}
+use crate::test_app::App;
 
 fn config(dir: &std::path::Path) -> Config {
     Config {
@@ -119,12 +60,7 @@ pub(crate) fn serve(mgr: std::sync::Arc<Manager>, dir: &std::path::Path) -> App 
     let owner = std::fs::metadata(dir).unwrap().uid();
     craked::dbus::serve_p2p(mgr, &socket, owner).unwrap();
     let (tx, updates) = async_channel::unbounded();
-    let commands = client::start_on(socket, tx);
-    App {
-        model: Model::default(),
-        updates,
-        commands,
-    }
+    App::new(client::start_on(socket, tx), updates)
 }
 
 fn fields(pairs: &[(&str, &str)]) -> HashMap<String, String> {

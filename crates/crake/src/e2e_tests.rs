@@ -8,8 +8,7 @@
 //! Skipped unless CRAKE_E2E=1; run it with `scripts/e2e-test.sh`, which
 //! gives it a container with no network but its wire to the gateway's.
 
-use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpStream, UdpSocket};
+use std::net::UdpSocket;
 use std::process::Command as Run;
 use std::time::Duration;
 
@@ -17,14 +16,8 @@ use craked::config::{Config, Protocol, TunnelConfig};
 use craked::manager::Manager;
 
 use crate::client::Command;
-use crate::signin::{self, Ask, Event, Reply, Spec};
-use crate::wire_tests::{self, App};
-
-/// The test gateway: scripts/e2e's container, or wherever CRAKE_E2E_GATEWAY
-/// says (the NixOS VM test's gateway VM).
-pub(crate) fn gateway() -> String {
-    std::env::var("CRAKE_E2E_GATEWAY").unwrap_or_else(|_| "https://198.51.100.10".into())
-}
+use crate::test_app::{App, connected, enabled, gateway, get, off, sign_in};
+use crate::wire_tests;
 
 pub(crate) fn sh(cmd: &str) -> String {
     let out = Run::new("sh").args(["-c", cmd]).output().unwrap();
@@ -60,71 +53,6 @@ pub(crate) fn config(dir: &std::path::Path) -> Config {
             own: None,
         }],
     }
-}
-
-/// The sign-in window's part: trust the gateway's certificate, give the
-/// password. Returns the session openconnect got.
-async fn sign_in() -> crake_proto::Session {
-    let spec = Spec {
-        tunnel: "acme".into(),
-        display: "ACME".into(),
-        gateway: gateway(),
-        protocol: "anyconnect".into(),
-        user: "alice".into(),
-        auth_args: vec![],
-        extra_args: vec![],
-        user_agent: None,
-        keyring: false,
-        openconnect: None,
-    };
-    let (tx, events) = async_channel::unbounded();
-    let replies = signin::start(spec, tx);
-    let mut asked = Vec::new();
-    loop {
-        let event = tokio::time::timeout(Duration::from_secs(20), events.recv())
-            .await
-            .expect("sign-in went quiet")
-            .expect("sign-in ended");
-        let answer = match event {
-            Event::Reached | Event::Attached(_) => continue,
-            Event::Done(session) => {
-                assert_eq!(asked, ["trust", "password"], "what the window asked");
-                return session;
-            }
-            Event::Failed(why) => panic!("sign-in failed: {why}"),
-            Event::Prompt(p) => match p.ask {
-                Ask::TrustServer { fingerprint } => {
-                    assert!(fingerprint.is_some(), "the window shows the fingerprint");
-                    asked.push("trust");
-                    "yes"
-                }
-                Ask::Secret => {
-                    asked.push("password");
-                    "hunter2"
-                }
-                other => panic!("unexpected question {other:?} ({})", p.label),
-            },
-        };
-        replies
-            .send(Reply::Answer {
-                text: answer.into(),
-                remember: false,
-                keep_certificate: false,
-            })
-            .await
-            .unwrap();
-    }
-}
-
-/// An HTTP GET on a fresh connection, as an app would.
-pub(crate) fn get(ip: &str, within: Duration) -> std::io::Result<String> {
-    let addr: SocketAddr = format!("{ip}:80").parse().unwrap();
-    let mut s = TcpStream::connect_timeout(&addr, within)?;
-    s.set_read_timeout(Some(Duration::from_secs(5)))?;
-    s.write_all(b"GET / HTTP/1.0\r\n\r\n")?;
-    let mut body = String::new();
-    s.read_to_string(&mut body)?;
-    Ok(body)
 }
 
 /// A DNS query for `name`'s address, as resolved would send it.
@@ -163,14 +91,6 @@ struct Crake {
     app: App,
 }
 
-pub(crate) fn enabled() -> bool {
-    if std::env::var("CRAKE_E2E").as_deref() == Ok("1") {
-        return true;
-    }
-    eprintln!("skipped: run scripts/e2e-test.sh (needs Docker)");
-    false
-}
-
 async fn start() -> Crake {
     let dir = tempfile::tempdir().unwrap();
     let cfg = config(dir.path());
@@ -188,18 +108,6 @@ async fn start() -> Crake {
         mgr,
         app,
     }
-}
-
-fn connected(m: &crate::model::Model) -> bool {
-    m.tunnels
-        .iter()
-        .any(|t| t.name == "acme" && t.state == "connected")
-}
-
-fn off(m: &crate::model::Model) -> bool {
-    m.tunnels
-        .iter()
-        .any(|t| t.name == "acme" && t.state == "off")
 }
 
 fn transport(m: &crate::model::Model) -> String {

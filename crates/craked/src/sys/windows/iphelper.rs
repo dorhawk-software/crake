@@ -7,7 +7,7 @@ use std::net::Ipv4Addr;
 use anyhow::{Result, bail};
 use windows_sys::Win32::NetworkManagement::IpHelper::{
     ConvertInterfaceAliasToLuid, ConvertInterfaceLuidToIndex, CreateIpForwardEntry2,
-    CreateUnicastIpAddressEntry, DeleteIpForwardEntry2, GetIpInterfaceEntry,
+    CreateUnicastIpAddressEntry, DeleteIpForwardEntry2, GetBestRoute2, GetIpInterfaceEntry,
     InitializeIpForwardEntry, InitializeIpInterfaceEntry, InitializeUnicastIpAddressEntry,
     MIB_IPFORWARD_ROW2, MIB_IPINTERFACE_ROW, MIB_UNICASTIPADDRESS_ROW, SetIpInterfaceEntry,
 };
@@ -100,18 +100,99 @@ pub fn set_mtu(luid: NET_LUID_LH, mtu: u32) -> Result<()> {
     }
 }
 
+/// A route: `dest/prefix` out of the interface, to `via` (unspecified: on
+/// the link, as a tunnel carries it).
+#[derive(Clone, Copy)]
+pub struct Route {
+    pub luid: NET_LUID_LH,
+    pub dest: Ipv4Addr,
+    pub prefix: u8,
+    pub via: Ipv4Addr,
+}
+
 fn route(luid: NET_LUID_LH, dest: Ipv4Addr, prefix: u8, metric: u32) -> MIB_IPFORWARD_ROW2 {
+    row(
+        Route {
+            luid,
+            dest,
+            prefix,
+            via: Ipv4Addr::UNSPECIFIED,
+        },
+        metric,
+    )
+}
+
+fn row(r: Route, metric: u32) -> MIB_IPFORWARD_ROW2 {
     // SAFETY: initialized by Windows, then filled.
     unsafe {
         let mut row: MIB_IPFORWARD_ROW2 = std::mem::zeroed();
         InitializeIpForwardEntry(&raw mut row);
-        row.InterfaceLuid = luid;
-        row.DestinationPrefix.Prefix = sockaddr(dest);
-        row.DestinationPrefix.PrefixLength = prefix;
-        // On the link: the tunnel carries it, no next hop.
-        row.NextHop = sockaddr(Ipv4Addr::UNSPECIFIED);
+        row.InterfaceLuid = r.luid;
+        row.DestinationPrefix.Prefix = sockaddr(r.dest);
+        row.DestinationPrefix.PrefixLength = r.prefix;
+        row.NextHop = sockaddr(r.via);
         row.Metric = metric;
         row
+    }
+}
+
+/// The way Windows sends to `dest` now: its route's interface, next hop
+/// and prefix length (with `dest` as the destination).
+pub fn best_route(dest: Ipv4Addr) -> Result<(Route, u8)> {
+    let to = sockaddr(dest);
+    // SAFETY: zeroed out values Windows fills; `to` is only read.
+    let (err, best) = unsafe {
+        let mut best: MIB_IPFORWARD_ROW2 = std::mem::zeroed();
+        let mut source: SOCKADDR_INET = std::mem::zeroed();
+        let err = GetBestRoute2(
+            std::ptr::null(),
+            0,
+            std::ptr::null(),
+            &raw const to,
+            0,
+            &raw mut best,
+            &raw mut source,
+        );
+        (err, best)
+    };
+    if err != 0 {
+        bail!("no route to {dest} ({})", os_error(err));
+    }
+    // SAFETY: an IPv4 route: its next hop is a SOCKADDR_IN.
+    let via = unsafe { best.NextHop.Ipv4.sin_addr.S_un.S_addr };
+    Ok((
+        Route {
+            luid: best.InterfaceLuid,
+            dest,
+            prefix: 32,
+            via: Ipv4Addr::from(via.to_ne_bytes()),
+        },
+        best.DestinationPrefix.PrefixLength,
+    ))
+}
+
+/// Add a route (already there: fine).
+pub fn add(r: Route) -> Result<()> {
+    let row = row(r, 0);
+    // SAFETY: a filled row, only read.
+    match unsafe { CreateIpForwardEntry2(&raw const row) } {
+        0 | ERROR_OBJECT_ALREADY_EXISTS => Ok(()),
+        e => bail!("routing {}/{}: {}", r.dest, r.prefix, os_error(e)),
+    }
+}
+
+/// Remove a route (gone already: fine).
+pub fn delete(r: Route) -> Result<()> {
+    let row = row(r, 0);
+    // SAFETY: a filled row, only read.
+    match unsafe { DeleteIpForwardEntry2(&raw const row) } {
+        0 | ERROR_NOT_FOUND => Ok(()),
+        e => bail!(
+            "removing the route to {}/{}: {}",
+            r.dest,
+            r.prefix,
+            os_error(e)
+        ),
     }
 }
 

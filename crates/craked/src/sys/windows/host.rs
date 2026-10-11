@@ -120,8 +120,10 @@ pub fn mark(sock: &tokio::net::TcpSocket, mark: u32) -> std::io::Result<()> {
 }
 
 /// A socket that leaves through this interface.
-pub fn bind_device(sock: &tokio::net::UdpSocket, device: &str) -> std::io::Result<()> {
-    use std::os::windows::io::AsRawSocket;
+pub fn bind_device(
+    sock: &impl std::os::windows::io::AsRawSocket,
+    device: &str,
+) -> std::io::Result<()> {
     unicast_if(sock.as_raw_socket(), device)
 }
 

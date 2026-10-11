@@ -21,8 +21,9 @@ use gpui_kit::{AnyWindowHandle, AppContext, Entity, Render, TestAppContext};
 
 use craked::manager::Manager;
 
-use crate::e2e_tests::{config, enabled, get, sh};
+use crate::e2e_tests::{config, sh};
 use crate::model::Model;
+use crate::test_app::{enabled, get};
 use crate::{Request, Setup, Shell, panel, settings_view, signin_view, start, tunnel_detail};
 
 /// craked, in a runtime of its own, serving the app on `socket`.
@@ -369,7 +370,7 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
     let (name, gateway, user) = view.read_with(cx, |v, _| v.fields_for_tests());
     type_into(cx, n, name, "Globex");
     click(cx, n, ("protocol", 1usize));
-    type_into(cx, n, gateway, &crate::e2e_tests::gateway());
+    type_into(cx, n, gateway, &crate::test_app::gateway());
     click(cx, n, "next");
     click(cx, n, ("method", 1usize));
     type_into(cx, n, user, "alice");
