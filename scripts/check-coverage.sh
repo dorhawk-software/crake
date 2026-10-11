@@ -37,6 +37,8 @@ for crate in "${!floor[@]}"; do
     pct=$(( (total - missed) * 100 / total ))
     if [ "$pct" -lt "${floor[$crate]}" ]; then
         echo "coverage: $crate is at $pct% of lines, its floor is ${floor[$crate]}%."
+        # Where: the lines no test ran, per file.
+        cargo llvm-cov report --show-missing-lines 2>/dev/null | grep "/$crate/src/" | sed 's/^/  /'
         fail=1
     fi
 done
