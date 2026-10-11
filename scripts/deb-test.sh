@@ -19,6 +19,8 @@ set -eu
 cd "$(dirname "$0")/.."
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
 DEB=$PWD/target/deb/crake_${VERSION}_amd64.deb
+# The journey's test binary, from scripts/build-deb.sh (run after the tunnel).
+JOURNEY=$PWD/target/deb/journey
 RPMF=$PWD/target/rpm/crake-${VERSION}-1.x86_64.rpm
 [ $# -gt 0 ] || set -- 22.04 24.04 26.04
 ARCHP=$(ls "$PWD"/target/arch/crake-"$VERSION"-*-x86_64.pkg.tar.zst 2>/dev/null | head -n1)
@@ -44,6 +46,7 @@ for REL in "$@"; do
     --cap-add SYS_ADMIN --cap-add NET_ADMIN --device /dev/net/tun --security-opt apparmor=unconfined \
     --sysctl net.ipv4.ip_unprivileged_port_start=1024 \
     -v "$PKG:$AS:ro" -v "$PWD/scripts/deb-test:/deb-test:ro" -v "$PWD/scripts/e2e:/e2e:ro" \
+    $([ -f "$JOURNEY" ] && echo "-v $JOURNEY:/pkg/journey:ro") \
     $(case "$IMAGE" in archlinux:*) echo "-v $LINK:/link" ;; esac) \
     "crake-deb-test:$TAG" sh -c 'mount -o remount,rw /sys/fs/cgroup && exec /sbin/init' >/dev/null
   until docker exec "$NAME" systemctl is-system-running --wait >/dev/null 2>&1 \
@@ -57,6 +60,7 @@ for REL in "$@"; do
       -v "$LINK:/link" crake-e2e-gateway >/dev/null ;;
   esac
   docker exec "$NAME" sh /deb-test/check.sh tunnel || fail=1
+  docker exec "$NAME" sh /deb-test/check.sh journey || fail=1
   docker exec "$NAME" sh /deb-test/check.sh remove || fail=1
   docker rm -f "$NAME" >/dev/null
   [ -z "$GW" ] || { docker rm -f "$GW" >/dev/null 2>&1; GW=; }

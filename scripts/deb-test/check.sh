@@ -6,6 +6,7 @@
 #   tunnel   (no network any more) a real tunnel through the installed
 #            service: ocserv in its own namespace (gateway.sh), probing,
 #            DNS through systemd-resolved, keeping names private
+#   journey  the journey suite (the app and its craked) on this system
 #   remove   remove and purge; nothing is left
 # Prints each check; exits non-zero if any failed.
 set -u
@@ -137,6 +138,21 @@ tunnel() {
     fi
     echo "  craked's journal:"
     journalctl -b -u craked --no-pager -o cat | sed 's/^/        /'
+}
+
+# The journey (crates/crake/src/journey_tests.rs): the real app and its own
+# craked against this system's openconnect, nft and ip, with the packaged
+# hook, through the gateway the tunnel phase started. The service steps
+# aside meanwhile (one craked at a time).
+journey() {
+    [ -x /pkg/journey ] || { echo "  skip  the journey: no target/deb/journey (scripts/build-deb.sh)"; return; }
+    hook=/usr/libexec/crake/hook
+    [ "$PM" = pacman ] && hook=/usr/lib/crake/hook
+    systemctl stop craked
+    mkdir -p /tmp/journey
+    check "a day with Crake (the journey)" env CRAKE_E2E=1 CRAKE_E2E_HOOK="$hook" TMPDIR=/tmp/journey \
+        /pkg/journey journey_tests --test-threads=1
+    systemctl start craked
 }
 
 remove() {

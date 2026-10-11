@@ -13,6 +13,12 @@ on:
 permissions:
   contents: read
 
+# One run per branch: a new push cancels the one still going (only the
+# newest commit matters; CI minutes aren't free for anyone).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   # What GPUI links (X11, keyboard, fonts) and what the tests drive.
