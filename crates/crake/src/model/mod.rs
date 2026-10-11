@@ -14,6 +14,8 @@ mod demo;
 // The log by day and the sample data, as the rest of the app knows them.
 use self::days::local_time;
 pub use self::days::{Day, Row, Show};
+#[cfg(test)]
+pub use self::demo::demo_log_whole_day;
 pub use self::demo::{demo, demo_detail, demo_log};
 
 /// How long the tray shows the "routed" shape after a decision.

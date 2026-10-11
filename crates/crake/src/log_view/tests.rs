@@ -1,5 +1,5 @@
 //! The log in a headless window, with the design's sample
-//! (model::demo_log): its filters show what the model says they should,
+//! (model::demo_log_whole_day): its filters show what the model says they should,
 //! and Copy for helpdesk copies what's shown.
 
 use gpui_kit::test::TestWindowExt;
@@ -15,7 +15,7 @@ struct Opened {
 }
 
 fn open(cx: &mut TestAppContext) -> Opened {
-    open_with(cx, crate::model::demo_log())
+    open_with(cx, crate::model::demo_log_whole_day())
 }
 
 fn open_with(cx: &mut TestAppContext, sample: Model) -> Opened {
@@ -136,7 +136,7 @@ fn one_tunnel_and_a_search(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn earlier_days_on_request(cx: &mut TestAppContext) {
     // The sample, and the same first entry three and four days ago.
-    let mut sample = crate::model::demo_log();
+    let mut sample = crate::model::demo_log_whole_day();
     let first = sample.log[0].clone();
     for days in [4, 3] {
         let at = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(24 * days);

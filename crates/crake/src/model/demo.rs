@@ -255,6 +255,18 @@ pub fn demo_detail() -> Model {
 /// the same rows at the same times today and yesterday, and a day of
 /// traffic that gets busy at 8:18, as in its chart.
 pub fn demo_log() -> Model {
+    log_until(jiff::Timestamp::now())
+}
+
+/// The whole of today's sample, later entries too: what tests use, so they
+/// don't depend on the time of day.
+#[cfg(test)]
+pub fn demo_log_whole_day() -> Model {
+    log_until(jiff::Timestamp::MAX)
+}
+
+/// The sample as it stands at `until`: entries after it haven't happened.
+fn log_until(until: jiff::Timestamp) -> Model {
     use LogKind::*;
     let mut m = demo();
     let today = jiff::Zoned::now();
@@ -390,10 +402,7 @@ pub fn demo_log() -> Model {
             "No answer directly. ACME answered in 38 ms.",
         ),
     ];
-    log.retain(|e| {
-        e.ts.parse::<jiff::Timestamp>()
-            .is_ok_and(|t| t <= jiff::Timestamp::now())
-    });
+    log.retain(|e| e.ts.parse::<jiff::Timestamp>().is_ok_and(|t| t <= until));
     m.log = log;
     let midnight = today
         .start_of_day()
