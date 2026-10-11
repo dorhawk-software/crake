@@ -92,7 +92,6 @@ const XSO_TCPCB: u32 = 0x20;
 const XINPGEN: usize = 24;
 /// A connection's record says IPv4 (`inp_vflag & INP_IPV4`).
 const INP_IPV4: u8 = 0x1;
-const IPPROTO_TCP: u8 = 6;
 
 /// The list: an `xinpgen`, then per connection its records (`xinpcb_n`,
 /// the socket's, `xtcpcb_n`), each led by its length and kind and padded
@@ -122,17 +121,18 @@ pub fn parse(buf: &[u8]) -> HashMap<Flow, TcpState> {
             break;
         }
         match kind {
-            // xinpcb_n: ports at 16 and 18; then inp_vflag, inp_ip_ttl and
-            // inp_ip_p (TCP: 6), and the foreign and local addresses
-            // (in_addr_4in6, IPv4 in their last four bytes) 16 and 32 bytes
-            // after the flag. Where the flag is depends on whether the
-            // kernel packs the struct to 4 bytes (44) or not (48): the one
-            // whose protocol byte says TCP.
+            // xinpcb_n: ports at 16 and 18; then inp_vflag, and the
+            // foreign and local addresses (in_addr_4in6, IPv4 in their last
+            // four bytes) 16 and 32 bytes after it. Where the flag is
+            // depends on whether the kernel packs the struct to 4 bytes (104
+            // long, the flag at 44: macOS 26 does) or not (112, at 48).
             XSO_INPCB => {
                 current = None;
-                let flag = [48, 44]
-                    .into_iter()
-                    .find(|v| buf.get(at + v + 2) == Some(&IPPROTO_TCP));
+                let flag = match len {
+                    104 => Some(44),
+                    112 => Some(48),
+                    _ => None,
+                };
                 if let Some(v) = flag
                     && buf.get(at + v).is_some_and(|f| f & INP_IPV4 != 0)
                     && let (Some(dport), Some(sport), Some(dst), Some(src)) = (
@@ -195,7 +195,6 @@ mod tests {
         inpcb[16..18].copy_from_slice(&dport.to_be_bytes());
         inpcb[18..20].copy_from_slice(&sport.to_be_bytes());
         inpcb[flag] = INP_IPV4;
-        inpcb[flag + 2] = IPPROTO_TCP;
         inpcb[flag + 16..flag + 20].copy_from_slice(&dst);
         inpcb[flag + 32..flag + 36].copy_from_slice(&src);
         let mut socket = vec![0u8; 92]; // padded to 96
