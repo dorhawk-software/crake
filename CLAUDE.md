@@ -929,21 +929,37 @@ whose a name is: `sys/dns_links.rs`), sockets bound with IP_BOUND_IF,
 byte counters from getifaddrs. openconnect can't name utun devices, so
 on macOS craked doesn't pass `--interface` and takes the utunN it
 reports (`sys::NAMES_DEVICES`, `sys::tunnel_device`; `device_of`).
-Not built yet (says so): the connection table for probing; public names
-(no root resolver in /etc/resolver: no rescue, no full tunnel's DNS for
-every name); craked as a launchd daemon serving the app on a Unix
-socket. The app's `sys/macos/`: the Keychain (security-framework,
+Probing reads the kernel's TCP list (`net.inet.tcp.pcblist_n`, what
+netstat reads) four times a second into `flows::changes`, as Windows
+polls. macOS can't reset another process's connection, so what leaves a
+tunnel with another source address (a stuck connection's next SYN) is
+NATed to the tunnel's address by pf, in Crake's anchor
+`com.apple/250.Crake` (pf on with a token while tunnels are up), as Linux
+masquerades: the first connection can work, as on Linux. craked serves
+the app on /var/run/crake.sock (peer to peer; changes need the user at
+the console or root, `Guard::ConsoleUser`); paths: hook socket in
+/var/run/crake, hook in /usr/local/libexec/crake (the system's /usr is
+sealed), state in /var/db/crake; openconnect from Homebrew
+(/opt/homebrew/bin, /usr/local/bin: launchd's and Finder apps' PATH
+lack it); `packaging/macos/software.dorhawk.craked.plist` runs craked as
+a launchd daemon. Not yet: public names (no root resolver in
+/etc/resolver: no rescue, no full tunnel's DNS for every name), the
+panel's placement under the menu bar, an installer (.pkg, signed and
+notarized with the user's Apple Developer account: ask for its details
+then). The app's `sys/macos/`: the Keychain (security-framework,
 labelled items), the menu bar through `sys/menu_tray.rs` (the tray-icon
 code Windows used, now shared), the private folder in the user's
-$TMPDIR, plain notifications (notify-rust has no actions there); no
-connection to craked yet. What Linux and macOS do alike lives in
+$TMPDIR, plain notifications (notify-rust has no actions there),
+craked's socket. What Linux and macOS do alike lives in
 `sys/unix.rs` in both crates. craked type-checks for macOS in a plain
 Linux container (`scripts/macos-check.sh`); the app needs a Mac's
 toolchain, so CI job `macos` (macos-latest) runs clippy, the
 portable tests, and `crates/craked/tests/macos.rs` as root: a utun
 device the test makes itself, its address, DNS route, learned and pinned
-routes, and an /etc/resolver file that macOS really follows to a
-stand-in server. A real gateway test needs someone with a Mac (Homebrew
+routes, a stuck connection's SYN read off the device NATed to the
+tunnel's address, and an /etc/resolver file that macOS really follows
+to a stand-in server; without root, a connection nobody answers seen
+stuck in the kernel's list. A real gateway test needs someone with a Mac (Homebrew
 has openconnect, not ocserv).
 
 **OpenVPN on Windows (open decision, noted for the user):** OpenVPN 3
