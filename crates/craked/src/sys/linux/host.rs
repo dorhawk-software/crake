@@ -102,3 +102,32 @@ pub fn create_private(path: &Path) -> std::io::Result<std::fs::File> {
         .mode(0o600)
         .open(path)
 }
+
+/// (bytes on physical interfaces, bytes on Crake's tunnels, bytes per
+/// tunnel device), both directions.
+pub fn counters(
+    devices: &std::collections::HashMap<String, String>,
+) -> (u64, u64, std::collections::HashMap<String, u64>) {
+    let (mut physical, mut tunnels, mut each) = (0, 0, std::collections::HashMap::new());
+    let Ok(dir) = std::fs::read_dir("/sys/class/net") else {
+        return (0, 0, each);
+    };
+    for e in dir.flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        let read = |f: &str| {
+            std::fs::read_to_string(e.path().join("statistics").join(f))
+                .ok()
+                .and_then(|s| s.trim().parse::<u64>().ok())
+                .unwrap_or(0)
+        };
+        let bytes = read("rx_bytes") + read("tx_bytes");
+        if name.starts_with("crake-") || devices.contains_key(&name) {
+            tunnels += bytes;
+            each.insert(name, bytes);
+        } else if e.path().join("device").exists() {
+            // A real device: not loopback, bridges, Docker or other tunnels.
+            physical += bytes;
+        }
+    }
+    (physical, tunnels, each)
+}

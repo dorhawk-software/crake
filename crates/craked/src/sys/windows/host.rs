@@ -227,3 +227,38 @@ pub fn create_private(path: &Path) -> std::io::Result<std::fs::File> {
     let _ = std::fs::remove_file(path);
     std::fs::File::create(path)
 }
+
+/// (bytes on physical interfaces, bytes on Crake's tunnels, bytes per
+/// tunnel device), both directions, from Windows' interface table.
+pub fn counters(
+    devices: &std::collections::HashMap<String, String>,
+) -> (u64, u64, std::collections::HashMap<String, u64>) {
+    use windows_sys::Win32::NetworkManagement::IpHelper::{
+        FreeMibTable, GetIfTable2, MIB_IF_TABLE2,
+    };
+    let (mut physical, mut tunnels, mut each) = (0, 0, std::collections::HashMap::new());
+    let mut table: *mut MIB_IF_TABLE2 = std::ptr::null_mut();
+    // SAFETY: Windows allocates the table; it's read, then freed.
+    unsafe {
+        if GetIfTable2(&raw mut table) != 0 {
+            return (0, 0, each);
+        }
+        let rows =
+            std::slice::from_raw_parts((*table).Table.as_ptr(), (*table).NumEntries as usize);
+        for row in rows {
+            let name = wide(row.Alias.as_ptr());
+            let bytes = row.InOctets + row.OutOctets;
+            // Bit 0 of the flags: a hardware interface (not loopback,
+            // virtual switches or other filters stacked on one).
+            let hardware = row.InterfaceAndOperStatusFlags._bitfield & 1 != 0;
+            if name.starts_with("crake-") || devices.contains_key(&name) {
+                tunnels += bytes;
+                each.insert(name, bytes);
+            } else if hardware {
+                physical += bytes;
+            }
+        }
+        FreeMibTable(table.cast());
+    }
+    (physical, tunnels, each)
+}
