@@ -50,6 +50,8 @@ mod theme;
 
 mod tray;
 
+#[cfg(test)]
+mod e2e_tests;
 mod tunnel_detail;
 #[cfg(test)]
 mod wire_tests;

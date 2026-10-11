@@ -18,20 +18,24 @@ use crate::client::{self, Command, Update};
 use crate::model::Model;
 
 /// The app's side: its model, fed by the client's updates.
-struct App {
-    model: Model,
-    updates: async_channel::Receiver<Update>,
+pub(crate) struct App {
+    pub model: Model,
+    pub updates: async_channel::Receiver<Update>,
     commands: async_channel::Sender<Command>,
 }
 
 impl App {
-    fn send(&self, c: Command) {
+    pub fn send(&self, c: Command) {
         self.commands.send_blocking(c).unwrap();
     }
 
     /// Apply updates until `done` holds for the model (5 s at most).
-    async fn until(&mut self, what: &str, done: impl Fn(&Model) -> bool) {
-        let end = Instant::now() + Duration::from_secs(5);
+    pub async fn until(&mut self, what: &str, done: impl Fn(&Model) -> bool) {
+        self.within(Duration::from_secs(5), what, done).await;
+    }
+
+    pub async fn within(&mut self, wait: Duration, what: &str, done: impl Fn(&Model) -> bool) {
+        let end = Instant::now() + wait;
         while !done(&self.model) {
             let left = end.saturating_duration_since(Instant::now());
             match tokio::time::timeout(left, self.updates.recv()).await {
@@ -46,7 +50,20 @@ impl App {
         }
     }
 
-    fn state(&self, tunnel: &str) -> Option<String> {
+    /// Apply whatever arrives for `wait`.
+    pub async fn settle(&mut self, wait: Duration) {
+        let end = Instant::now() + wait;
+        while let Ok(Ok(u)) = tokio::time::timeout(
+            end.saturating_duration_since(Instant::now()),
+            self.updates.recv(),
+        )
+        .await
+        {
+            self.model.apply(u);
+        }
+    }
+
+    pub fn state(&self, tunnel: &str) -> Option<String> {
         self.model
             .tunnels
             .iter()
@@ -89,10 +106,15 @@ fn config(dir: &std::path::Path) -> Config {
     }
 }
 
-/// craked serving on a private socket, and the app's client connected to it.
 async fn start(dir: &std::path::Path) -> App {
     let mgr = Manager::new(config(dir)).unwrap();
     mgr.init().await.unwrap();
+    serve(mgr, dir)
+}
+
+/// craked serving on a private socket in `dir`, and the app's client
+/// connected to it.
+pub(crate) fn serve(mgr: std::sync::Arc<Manager>, dir: &std::path::Path) -> App {
     let socket = dir.join("crake.sock");
     let owner = std::fs::metadata(dir).unwrap().uid();
     craked::dbus::serve_p2p(mgr, &socket, owner).unwrap();

@@ -531,6 +531,21 @@ The user doesn't want development builds installed on their machine.
   engines, `Prefs { scratch: true }` writes nothing.
 - `scripts/netns-test.sh`: real nftables and policy routing inside a
   disposable container with no network (host filesystem read-only).
+- `scripts/e2e-test.sh` (`crates/crake/src/e2e_tests.rs`, skipped unless
+  `CRAKE_E2E=1`): a real gateway. ocserv in one container (`scripts/e2e/`:
+  user alice, password hunter2, a self-signed certificate; ACME's network
+  10.40.0.0/16 behind it: DNS 10.40.0.2, git.acme.internal 10.40.1.10,
+  wiki.acme.internal 10.40.1.11), the test in another, run from the host's
+  read-only filesystem with the host's openconnect, nft and ip. Neither has
+  a network: their only link is a socket pair in a temporary folder
+  (`relay.py`, which drops UDP 443 while the test's `block-udp` file
+  exists). The app's sign-in (trust the certificate, the password), craked
+  over D-Bus, probing, a name only the tunnel's DNS knows, switching off
+  and stopping leaving nothing; and a network that blocks UDP (7b: noticed,
+  over TCP on the same session, remembered). Keep both containers without a
+  network: a gateway on a Docker network would be a service on this machine.
+- CI (`.github/workflows/ci.yml`, not yet run: nothing is pushed): the lint
+  gate, `cargo test`, the coverage floors, then the netns and e2e scripts.
 - Daily use, nothing installed: `sudo ./target/debug/craked --config dev/<yours>.toml --dev`
   (serves the app on `/run/user/<uid>/crake-dev.sock`), then `./target/debug/crake`.
   The app signs in as the user (`openconnect --authenticate`, questions in
