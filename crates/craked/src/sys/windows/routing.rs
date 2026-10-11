@@ -16,6 +16,9 @@ use super::iphelper;
 use crate::hosts::Target;
 pub use crate::plan::{ID_BASE, Ids, MARK_BASE, MAX_TUNNELS, Plan, ids};
 
+/// The tunnel's own default route: never better than the real one.
+const PATH_METRIC: u32 = 9000;
+
 pub struct Routing {
     real: bool,
     /// Per tunnel: its interface and the routes craked added through it.
@@ -50,6 +53,8 @@ impl Routing {
         if plan.full_except.is_some() && self.real {
             return Err(super::not_yet("a full tunnel"));
         }
+        // Probes name the tunnel by its mark: which interface that is.
+        super::set_path(ids(plan.index).mark, Some(plan.device));
         self.tunnels.lock().unwrap().insert(
             plan.name.to_owned(),
             Routes {
@@ -57,6 +62,18 @@ impl Routing {
                 targets: BTreeSet::new(),
             },
         );
+        // A default route through the tunnel that normal traffic never
+        // takes (the real one has a far lower metric), for sockets bound to
+        // the tunnel (probes, DNS checks): Windows only looks at routes on
+        // the interface they're bound to. Linux's per-tunnel table.
+        if self.real {
+            iphelper::add_route_metric(
+                iphelper::luid(plan.device)?,
+                Ipv4Addr::UNSPECIFIED,
+                0,
+                PATH_METRIC,
+            )?;
+        }
         let learned = plan.learned.iter().map(|(a, _)| Target::host(*a));
         for t in plan.pinned.iter().copied().chain(learned) {
             self.add(plan.name, t)?;
@@ -75,7 +92,8 @@ impl Routing {
     }
 
     /// Take away every route craked added through the tunnel.
-    pub async fn down(&self, name: &str, _index: usize, _device: Option<&str>) -> Result<()> {
+    pub async fn down(&self, name: &str, index: usize, _device: Option<&str>) -> Result<()> {
+        super::set_path(ids(index).mark, None);
         let Some(routes) = self.tunnels.lock().unwrap().remove(name) else {
             return Ok(());
         };
@@ -89,6 +107,7 @@ impl Routing {
         for t in routes.targets {
             iphelper::delete_route(luid, t.addr(), t.prefix_len())?;
         }
+        iphelper::delete_route(luid, Ipv4Addr::UNSPECIFIED, 0)?;
         Ok(())
     }
 

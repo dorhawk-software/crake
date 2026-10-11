@@ -100,7 +100,7 @@ pub fn set_mtu(luid: NET_LUID_LH, mtu: u32) -> Result<()> {
     }
 }
 
-fn route(luid: NET_LUID_LH, dest: Ipv4Addr, prefix: u8) -> MIB_IPFORWARD_ROW2 {
+fn route(luid: NET_LUID_LH, dest: Ipv4Addr, prefix: u8, metric: u32) -> MIB_IPFORWARD_ROW2 {
     // SAFETY: initialized by Windows, then filled.
     unsafe {
         let mut row: MIB_IPFORWARD_ROW2 = std::mem::zeroed();
@@ -110,14 +110,19 @@ fn route(luid: NET_LUID_LH, dest: Ipv4Addr, prefix: u8) -> MIB_IPFORWARD_ROW2 {
         row.DestinationPrefix.PrefixLength = prefix;
         // On the link: the tunnel carries it, no next hop.
         row.NextHop = sockaddr(Ipv4Addr::UNSPECIFIED);
-        row.Metric = 0;
+        row.Metric = metric;
         row
     }
 }
 
 /// `dest/prefix` through the interface (already there: fine).
 pub fn add_route(luid: NET_LUID_LH, dest: Ipv4Addr, prefix: u8) -> Result<()> {
-    let row = route(luid, dest, prefix);
+    add_route_metric(luid, dest, prefix, 0)
+}
+
+/// The same with a route metric (higher: chosen only when nothing better).
+pub fn add_route_metric(luid: NET_LUID_LH, dest: Ipv4Addr, prefix: u8, metric: u32) -> Result<()> {
+    let row = route(luid, dest, prefix, metric);
     // SAFETY: a filled row, only read.
     match unsafe { CreateIpForwardEntry2(&raw const row) } {
         0 | ERROR_OBJECT_ALREADY_EXISTS => Ok(()),
@@ -127,7 +132,7 @@ pub fn add_route(luid: NET_LUID_LH, dest: Ipv4Addr, prefix: u8) -> Result<()> {
 
 /// Remove `dest/prefix` from the interface (gone already: fine).
 pub fn delete_route(luid: NET_LUID_LH, dest: Ipv4Addr, prefix: u8) -> Result<()> {
-    let row = route(luid, dest, prefix);
+    let row = route(luid, dest, prefix, 0);
     // SAFETY: a filled row, only read.
     match unsafe { DeleteIpForwardEntry2(&raw const row) } {
         0 | ERROR_NOT_FOUND => Ok(()),
