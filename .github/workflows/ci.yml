@@ -1,6 +1,6 @@
 # Every push and pull request: the lint gate, the tests and the coverage
 # floors; Crake for Windows (scripts/windows-check.sh, then built and its
-# portable tests run on a Windows runner); the tests that
+# portable tests run on a Windows runner) and for macOS; the tests that
 # need real networking, each in throwaway containers with no network
 # (scripts/netns-test.sh, scripts/e2e-test.sh); and the packages, built once
 # and installed and used on every supported release, in parallel, with the
@@ -61,6 +61,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Crake compiles for Windows, lint-clean
         run: scripts/windows-check.sh
+
+  # macOS, phase 1 (CLAUDE.md): Crake compiles there, lint-clean, and the
+  # portable tests pass. Only on GitHub's runners: no Mac here.
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Crake compiles for macOS, lint-clean
+        run: cargo clippy --workspace --all-targets --locked
+      - name: The tests that aren't Linux's own, on macOS
+        run: cargo test --workspace --locked
 
   windows-build:
     runs-on: windows-latest

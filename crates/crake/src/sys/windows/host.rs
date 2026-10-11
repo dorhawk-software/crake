@@ -240,3 +240,49 @@ fn service_pid(name: &str) -> Option<u32> {
         (ok && status.dwProcessId != 0).then_some(status.dwProcessId)
     }
 }
+
+/// A click's screen position in the logical pixels windows are placed in
+/// (the tray reports physical ones): scaled by its monitor's DPI.
+pub fn logical(x: f64, y: f64) -> (i32, i32) {
+    use windows_sys::Win32::Foundation::POINT;
+    use windows_sys::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromPoint};
+    use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
+    let point = POINT {
+        x: x as i32,
+        y: y as i32,
+    };
+    let (mut dpi, mut _y) = (96, 96);
+    // SAFETY: a monitor handle from Windows, out pointers for the call.
+    unsafe {
+        let monitor = MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST);
+        GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &raw mut dpi, &raw mut _y);
+    }
+    let scale = f64::from(dpi.max(1)) / 96.;
+    ((x / scale) as i32, (y / scale) as i32)
+}
+
+/// Windows' own setting for the taskbar: "Choose your Windows mode".
+pub fn light_bar() -> bool {
+    use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RegGetValueW};
+    let key = wide(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+    let value = wide("SystemUsesLightTheme");
+    let mut light: u32 = 0;
+    let mut size = size_of::<u32>() as u32;
+    // SAFETY: NUL-terminated names; `light` holds the DWORD asked for.
+    let read = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            key.as_ptr(),
+            value.as_ptr(),
+            RRF_RT_REG_DWORD,
+            std::ptr::null_mut(),
+            (&raw mut light).cast(),
+            &raw mut size,
+        )
+    };
+    read == 0 && light == 1
+}
+
+fn wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain([0]).collect()
+}

@@ -1436,6 +1436,7 @@ dependencies = [
  "oo7",
  "raw-window-handle",
  "resvg 0.45.1",
+ "security-framework",
  "serde",
  "serde_json",
  "tempfile",

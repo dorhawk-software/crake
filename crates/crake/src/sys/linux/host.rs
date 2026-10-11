@@ -1,8 +1,8 @@
-//! Small things that differ by system: the monitors, private files,
-//! whether a program can run, and the development connection to craked.
+//! Small things that differ by system: the monitors, the private folder,
+//! and the connection to craked (the rest is `sys::unix`'s, shared with
+//! macOS).
 
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::place::Rect;
 
@@ -55,26 +55,6 @@ pub fn private_dir() -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-/// `bytes` in a file only this user can read, replacing any older one.
-pub fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    use std::os::unix::fs::OpenOptionsExt;
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(path)
-        .and_then(|mut f| f.write_all(bytes))
-        .map_err(|e| e.to_string())
-}
-
-/// `path` is a program this user may run.
-pub fn executable(path: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-    path.metadata()
-        .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
-}
-
 /// Linux windows need nothing more: Crake's own frame is the frame.
 pub fn plain_frame(_window: &gpui_kit::Window) {}
 
@@ -84,13 +64,4 @@ pub fn no_console(_cmd: &mut std::process::Command) {}
 /// The installed craked, on the system bus (not peer to peer).
 pub async fn connect_craked() -> zbus::Result<(zbus::Connection, bool)> {
     Ok((zbus::Connection::system().await?, false))
-}
-
-/// craked's private socket (development: `craked --dev`).
-pub async fn connect_dev(path: &Path) -> zbus::Result<zbus::Connection> {
-    let stream = tokio::net::UnixStream::connect(path).await?;
-    zbus::connection::Builder::unix_stream(stream)
-        .p2p()
-        .build()
-        .await
 }

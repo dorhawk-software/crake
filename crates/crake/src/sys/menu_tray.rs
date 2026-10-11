@@ -1,14 +1,15 @@
-//! The tray on Windows: an icon in the notification area, its menu the
-//! same fallback as on Linux. The taskbar is light or dark with the
-//! system's theme, so the head is drawn white or dark to match.
+//! The tray on Windows and macOS (tray-icon): an icon in the notification
+//! area or the menu bar, its menu the same fallback as on Linux. The bar
+//! is light or dark with the system's theme (`light_bar`), so the head is
+//! drawn white or dark to match.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
-use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RegGetValueW};
 
+use super::{light_bar, logical};
 use crate::Request;
 use crate::tray::{Icon, MenuTunnel, State};
 
@@ -39,11 +40,7 @@ impl Handle {
 impl Shown {
     fn show(&mut self) {
         let icon = self.state.icon();
-        let icon = if light_taskbar() {
-            on_light(&icon)
-        } else {
-            icon
-        };
+        let icon = if light_bar() { on_light(&icon) } else { icon };
         if let Some(icon) = rgba(&icon) {
             let _ = self.tray.set_icon(Some(icon));
         }
@@ -123,52 +120,7 @@ pub fn start(requests: async_channel::Sender<Request>) -> Option<Handle> {
     Some(Handle(Rc::new(RefCell::new(shown))))
 }
 
-/// A click's screen position in the logical pixels windows are placed in
-/// (the tray reports physical ones): scaled by its monitor's DPI.
-fn logical(x: f64, y: f64) -> (i32, i32) {
-    use windows_sys::Win32::Foundation::POINT;
-    use windows_sys::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromPoint};
-    use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
-    let point = POINT {
-        x: x as i32,
-        y: y as i32,
-    };
-    let (mut dpi, mut _y) = (96, 96);
-    // SAFETY: a monitor handle from Windows, out pointers for the call.
-    unsafe {
-        let monitor = MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST);
-        GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &raw mut dpi, &raw mut _y);
-    }
-    let scale = f64::from(dpi.max(1)) / 96.;
-    ((x / scale) as i32, (y / scale) as i32)
-}
-
-/// Windows' own setting for the taskbar: "Choose your Windows mode".
-fn light_taskbar() -> bool {
-    let key = wide(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-    let value = wide("SystemUsesLightTheme");
-    let mut light: u32 = 0;
-    let mut size = size_of::<u32>() as u32;
-    // SAFETY: NUL-terminated names; `light` holds the DWORD asked for.
-    let read = unsafe {
-        RegGetValueW(
-            HKEY_CURRENT_USER,
-            key.as_ptr(),
-            value.as_ptr(),
-            RRF_RT_REG_DWORD,
-            std::ptr::null_mut(),
-            (&raw mut light).cast(),
-            &raw mut size,
-        )
-    };
-    read == 0 && light == 1
-}
-
-fn wide(s: &str) -> Vec<u16> {
-    s.encode_utf16().chain([0]).collect()
-}
-
-/// The image for a light taskbar: the white head drawn dark, the coloured
+/// The image for a light bar: the white head drawn dark, the coloured
 /// marks as they are.
 fn on_light(icon: &Icon) -> Icon {
     let mut data = icon.data.clone();

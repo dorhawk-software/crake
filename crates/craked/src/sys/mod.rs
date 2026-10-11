@@ -6,6 +6,11 @@
 //! portable and reaches these by the same names on every system (lib.rs
 //! re-exports the modules: `crate::routing`, `crate::net`, ...).
 
+#[cfg(unix)]
+mod unix;
+#[cfg(unix)]
+pub use unix::*;
+
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
@@ -15,3 +20,8 @@ pub use linux::*;
 mod windows;
 #[cfg(windows)]
 pub use windows::*;
+
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "macos")]
+pub use macos::*;
