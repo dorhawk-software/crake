@@ -41,8 +41,12 @@ pub fn reply_code(query: &[u8], rcode: u8) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// Answer on ADDR:53 until the socket fails.
+/// Answer on ADDR:53 until the socket fails. Windows: craked's DNS server
+/// answers for this link (`sys::windows::dns_queue`).
 pub async fn serve() -> Result<()> {
+    if cfg!(windows) {
+        return Ok(());
+    }
     let sock = UdpSocket::bind((ADDR, 53)).await?;
     let mut buf = vec![0u8; 1500];
     loop {

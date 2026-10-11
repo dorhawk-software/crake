@@ -39,13 +39,10 @@ impl Net {
         Ok(())
     }
 
-    /// craked's own DNS links (`hush`, `keep`): Linux's systemd-resolved
-    /// form. Windows will use NRPT rules to craked's DNS instead.
+    /// craked's own DNS links (`hush`, `keep`) need no interface on Windows:
+    /// craked's DNS server answers for them (`dns_queue`).
     pub async fn dummy(&self, _dev: &str, _addr: Ipv4Addr) -> Result<()> {
-        match self {
-            Self::Ip => Err(super::not_yet("craked's own DNS links")),
-            Self::Noop => Ok(()),
-        }
+        Ok(())
     }
 
     /// Wintun's adapter goes with openconnect.

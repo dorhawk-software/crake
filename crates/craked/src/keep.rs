@@ -41,8 +41,12 @@ pub fn answer(query: &[u8], addrs: &[Ipv4Addr]) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// Answer on ADDR:53 until the socket fails.
+/// Answer on ADDR:53 until the socket fails. Windows: craked's DNS server
+/// answers for this link (`sys::windows::dns_queue`).
 pub async fn serve(mgr: Arc<crate::manager::Manager>) -> Result<()> {
+    if cfg!(windows) {
+        return Ok(());
+    }
     let sock = Arc::new(UdpSocket::bind((ADDR, 53)).await?);
     let mut buf = vec![0u8; 1500];
     loop {
