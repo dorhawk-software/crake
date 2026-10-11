@@ -897,7 +897,8 @@ address; Windows' stuck connection keeps the LAN's source address, so
 craked resets it. Making the first one work would need a WFP callout
 driver (holding the SYN), not planned.
 
-**Phase 4: built** (`scripts/windows-vm-test.sh`). A Windows 11 VM with
+**Phase 4: done** (`scripts/windows-vm-test.sh`; passes: about 2½
+minutes a run, the image's unattended install about 25 minutes once). A Windows 11 VM with
 Crake installed as a person would have it (Program Files\Crake, the
 craked service, openconnect beside it) and a gateway VM (Ubuntu's cloud
 image, ocserv, ACME's network behind it, and the LAN's own DNS, which

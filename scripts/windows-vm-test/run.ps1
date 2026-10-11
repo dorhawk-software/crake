@@ -63,7 +63,8 @@ $env:CRAKE_E2E = '1'
 $env:CRAKE_E2E_GATEWAY = 'https://198.51.100.10'
 $env:CRAKE_OPENCONNECT = "$dir\openconnect\openconnect.exe"
 Say "== the Windows test (windows_tests.rs)"
-$out = & "$Disc\crake-tests.exe" windows_tests --nocapture --test-threads=1 2>&1 | Out-String
+# Through cmd: PowerShell would wrap each line on stderr as an error.
+$out = cmd /c "`"$Disc\crake-tests.exe`" windows_tests --nocapture --test-threads=1 2>&1" | Out-String
 Say $out
 if ($LASTEXITCODE -ne 0) { $fail = 1 }
 
