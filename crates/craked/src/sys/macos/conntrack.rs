@@ -92,6 +92,7 @@ const XSO_TCPCB: u32 = 0x20;
 const XINPGEN: usize = 24;
 /// A connection's record says IPv4 (`inp_vflag & INP_IPV4`).
 const INP_IPV4: u8 = 0x1;
+const IPPROTO_TCP: u8 = 6;
 
 /// The list: an `xinpgen`, then per connection its records (`xinpcb_n`,
 /// the socket's, `xtcpcb_n`), each led by its length and kind and padded
@@ -121,17 +122,24 @@ pub fn parse(buf: &[u8]) -> HashMap<Flow, TcpState> {
             break;
         }
         match kind {
-            // xinpcb_n: ports at 16 and 18, inp_vflag at 48, the foreign
-            // and local addresses (in_addr_4in6) at 52 and 68, IPv4 in
-            // their last four bytes.
+            // xinpcb_n: ports at 16 and 18; then inp_vflag, inp_ip_ttl and
+            // inp_ip_p (TCP: 6), and the foreign and local addresses
+            // (in_addr_4in6, IPv4 in their last four bytes) 16 and 32 bytes
+            // after the flag. Where the flag is depends on whether the
+            // kernel packs the struct to 4 bytes (44) or not (48): the one
+            // whose protocol byte says TCP.
             XSO_INPCB => {
                 current = None;
-                if buf.get(at + 48).is_some_and(|v| v & INP_IPV4 != 0)
+                let flag = [48, 44]
+                    .into_iter()
+                    .find(|v| buf.get(at + v + 2) == Some(&IPPROTO_TCP));
+                if let Some(v) = flag
+                    && buf.get(at + v).is_some_and(|f| f & INP_IPV4 != 0)
                     && let (Some(dport), Some(sport), Some(dst), Some(src)) = (
                         u16_net(at + 16),
                         u16_net(at + 18),
-                        ip_at(at + 64),
-                        ip_at(at + 80),
+                        ip_at(at + v + 16),
+                        ip_at(at + v + 32),
                     )
                     && !dst.is_unspecified()
                 {
@@ -172,16 +180,24 @@ fn tcp_state(raw: u32) -> TcpState {
 mod tests {
     use super::*;
 
-    /// One connection's records as the kernel lays them out.
-    fn connection(src: [u8; 4], sport: u16, dst: [u8; 4], dport: u16, state: u32) -> Vec<u8> {
-        let mut inpcb = vec![0u8; 104];
-        inpcb[0..4].copy_from_slice(&104u32.to_ne_bytes());
+    /// One connection's records as the kernel lays them out, its
+    /// `xinpcb_n` packed to 4 bytes or not.
+    fn connection(
+        packed: bool,
+        (src, sport): ([u8; 4], u16),
+        (dst, dport): ([u8; 4], u16),
+        state: u32,
+    ) -> Vec<u8> {
+        let (len, flag) = if packed { (104, 44) } else { (112, 48) };
+        let mut inpcb = vec![0u8; len];
+        inpcb[0..4].copy_from_slice(&(len as u32).to_ne_bytes());
         inpcb[4..8].copy_from_slice(&XSO_INPCB.to_ne_bytes());
         inpcb[16..18].copy_from_slice(&dport.to_be_bytes());
         inpcb[18..20].copy_from_slice(&sport.to_be_bytes());
-        inpcb[48] = INP_IPV4;
-        inpcb[64..68].copy_from_slice(&dst);
-        inpcb[80..84].copy_from_slice(&src);
+        inpcb[flag] = INP_IPV4;
+        inpcb[flag + 2] = IPPROTO_TCP;
+        inpcb[flag + 16..flag + 20].copy_from_slice(&dst);
+        inpcb[flag + 32..flag + 36].copy_from_slice(&src);
         let mut socket = vec![0u8; 92]; // padded to 96
         socket[0..4].copy_from_slice(&92u32.to_ne_bytes());
         socket[4..8].copy_from_slice(&1u32.to_ne_bytes());
@@ -203,22 +219,24 @@ mod tests {
             g[4..8].copy_from_slice(&count.to_ne_bytes());
             g
         };
-        let buf = [
-            generation(32),
-            connection([192, 0, 2, 5], 50000, [10, 40, 1, 10], 443, 2),
-            connection([192, 0, 2, 5], 50001, [198, 51, 100, 7], 80, 4),
-            generation(32),
-        ]
-        .concat();
-        let found = parse(&buf);
-        assert_eq!(found.len(), 2);
-        let stuck = Flow {
-            src: Ipv4Addr::new(192, 0, 2, 5),
-            dst: Ipv4Addr::new(10, 40, 1, 10),
-            sport: 50000,
-            dport: 443,
-        };
-        assert_eq!(found.get(&stuck), Some(&TcpState::SynSent));
-        assert!(found.values().any(|s| *s == TcpState::Answered));
+        for packed in [false, true] {
+            let buf = [
+                generation(32),
+                connection(packed, ([192, 0, 2, 5], 50000), ([10, 40, 1, 10], 443), 2),
+                connection(packed, ([192, 0, 2, 5], 50001), ([198, 51, 100, 7], 80), 4),
+                generation(32),
+            ]
+            .concat();
+            let found = parse(&buf);
+            assert_eq!(found.len(), 2, "packed: {packed}");
+            let stuck = Flow {
+                src: Ipv4Addr::new(192, 0, 2, 5),
+                dst: Ipv4Addr::new(10, 40, 1, 10),
+                sport: 50000,
+                dport: 443,
+            };
+            assert_eq!(found.get(&stuck), Some(&TcpState::SynSent));
+            assert!(found.values().any(|s| *s == TcpState::Answered));
+        }
     }
 }

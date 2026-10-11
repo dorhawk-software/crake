@@ -289,7 +289,60 @@ async fn the_connection_table_sees_a_stuck_connection() {
         }
     })
     .await
-    .expect("the new connection in the table");
+    .unwrap_or_else(|_| panic!("the new connection in the table\n{}", layout()));
     assert_eq!(seen, (Kind::New, Some(TcpState::SynSent)));
     connecting.abort();
+}
+
+/// Where 192.0.2.1 and port 9 sit in the kernel's records, for when the
+/// table can't be read: each record (offset, length, kind), and the
+/// offsets of the address and port within the one that has them.
+fn layout() -> String {
+    let name = c"net.inet.tcp.pcblist_n";
+    let mut len = 0;
+    // SAFETY: a size query, then a buffer of that size.
+    let buf = unsafe {
+        libc::sysctlbyname(
+            name.as_ptr(),
+            std::ptr::null_mut(),
+            &raw mut len,
+            std::ptr::null_mut(),
+            0,
+        );
+        len += 65536;
+        let mut buf = vec![0u8; len];
+        libc::sysctlbyname(
+            name.as_ptr(),
+            buf.as_mut_ptr().cast(),
+            &raw mut len,
+            std::ptr::null_mut(),
+            0,
+        );
+        buf.truncate(len);
+        buf
+    };
+    let mut out = format!("{} bytes\n", buf.len());
+    let mut at = 24;
+    while at + 24 < buf.len() {
+        let rec_len = u32::from_ne_bytes(buf[at..at + 4].try_into().unwrap()) as usize;
+        let kind = u32::from_ne_bytes(buf[at + 4..at + 8].try_into().unwrap());
+        let rec = &buf[at..(at + rec_len).min(buf.len())];
+        if let Some(i) = rec.windows(4).position(|w| w == [192, 0, 2, 1]) {
+            let ports: Vec<usize> = rec
+                .windows(2)
+                .enumerate()
+                .filter(|(_, w)| *w == [0, 9])
+                .map(|(i, _)| i)
+                .collect();
+            out += &format!(
+                "record at {at}: len {rec_len} kind {kind:#x}: 192.0.2.1 at +{i}, port 9 at {ports:?}\n"
+            );
+            out += &format!("  {:02x?}\n", &rec[..rec.len().min(120)]);
+        }
+        if rec_len < 8 {
+            break;
+        }
+        at += rec_len.next_multiple_of(8);
+    }
+    out
 }
