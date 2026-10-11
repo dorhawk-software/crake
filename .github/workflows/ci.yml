@@ -1,0 +1,52 @@
+# Every push and pull request: the lint gate, the tests and the coverage
+# floors; then the tests that need real networking, each in throwaway
+# containers with no network (scripts/netns-test.sh, scripts/e2e-test.sh).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # What GPUI links (X11, keyboard, fonts) and what the tests drive.
+  APT: >-
+    build-essential pkg-config cmake clang
+    libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
+    libfontconfig-dev libfreetype-dev libvulkan-dev
+    openconnect nftables iproute2
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $APT
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt, llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny,cargo-machete,cargo-llvm-cov
+      - name: Lint gate
+        run: scripts/lint.sh
+      - name: Tests
+        run: cargo test --workspace
+      - name: Coverage floors
+        run: scripts/check-coverage.sh
+
+  network:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $APT
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: nftables and policy routing in a namespace
+        run: scripts/netns-test.sh
+      - name: End to end against ocserv
+        run: scripts/e2e-test.sh
