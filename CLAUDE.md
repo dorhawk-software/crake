@@ -631,7 +631,18 @@ it doesn't, bundle, and own the updates.**
   and purge leave nothing. It found the unit lacking
   `CAP_NET_BIND_SERVICE` (craked's own DNS couldn't bind port 53), and that
   a systemd-resolved that doesn't answer kept tunnels from coming up (the
-  hook timed out); resolved now gets 3 s per call (`resolved.rs`). Still
+  hook timed out); resolved now gets 3 s per call (`resolved.rs`).
+  **AppArmor:** `packaging/apparmor/usr.sbin.craked` confines craked (its
+  files, netlink, its D-Bus name and calls to resolved and polkit, ip, nft,
+  openconnect and the hook); the package loads it before craked starts and
+  unloads it on removal. openconnect runs under craked's profile, not one
+  of its own: the unit's NoNewPrivileges forbids the switch ("no new
+  privs"). Containers can't test it (loading a profile there would load it
+  into this machine's kernel), so `scripts/vm-test.sh [--complain]
+  [release]` runs the same checks in a throwaway Ubuntu VM (qemu, KVM, no
+  display, no ports; cloud image cached in `target/vm/`) with the profile
+  enforced: craked and openconnect confined, nothing refused. Passes on
+  22.04, 24.04 and 26.04. Not in CI (needs KVM). Still
   to do, with the user: the signed apt repository (their key) and its
   publishing.
 - **At runtime (built, `engines.rs`):** the app checks which engines exist

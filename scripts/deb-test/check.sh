@@ -26,6 +26,9 @@ install() {
     check "the polkit action is known" sh -c 'pkaction | grep -qx software.dorhawk.crake.manage-tunnels'
     for _ in $(seq 1 20); do systemctl is-active -q craked && break; sleep 0.5; done
     check "craked is running" systemctl is-active craked
+    if aa-enabled --quiet 2>/dev/null; then
+        check "craked runs confined by AppArmor" sh -c 'grep -Eq "^craked \((enforce|complain)\)" /proc/$(systemctl show -p MainPID --value craked)/attr/current'
+    fi
     check "craked answers on the system bus" call Settings
     check "root may add a tunnel" call AddTunnel 'a{ss}' 3 display_name Globex gateway vpn.globex.example protocol anyconnect
     check "it is listed" sh -c "busctl --system call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 ListTunnels | grep -q globex"
@@ -64,6 +67,9 @@ tunnel() {
         fingerprint "$(session_arg FINGERPRINT)" resolve "$(session_arg RESOLVE)"
     for _ in $(seq 1 40); do call GetTunnel s acme | grep -q '"connected"' && break; sleep 0.5; done
     check "connected" sh -c "busctl --system call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 GetTunnel s acme | grep -q '\"connected\"'"
+    if aa-enabled --quiet 2>/dev/null; then
+        check "openconnect runs confined too" sh -c 'ps -eo label,comm | grep -Eq "^craked \((enforce|complain)\) +openconnect"'
+    fi
     check "its address on crake-acme" sh -c 'ip -4 -o addr show crake-acme | grep -q "inet 10.40.255."'
     check "the gateway's network isn't routed" sh -c '! ip -4 route show table all | grep -q "10.40.0.0/16 dev crake-acme"'
     # Probing: no answer directly, so tried through ACME; the retry gets in.
@@ -79,6 +85,11 @@ tunnel() {
     check "crake-hush is up" ip link show crake-hush
     check "ACME's names are refused at once" refused_at_once wiki.acme.internal
     check "nothing went wrong in craked's journal" sh -c '! journalctl -b -u craked --no-pager -o cat | grep -E "ERROR|panicked"'
+    if aa-enabled --quiet 2>/dev/null; then
+        # Complain mode (scripts/vm-test.sh --complain) lists what the
+        # profile would have refused: ALLOWED instead of DENIED.
+        check "AppArmor refused craked nothing" sh -c '! journalctl -k --no-pager -o cat | grep -E "apparmor=\"(DENIED|ALLOWED)\"" | grep "craked"'
+    fi
     echo "  craked's journal:"
     journalctl -b -u craked --no-pager -o cat | sed 's/^/        /'
 }
@@ -86,6 +97,7 @@ tunnel() {
 remove() {
     check "removes" apt-get remove -y -qq crake
     check "craked stopped" sh -c '! systemctl is-active -q craked'
+    check "and stopped without an error" sh -c '! journalctl -b -u craked --no-pager -o cat | grep -E "ERROR|panicked"'
     check "no crake links left" sh -c '! ip -o link | grep -q crake-'
     check "no nftables table left" sh -c '! nft list tables 2>/dev/null | grep -q crake'
     check "purges" apt-get purge -y -qq crake

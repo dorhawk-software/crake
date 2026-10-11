@@ -235,6 +235,7 @@ scripts/lint.sh                               # rustfmt, clippy, cargo-deny, car
 scripts/check-coverage.sh                     # each crate's tested share of lines stays above its floor
 scripts/build-deb.sh                          # the .deb, built in an Ubuntu 22.04 container
 scripts/deb-test.sh                           # install and use it on Ubuntu 22.04, 24.04 and 26.04, in containers
+scripts/vm-test.sh [release]                  # the same in a throwaway VM, with craked's AppArmor profile enforced
 ```
 
 - **Needs:** openconnect, nftables, iproute2, systemd-resolved, and a tray: GNOME with the

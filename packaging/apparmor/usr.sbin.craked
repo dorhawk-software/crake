@@ -1,0 +1,86 @@
+# AppArmor profile for craked, Crake's daemon (installed as
+# /etc/apparmor.d/usr.sbin.craked). craked runs as root and reads what the
+# network sends (DNS answers, connection events), so it gets only what it
+# needs: its own files, netlink (routes, nftables, the DNS queue,
+# conntrack), its D-Bus name and the calls it makes (resolved, polkit), ip
+# and nft, and openconnect with the hook it runs.
+# Tested enforced by scripts/vm-test.sh.
+
+abi <abi/3.0>,
+
+include <tunables/global>
+
+profile craked /usr/sbin/craked flags=(attach_disconnected) {
+  include <abstractions/base>
+  include <abstractions/dbus-strict>
+
+  # As systemd's unit allows (craked.service).
+  capability net_admin,
+  capability net_raw,
+  capability net_bind_service,
+  capability kill,
+
+  network inet dgram,
+  network inet stream,
+  network inet6 dgram,
+  network inet6 stream,
+  network netlink raw,
+  network unix stream,
+  network unix dgram,
+
+  /usr/sbin/craked mr,
+  /etc/crake/ r,
+  /etc/crake/** r,
+  /var/lib/crake/ rw,
+  /var/lib/crake/** rwk,
+  /run/crake/ rw,
+  /run/crake/** rw,
+
+  # The network it's on (networks.rs) and the interfaces' counters.
+  @{PROC}/net/route r,
+  @{PROC}/net/arp r,
+  @{PROC}/@{pid}/net/route r,
+  @{PROC}/@{pid}/net/arp r,
+  /sys/class/net/ r,
+  /sys/devices/**/net/** r,
+  # How many CPUs it may use (Rust's runtime, from its cgroup).
+  @{PROC}/@{pid}/cgroup r,
+  /sys/fs/cgroup/**/cpu.max r,
+
+  # D-Bus: its own name and object, resolved, polkit.
+  dbus bind bus=system name=software.dorhawk.Crake1,
+  dbus receive bus=system path=/software/dorhawk/Crake1,
+  dbus send bus=system path=/software/dorhawk/Crake1,
+  dbus send bus=system path=/org/freedesktop/DBus interface=org.freedesktop.DBus
+       member={RequestName,ReleaseName,AddMatch,RemoveMatch,GetNameOwner,GetConnectionCredentials,GetConnectionUnixUser,GetConnectionUnixProcessID}
+       peer=(name=org.freedesktop.DBus),
+  dbus send bus=system peer=(name=org.freedesktop.resolve1),
+  dbus send bus=system path=/org/freedesktop/PolicyKit1/Authority
+       interface=org.freedesktop.PolicyKit1.Authority member=CheckAuthorization
+       peer=(name=org.freedesktop.PolicyKit1),
+
+  # Routes, rules and nftables.
+  /{usr/,}{s,}bin/ip ix,
+  /{usr/,}{s,}bin/nft ix,
+  /etc/iproute2/** r,
+  /usr/share/iproute2/** r,
+  /usr/lib/iproute2/** r,
+  /etc/nftables.conf r,
+
+  # One openconnect per tunnel, under this profile (craked.service sets
+  # NoNewPrivileges, which rules out a profile of its own), and the hook it
+  # runs through /bin/sh, which talks to craked's socket.
+  include <abstractions/nameservice>
+  include <abstractions/ssl_certs>
+  include <abstractions/openssl>
+  include <abstractions/p11-kit>
+  /{usr/,}{s,}bin/openconnect ix,
+  signal send set=(hup, term, kill, int) peer=craked,
+  signal receive peer=craked,
+  /dev/net/tun rw,
+  /dev/vhost-net rw,
+  /etc/gnutls/** r,
+  /usr/share/crypto-policies/** r,
+  /{usr/,}bin/{,da}sh ix,
+  /usr/libexec/crake/hook ix,
+}

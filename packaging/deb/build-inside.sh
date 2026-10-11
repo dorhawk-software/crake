@@ -24,6 +24,7 @@ install -Dm644 /src/packaging/software.dorhawk.Crake1.conf "$root/usr/share/dbus
 install -Dm644 /src/packaging/software.dorhawk.crake.policy "$root/usr/share/polkit-1/actions/software.dorhawk.crake.policy"
 install -Dm644 /src/packaging/deb/craked.toml "$root/etc/crake/craked.toml"
 install -d "$root/etc/crake/managed.d"
+install -Dm644 /src/packaging/apparmor/usr.sbin.craked "$root/etc/apparmor.d/usr.sbin.craked"
 install -Dm644 /src/packaging/deb/crake.desktop "$root/usr/share/applications/software.dorhawk.crake.desktop"
 doc="$root/usr/share/doc/crake"
 install -Dm644 /src/packaging/deb/copyright "$doc/copyright"
@@ -40,7 +41,7 @@ shlibs=$(cd "$work" && dpkg-shlibdeps -O "$root/usr/bin/crake" "$root/usr/sbin/c
 install -d "$root/DEBIAN"
 sed -e "s/@VERSION@/$VERSION/" -e "s/@SHLIBS@/$shlibs/" /src/packaging/deb/control.in > "$root/DEBIAN/control"
 echo "Installed-Size: $(du -sk --exclude=DEBIAN "$root" | cut -f1)" >> "$root/DEBIAN/control"
-echo /etc/crake/craked.toml > "$root/DEBIAN/conffiles"
+printf '/etc/crake/craked.toml\n/etc/apparmor.d/usr.sbin.craked\n' > "$root/DEBIAN/conffiles"
 install -m755 /src/packaging/deb/postinst /src/packaging/deb/prerm /src/packaging/deb/postrm "$root/DEBIAN/"
 deb="/out/crake_${VERSION}_amd64.deb"
 dpkg-deb --root-owner-group -Zxz --build "$root" "$deb" >/dev/null
