@@ -35,7 +35,8 @@
 <div class="intro"><b>Proposal: what "What Crake did" shows.</b> You expected every visit to a host to show up here; Crake
   records only the first time it sends a host through a tunnel. A "?" after the heading says so, with the pattern
   Settings uses (DESIGN.md, Copy voice): 15 px muted, teal while open; hovering or clicking opens the card. Closed
-  (left), open (right).</div>
+  (left), open (right). How long a host is kept comes from the settings: Learning's "Forget after", and a tunnel
+  added in the app that sets its own is named (only those that differ).</div>
 <div class="page">
   <div>
     <div class="label">Closed</div>
@@ -53,7 +54,8 @@
       <div class="sec">What Crake did <span class="q open">?</span></div>
       <div class="card">
         <p>A host shows up here once: the first time Crake sends it through a tunnel. After that it just goes
-          through, and every time you use it Crake keeps it another week.</p>
+          through, and every time you use it Crake keeps it another 7 days, as set in Settings → Learning.
+          Initech keeps its hosts 30 days.</p>
         <p>To see when a host was last used, open its tunnel in Settings → Tunnels.</p>
         <p class="ex">Example: git.acme.internal showed up at 13:21. Opening it again tomorrow goes through ACME
           without a new line here.</p>
@@ -67,6 +69,13 @@
     </div>
   </div>
 </div>
+<div class="intro" style="margin-top: 0"><b>The sentence, by setting:</b><br>
+  Forget after 7 days: “… every time you use it Crake keeps it another 7 days, as set in Settings → Learning.”<br>
+  1 day: “… keeps it another day, …”<br>
+  Never: “… After that it just goes through, and Crake keeps it until you forget it in the tunnel’s details, as set in
+  Settings → Learning.”<br>
+  A tunnel with its own: “Initech keeps its hosts 30 days.” / “Initech keeps its hosts until you forget them.”
+  Two or more: “Initech and Globex keep theirs 30 days.” (grouped by value)</div>
 <script>if (location.search.includes('dark=false')) document.body.classList.add('light');</script>
 </body>
 </html>
