@@ -141,7 +141,8 @@ fn stored(spec: &Spec, rt: &tokio::runtime::Runtime) -> Stored {
             keyring::get(&spec.tunnel, Kind::Password).await,
         )
     };
-    rt.block_on(tokio::time::timeout(KEYRING_WAIT, read))
+    // The timer is made inside the runtime: it needs one to exist.
+    rt.block_on(async { tokio::time::timeout(KEYRING_WAIT, read).await })
         .unwrap_or((None, None, None))
 }
 

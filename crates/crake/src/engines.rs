@@ -187,11 +187,13 @@ mod tests {
             browser: false,
             openconnect_version: None,
         };
-        assert!(
-            none.missing("gp")
-                .unwrap()
-                .contains("sudo apt install openconnect")
-        );
+        // Linux: from the distribution; Windows: it came with Crake.
+        let how = if cfg!(windows) {
+            "Reinstall Crake"
+        } else {
+            "sudo apt install openconnect"
+        };
+        assert!(none.missing("gp").unwrap().contains(how));
         assert!(none.missing("openvpn3").unwrap().contains("OpenVPN 3"));
         let both = Engines::ALL;
         assert_eq!(both.missing("anyconnect"), None);
