@@ -573,9 +573,8 @@ The user doesn't want development builds installed on their machine.
   every package test's container after the tunnel phase (`check.sh
   journey`: the service steps aside, the journey runs its own craked with
   the packaged hook and the system's openconnect, nft and ip). Passes on
-  Ubuntu 22.04/24.04/26.04, Debian 12/13, Fedora 43/44/45 and Arch. Still
-  to do: NixOS (its VM test), Windows (its VM test, phase 4), macOS
-  (GitHub's runners).
+  Ubuntu 22.04/24.04/26.04, Debian 12/13, Fedora 43/44/45 and Arch; NixOS in its VM test. Still to do: Windows (its VM test,
+  phase 4), macOS (GitHub's runners).
 - `scripts/netns-test.sh`: real nftables and policy routing inside a
   disposable container with no network (host filesystem read-only).
 - `scripts/e2e-test.sh` (`crates/crake/src/e2e_tests.rs`, skipped unless
@@ -783,9 +782,15 @@ it doesn't, bundle, and own the updates.**
   behind which ACME's network sits, and a client with the module: sign-in,
   connect over D-Bus, probing, DNS, names kept private.
   `scripts/nix-test.sh` runs it in the nixos/nix container (no Nix on this
-  machine), CI with install-nix-action. Not done there: an upgrade
-  (nixos-rebuild switch) restarts craked without the handover, so tunnels
-  sign out.
+  machine), CI with nix-quick-install-action. Upgrades keep tunnels signed
+  in: the module reloads craked on `nixos-rebuild switch`
+  (`reloadIfChanged`), and its reload leaves the handover flag and
+  restarts it, as the packages' upgrade scripts do. The VM test also
+  checks polkit's refusal, the upgrade (a specialisation with craked's
+  unit changed, switched to with ACME up), and runs the journey (Nix
+  builds its test binary: the flake's `packages.journey`). Locally the
+  container makes its own /dev/kvm open to all (Nix's build users lose
+  their groups; without it the VMs ran emulated).
 - **macOS and Windows (someday):** no package manager to pull engines in,
   so the installer bundles them: openconnect (Windows: its DLL plus Wintun;
   macOS: inside the signed, notarized .app). Bundling makes Crake

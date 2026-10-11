@@ -123,9 +123,10 @@ in {
         client.fail("curl -s -m 2 http://10.40.1.10/")
 
     with subtest("polkit refuses someone without a session here"):
-        client.succeed("setpriv --reuid=nobody --regid=$(id -g nobody) --clear-groups "
+        # (dbus-send fails on the refusal; the driver's shell has pipefail)
+        client.succeed("(setpriv --reuid=nobody --regid=$(id -g nobody) --clear-groups "
                        + "dbus-send --system --print-reply --dest=software.dorhawk.Crake1 /software/dorhawk/Crake1 "
-                       + "software.dorhawk.Crake1.RemoveTunnel string:globex 2>&1 | grep 'not authorized to switch tunnels'")
+                       + "software.dorhawk.Crake1.RemoveTunnel string:globex 2>&1 || true) | grep 'not authorized to switch tunnels'")
 
     with subtest("signs in and connects through craked"):
         client.succeed(call + "AddTunnel 'a{ss}' 4 display_name ACME gateway https://${gw} protocol anyconnect user alice")

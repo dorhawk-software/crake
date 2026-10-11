@@ -10,15 +10,16 @@ set -eu
 cd "$(dirname "$0")/.."
 LOCK=${1:-}
 # The script in the container is single-quoted: no apostrophes in it.
-docker run --rm -v "$PWD:/src" -v crake-nix:/nix --device /dev/kvm \
-  -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e LOCK="$LOCK" -e KVM_GID="$(stat -c %g /dev/kvm)" nixos/nix sh -euc '
+docker run --rm -v "$PWD:/src" -v crake-nix:/nix --device-cgroup-rule="c 10:232 rwm" \
+  -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e LOCK="$LOCK" nixos/nix sh -euc '
     git config --global --add safe.directory /src
-    # Nix builds as its own users (nixbld*), not in the group of /dev/kvm:
-    # without this the VMs of the test run emulated, slowly enough for its
-    # timeouts to trip. The group goes in the /etc/group of the container.
-    echo "kvm:x:$KVM_GID:$(sed -n "s/^nixbld:x:[0-9]*://p" /etc/group)" >> /etc/group
     # Nix reads the flake through git, which may store objects as root.
     trap "chown -R $HOST_UID:$HOST_GID /src/.git" EXIT
+    # /dev/kvm open to all, as NixOS and CI make it: Nix builds as its own
+    # users, who lose every extra group, so with the node of the host the
+    # VMs of the test ran emulated, slowly enough for its timeouts to trip.
+    # A node of the container only (the device rule above lets it in).
+    mknod -m 666 /dev/kvm c 10 232
     export NIX_CONFIG="experimental-features = nix-command flakes
 system-features = kvm nixos-test benchmark big-parallel"
     cd /src
