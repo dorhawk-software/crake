@@ -31,10 +31,22 @@ struct Args {
     #[cfg(windows)]
     #[arg(long)]
     console: bool,
+    /// Windows, craked's own use: send a console event (c or break) to an
+    /// openconnect it started, from this separate process.
+    #[cfg(windows)]
+    #[arg(long, num_args = 2, value_names = ["PID", "EVENT"], hide = true)]
+    console_event: Option<Vec<String>>,
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
+    #[cfg(windows)]
+    if let Some([pid, event]) = args.console_event.as_deref() {
+        let sent = pid
+            .parse()
+            .is_ok_and(|pid| craked::sys::deliver_console_event(pid, event));
+        std::process::exit(if sent { 0 } else { 1 });
+    }
     #[cfg(windows)]
     if !args.console && args.connect.is_none() {
         return service::run(args);

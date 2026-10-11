@@ -4,7 +4,6 @@
 
 use std::net::Ipv4Addr;
 use std::path::Path;
-use std::sync::Mutex;
 use std::time::Duration;
 
 use tokio::process::{Child, Command};
@@ -29,11 +28,28 @@ pub fn mark(_sock: &tokio::net::TcpSocket, _mark: u32) -> std::io::Result<()> {
     ))
 }
 
-/// A socket that leaves through this interface.
-pub fn bind_device(_sock: &tokio::net::UdpSocket, _device: &str) -> std::io::Result<()> {
-    Err(std::io::Error::other(
-        "binding to a tunnel isn't built for Windows yet",
-    ))
+/// A socket that leaves through this interface (IP_UNICAST_IF, the
+/// interface's index in network byte order).
+pub fn bind_device(sock: &tokio::net::UdpSocket, device: &str) -> std::io::Result<()> {
+    use std::os::windows::io::AsRawSocket;
+    use windows_sys::Win32::Networking::WinSock::{IP_UNICAST_IF, IPPROTO_IP, SOCKET, setsockopt};
+    let index = super::iphelper::index(device).map_err(std::io::Error::other)?;
+    let value = index.to_be();
+    // SAFETY: a live socket of ours; `value` is the u32 the option takes.
+    let err = unsafe {
+        setsockopt(
+            sock.as_raw_socket() as SOCKET,
+            IPPROTO_IP,
+            IP_UNICAST_IF,
+            (&raw const value).cast(),
+            size_of::<u32>() as i32,
+        )
+    };
+    if err == 0 {
+        Ok(())
+    } else {
+        Err(std::io::Error::last_os_error())
+    }
 }
 
 /// openconnect gets a console of its own (in the service's session, so
@@ -46,15 +62,8 @@ pub fn own_group(cmd: &mut Command) {
 /// counterpart), Ctrl+C logs off. Killed if it doesn't end in 10 s.
 pub async fn stop(child: &mut Child, keep_session: bool) {
     if let Some(pid) = child.id() {
-        let event = if keep_session {
-            CTRL_BREAK_EVENT
-        } else {
-            CTRL_C_EVENT
-        };
-        let sent = tokio::task::spawn_blocking(move || console_event(pid, event))
-            .await
-            .unwrap_or(false);
-        if sent
+        let event = if keep_session { "break" } else { "c" };
+        if send_console_event(pid, event).await
             && tokio::time::timeout(Duration::from_secs(10), child.wait())
                 .await
                 .is_ok()
@@ -65,13 +74,31 @@ pub async fn stop(child: &mut Child, keep_session: bool) {
     let _ = child.kill().await;
 }
 
-/// Send `event` to everything on `pid`'s console, craked swallowing its
-/// own copy while attached. One at a time: a process has one console.
-fn console_event(pid: u32, event: u32) -> bool {
-    static ONE: Mutex<()> = Mutex::new(());
-    let _one = ONE
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+/// A copy of craked delivers the event (`deliver_console_event`): whoever
+/// attaches to openconnect's console to send it receives it too, and in a
+/// service that ends the process (it ended craked). The copy takes the hit.
+async fn send_console_event(pid: u32, event: &str) -> bool {
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let Ok(exe) = std::env::current_exe() else {
+        return false;
+    };
+    Command::new(exe)
+        .args(["--console-event", &pid.to_string(), event])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()
+        .await
+        .is_ok_and(|s| s.success())
+}
+
+/// `craked --console-event <pid> c|break`: attach to `pid`'s console and
+/// send the event to everything on it, this process swallowing its own copy
+/// until it exits.
+pub fn deliver_console_event(pid: u32, event: &str) -> bool {
+    let event = match event {
+        "c" => CTRL_C_EVENT,
+        "break" => CTRL_BREAK_EVENT,
+        _ => return false,
+    };
     // SAFETY: plain console calls; `swallow` lives for the whole program.
     unsafe {
         FreeConsole();
@@ -80,11 +107,8 @@ fn console_event(pid: u32, event: u32) -> bool {
         }
         SetConsoleCtrlHandler(Some(swallow), 1);
         let sent = GenerateConsoleCtrlEvent(event, 0) != 0;
-        FreeConsole();
-        // The event arrives on another thread: give it time before craked
-        // stops swallowing.
+        // The event arrives on a thread of its own: be here for it.
         std::thread::sleep(Duration::from_millis(500));
-        SetConsoleCtrlHandler(Some(swallow), 0);
         sent
     }
 }

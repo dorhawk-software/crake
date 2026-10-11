@@ -6,10 +6,10 @@ use std::net::Ipv4Addr;
 
 use anyhow::{Result, bail};
 use windows_sys::Win32::NetworkManagement::IpHelper::{
-    ConvertInterfaceAliasToLuid, CreateIpForwardEntry2, CreateUnicastIpAddressEntry,
-    DeleteIpForwardEntry2, GetIpInterfaceEntry, InitializeIpForwardEntry,
-    InitializeIpInterfaceEntry, InitializeUnicastIpAddressEntry, MIB_IPFORWARD_ROW2,
-    MIB_IPINTERFACE_ROW, MIB_UNICASTIPADDRESS_ROW, SetIpInterfaceEntry,
+    ConvertInterfaceAliasToLuid, ConvertInterfaceLuidToIndex, CreateIpForwardEntry2,
+    CreateUnicastIpAddressEntry, DeleteIpForwardEntry2, GetIpInterfaceEntry,
+    InitializeIpForwardEntry, InitializeIpInterfaceEntry, InitializeUnicastIpAddressEntry,
+    MIB_IPFORWARD_ROW2, MIB_IPINTERFACE_ROW, MIB_UNICASTIPADDRESS_ROW, SetIpInterfaceEntry,
 };
 use windows_sys::Win32::NetworkManagement::Ndis::NET_LUID_LH;
 use windows_sys::Win32::Networking::WinSock::{
@@ -29,6 +29,18 @@ pub fn luid(alias: &str) -> Result<NET_LUID_LH> {
         bail!("no interface {alias} ({})", os_error(err));
     }
     Ok(luid)
+}
+
+/// An interface's index, by its alias.
+pub fn index(alias: &str) -> Result<u32> {
+    let luid = luid(alias)?;
+    let mut index = 0;
+    // SAFETY: a LUID from Windows, an out pointer for the call.
+    let err = unsafe { ConvertInterfaceLuidToIndex(&raw const luid, &raw mut index) };
+    if err != 0 {
+        bail!("no index for {alias} ({})", os_error(err));
+    }
+    Ok(index)
 }
 
 fn sockaddr(addr: Ipv4Addr) -> SOCKADDR_INET {
