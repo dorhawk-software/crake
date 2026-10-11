@@ -455,7 +455,7 @@ fn turned_away(lines: &[String]) -> bool {
 
 /// Lines openconnect prints about its own progress, not the gateway's words.
 fn is_progress(line: &str) -> bool {
-    const PREFIXES: [&str; 12] = [
+    const PREFIXES: [&str; 16] = [
         "POST ",
         "GET ",
         "Connected to ",
@@ -468,7 +468,13 @@ fn is_progress(line: &str) -> bool {
         "Server certificate verify failed",
         "Please enter your",
         "Enter '",
+        // Its own explanation of a certificate this computer doesn't trust.
+        "Certificate from VPN server",
+        "Reason: ",
+        "To trust this server",
+        "--servercert ",
     ];
+    let line = line.trim_start();
     PREFIXES.iter().any(|p| line.starts_with(p))
 }
 
@@ -558,6 +564,21 @@ mod tests {
 
     fn lines(l: &[&str]) -> Vec<String> {
         l.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn a_trusted_certificate_is_not_the_gateways_words() {
+        let seen = lines(&[
+            "Server certificate verify failed: signer not found",
+            "Certificate from VPN server \"vpn.acme.example\" failed verification.",
+            "Reason: signer not found",
+            "To trust this server in future, perhaps add this to your command line:",
+            "    --servercert pin-sha256:QUNNRSBleGFtcGxlIGNlcnRpZmljYXRlIHBpbg==",
+            "Connected to HTTPS on vpn.acme.example with ciphersuite (TLS1.3)",
+            "XML POST enabled",
+            "Please enter your username and password.",
+        ]);
+        assert_eq!(classify("Username:", &seen).words, None);
     }
 
     #[test]

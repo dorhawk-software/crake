@@ -2,14 +2,17 @@
 # openconnect for Windows, cross-built in a Fedora container with MinGW (as
 # openconnect's own Windows builds are): openconnect.exe and the DLLs it
 # needs in target/windows/openconnect/, with Wintun's DLL (wintun.net, its
-# prebuilt-binaries licence: shipped unmodified) beside them. For the VM tests now, the installer later
-# (the Windows plan in CLAUDE.md, phase 5). openconnect is LGPL-2.1.
+# prebuilt-binaries licence: shipped unmodified) beside them. For the VM
+# tests now, the installer later (the Windows plan in CLAUDE.md, phase 5).
+# openconnect is LGPL-2.1; Crake changes one thing, its output buffering
+# (scripts/windows/openconnect-unbuffered.c). The script inside the
+# container is single-quoted: no apostrophes in it.
 set -eu
 cd "$(dirname "$0")/.."
 VERSION=${OPENCONNECT_VERSION:-9.12}
 OUT=$PWD/target/windows/openconnect
 mkdir -p "$OUT"
-docker run --rm -v "$OUT:/out" -e VERSION="$VERSION" -e HOST_UID="$(id -u)" fedora:44 sh -euc '
+docker run --rm -v "$OUT:/out" -v "$PWD/scripts/windows:/crake:ro" -e VERSION="$VERSION" -e HOST_UID="$(id -u)" fedora:44 sh -euc '
   dnf install -y -q mingw64-gcc mingw64-gnutls mingw64-libxml2 mingw64-zlib \
     mingw64-gettext mingw64-winpthreads-static make pkgconf curl xz tar gettext unzip >/dev/null
   cd /tmp
@@ -18,6 +21,8 @@ docker run --rm -v "$OUT:/out" -e VERSION="$VERSION" -e HOST_UID="$(id -u)" fedo
   curl -fsSL "https://www.infradead.org/openconnect/download/openconnect-$VERSION.tar.gz" | tar xz
   cd "openconnect-$VERSION"
   cp /tmp/wintun/include/wintun.h .
+  # The one change Crake makes (scripts/windows/openconnect-unbuffered.c).
+  cat /crake/openconnect-unbuffered.c >> main.c
   # openconnect 9.12 predates GCC 14, which made these errors.
   LENIENT="-Wno-error=incompatible-pointer-types -Wno-error=int-conversion -Wno-error=implicit-function-declaration"
   mingw64-configure CFLAGS="$(rpm --eval %{mingw64_cflags}) $LENIENT" --disable-nls --without-libpskc --without-stoken --without-libproxy --without-lz4 \
