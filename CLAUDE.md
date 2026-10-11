@@ -629,7 +629,9 @@ it doesn't, bundle, and own the updates.**
   installed service (ocserv in a namespace of its own): probing, DNS via
   systemd-resolved, names kept private by craked's DNS on port 53; remove
   and purge leave nothing. It found the unit lacking
-  `CAP_NET_BIND_SERVICE` (craked's own DNS couldn't bind port 53). Still
+  `CAP_NET_BIND_SERVICE` (craked's own DNS couldn't bind port 53), and that
+  a systemd-resolved that doesn't answer kept tunnels from coming up (the
+  hook timed out); resolved now gets 3 s per call (`resolved.rs`). Still
   to do, with the user: the signed apt repository (their key) and its
   publishing.
 - **At runtime (built, `engines.rs`):** the app checks which engines exist

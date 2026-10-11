@@ -3,11 +3,30 @@
 //! asked of the tunnel's DNS (and of no one else), all other names are not.
 
 use std::ffi::CString;
+use std::future::Future;
 use std::net::Ipv4Addr;
+use std::time::Duration;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use tokio::sync::OnceCell;
 use zbus::Connection;
+
+/// How long resolved gets to answer a call. It answers at once when it
+/// works; one that doesn't answer counts as failing, so a tunnel still comes
+/// up (openconnect's hook waits 15 s for craked) and says why.
+const WAIT: Duration = Duration::from_secs(3);
+
+/// `call`, given `wait` to finish.
+async fn within<T>(
+    what: &str,
+    wait: Duration,
+    call: impl Future<Output = zbus::Result<T>>,
+) -> Result<T> {
+    tokio::time::timeout(wait, call)
+        .await
+        .map_err(|_| anyhow!("{what}: systemd-resolved didn't answer"))?
+        .context(what.to_owned())
+}
 
 pub enum Resolved {
     Real(OnceCell<Connection>),
@@ -28,9 +47,8 @@ impl Resolved {
             return Ok(None);
         };
         let conn = cell
-            .get_or_try_init(|| async { Connection::system().await })
-            .await
-            .context("connecting to the system bus")?;
+            .get_or_try_init(|| within("connecting to the system bus", WAIT, Connection::system()))
+            .await?;
         let proxy = zbus::Proxy::new(
             conn,
             "org.freedesktop.resolve1",
@@ -61,17 +79,26 @@ impl Resolved {
         if everything {
             domains.push((".", true)); // "~.": every name
         }
-        m.call::<_, _, ()>("SetLinkDNS", &(index, servers))
-            .await
-            .context("SetLinkDNS")?;
-        m.call::<_, _, ()>("SetLinkDomains", &(index, domains))
-            .await
-            .context("SetLinkDomains")?;
+        within(
+            "SetLinkDNS",
+            WAIT,
+            m.call::<_, _, ()>("SetLinkDNS", &(index, servers)),
+        )
+        .await?;
+        within(
+            "SetLinkDomains",
+            WAIT,
+            m.call::<_, _, ()>("SetLinkDomains", &(index, domains)),
+        )
+        .await?;
         // Never the place for names outside the tunnel's domains, unless
         // everything goes through it.
-        m.call::<_, _, ()>("SetLinkDefaultRoute", &(index, everything))
-            .await
-            .context("SetLinkDefaultRoute")?;
+        within(
+            "SetLinkDefaultRoute",
+            WAIT,
+            m.call::<_, _, ()>("SetLinkDefaultRoute", &(index, everything)),
+        )
+        .await?;
         Ok(())
     }
 
@@ -83,7 +110,7 @@ impl Resolved {
         };
         let index = ifindex(device)?;
         let path: zbus::zvariant::OwnedObjectPath =
-            m.call("GetLink", &(index,)).await.context("GetLink")?;
+            within("GetLink", WAIT, m.call("GetLink", &(index,))).await?;
         let link = zbus::Proxy::new(
             m.connection(),
             "org.freedesktop.resolve1",
@@ -91,8 +118,9 @@ impl Resolved {
             "org.freedesktop.resolve1.Link",
         )
         .await?;
-        let servers: Vec<(i32, Vec<u8>)> = link.get_property("DNS").await.context("DNS")?;
-        let domains: Vec<(String, bool)> = link.get_property("Domains").await.context("Domains")?;
+        let servers: Vec<(i32, Vec<u8>)> = within("DNS", WAIT, link.get_property("DNS")).await?;
+        let domains: Vec<(String, bool)> =
+            within("Domains", WAIT, link.get_property("Domains")).await?;
         Ok((
             servers
                 .into_iter()
@@ -111,7 +139,7 @@ impl Resolved {
     /// went down) aren't reused.
     pub async fn flush(&self) {
         if let Ok(Some(m)) = self.manager().await {
-            let _ = m.call::<_, _, ()>("FlushCaches", &()).await;
+            let _ = within("FlushCaches", WAIT, m.call::<_, _, ()>("FlushCaches", &())).await;
         }
     }
 
@@ -121,7 +149,12 @@ impl Resolved {
             return;
         };
         if let Ok(index) = ifindex(device) {
-            let _ = m.call::<_, _, ()>("RevertLink", &(index,)).await;
+            let _ = within(
+                "RevertLink",
+                WAIT,
+                m.call::<_, _, ()>("RevertLink", &(index,)),
+            )
+            .await;
         }
     }
 }
@@ -134,4 +167,20 @@ fn ifindex(device: &str) -> Result<i32> {
         bail!("no interface {device}");
     }
     Ok(i as i32)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_resolved_that_never_answers_is_a_failure() {
+        let silent = std::future::pending::<zbus::Result<()>>();
+        let e = within("SetLinkDNS", Duration::from_millis(20), silent)
+            .await
+            .unwrap_err();
+        assert_eq!(e.to_string(), "SetLinkDNS: systemd-resolved didn't answer");
+        let answered = within("SetLinkDNS", Duration::from_millis(20), async { Ok(7) });
+        assert_eq!(answered.await.unwrap(), 7);
+    }
 }
