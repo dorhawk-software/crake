@@ -1,6 +1,5 @@
 //! macOS: the menu bar (`sys::menu_tray`, shared with Windows), the
-//! Keychain, the private folder. Not yet: the connection to craked (the
-//! macOS plan in CLAUDE.md, with craked as a launchd daemon).
+//! Keychain, the private folder, craked's socket.
 
 pub mod keyring;
 pub mod single;

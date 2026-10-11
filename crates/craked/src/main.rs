@@ -132,8 +132,10 @@ async fn run(args: Args, external: Option<oneshot::Receiver<()>>) -> Result<()> 
         std::process::exit(0);
     }
 
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     let _bus = dbus::serve(mgr.clone(), !args.session_bus).await?;
+    #[cfg(target_os = "macos")]
+    dbus::serve_console(mgr.clone(), std::path::Path::new(crake_proto::APP_SOCKET))?;
     #[cfg(windows)]
     dbus::serve_local(mgr.clone(), crake_proto::APP_ADDRESS).await?;
     tracing::info!("craked {} ready", env!("CARGO_PKG_VERSION"));
@@ -201,14 +203,21 @@ async fn external(rx: &mut Option<oneshot::Receiver<()>>) {
 }
 
 /// Serve the Crake app for a run started by hand. Linux: a private socket
-/// for the user who ran sudo, returned to be removed when done. Windows:
-/// the loopback port, as the service does.
-#[cfg(unix)]
+/// for the user who ran sudo, returned to be removed when done. Windows and
+/// macOS: where the service serves it.
+#[cfg(target_os = "linux")]
 async fn serve_app(mgr: &Arc<Manager>) -> Result<Option<PathBuf>> {
     let Some((path, uid)) = ui_socket() else {
         bail!("the app needs sudo (SUDO_UID) and the user's /run/user directory");
     };
     dbus::serve_p2p(mgr.clone(), &path, uid)?;
+    Ok(Some(path))
+}
+
+#[cfg(target_os = "macos")]
+async fn serve_app(mgr: &Arc<Manager>) -> Result<Option<PathBuf>> {
+    let path = PathBuf::from(crake_proto::APP_SOCKET);
+    dbus::serve_console(mgr.clone(), &path)?;
     Ok(Some(path))
 }
 
@@ -219,7 +228,7 @@ async fn serve_app(mgr: &Arc<Manager>) -> Result<Option<PathBuf>> {
 }
 
 /// `/run/user/<uid>/crake-dev.sock` for the user who ran sudo.
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 fn ui_socket() -> Option<(PathBuf, u32)> {
     let uid: u32 = std::env::var("SUDO_UID").ok()?.parse().ok()?;
     let dir = PathBuf::from(format!("/run/user/{uid}"));

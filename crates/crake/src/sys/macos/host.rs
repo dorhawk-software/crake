@@ -31,10 +31,12 @@ pub fn plain_frame(_window: &gpui_kit::Window) {}
 /// A command-line program started from the app: on macOS it has no window.
 pub fn no_console(_cmd: &mut std::process::Command) {}
 
-/// The installed craked: not built for macOS yet.
+/// The installed craked, on its socket (peer to peer: no system bus on
+/// macOS).
 pub async fn connect_craked() -> zbus::Result<(zbus::Connection, bool)> {
-    Err(zbus::Error::Failure(
-        "craked isn't built for macOS yet".into(),
+    Ok((
+        super::super::connect_dev(std::path::Path::new(crake_proto::APP_SOCKET)).await?,
+        true,
     ))
 }
 

@@ -4,13 +4,17 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crake_proto::{BUS_NAME, BUS_PATH};
 use zbus::message::Header;
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::{OwnedValue, Value};
 use zbus::{Connection, fdo, interface};
 
 use crate::manager::{Manager, Snapshot};
+
+// Where the API is served: the system bus, private and app sockets, the
+// loopback port.
+mod serve;
+pub use serve::*;
 
 pub const POLKIT_ACTION: &str = "software.dorhawk.crake.manage-tunnels";
 
@@ -31,6 +35,9 @@ enum Guard {
     /// counterpart of polkit's active session).
     #[cfg(windows)]
     ConsoleSession,
+    /// macOS' app socket: the user at the console (or root).
+    #[cfg(target_os = "macos")]
+    ConsoleUser,
 }
 
 #[interface(name = "software.dorhawk.Crake1")]
@@ -385,6 +392,8 @@ impl Service {
             Guard::Polkit => {}
             #[cfg(windows)]
             Guard::ConsoleSession => return in_console_session(conn).await,
+            #[cfg(target_os = "macos")]
+            Guard::ConsoleUser => return console_user(conn).await,
         }
         let sender = hdr
             .sender()
@@ -409,6 +418,21 @@ async fn in_console_session(conn: &Connection) -> fdo::Result<()> {
         Err(fdo::Error::AccessDenied(
             "only the signed-in user can switch tunnels".into(),
         ))
+    }
+}
+
+/// The caller is the user at the console, or root (macOS).
+#[cfg(target_os = "macos")]
+async fn console_user(conn: &Connection) -> fdo::Result<()> {
+    use std::os::unix::fs::MetadataExt;
+    let caller = conn.peer_creds().await.ok().and_then(|c| c.unix_user_id());
+    let console = std::fs::metadata("/dev/console").ok().map(|m| m.uid());
+    match caller {
+        Some(0) => Ok(()),
+        Some(uid) if Some(uid) == console => Ok(()),
+        _ => Err(fdo::Error::AccessDenied(
+            "only the user at the console can switch tunnels".into(),
+        )),
     }
 }
 
@@ -554,141 +578,4 @@ fn to_dict(s: &Snapshot) -> HashMap<String, OwnedValue> {
         strings(info.map(|i| i.split_exclude.clone()).unwrap_or_default()),
     );
     d
-}
-
-/// Claim the bus name, publish the object and relay changes as signals.
-pub async fn serve(mgr: Arc<Manager>, system_bus: bool) -> zbus::Result<Connection> {
-    let service = Service {
-        mgr: Arc::clone(&mgr),
-        guard: if system_bus {
-            Guard::Polkit
-        } else {
-            Guard::Open
-        },
-    };
-    let builder = if system_bus {
-        zbus::connection::Builder::system()?
-    } else {
-        zbus::connection::Builder::session()?
-    };
-    let conn = builder
-        .name(BUS_NAME)?
-        .serve_at(BUS_PATH, service)?
-        .build()
-        .await?;
-    relay(conn.clone(), mgr);
-    Ok(conn)
-}
-
-/// The same API without a bus: a private socket only `owner` can open
-/// (development, where nothing is installed). Polkit isn't asked; the
-/// socket's permissions are the guard.
-#[cfg(unix)]
-pub fn serve_p2p(mgr: Arc<Manager>, path: &std::path::Path, owner: u32) -> anyhow::Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    let _ = std::fs::remove_file(path);
-    let listener = tokio::net::UnixListener::bind(path)?;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
-    std::os::unix::fs::chown(path, Some(owner), None)?;
-    tokio::spawn(async move {
-        loop {
-            let Ok((stream, _)) = listener.accept().await else {
-                return;
-            };
-            let mgr = Arc::clone(&mgr);
-            tokio::spawn(async move {
-                let service = Service {
-                    mgr: Arc::clone(&mgr),
-                    guard: Guard::Open,
-                };
-                let built = async {
-                    zbus::connection::Builder::unix_stream(stream)
-                        .server(zbus::Guid::generate())?
-                        .p2p()
-                        .serve_at(BUS_PATH, service)?
-                        .build()
-                        .await
-                };
-                match built.await {
-                    Ok(conn) => relay(conn, mgr),
-                    Err(e) => tracing::warn!("UI connection: {e}"),
-                }
-            });
-        }
-    });
-    Ok(())
-}
-
-/// Windows: the same API on a loopback port (`crake_proto::APP_ADDRESS`).
-/// zbus learns each caller's account from the connection (EXTERNAL with
-/// the process's SID); changes need the console session.
-#[cfg(windows)]
-pub async fn serve_local(mgr: Arc<Manager>, address: &str) -> anyhow::Result<()> {
-    let listener = tokio::net::TcpListener::bind(address).await?;
-    tokio::spawn(async move {
-        loop {
-            let Ok((stream, _)) = listener.accept().await else {
-                return;
-            };
-            let mgr = Arc::clone(&mgr);
-            tokio::spawn(async move {
-                let service = Service {
-                    mgr: Arc::clone(&mgr),
-                    guard: Guard::ConsoleSession,
-                };
-                let built = async {
-                    zbus::connection::Builder::tcp_stream(stream)
-                        .server(zbus::Guid::generate())?
-                        .p2p()
-                        .serve_at(BUS_PATH, service)?
-                        .build()
-                        .await
-                };
-                match built.await {
-                    Ok(conn) => relay(conn, mgr),
-                    Err(e) => tracing::warn!("app connection: {e}"),
-                }
-            });
-        }
-    });
-    Ok(())
-}
-
-/// Tunnel state changes and new log entries, as signals on `conn`.
-fn relay(conn: Connection, mgr: Arc<Manager>) {
-    let mut changes = mgr.subscribe();
-    let mut entries = mgr.log().subscribe();
-    tokio::spawn(async move {
-        let Ok(iface) = conn.object_server().interface::<_, Service>(BUS_PATH).await else {
-            return;
-        };
-        loop {
-            use tokio::sync::broadcast::error::RecvError;
-            let sent = tokio::select! {
-                name = changes.recv() => match name {
-                    // An empty name: the settings changed.
-                    Ok(name) if name.is_empty() => Service::settings_changed(iface.signal_emitter()).await,
-                    Ok(name) => match mgr.get(&name) {
-                        Some(snap) => Service::tunnel_changed(iface.signal_emitter(), &name, snap.state.as_str()).await,
-                        // Removed (Settings, Tunnels).
-                        None => Service::tunnel_changed(iface.signal_emitter(), &name, "removed").await,
-                    },
-                    Err(RecvError::Lagged(_)) => Ok(()),
-                    Err(RecvError::Closed) => return,
-                },
-                entry = entries.recv() => match entry {
-                    Ok(entry) => match serde_json::to_string(&entry) {
-                        Ok(json) => Service::log_appended(iface.signal_emitter(), &json).await,
-                        Err(_) => Ok(()),
-                    },
-                    Err(RecvError::Lagged(_)) => Ok(()),
-                    Err(RecvError::Closed) => return,
-                },
-            };
-            // A peer that went away: stop relaying to it.
-            if sent.is_err() {
-                return;
-            }
-        }
-    });
 }

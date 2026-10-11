@@ -10,8 +10,11 @@ pub const DEFAULT_CONFIG: &str = "/etc/crake/craked.toml";
 pub const DEFAULT_CONFIG: &str = r"C:\ProgramData\Crake\craked.toml";
 
 /// Where craked keeps its state and log.
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 const STATE_DIR: &str = "/var/lib/crake";
+/// macOS: where system daemons keep theirs.
+#[cfg(target_os = "macos")]
+const STATE_DIR: &str = "/var/db/crake";
 #[cfg(windows)]
 const STATE_DIR: &str = r"C:\ProgramData\Crake";
 /// IT's managed tunnels.

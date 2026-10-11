@@ -5,14 +5,20 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 /// Where `craked` listens for the hook, unless configured otherwise.
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 pub const DEFAULT_HOOK_SOCKET: &str = "/run/crake/hook.sock";
+/// macOS: /var/run (there's no /run).
+#[cfg(target_os = "macos")]
+pub const DEFAULT_HOOK_SOCKET: &str = "/var/run/crake/hook.sock";
 /// Windows: a named pipe.
 #[cfg(windows)]
 pub const DEFAULT_HOOK_SOCKET: &str = r"\\.\pipe\crake-hook";
 /// Where the hook binary is installed.
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 pub const DEFAULT_HOOK_PATH: &str = "/usr/libexec/crake/hook";
+/// macOS: /usr/local (the system's /usr is sealed).
+#[cfg(target_os = "macos")]
+pub const DEFAULT_HOOK_PATH: &str = "/usr/local/libexec/crake/hook";
 /// Windows: openconnect runs its script through cscript.exe, so the hook
 /// is a JScript shim that starts crake-hook.exe beside it.
 #[cfg(windows)]
@@ -22,6 +28,10 @@ pub const DEFAULT_HOOK_PATH: &str = r"C:\Program Files\Crake\crake-hook.js";
 /// in the console session).
 #[cfg(windows)]
 pub const APP_ADDRESS: &str = "127.0.0.1:47366";
+/// macOS: where craked serves the app (D-Bus over a Unix socket; anyone
+/// may read, the console's user may change things).
+#[cfg(target_os = "macos")]
+pub const APP_SOCKET: &str = "/var/run/crake.sock";
 /// Windows: craked's service name.
 #[cfg(windows)]
 pub const SERVICE_NAME: &str = "craked";
