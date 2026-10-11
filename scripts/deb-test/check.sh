@@ -22,6 +22,9 @@ if command -v apt-get >/dev/null; then RPM=; else RPM=1; fi
 install() {
     if [ -n "$RPM" ]; then
         check "installs with its Requires only" dnf install -y -q --setopt=install_weak_deps=False /pkg/crake.rpm
+        # The test's own tool for the polkit check (dbus-send), after the
+        # package, so its Requires are what's tested.
+        dnf install -y -q dbus-tools >/dev/null 2>&1
     else
         apt-get update -qq >/dev/null
         check "installs with its Depends only" apt-get install -y -qq --no-install-recommends /pkg/crake.deb
@@ -111,6 +114,10 @@ tunnel() {
         # Complain mode (scripts/vm-test.sh --complain) lists what the
         # profile would have refused: ALLOWED instead of DENIED.
         check "AppArmor refused craked nothing" sh -c '! journalctl -k --no-pager -o cat | grep -E "apparmor=\"(DENIED|ALLOWED)\"" | grep "craked"'
+    fi
+    if [ "$(getenforce 2>/dev/null)" = Enforcing ]; then
+        check "SELinux refused craked nothing" sh -c '! journalctl --no-pager -o cat | grep "avc:  denied" | grep -E "comm=\"(craked|openconnect|nft|ip|hook|sh)\""'
+        check "craked runs as a confined-or-unconfined service" sh -c 'ps -eZ | grep -E " craked$"'
     fi
     echo "  craked's journal:"
     journalctl -b -u craked --no-pager -o cat | sed 's/^/        /'

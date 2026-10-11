@@ -692,8 +692,11 @@ it doesn't, bundle, and own the updates.**
   `Requires: (openconnect or openvpn3)`, nftables, iproute,
   systemd-resolved, polkit, dbus; `Recommends:` as above; no AppArmor
   profile (Fedora confines services with SELinux; craked runs as an
-  unconfined service there, not yet tested under SELinux enforcing in a
-  VM). %post enables craked, or on an upgrade leaves the handover flag and
+  unconfined service there: `scripts/vm-test.sh fedora:44` runs the whole
+  package test in a Fedora VM with SELinux enforcing, a real tunnel
+  included, and SELinux refuses craked nothing). The test's gateway enters
+  its namespace with `nsenter`: `ip netns exec` / `ip -n` remount /sys,
+  which SELinux refuses to a test script there. %post enables craked, or on an upgrade leaves the handover flag and
   restarts it; removing takes /var/lib/crake (rpm has no purge).
   `scripts/deb-test.sh fedora:43 fedora:44 fedora:45` runs the same
   package test with dnf and rpm.

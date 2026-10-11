@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-GPL--3.0-0F766E?style=flat-square" alt="Licence GPL-3.0" /></a>
-  <a href="#building-and-trying-it"><img src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20Ubuntu%20%C2%B7%20Debian-115E59?style=flat-square" alt="Platform: Linux, Ubuntu and Debian" /></a>
+  <a href="#building-and-trying-it"><img src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20Ubuntu%20%C2%B7%20Debian%20%C2%B7%20Fedora-115E59?style=flat-square" alt="Platform: Linux, Ubuntu, Debian and Fedora" /></a>
   <a href="Cargo.toml"><img src="https://img.shields.io/badge/Rust-2024%20%C2%B7%20GPUI-0F766E?style=flat-square" alt="Rust 2024 and GPUI" /></a>
   <a href="#status"><img src="https://img.shields.io/badge/status-coming%20soon-5A5F64?style=flat-square" alt="Status: coming soon" /></a>
   <a href="#built-with-ai"><img src="https://img.shields.io/badge/built%20with-Claude-5A5F64?style=flat-square" alt="Built with Claude" /></a>
@@ -234,8 +234,9 @@ scripts/e2e-test.sh                           # sign in and connect to a real oc
 scripts/lint.sh                               # rustfmt, clippy, cargo-deny, cargo-machete, private names, sizes
 scripts/check-coverage.sh                     # each crate's tested share of lines stays above its floor
 scripts/build-deb.sh                          # the .deb, built in an Ubuntu 22.04 container
-scripts/deb-test.sh                           # install and use it on Ubuntu 22.04, 24.04 and 26.04, in containers
-scripts/vm-test.sh [release]                  # the same in a throwaway VM, with craked's AppArmor profile enforced
+scripts/build-rpm.sh                          # the RPM for Fedora, from the same files
+scripts/deb-test.sh [release...]              # install and use it in containers: 22.04 … debian:12 … fedora:44
+scripts/vm-test.sh [release]                  # the same in a throwaway VM: AppArmor (Ubuntu) or SELinux (fedora:44) enforcing
 ```
 
 - **Needs:** openconnect, nftables, iproute2, systemd-resolved, and a tray: GNOME with the
@@ -280,7 +281,9 @@ forgotten so the app's next try goes through.
 - ✅ One `.deb` for Ubuntu 26.04, 24.04 and 22.04 (password or certificate sign-in there: its
   openconnect is too old for the browser) and Debian 13 and 12, each installed and tested;
   a systemd service, polkit, an AppArmor profile; upgrades keep tunnels signed in
-- ⚪ Fedora (RPM), then Arch and NixOS
+- ✅ An RPM for Fedora 45, 44 and 43, the same binaries, tested the same way (and in a VM with
+  SELinux enforcing)
+- ⚪ Arch, then NixOS
 - ⚪ IPv6
 
 <br/>

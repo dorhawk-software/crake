@@ -15,17 +15,19 @@ sed -e 's#^socket-file = .*#socket-file = /run/ocserv-gw.socket#' \
     -e "s#^run-as-group = .*#run-as-group = $(id -gn nobody)#" /e2e/ocserv.conf > /etc/ocserv/ocserv.conf
 echo crex > /srv/www/index.html
 
+# Into the gateway's namespace with nsenter, which (unlike ip netns exec)
+# doesn't remount /sys: SELinux on Fedora refuses that to a test script.
 ip netns add gw
 ip link add lan type veth peer name lan netns gw
 ip addr add 198.51.100.20/24 dev lan
 ip link set lan up
-ip -n gw link set lo up
-ip -n gw addr add 198.51.100.10/24 dev lan
-ip -n gw link set lan up
-ip -n gw link add acme type dummy
-ip -n gw link set acme up
-for a in 10.40.0.2 10.40.1.10 10.40.1.11; do ip -n gw addr add "$a/32" dev acme; done
-ip netns exec gw nft -f - <<'NFT'
+nsenter --net=/run/netns/gw ip link set lo up
+nsenter --net=/run/netns/gw ip addr add 198.51.100.10/24 dev lan
+nsenter --net=/run/netns/gw ip link set lan up
+nsenter --net=/run/netns/gw ip link add acme type dummy
+nsenter --net=/run/netns/gw ip link set acme up
+for a in 10.40.0.2 10.40.1.10 10.40.1.11; do nsenter --net=/run/netns/gw ip addr add "$a/32" dev acme; done
+nsenter --net=/run/netns/gw nft -f - <<'NFT'
 table ip lan {
   chain input {
     type filter hook input priority 0;
@@ -35,7 +37,7 @@ table ip lan {
 NFT
 # The LAN's router: it doesn't know ACME's network either.
 ip route add 10.40.0.0/16 via 198.51.100.10
-ip netns exec gw dnsmasq --no-resolv --no-hosts --listen-address=10.40.0.2 --bind-interfaces \
+nsenter --net=/run/netns/gw dnsmasq --no-resolv --no-hosts --listen-address=10.40.0.2 --bind-interfaces \
   --address=/git.acme.internal/10.40.1.10 --address=/wiki.acme.internal/10.40.1.11
-ip netns exec gw busybox httpd -p 80 -h /srv/www
-ip netns exec gw ocserv --config /etc/ocserv/ocserv.conf
+nsenter --net=/run/netns/gw busybox httpd -p 80 -h /srv/www
+nsenter --net=/run/netns/gw ocserv --config /etc/ocserv/ocserv.conf

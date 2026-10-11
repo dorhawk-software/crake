@@ -6,7 +6,8 @@
 # The VM's disk is a temporary overlay of Ubuntu's cloud image (downloaded
 # once into target/vm/); nothing else stays.
 #
-#   scripts/vm-test.sh [--complain] [release]     # default 26.04
+#   scripts/vm-test.sh [--complain] [release]     # default 26.04; or fedora:44
+#                                                 # (the RPM, SELinux enforcing)
 #
 # --complain loads craked's profile in complain mode and lists what it
 # would have refused.
@@ -16,12 +17,23 @@ COMPLAIN=
 [ "${1:-}" = --complain ] && { COMPLAIN=1; shift; }
 REL=${1:-26.04}
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
-DEB=target/deb/crake_${VERSION}_amd64.deb
-[ -f "$DEB" ] || { echo "no $DEB: run scripts/build-deb.sh" >&2; exit 1; }
-IMG=target/vm/ubuntu-$REL.img
+case "$REL" in
+  fedora:*)
+    N=${REL#fedora:}
+    PKG=target/rpm/crake-${VERSION}-1.x86_64.rpm; AS=crake.rpm
+    IMG=target/vm/fedora-$N.qcow2
+    DIR="https://download.fedoraproject.org/pub/fedora/linux/releases/$N/Cloud/x86_64/images"
+    URL=$(curl -fsSL "$DIR/" | grep -o 'Fedora-Cloud-Base-Generic[^"<]*\.qcow2' | sort -u | tail -n1)
+    URL="$DIR/$URL" ;;
+  *)
+    PKG=target/deb/crake_${VERSION}_amd64.deb; AS=crake.deb
+    IMG=target/vm/ubuntu-$REL.img
+    URL="https://cloud-images.ubuntu.com/releases/$REL/release/ubuntu-$REL-server-cloudimg-amd64.img" ;;
+esac
+[ -f "$PKG" ] || { echo "no $PKG: run scripts/build-deb.sh (and build-rpm.sh)" >&2; exit 1; }
 if [ ! -f "$IMG" ]; then
   mkdir -p target/vm
-  curl -fsSL -o "$IMG.part" "https://cloud-images.ubuntu.com/releases/$REL/release/ubuntu-$REL-server-cloudimg-amd64.img"
+  curl -fsSL -o "$IMG.part" "$URL"
   mv "$IMG.part" "$IMG"
 fi
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/crake-vm.XXXXXX")
@@ -38,7 +50,7 @@ runcmd:
   - [sh, -c, "mkdir -p /test && mount -o ro LABEL=CRAKETEST /test && sh /test/run.sh > /dev/ttyS1 2>&1; poweroff"]
 CLOUD
 xorriso -as mkisofs -quiet -output "$WORK/seed.iso" -volid cidata -joliet -rock "$WORK/seed"
-cp "$DEB" "$WORK/test/crake.deb"
+cp "$PKG" "$WORK/test/$AS"
 cp -r scripts/deb-test scripts/e2e "$WORK/test/"
 cp scripts/vm-test/run.sh "$WORK/test/"
 [ -z "$COMPLAIN" ] || touch "$WORK/test/complain"
