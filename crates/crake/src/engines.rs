@@ -84,13 +84,23 @@ impl Engines {
                 "Needs OpenVPN 3, which isn\u{2019}t installed. It comes from OpenVPN\u{2019}s own repository (openvpn.net, \u{201c}OpenVPN 3 Linux\u{201d}).",
             ),
             "openvpn3" => None,
-            _ if !self.openconnect => Some(
-                "Needs openconnect, which isn\u{2019}t installed: sudo apt install openconnect",
-            ),
+            _ if !self.openconnect => Some(if cfg!(windows) {
+                "Needs openconnect, which comes with Crake but is missing. Reinstall Crake."
+            } else {
+                "Needs openconnect, which isn\u{2019}t installed: sudo apt install openconnect"
+            }),
             _ => None,
         }
     }
 }
+
+/// How to get openconnect back, in a sentence: Linux takes it from the
+/// distribution, Windows has it from Crake's installer.
+pub const GET_OPENCONNECT: &str = if cfg!(windows) {
+    "It comes with Crake, but it\u{2019}s missing: reinstall Crake."
+} else {
+    "Install it with: sudo apt install openconnect"
+};
 
 /// openconnect's file name.
 const PROGRAM: &str = if cfg!(windows) {

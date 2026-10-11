@@ -63,7 +63,8 @@ pub(super) fn explain(raw: &str, at: usize, spec: &Spec) -> Why {
         return Why {
             title: "openconnect isn\u{2019}t installed".into(),
             sentence: format!(
-                "Crake uses openconnect to talk to {display}\u{2019}s gateway. Install it with: sudo apt install openconnect"
+                "Crake uses openconnect to talk to {display}\u{2019}s gateway. {}",
+                crate::engines::GET_OPENCONNECT
             ),
             row: "openconnect not installed".into(),
         };
