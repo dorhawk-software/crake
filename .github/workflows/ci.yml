@@ -58,11 +58,14 @@ jobs:
       - uses: actions/checkout@v5
       - name: Build the .deb on Ubuntu 22.04, and the RPM from the same files
         run: scripts/build-deb.sh && scripts/build-rpm.sh
-      - name: Install and use them on Ubuntu, Debian and Fedora
-        run: scripts/deb-test.sh 22.04 24.04 26.04 debian:12 debian:13 fedora:43 fedora:44 fedora:45
+      - name: Build the Arch package from source with Arch's Rust
+        run: scripts/build-arch.sh
+      - name: Install and use them on Ubuntu, Debian, Fedora and Arch
+        run: scripts/deb-test.sh 22.04 24.04 26.04 debian:12 debian:13 fedora:43 fedora:44 fedora:45 archlinux:latest
       - uses: actions/upload-artifact@v4
         with:
           name: crake-packages
           path: |
             target/deb/*.deb
             target/rpm/*.rpm
+            target/arch/crake-[0-9]*.pkg.tar.zst

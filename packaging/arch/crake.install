@@ -1,0 +1,28 @@
+post_install() {
+  echo ":: Crake needs systemd-resolved, with /etc/resolv.conf pointing at it,"
+  echo "   and its own daemon running:"
+  echo "     ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf"
+  echo "     systemctl enable --now systemd-resolved craked"
+  echo ":: and a VPN engine: pacman -S openconnect (or openvpn3 from the AUR)."
+}
+
+post_upgrade() {
+  # The running craked hands its tunnels to the new one, signed in
+  # (craked's manager/handover.rs), instead of logging them off.
+  if systemctl is-active --quiet craked.service; then
+    mkdir -p /run/crake
+    : > /run/crake/handover
+    systemctl daemon-reload
+    systemctl restart craked.service
+  fi
+}
+
+pre_remove() {
+  # craked switches every tunnel off as it stops.
+  systemctl disable --now craked.service >/dev/null 2>&1 || true
+}
+
+post_remove() {
+  # What craked learned and logged goes with it.
+  rm -rf /var/lib/crake
+}

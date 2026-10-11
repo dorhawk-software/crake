@@ -700,8 +700,19 @@ it doesn't, bundle, and own the updates.**
   restarts it; removing takes /var/lib/crake (rpm has no purge).
   `scripts/deb-test.sh fedora:43 fedora:44 fedora:45` runs the same
   package test with dnf and rpm.
-- **Arch:** no alternatives in pacman: `optdepends` for both engines plus
-  the runtime check.
+- **Arch: built.** `packaging/arch/PKGBUILD` (for the AUR; builds a
+  release's source with Arch's Rust; `options=('!lto')`: makepkg's -flto
+  makes C parts of crates GCC bitcode lld can't link) and `crake.install`.
+  pacman has no alternatives: both engines are `optdepends`, and the app's
+  engine check says which a tunnel needs. Arch layout: everything in
+  /usr/bin, the hook in /usr/lib/crake (the shipped craked.toml sets
+  `hook_path`). Arch enables no services on install: the install message
+  says to point /etc/resolv.conf at resolved and `systemctl enable --now
+  systemd-resolved craked`; post_upgrade hands tunnels over as elsewhere.
+  `scripts/build-arch.sh` builds it from the current commit;
+  `scripts/deb-test.sh archlinux:latest` tests it, its gateway in a second
+  container wired by `relay.py` (ocserv is AUR-only). Publishing to the
+  AUR needs the user's AUR account.
 - **Not Flatpak or Snap:** craked needs root-level network control on the
   host (nftables, policy routing, resolved), which sandboxes don't allow.
 - **macOS and Windows (someday):** no package manager to pull engines in,

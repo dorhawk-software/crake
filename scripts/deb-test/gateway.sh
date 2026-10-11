@@ -4,6 +4,14 @@
 # own, wired to this one as the LAN (198.51.100.0/24), with ACME's internal
 # network behind it as in scripts/e2e/start.sh.
 set -eu
+# Arch: the gateway is a second container (scripts/deb-test.sh); this one
+# only joins the wire to it.
+if [ -d /link ]; then
+    python3 /e2e/relay.py lan 198.51.100.20/24 /link/client.sock /link/gateway.sock >/dev/null 2>&1 &
+    sleep 1
+    ip route add 10.40.0.0/16 via 198.51.100.10
+    exit 0
+fi
 mkdir -p /etc/ocserv /srv/www
 certtool --generate-privkey --outfile /etc/ocserv/key.pem --key-type=ecdsa 2>/dev/null
 printf 'cn = vpn.acme.example\nexpiration_days = 30\ntls_www_server\nsigning_key\nencryption_key\n' > /tmp/cert.cfg
