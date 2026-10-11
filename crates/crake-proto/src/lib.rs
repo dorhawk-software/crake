@@ -262,6 +262,30 @@ mod tests {
     }
 
     #[test]
+    fn states_have_the_names_the_api_uses() {
+        for (state, name) in [
+            (TunnelState::Off, "off"),
+            (TunnelState::Connecting, "connecting"),
+            (TunnelState::Connected, "connected"),
+            (TunnelState::Trouble, "trouble"),
+        ] {
+            assert_eq!(state.as_str(), name);
+        }
+    }
+
+    #[test]
+    fn a_session_with_a_resolve_and_unquoted_values() {
+        // openconnect quotes what needs it; plain values come bare.
+        let s = Session::parse(
+            "COOKIE=abc\nCONNECT_URL=https://vpn.example/\nRESOLVE='vpn.example:192.0.2.1'\n",
+        )
+        .unwrap();
+        assert_eq!(s.cookie, "abc");
+        assert_eq!(s.resolve.as_deref(), Some("vpn.example:192.0.2.1"));
+        assert_eq!(Session::from_map(&s.to_map()).unwrap(), s);
+    }
+
+    #[test]
     fn sessions() {
         let s = Session::parse(
             "POST https://vpn.example/\nCOOKIE='abc'\\''def'\nHOST='192.0.2.1'\n\
