@@ -24,7 +24,7 @@ mod widgets;
 mod tests;
 
 use self::explain::explain;
-use self::widgets::{Look, button, buttons, checkbox, lower_first, para, steps, title};
+use self::widgets::{Look, button, buttons, checkbox, link, lower_first, para, steps, title};
 
 pub const WIDTH: f32 = 340.;
 
@@ -144,15 +144,17 @@ impl Render for SignIn {
                             .text_color(t.muted)
                             .child(format!("{} said: {reason}", self.spec.program())),
                     )
+                    // Beside the words it copies: the buttons' row has room
+                    // for two (design/proposals/signin-error-buttons.html, A).
+                    .child(
+                        div().mt(px(6.)).flex().child(
+                            link("helpdesk", "Copy for helpdesk", &t)
+                                .on_click(cx.listener(|this, _, _, cx| this.copy_for_helpdesk(cx)))
+                                .test_support(),
+                        ),
+                    )
                     .child(
                         buttons()
-                            .child(
-                                button("helpdesk", "Copy for helpdesk", Look::Outline, &t)
-                                    .on_click(
-                                        cx.listener(|this, _, _, cx| this.copy_for_helpdesk(cx)),
-                                    )
-                                    .test_support(),
-                            )
                             .child(div().flex_1())
                             .child(
                                 button("close", "Close", Look::Text, &t)

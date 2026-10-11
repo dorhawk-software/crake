@@ -197,6 +197,15 @@ fn a_wrong_password_can_be_tried_again(cx: &mut TestAppContext) {
     assert!(!w.signing_in(cx), "not connecting any more");
     assert!(w.requests.try_recv().is_err(), "no session");
 
+    // Copy for helpdesk: what happened, for someone else to read.
+    w.click("helpdesk", cx);
+    let copied = cx
+        .read_from_clipboard()
+        .and_then(|c| c.text())
+        .unwrap_or_default();
+    assert!(copied.contains("Couldn\u{2019}t sign in to"), "{copied}");
+    assert!(copied.contains(&reason), "{copied}");
+
     w.click("retry", cx);
     assert!(w.signing_in(cx));
     w.until("asked again", cx, |s| asked(s, &groups));

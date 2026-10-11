@@ -135,6 +135,24 @@ pub(super) fn button(
         .on_mouse_down(gpui_kit::MouseButton::Left, keep_press)
 }
 
+/// A small accent link that acts (sign-in.html's "Copy for helpdesk",
+/// beside the words it copies).
+pub(super) fn link(
+    id: impl Into<gpui_kit::ElementId>,
+    label: &'static str,
+    t: &Theme,
+) -> Stateful<Div> {
+    div()
+        .id(id)
+        .text_size(px(13.))
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(t.accent)
+        .cursor_pointer()
+        .hover(|s| s.underline())
+        .child(label)
+        .on_mouse_down(gpui_kit::MouseButton::Left, keep_press)
+}
+
 /// A press on a control is its own: the card's window drag doesn't take it.
 fn keep_press(_: &gpui_kit::MouseDownEvent, _: &mut gpui_kit::Window, cx: &mut gpui_kit::App) {
     cx.stop_propagation();
