@@ -711,8 +711,11 @@ DNS, tray) that can get a per-OS implementation.
 - **Other Linux distributions:** mostly as is. Watch strict reverse-path
   filtering (`rp_filter=1`, e.g. Fedora/RHEL): replies from routed hosts
   arrive on the tunnel while the unmarked route points elsewhere, so they'd
-  be dropped. Ubuntu uses loose mode (2). Fix when needed: restore the mark
-  from conntrack on input plus `src_valid_mark`. Needs openconnect, nftables,
+  be dropped. Ubuntu uses loose mode (2). **Fixed:** craked sets loose
+  mode on each tunnel's own interface when it comes up, over netlink
+  (RTM_SETLINK; works where /proc/sys is read-only); the kernel takes the
+  looser of `all` and the interface. The netns tests run with rp_filter=1
+  everywhere and fail without it. Debian 12/13: tested, same .deb. Needs openconnect, nftables,
   iproute2, systemd, D-Bus and polkit. DNS learning assumes systemd-resolved;
   distros without it need a fallback. GNOME needs the AppIndicator extension
   for the tray; KDE has it built in. Packaging: .deb first, then .rpm / AUR.

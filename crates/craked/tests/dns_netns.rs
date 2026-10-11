@@ -478,6 +478,8 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
         eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
         return;
     }
+    // Strict reverse-path filtering, as Fedora has it.
+    strict_rp_filter();
     // A stand-in for the Wi-Fi, with public DNS at 192.168.0.1 (played by the test).
     let mut uplink = open_tun("uplink");
     sh(
@@ -683,4 +685,13 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
         "{log}"
     );
     assert!(!log.contains("office.acme.example"), "{log}");
+}
+
+/// rp_filter=1 everywhere, as Fedora has it (scripts/netns-test.sh starts
+/// the namespace so): a reply arriving on an interface the main table
+/// wouldn't use to reach its sender is dropped, unless craked loosens it
+/// for the tunnel's interface.
+fn strict_rp_filter() {
+    let all = std::fs::read_to_string("/proc/sys/net/ipv4/conf/all/rp_filter").unwrap();
+    assert_eq!(all.trim(), "1", "the namespace filters strictly");
 }

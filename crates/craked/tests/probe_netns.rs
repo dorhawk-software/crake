@@ -193,6 +193,8 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
         eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
         return;
     }
+    // Strict reverse-path filtering, as Fedora has it.
+    strict_rp_filter();
     let uplink = open_tun("uplink");
     sh(
         "ip link set uplink up; ip addr add 192.168.0.242/24 dev uplink; \
@@ -373,4 +375,13 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
         !log.contains("192.168.0.50") && !log.contains("10.70.9.9"),
         "{log}"
     );
+}
+
+/// rp_filter=1 everywhere, as Fedora has it (scripts/netns-test.sh starts
+/// the namespace so): a reply arriving on an interface the main table
+/// wouldn't use to reach its sender is dropped, unless craked loosens it
+/// for the tunnel's interface.
+fn strict_rp_filter() {
+    let all = std::fs::read_to_string("/proc/sys/net/ipv4/conf/all/rp_filter").unwrap();
+    assert_eq!(all.trim(), "1", "the namespace filters strictly");
 }

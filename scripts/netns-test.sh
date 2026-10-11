@@ -12,7 +12,9 @@ trap 'rm -rf "$WORK"' EXIT
 # One fresh container (fresh namespace) per test binary.
 for BIN in $BINS; do
   echo "== $(basename "$BIN")"
+  # Strict reverse-path filtering, as on Fedora (the tests check it's on).
   docker run --rm --network none --cap-add NET_ADMIN --device /dev/net/tun \
+    --sysctl net.ipv4.conf.all.rp_filter=1 --sysctl net.ipv4.conf.default.rp_filter=1 \
     -v /:/host:ro -v "$WORK:/host/mnt" \
     -e CRAKE_NETNS_TEST=1 -e TMPDIR=/mnt \
     alpine:3 chroot /host "$BIN" --test-threads=1 "$@"

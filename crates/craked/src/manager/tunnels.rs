@@ -155,6 +155,9 @@ impl Manager {
                 }
             };
         }
+        if let Err(e) = self.net.loose_rp_filter(&info.device) {
+            tracing::error!("{e:#}");
+        }
         for dns in &info.dns {
             self.net.route_dns(&info.device, *dns).await?;
         }

@@ -62,6 +62,8 @@ async fn routes_only_what_it_is_told() {
         eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
         return;
     }
+    // Strict reverse-path filtering, as Fedora has it.
+    strict_rp_filter();
     let dir = tempfile::tempdir().unwrap();
     let fake = dir.path().join("openconnect");
     std::fs::write(&fake, FAKE).unwrap();
@@ -200,6 +202,8 @@ async fn a_full_tunnel_takes_everything_but_the_gateway_and_the_lan() {
         eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
         return;
     }
+    // Strict reverse-path filtering, as Fedora has it.
+    strict_rp_filter();
     let dir = tempfile::tempdir().unwrap();
     let fake = dir.path().join("openconnect");
     std::fs::write(&fake, FAKE).unwrap();
@@ -274,6 +278,8 @@ async fn internal_names_stay_private_while_the_tunnel_is_off() {
         eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
         return;
     }
+    // Strict reverse-path filtering, as Fedora has it.
+    strict_rp_filter();
     let dir = tempfile::tempdir().unwrap();
     let cfg = Config {
         hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
@@ -337,4 +343,13 @@ async fn internal_names_stay_private_while_the_tunnel_is_off() {
     assert!(sh("ip link").contains("crake-hush"));
     mgr.shutdown().await;
     assert!(!sh("ip link").contains("crake-hush"), "nothing left behind");
+}
+
+/// rp_filter=1 everywhere, as Fedora has it (scripts/netns-test.sh starts
+/// the namespace so): a reply arriving on an interface the main table
+/// wouldn't use to reach its sender is dropped, unless craked loosens it
+/// for the tunnel's interface.
+fn strict_rp_filter() {
+    let all = std::fs::read_to_string("/proc/sys/net/ipv4/conf/all/rp_filter").unwrap();
+    assert_eq!(all.trim(), "1", "the namespace filters strictly");
 }
