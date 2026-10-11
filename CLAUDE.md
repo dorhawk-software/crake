@@ -567,11 +567,15 @@ The user doesn't want development builds installed on their machine.
   implementation change can't quietly break one of them: each Linux
   distribution (Ubuntu 22.04/24.04/26.04, Debian 12/13, Fedora 43–45,
   Arch, NixOS) with its own openconnect, resolved and libraries, Windows,
-  and macOS when it comes. Today it runs in one place only (this machine's
-  Ubuntu tools, in e2e-test.sh's container, and CI's `network` job). Plan:
-  the test binary built on 22.04 like the packages, run in each package
-  test's container after the package is installed (and in the NixOS VM
-  test); Windows in its VM test (phase 4); macOS on GitHub's runners.
+  and macOS when it comes. **Linux distributions: done.**
+  `scripts/build-deb.sh` builds the journey's test binary on 22.04 with
+  the packages (`target/deb/journey`); `scripts/deb-test.sh` runs it in
+  every package test's container after the tunnel phase (`check.sh
+  journey`: the service steps aside, the journey runs its own craked with
+  the packaged hook and the system's openconnect, nft and ip). Passes on
+  Ubuntu 22.04/24.04/26.04, Debian 12/13, Fedora 43/44/45 and Arch. Still
+  to do: NixOS (its VM test), Windows (its VM test, phase 4), macOS
+  (GitHub's runners).
 - `scripts/netns-test.sh`: real nftables and policy routing inside a
   disposable container with no network (host filesystem read-only).
 - `scripts/e2e-test.sh` (`crates/crake/src/e2e_tests.rs`, skipped unless
