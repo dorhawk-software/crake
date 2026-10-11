@@ -546,6 +546,16 @@ pub fn classify(question: &str, lines: &[String]) -> Prompt {
 
 /// The reason to show when sign-in failed: openconnect's last complaint.
 fn failure(lines: &[String]) -> String {
+    // openconnect 8 (Ubuntu 22.04) doesn't know --external-browser.
+    if lines
+        .iter()
+        .any(|l| l.contains("unrecognized option") && l.contains("external-browser"))
+    {
+        return "Signing in through your browser needs openconnect 9 or newer, which this \
+                computer doesn\u{2019}t have. A username and password or a certificate \
+                work with the openconnect here."
+            .into();
+    }
     lines
         .iter()
         .rev()
@@ -717,5 +727,14 @@ mod tests {
             certificate_arg(&["--certificate=/a/b.p12".into()]),
             Some((0, PathBuf::from("/a/b.p12")))
         );
+    }
+
+    #[test]
+    fn says_when_openconnect_is_too_old_for_the_browser() {
+        let said = [
+            "openconnect: unrecognized option '--external-browser=xdg-open'".to_owned(),
+            "Usage:  openconnect [options] <server>".to_owned(),
+        ];
+        assert!(failure(&said).starts_with("Signing in through your browser needs openconnect 9"));
     }
 }

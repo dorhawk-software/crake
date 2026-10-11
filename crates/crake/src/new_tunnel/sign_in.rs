@@ -25,11 +25,16 @@ impl NewTunnel {
                 )
                 .into_any_element();
         }
+        let no_browser = self.no_browser();
         let mut methods = div().flex().flex_col().gap(px(8.)).mt(px(18.));
         for (i, (id, name, sub)) in METHODS.into_iter().enumerate() {
             let on = self.method == id;
+            let unavailable = id == "browser" && no_browser.is_some();
             methods = methods.child(
                 card(("method", i), on, name, sub, None, t)
+                    .when(unavailable, |c| {
+                        c.child(super::server::tag("Not available", t))
+                    })
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.method = id;
                         this.problem = None;
@@ -39,9 +44,20 @@ impl NewTunnel {
             );
         }
         let detail = self.method_detail(t, cx);
+        let why = no_browser.filter(|_| self.method == "browser");
         div()
             .child(heading("How do you sign in?"))
             .child(methods)
+            .when_some(why, |d, why| {
+                d.child(
+                    div()
+                        .mt(px(10.))
+                        .text_size(px(13.))
+                        .line_height(px(19.))
+                        .text_color(t.ink)
+                        .child(why),
+                )
+            })
             .child(detail)
             .child(
                 div()

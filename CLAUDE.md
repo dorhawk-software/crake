@@ -652,6 +652,15 @@ it doesn't, bundle, and own the updates.**
   22.04, 24.04 and 26.04. Not in CI (needs KVM). Still
   to do, with the user: the signed apt repository (their key) and its
   publishing.
+- **Ubuntu 22.04 (decided with the user): supported, with password and
+  certificate sign-in only.** Its openconnect is 8.20, without
+  `--external-browser` (openconnect 9+). `engines.rs` asks openconnect's
+  `--help` for it (and `--version` for the number); New tunnel tags the
+  browser card "Not available", says why ("…needs openconnect 9 or newer;
+  this computer has 8.20. Use a username and password or a certificate."),
+  won't continue with it, and starts new tunnels on the password there.
+  Sign-in turns openconnect 8's "unrecognized option '--external-browser'"
+  into the same sentence. Checked against 22.04's real openconnect.
 - **At runtime (built, `engines.rs`):** the app checks which engines exist
   (openconnect on PATH, or `CRAKE_OPENCONNECT`; openvpn3's D-Bus
   configuration service file). New tunnel shows every protocol; one whose

@@ -185,11 +185,8 @@ pub struct Close;
 /// a fixed pair (three profiles, both engines), never this computer's.
 fn look_around() -> (Vec<String>, crate::engines::Engines) {
     if cfg!(test) {
-        let both = crate::engines::Engines {
-            openconnect: true,
-            openvpn3: true,
-        };
-        return (vec!["globex".into(), "acme".into(), "initech".into()], both);
+        let all = crate::engines::Engines::ALL;
+        return (vec!["globex".into(), "acme".into(), "initech".into()], all);
     }
     (crate::ovpn3::profiles(), crate::engines::Engines::find())
 }
@@ -305,7 +302,12 @@ impl NewTunnel {
                 .await;
             let _ = this.update(cx, |this: &mut Self, cx| {
                 this.profiles = found;
-                this.engines.get_or_insert(engines);
+                let engines = *this.engines.get_or_insert(engines);
+                // A new tunnel where the browser can't sign in starts on the
+                // password instead (Ubuntu 22.04's openconnect).
+                if this.editing.is_none() && this.method == "browser" && !engines.browser {
+                    this.method = "password";
+                }
                 cx.notify();
             });
         })
@@ -368,10 +370,7 @@ impl NewTunnel {
                 .first()
                 .map_or(1000., |m| m.h - 120.),
             profiles: Vec::new(),
-            engines: demo.then_some(crate::engines::Engines {
-                openconnect: true,
-                openvpn3: true,
-            }),
+            engines: demo.then_some(crate::engines::Engines::ALL),
             profile: (field("protocol") == "openvpn3")
                 .then(|| field("gateway"))
                 .filter(|g| !g.is_empty()),
@@ -437,8 +436,21 @@ impl NewTunnel {
         self.engines.and_then(|e| e.missing(protocol))
     }
 
+    /// Why the browser can't sign in here, if it can't.
+    fn no_browser(&self) -> Option<String> {
+        self.engines.and_then(|e| e.no_browser())
+    }
+
     /// Can step `step` be left? Says what's missing if not.
     fn check(&mut self, step: usize, cx: &Context<Self>) -> bool {
+        if step == 2
+            && self.method == "browser"
+            && self.protocol != "openvpn3"
+            && let Some(why) = self.no_browser()
+        {
+            self.problem = Some(why);
+            return false;
+        }
         let problem = match step {
             1 if self.display_name(cx).is_empty() => Some("Give it a name."),
             1 if self.missing(self.protocol).is_some() => self.missing(self.protocol),

@@ -193,3 +193,35 @@ fn an_incomplete_step_says_what_is_missing(cx: &mut TestAppContext) {
     );
     assert!(w.requests.try_recv().is_err(), "nothing was added");
 }
+
+/// openconnect 8 (Ubuntu 22.04) can't sign in through the browser: that
+/// card can't be continued with, and says why; a password can.
+#[gpui_kit::test]
+fn without_browser_sign_in_a_password_still_works(cx: &mut TestAppContext) {
+    let w = open(cx);
+    w.view.update(cx, |t, _| {
+        t.engines = Some(crate::engines::Engines {
+            browser: false,
+            openconnect_version: Some((8, 20)),
+            ..crate::engines::Engines::ALL
+        });
+    });
+    w.type_into(|t| t.name.clone(), "ACME", cx);
+    w.click(("protocol", ANYCONNECT), cx);
+    w.type_into(|t| t.gateway.clone(), "vpn.acme.example", cx);
+    w.click("next", cx);
+    assert_eq!(w.read(cx, |t| t.step), 2);
+
+    w.click(("method", 0usize), cx);
+    w.click("next", cx);
+    assert_eq!(w.read(cx, |t| t.step), 2, "the browser can't sign in here");
+    let problem = w.read(cx, |t| t.problem.clone()).unwrap_or_default();
+    assert!(problem.contains("this computer has 8.20"), "{problem}");
+
+    w.click(("method", 1usize), cx);
+    w.type_into(|t| t.user.clone(), "jane", cx);
+    w.click("next", cx);
+    assert_eq!(w.read(cx, |t| t.step), 3);
+    w.click("next", cx);
+    assert_eq!(w.added()["sign_in"], "password");
+}
