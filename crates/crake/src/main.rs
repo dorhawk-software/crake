@@ -2,6 +2,10 @@
 //! Everything Crake decides happens in craked; this shows it and passes on
 //! what the user chooses.
 
+// Windows: a windowed app, so no console window opens beside it (release
+// builds; development builds keep the console for their debug lines).
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 mod requests;
 mod updates;
 mod windows;
