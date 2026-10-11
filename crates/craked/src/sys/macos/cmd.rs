@@ -84,6 +84,52 @@ async fn route(args: &[String], adding: bool) -> Result<()> {
     Ok(())
 }
 
+/// `rules` in pf's `anchor` (none: emptied).
+pub async fn pf_rules(anchor: &str, rules: &str) -> Result<()> {
+    use tokio::io::AsyncWriteExt;
+    let mut child = Command::new("pfctl")
+        .args(["-a", anchor, "-f", "-"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
+        .spawn()?;
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(rules.as_bytes()).await?;
+    }
+    let out = child.wait_with_output().await?;
+    if !out.status.success() {
+        bail!(
+            "pfctl -a {anchor}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        );
+    }
+    Ok(())
+}
+
+/// pf on, counted: the token to give back (`pf_release`).
+pub async fn pf_enable() -> Result<String> {
+    let out = Command::new("pfctl").arg("-E").output().await?;
+    let said =
+        String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr);
+    match pf_token(&said) {
+        Some(token) => Ok(token),
+        None => bail!("pfctl -E: {}", said.trim()),
+    }
+}
+
+/// Crake no longer needs pf (it stays on while others hold tokens).
+pub async fn pf_release(token: &str) -> Result<()> {
+    run("pfctl", &["-X", token]).await
+}
+
+/// `pfctl -E`'s token ("Token : 1234").
+fn pf_token(said: &str) -> Option<String> {
+    said.lines()
+        .find_map(|l| l.trim().strip_prefix("Token :"))
+        .map(|t| t.trim().to_owned())
+        .filter(|t| !t.is_empty())
+}
+
 /// How macOS sends to `dest` now: (whether by the default route, its next
 /// hop if any), from `route -n get`.
 pub async fn way_to(dest: Ipv4Addr) -> Result<(bool, Option<Ipv4Addr>)> {
@@ -119,5 +165,12 @@ mod tests {
         );
         let lan = "   route to: 192.0.2.7\ndestination: 192.0.2.0\n  interface: en0\n";
         assert_eq!(super::parse_route_get(lan), (false, None));
+    }
+
+    #[test]
+    fn reads_pfs_token() {
+        let said = "No ALTQ support in kernel\npf enabled\nToken : 9174624823\n";
+        assert_eq!(super::pf_token(said).as_deref(), Some("9174624823"));
+        assert_eq!(super::pf_token("pfctl: /dev/pf: Permission denied"), None);
     }
 }

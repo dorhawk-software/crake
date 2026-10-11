@@ -151,6 +151,27 @@ async fn a_tunnel_on_a_utun_device() {
         .await
         .unwrap();
     assert_ne!(way("10.40.1.11"), dev, "forgotten");
+    // A connection that started before its host was routed: its next SYN
+    // goes through the tunnel, NATed to the tunnel's address (pf).
+    let early = tokio::net::TcpSocket::new_v4().unwrap();
+    let connecting = tokio::spawn(early.connect("10.40.1.99:80".parse().unwrap()));
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    routing
+        .add_learned("acme", Ipv4Addr::new(10, 40, 1, 99), 600)
+        .await
+        .unwrap();
+    let syn = tokio::task::spawn_blocking({
+        let fd = std::os::fd::AsRawFd::as_raw_fd(&_fd);
+        move || syn_to(fd, Ipv4Addr::new(10, 40, 1, 99))
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        syn,
+        Some(Ipv4Addr::new(10, 40, 255, 5)),
+        "the retried SYN, from the tunnel's address"
+    );
+    connecting.abort();
     // A socket bound to the tunnel finds its way out through it (probes).
     let probe = tokio::net::TcpSocket::new_v4().unwrap();
     craked::sys::mark(&probe, craked::routing::ids(0).mark).unwrap();
@@ -191,6 +212,43 @@ async fn a_tunnel_on_a_utun_device() {
     routing.down("acme", 0, Some(&dev)).await.unwrap();
     assert_ne!(way("10.40.1.10"), dev);
     assert_ne!(way("10.40.2.7"), dev);
+}
+
+/// The source of the first SYN to `dst` that comes out of the utun device
+/// (each packet led by its address family), within 8 seconds.
+fn syn_to(fd: std::os::fd::RawFd, dst: Ipv4Addr) -> Option<Ipv4Addr> {
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(8);
+    let mut buf = [0u8; 2048];
+    while std::time::Instant::now() < end {
+        let mut poll = libc::pollfd {
+            fd,
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        // SAFETY: one pollfd; then a read into `buf`, as long as it is.
+        let n = unsafe {
+            if libc::poll(&raw mut poll, 1, 500) <= 0 {
+                continue;
+            }
+            libc::read(fd, buf.as_mut_ptr().cast(), buf.len())
+        };
+        let Ok(n) = usize::try_from(n) else { continue };
+        if n < 24 {
+            continue;
+        }
+        let ip = &buf[4..n];
+        let ihl = usize::from(ip[0] & 0x0f) * 4;
+        let to = Ipv4Addr::new(ip[16], ip[17], ip[18], ip[19]);
+        // TCP, and its flags say SYN.
+        if ip[0] >> 4 == 4
+            && ip[9] == 6
+            && to == dst
+            && ip.get(ihl + 13).is_some_and(|f| f & 0x02 != 0)
+        {
+            return Some(Ipv4Addr::new(ip[12], ip[13], ip[14], ip[15]));
+        }
+    }
+    None
 }
 
 /// A DNS answer to `query`: its question, one A record, 10.40.1.10.

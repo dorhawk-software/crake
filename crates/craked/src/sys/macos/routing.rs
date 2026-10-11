@@ -5,8 +5,11 @@
 //! macOS: expiry is craked's store's (it expires hosts when the tunnel
 //! comes up). A full tunnel is two halves of the address space through
 //! the tunnel (0/1 and 128/1, more specific than the default route), with
-//! the gateway kept on the way it went before. Public DNS answers aren't
-//! watched (not yet on macOS).
+//! the gateway kept on the way it went before. What leaves through a
+//! tunnel with another source address (a connection that started before
+//! its host was routed, on its next SYN) is NATed to the tunnel's address
+//! by pf, in an anchor of Crake's (`nat`), as Linux masquerades. Public
+//! DNS answers aren't watched (not yet on macOS).
 
 use std::collections::{BTreeSet, HashMap};
 use std::net::Ipv4Addr;
@@ -22,6 +25,8 @@ pub struct Routing {
     real: bool,
     /// Per tunnel: its device and the routes craked added through it.
     tunnels: Mutex<HashMap<String, Routes>>,
+    /// pf, while Crake has it on: the token `pfctl -E` gave.
+    pf: tokio::sync::Mutex<Option<String>>,
 }
 
 struct Routes {
@@ -42,6 +47,7 @@ impl Routing {
         Self {
             real: apply,
             tunnels: Mutex::new(HashMap::new()),
+            pf: tokio::sync::Mutex::new(None),
         }
     }
 
@@ -77,6 +83,7 @@ impl Routing {
         // (probes, DNS checks): Linux's per-tunnel table.
         if self.real {
             cmd::route_add_scoped("0.0.0.0", 0, plan.device).await?;
+            self.nat().await?;
         }
         let learned = plan.learned.iter().map(|(a, _)| Target::host(*a));
         let full = plan.full_except.map(|_| halves()).into_iter().flatten();
@@ -110,6 +117,32 @@ impl Routing {
         cmd::route_delete("0.0.0.0", 0, Some(&routes.device)).await?;
         for (t, _) in routes.kept {
             cmd::route_delete(&t.addr().to_string(), t.prefix_len(), None).await?;
+        }
+        self.nat().await
+    }
+
+    /// pf's NAT for every tunnel that's up, in Crake's anchor (under
+    /// macOS' own `com.apple/*`, which its pf.conf evaluates); pf on while
+    /// there are any, and released (its token) when there are none.
+    async fn nat(&self) -> Result<()> {
+        let devices: Vec<String> = self
+            .tunnels
+            .lock()
+            .unwrap()
+            .values()
+            .map(|r| r.device.clone())
+            .collect();
+        let mut pf = self.pf.lock().await;
+        if devices.is_empty() {
+            cmd::pf_rules(ANCHOR, "").await?;
+            if let Some(token) = pf.take() {
+                cmd::pf_release(&token).await?;
+            }
+            return Ok(());
+        }
+        cmd::pf_rules(ANCHOR, &nat_rules(&devices)).await?;
+        if pf.is_none() {
+            *pf = Some(cmd::pf_enable().await?);
         }
         Ok(())
     }
@@ -170,6 +203,18 @@ impl Routing {
     }
 }
 
+/// Crake's pf anchor.
+const ANCHOR: &str = "com.apple/250.Crake";
+
+/// One NAT rule per tunnel device: anything leaving through it with
+/// another source takes the device's address.
+fn nat_rules(devices: &[String]) -> String {
+    devices
+        .iter()
+        .map(|d| format!("nat on {d} inet from ! ({d}) to any -> ({d})\n"))
+        .collect()
+}
+
 /// Each exception whose way is the default route (which the halves would
 /// take over) gets a route of its own to the same next hop: the gateway,
 /// above all. The LAN's networks have routes more specific already.
@@ -184,4 +229,16 @@ async fn keep_ways(except: &[Target]) -> Result<Vec<(Target, Ipv4Addr)>> {
         kept.push((*t, via));
     }
     Ok(kept)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_nat_rule_per_tunnel() {
+        assert_eq!(
+            super::nat_rules(&["utun5".into(), "utun6".into()]),
+            "nat on utun5 inet from ! (utun5) to any -> (utun5)\n\
+             nat on utun6 inet from ! (utun6) to any -> (utun6)\n"
+        );
+    }
 }
