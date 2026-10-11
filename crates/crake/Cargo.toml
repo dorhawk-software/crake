@@ -39,6 +39,10 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphic
 # The single-instance pipe is read a line at a time.
 tokio = { version = "1", features = ["io-util"] }
 
+[build-dependencies]
+# crake.exe's icon on Windows (a no-op elsewhere).
+embed-resource = "3"
+
 [dev-dependencies]
 # The integration test (src/wire_tests.rs): craked itself, serving its API.
 craked = { path = "../craked" }

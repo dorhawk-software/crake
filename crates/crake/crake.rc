@@ -1,0 +1,3 @@
+// crake.exe's resources: its icon (the bird in the grass), resource 1, which
+// Windows shows for the program and GPUI loads for its windows.
+1 ICON "../../assets/icons/app/crake.ico"

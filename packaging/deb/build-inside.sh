@@ -26,6 +26,11 @@ install -Dm644 /src/packaging/deb/craked.toml "$root/etc/crake/craked.toml"
 install -d "$root/etc/crake/managed.d"
 install -Dm644 /src/packaging/apparmor/usr.sbin.craked "$root/etc/apparmor.d/usr.sbin.craked"
 install -Dm644 /src/packaging/deb/crake.desktop "$root/usr/share/applications/software.dorhawk.crake.desktop"
+# The app icon (assets/icons/app: the bird in the grass), for the icon themes.
+install -Dm644 /src/assets/icons/app/crake.svg "$root/usr/share/icons/hicolor/scalable/apps/software.dorhawk.crake.svg"
+for s in 16 24 32 48 64 128 256 512; do
+  install -Dm644 "/src/assets/icons/app/crake-$s.png" "$root/usr/share/icons/hicolor/${s}x$s/apps/software.dorhawk.crake.png"
+done
 doc="$root/usr/share/doc/crake"
 install -Dm644 /src/packaging/deb/copyright "$doc/copyright"
 install -Dm644 /src/packaging/craked.toml.example "$doc/craked.toml.example"

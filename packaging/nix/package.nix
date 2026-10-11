@@ -27,6 +27,10 @@ rustPlatform.buildRustPackage {
     install -Dm644 packaging/software.dorhawk.Crake1.conf $out/share/dbus-1/system.d/software.dorhawk.Crake1.conf
     install -Dm644 packaging/software.dorhawk.crake.policy $out/share/polkit-1/actions/software.dorhawk.crake.policy
     install -Dm644 packaging/deb/crake.desktop $out/share/applications/software.dorhawk.crake.desktop
+    install -Dm644 assets/icons/app/crake.svg $out/share/icons/hicolor/scalable/apps/software.dorhawk.crake.svg
+    for s in 16 24 32 48 64 128 256 512; do
+      install -Dm644 assets/icons/app/crake-$s.png $out/share/icons/hicolor/''${s}x$s/apps/software.dorhawk.crake.png
+    done
     install -Dm644 packaging/craked.toml.example $out/share/doc/crake/craked.toml.example
   '';
   # GPUI opens Vulkan, Wayland and libxkbcommon at run time.

@@ -69,6 +69,7 @@ fi
 /usr/share/dbus-1/system.d/software.dorhawk.Crake1.conf
 /usr/share/polkit-1/actions/software.dorhawk.crake.policy
 /usr/share/applications/software.dorhawk.crake.desktop
+/usr/share/icons/hicolor/*/apps/software.dorhawk.crake.*
 %dir /etc/crake
 %config(noreplace) /etc/crake/craked.toml
 %dir /etc/crake/managed.d

@@ -1427,6 +1427,7 @@ dependencies = [
  "async-channel",
  "crake-proto",
  "craked",
+ "embed-resource",
  "futures-util",
  "gpui-kit",
  "jiff",

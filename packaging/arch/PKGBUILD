@@ -47,6 +47,10 @@ package() {
   install -Dm644 packaging/software.dorhawk.Crake1.conf "$pkgdir/usr/share/dbus-1/system.d/software.dorhawk.Crake1.conf"
   install -Dm644 packaging/software.dorhawk.crake.policy "$pkgdir/usr/share/polkit-1/actions/software.dorhawk.crake.policy"
   install -Dm644 packaging/deb/crake.desktop "$pkgdir/usr/share/applications/software.dorhawk.crake.desktop"
+  install -Dm644 assets/icons/app/crake.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/software.dorhawk.crake.svg"
+  for s in 16 24 32 48 64 128 256 512; do
+    install -Dm644 "assets/icons/app/crake-$s.png" "$pkgdir/usr/share/icons/hicolor/${s}x$s/apps/software.dorhawk.crake.png"
+  done
   install -Dm644 packaging/deb/craked.toml "$pkgdir/etc/crake/craked.toml"
   printf '\n# Arch: the hook lives in /usr/lib/crake.\nhook_path = "/usr/lib/crake/hook"\n' >> "$pkgdir/etc/crake/craked.toml"
   install -dm755 "$pkgdir/etc/crake/managed.d"
