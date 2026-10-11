@@ -604,6 +604,13 @@ The user doesn't want development builds installed on their machine.
   (cache-nix-action), where crane keeps the crates.io dependencies a
   derivation of their own (packaging/nix/package.nix; the vendored GPUI
   backend stays whole in it).
+  **To do (noted for the user):** GitHub keeps 10 GB of caches per
+  repository, and rust-cache (check 2.4 GB, Windows build 3.2 GB, the
+  Windows check 1 GB), Nix (2.4 GB) and the packages (~3 GB) don't fit
+  together: GitHub evicts the least used, and that run is slow again.
+  Once `windows` is merged, save caches from `main` only (rust-cache's
+  `save-if`, actions/cache's restore/save split) and let branches restore
+  them; if still too big, drop rustup from the package cache.
 - Daily use, nothing installed: `sudo ./target/debug/craked --config dev/<yours>.toml --dev`
   (serves the app on `/run/user/<uid>/crake-dev.sock`), then `./target/debug/crake`.
   The app signs in as the user (`openconnect --authenticate`, questions in
