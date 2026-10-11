@@ -41,7 +41,13 @@ in {
       after = [ "network-online.target" "dbus.service" ];
       wants = [ "network-online.target" ];
       path = [ pkgs.nftables pkgs.iproute2 pkgs.openconnect ];
+      # An upgrade (nixos-rebuild switch) reloads craked rather than
+      # restarting it: the reload leaves the handover flag and restarts it,
+      # so its tunnels stay signed in, as the packages' upgrade scripts do
+      # (manager/handover.rs).
+      reloadIfChanged = true;
       serviceConfig = {
+        ExecReload = "${pkgs.bash}/bin/sh -c 'touch /run/crake/handover && ${pkgs.systemd}/bin/systemctl restart --no-block craked.service'";
         Type = "dbus";
         BusName = "software.dorhawk.Crake1";
         ExecStart = "${cfg.package}/bin/craked";

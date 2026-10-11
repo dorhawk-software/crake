@@ -95,7 +95,13 @@ in {
     imports = [ self.nixosModules.default ];
     services.crake.enable = true;
     networking.firewall.enable = false;
-    environment.systemPackages = [ pkgs.curl ];
+    # The journey runs as root with the system's own tools.
+    environment.systemPackages = [ pkgs.curl pkgs.nftables pkgs.dbus pkgs.util-linux ];
+    # An upgrade: the same system with craked's unit changed, switched to
+    # while ACME is up.
+    specialisation.upgraded.configuration = {
+      systemd.services.craked.environment.CRAKE_TEST_GENERATION = "2";
+    };
     # The LAN's router doesn't know ACME's network either.
     networking.interfaces.eth1.ipv4.routes = [{
       address = "10.40.0.0"; prefixLength = 16;
@@ -116,6 +122,11 @@ in {
     with subtest("nothing reaches ACME's network without the tunnel"):
         client.fail("curl -s -m 2 http://10.40.1.10/")
 
+    with subtest("polkit refuses someone without a session here"):
+        client.succeed("setpriv --reuid=nobody --regid=$(id -g nobody) --clear-groups "
+                       + "dbus-send --system --print-reply --dest=software.dorhawk.Crake1 /software/dorhawk/Crake1 "
+                       + "software.dorhawk.Crake1.RemoveTunnel string:globex 2>&1 | grep 'not authorized to switch tunnels'")
+
     with subtest("signs in and connects through craked"):
         client.succeed(call + "AddTunnel 'a{ss}' 4 display_name ACME gateway https://${gw} protocol anyconnect user alice")
         out = client.succeed("printf 'yes\\nhunter2\\n' | openconnect --authenticate --user=alice https://${gw} 2>/dev/null")
@@ -134,6 +145,13 @@ in {
         client.succeed("resolvectl query wiki.acme.internal | grep -q 10.40.1.11")
         client.succeed("curl -s -m 1 http://10.40.1.11/ | grep -q crex")
 
+    with subtest("an upgrade keeps ACME signed in"):
+        client.succeed("/run/current-system/specialisation/upgraded/bin/switch-to-configuration test")
+        client.wait_until_succeeds("grep -q 'Crake was updated. Your tunnels are reconnecting with your sign-ins.' /var/lib/crake/log", timeout=30)
+        client.wait_until_succeeds(call + "GetTunnel s acme | grep -q '\"connected\"'", timeout=30)
+        client.succeed("curl -s -m 3 http://10.40.1.11/ | grep -q crex")
+        client.fail("test -e /run/crake/resume.json")
+
     with subtest("switched off, ACME's names are refused at once"):
         client.succeed(call + "Disconnect s acme")
         client.wait_until_succeeds("ip link show crake-hush")
@@ -142,5 +160,12 @@ in {
 
     with subtest("nothing went wrong in craked's journal"):
         client.fail("journalctl -u craked -o cat | grep -E 'ERROR|panicked'")
+
+    with subtest("the journey (the app and its own craked)"):
+        client.succeed("systemctl stop craked")
+        client.succeed("mkdir -p /tmp/journey && env CRAKE_E2E=1 TMPDIR=/tmp/journey "
+                       + "CRAKE_E2E_HOOK=${self.packages.${pkgs.stdenv.hostPlatform.system}.default}/libexec/crake/hook "
+                       + "CRAKE_E2E_GATEWAY=https://${gw} "
+                       + "${self.packages.${pkgs.stdenv.hostPlatform.system}.journey}/bin/crake-journey journey_tests --test-threads=1 >&2")
   '';
 }

@@ -16,6 +16,8 @@
           craneLib = crane.mkLib pkgs;
         };
         default = crake;
+        # The journey's test binary, for the NixOS VM test.
+        journey = crake.journey;
       };
       # services.crake.enable = true;
       nixosModules.default = import ./packaging/nix/module.nix self;
