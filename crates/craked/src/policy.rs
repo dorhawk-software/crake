@@ -210,7 +210,7 @@ pub fn load_file(path: &Path) -> Result<TunnelConfig> {
         auth_args.push(format!("--certificate={c}"));
     }
     if f.sign_in.as_deref() == Some("browser") {
-        auth_args.push("--external-browser=xdg-open".into());
+        auth_args.push(format!("--external-browser={}", crake_proto::BROWSER));
     }
     Ok(TunnelConfig {
         name,
@@ -274,7 +274,10 @@ mod tests {
         assert_eq!(t.name, "acme");
         assert_eq!(
             t.auth_args,
-            ["--authgroup=Employees", "--external-browser=xdg-open"]
+            [
+                "--authgroup=Employees".to_owned(),
+                format!("--external-browser={}", crake_proto::BROWSER)
+            ]
         );
         let m = t.managed.unwrap();
         assert_eq!(

@@ -57,7 +57,8 @@ fn routes(alias: &str) -> String {
 }
 
 /// The app connected to the craked service, with a tunnel `name` freshly
-/// added (New tunnel's "Add") to the test gateway, with `more` fields.
+/// added (New tunnel's "Add") to the test gateway, with `more` fields, and
+/// no other test tunnel.
 async fn added(name: &str, display: &str, more: &[(&str, &str)]) -> App {
     let (tx, updates) = async_channel::unbounded();
     let mut app = App::new(client::start(tx), updates);
@@ -65,12 +66,15 @@ async fn added(name: &str, display: &str, more: &[(&str, &str)]) -> App {
         m.reachable == Some(true) && !m.settings.is_empty()
     })
     .await;
-    if app.state(name).is_some() {
-        app.send(Command::RemoveTunnel(name.into()));
-        app.until("an old one gone", |m| {
-            !m.tunnels.iter().any(|t| t.name == name)
-        })
-        .await;
+    // No test tunnel left from before (one that's up would clash).
+    for old in ["acme", "globex", name] {
+        if app.state(old).is_some() {
+            app.send(Command::RemoveTunnel(old.into()));
+            app.until("an old one gone", |m| {
+                !m.tunnels.iter().any(|t| t.name == old)
+            })
+            .await;
+        }
     }
     let gateway = crate::test_app::gateway();
     let fields: HashMap<String, String> = [

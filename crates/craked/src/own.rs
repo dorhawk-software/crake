@@ -228,7 +228,9 @@ impl OwnTunnel {
             auth_args.push(format!("--authgroup={g}"));
         }
         match (self.sign_in, &self.certificate) {
-            (SignIn::Browser, _) => auth_args.push("--external-browser=xdg-open".into()),
+            (SignIn::Browser, _) => {
+                auth_args.push(format!("--external-browser={}", crake_proto::BROWSER))
+            }
             // The app writes a keyring copy for each sign-in itself.
             (SignIn::Certificate, Some(c)) if c != "keyring" => {
                 auth_args.push(format!("--certificate={c}"))

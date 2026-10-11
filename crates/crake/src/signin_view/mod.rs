@@ -222,7 +222,7 @@ fn fit_window() -> impl IntoElement {
 
 impl SignIn {
     /// Where sign-in is (journey tests).
-    #[cfg(all(test, target_os = "linux"))]
+    #[cfg(all(test, any(target_os = "linux", windows)))]
     pub(crate) fn stage(&self) -> &Stage {
         &self.stage
     }

@@ -13,7 +13,7 @@ use windows_sys::Win32::NetworkManagement::IpHelper::{
 };
 use windows_sys::Win32::NetworkManagement::Ndis::NET_LUID_LH;
 use windows_sys::Win32::Networking::WinSock::{
-    AF_INET, IN_ADDR, IN_ADDR_0, SOCKADDR_IN, SOCKADDR_INET,
+    AF_INET, IN_ADDR, IN_ADDR_0, IpDadStatePreferred, SOCKADDR_IN, SOCKADDR_INET,
 };
 
 const ERROR_NOT_FOUND: u32 = 1168;
@@ -68,6 +68,10 @@ pub fn set_address(luid: NET_LUID_LH, addr: Ipv4Addr, prefix: u8) -> Result<()> 
         row.InterfaceLuid = luid;
         row.Address = sockaddr(addr);
         row.OnLinkPrefixLength = prefix;
+        // Usable at once: a tunnel's address has no one to clash with on
+        // its link, and duplicate address detection would keep it
+        // tentative for a moment (a probe right after would fail).
+        row.DadState = IpDadStatePreferred;
         CreateUnicastIpAddressEntry(&raw const row)
     };
     match err {

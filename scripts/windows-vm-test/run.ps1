@@ -38,6 +38,9 @@ Check "installed in Program Files\Crake" {
 Check "the craked service runs" {
     New-Service -Name craked -DisplayName 'Crake' -BinaryPathName "`"$dir\craked.exe`"" `
         -StartupType Automatic -ErrorAction Stop | Out-Null
+    # craked's debug lines in its log, for when something goes wrong.
+    Set-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Services\craked -Name Environment `
+        -Type MultiString -Value 'RUST_LOG=craked=debug,info' 
     Start-Service craked -ErrorAction Stop
     (Get-Service craked).Status -eq 'Running'
 }
@@ -62,9 +65,9 @@ Check "the gateway answers (198.51.100.10:443)" {
 $env:CRAKE_E2E = '1'
 $env:CRAKE_E2E_GATEWAY = 'https://198.51.100.10'
 $env:CRAKE_OPENCONNECT = "$dir\openconnect\openconnect.exe"
-Say "== the Windows test (windows_tests.rs)"
+Say "== the Windows tests (windows_tests.rs, windows_journey.rs)"
 # Through cmd: PowerShell would wrap each line on stderr as an error.
-$out = cmd /c "`"$Disc\crake-tests.exe`" windows_tests --nocapture --test-threads=1 2>&1" | Out-String
+$out = cmd /c "`"$Disc\crake-tests.exe`" windows_ --nocapture --test-threads=1 2>&1" | Out-String
 Say $out
 if ($LASTEXITCODE -ne 0) { $fail = 1 }
 
@@ -81,6 +84,8 @@ Say "  craked.log:"
 Get-Content "$env:ProgramData\Crake\craked.log" -ErrorAction SilentlyContinue |
     Where-Object { $_ -notmatch 'Windows Script Host|Microsoft Corporation' } |
     ForEach-Object { Say "        $_" }
+Say "  what craked decided (its log, last lines):"
+Get-Content "$env:ProgramData\Crake\log" -Tail 40 -ErrorAction SilentlyContinue | ForEach-Object { Say "        $_" }
 Say "VM-TEST-RESULT: $fail"
 $port.Close()
 Stop-Computer -Force

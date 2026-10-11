@@ -35,6 +35,12 @@ pub const APP_SOCKET: &str = "/var/run/crake.sock";
 /// Windows: craked's service name.
 #[cfg(windows)]
 pub const SERVICE_NAME: &str = "craked";
+/// What openconnect opens a browser sign-in's page with
+/// (`--external-browser`): the desktop's own opener.
+#[cfg(not(target_os = "macos"))]
+pub const BROWSER: &str = "xdg-open";
+#[cfg(target_os = "macos")]
+pub const BROWSER: &str = "open";
 /// Set by `craked` in openconnect's environment so the hook knows which tunnel it serves.
 pub const ENV_TUNNEL: &str = "CRAKE_TUNNEL";
 /// Overrides the hook socket path (used by the hook and by tests).

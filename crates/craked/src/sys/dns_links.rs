@@ -50,7 +50,9 @@ pub fn set_public(on: bool) {
 }
 
 /// The link that answers for `name` (its most specific domain; failing
-/// that, a full tunnel's), with that link's servers.
+/// that, a full tunnel's), with that link's servers. On a tie a tunnel
+/// that's up wins over craked's own links: a domain kept private for a
+/// tunnel that's off may be one a tunnel that's up has too.
 pub fn owner(name: &str) -> Option<(String, Vec<Ipv4Addr>)> {
     links()
         .iter()
@@ -61,9 +63,10 @@ pub fn owner(name: &str) -> Option<(String, Vec<Ipv4Addr>)> {
                 .map(|d| d.len() + 1)
                 .max()
                 .or(everything.then_some(0))?;
-            Some((best, device, servers))
+            let own = device == crate::hush::DEVICE || device == crate::keep::DEVICE;
+            Some(((best, !own), device, servers))
         })
-        .max_by_key(|(len, _, _)| *len)
+        .max_by_key(|(rank, _, _)| *rank)
         .map(|(_, device, servers)| (device.clone(), servers.clone()))
 }
 
@@ -71,12 +74,20 @@ pub fn owner(name: &str) -> Option<(String, Vec<Ipv4Addr>)> {
 mod tests {
     use std::net::Ipv4Addr;
 
+    fn owner(name: &str) -> Option<String> {
+        super::owner(name).map(|(d, _)| d)
+    }
+
+    fn dns(n: u8) -> Vec<Ipv4Addr> {
+        vec![Ipv4Addr::new(10, 0, 0, n)]
+    }
+
+    // One test: the links are one table for the whole process.
     #[test]
-    fn the_most_specific_domain_wins_and_a_full_tunnel_takes_the_rest() {
-        let dns = |n| vec![Ipv4Addr::new(10, 0, 0, n)];
+    fn whose_a_name_is() {
+        // The most specific domain wins; a full tunnel takes the rest.
         super::set("crake-acme", &dns(1), &["acme.internal".into()], false);
         super::set("crake-dev", &dns(2), &["dev.acme.internal".into()], false);
-        let owner = |name| super::owner(name).map(|(d, _)| d);
         assert_eq!(owner("git.acme.internal").as_deref(), Some("crake-acme"));
         assert_eq!(owner("ci.dev.acme.internal").as_deref(), Some("crake-dev"));
         assert_eq!(owner("example.org"), None);
@@ -87,5 +98,20 @@ mod tests {
             super::remove(d);
         }
         assert_eq!(owner("git.acme.internal"), None);
+
+        // ACME's names kept private while it's off; Nordbank, up, has the
+        // same domain: Nordbank answers.
+        super::set(crate::hush::DEVICE, &[], &["acme.internal".into()], false);
+        assert_eq!(
+            owner("wiki.acme.internal").as_deref(),
+            Some(crate::hush::DEVICE)
+        );
+        super::set("crake-nordbank", &dns(4), &["acme.internal".into()], false);
+        assert_eq!(
+            owner("wiki.acme.internal").as_deref(),
+            Some("crake-nordbank")
+        );
+        super::remove("crake-nordbank");
+        super::remove(crate::hush::DEVICE);
     }
 }

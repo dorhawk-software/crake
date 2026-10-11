@@ -14,14 +14,16 @@
 
 use std::os::unix::fs::MetadataExt;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use gpui_kit::test::TestWindowExt;
-use gpui_kit::{AnyWindowHandle, AppContext, Entity, Render, TestAppContext};
+use gpui_kit::TestAppContext;
 
 use craked::manager::Manager;
 
 use crate::e2e_tests::{config, sh};
+use crate::journey_kit::{
+    click, index, model, panel, request, sign_in, state, type_into, until, wait_window, window,
+};
 use crate::model::Model;
 use crate::test_app::{enabled, get};
 use crate::{Request, Setup, Shell, panel, settings_view, signin_view, start, tunnel_detail};
@@ -51,175 +53,6 @@ fn daemon(dir: &std::path::Path) -> Daemon {
         mgr
     });
     Daemon { rt, mgr }
-}
-
-/// Let the app and craked work until `done` holds; `what` names the step.
-fn until(
-    cx: &mut TestAppContext,
-    what: &str,
-    wait: Duration,
-    done: impl Fn(&mut TestAppContext) -> bool,
-) {
-    let end = Instant::now() + wait;
-    loop {
-        cx.run_until_parked();
-        if done(cx) {
-            return;
-        }
-        assert!(Instant::now() < end, "never: {what}");
-        std::thread::sleep(Duration::from_millis(20));
-    }
-}
-
-fn model(cx: &mut TestAppContext) -> Model {
-    cx.read(|cx| cx.global::<Shell>().model.read(cx).clone())
-}
-
-fn request(cx: &mut TestAppContext, r: Request) {
-    cx.update(|cx| cx.global::<Shell>().requests.send_blocking(r).unwrap());
-    cx.run_until_parked();
-}
-
-/// The open window whose view is a `V`, and that view.
-fn window<V: 'static + Render>(cx: &mut TestAppContext) -> Option<(AnyWindowHandle, Entity<V>)> {
-    cx.update(|cx| {
-        cx.windows().into_iter().find_map(|w| {
-            let typed = w.downcast::<V>()?;
-            Some((w, typed.root(cx).ok()?))
-        })
-    })
-}
-
-fn wait_window<V: 'static + Render>(
-    cx: &mut TestAppContext,
-    what: &str,
-) -> (AnyWindowHandle, Entity<V>) {
-    until(cx, what, Duration::from_secs(10), |cx| {
-        window::<V>(cx).is_some()
-    });
-    window::<V>(cx).unwrap()
-}
-
-fn click(cx: &mut TestAppContext, w: AnyWindowHandle, id: impl Into<gpui_kit::ElementId>) {
-    let id = id.into();
-    settle(cx, w);
-    if std::env::var_os("CRAKE_JOURNEY_DEBUG").is_some() {
-        cx.update_window(w, |_, window, cx| {
-            window.render_frame(cx);
-            let found = window
-                .try_find(id.clone())
-                .map(|e| (e.bounds(), e.visible()));
-            eprintln!(
-                "click {id:?}: viewport {:?}, element {found:?}",
-                window.viewport_size()
-            );
-        })
-        .unwrap();
-    }
-    cx.update_window(w, |_, window, cx| {
-        window.render_frame(cx);
-        window.click(id, cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-}
-
-/// A few frames, as a screen would draw them: a window that fits itself
-/// to its content (New tunnel) resizes on the frame after it measures.
-/// GPUI's test platform takes a resize without telling the window, as a
-/// window system's configure event would: it's delivered here.
-fn settle(cx: &mut TestAppContext, w: AnyWindowHandle) {
-    for _ in 0..3 {
-        let asked = cx
-            .update_window(w, |_, window, cx| {
-                window.render_frame(cx);
-                let asked = window.bounds().size;
-                (asked != window.viewport_size()).then_some(asked)
-            })
-            .unwrap();
-        if let Some(size) = asked {
-            cx.simulate_window_resize(w, size);
-        }
-        cx.run_until_parked();
-    }
-}
-
-fn type_into(
-    cx: &mut TestAppContext,
-    w: AnyWindowHandle,
-    field: Entity<gpui_kit::component::input::InputState>,
-    text: &str,
-) {
-    cx.update_window(w, |_, window, cx| {
-        field.update(cx, |f, cx| f.focus(window, cx));
-        window.render_frame(cx);
-        window.input(text, cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-}
-
-/// The panel, opened the way the tray icon opens it.
-fn panel(cx: &mut TestAppContext) -> AnyWindowHandle {
-    if window::<panel::Panel>(cx).is_none() {
-        // A tray click within half a second of the panel closing on blur
-        // means "close" (the click takes focus first; windows.rs): a person
-        // clicks later than that.
-        let blurred = cx.read(|cx| cx.global::<Shell>().panel_blurred.map(|t| t.elapsed()));
-        if let Some(ago) = blurred {
-            std::thread::sleep(Duration::from_millis(600).saturating_sub(ago));
-        }
-        request(cx, Request::Panel(None));
-    }
-    wait_window::<panel::Panel>(cx, "the panel opens").0
-}
-
-fn state(cx: &mut TestAppContext, tunnel: &str) -> String {
-    model(cx)
-        .tunnels
-        .iter()
-        .find(|t| t.name == tunnel)
-        .map(|t| t.state.clone())
-        .unwrap_or_default()
-}
-
-fn index(cx: &mut TestAppContext, tunnel: &str) -> usize {
-    model(cx)
-        .tunnels
-        .iter()
-        .position(|t| t.name == tunnel)
-        .expect("listed")
-}
-
-/// Sign in as the window asks: trust the gateway, give the password.
-fn sign_in(cx: &mut TestAppContext) {
-    use crate::signin::Ask;
-    let (w, view) = wait_window::<signin_view::SignIn>(cx, "the sign-in window opens");
-    let asked = |cx: &mut TestAppContext, want: fn(&Ask) -> bool| {
-        view.read_with(
-            cx,
-            |v, _| matches!(v.stage(), signin_view::Stage::Asking(p) if want(&p.ask)),
-        )
-    };
-    until(
-        cx,
-        "asked to trust the gateway",
-        Duration::from_secs(20),
-        |cx| asked(cx, |a| matches!(a, Ask::TrustServer { .. })),
-    );
-    click(cx, w, "yes");
-    until(
-        cx,
-        "asked for the password",
-        Duration::from_secs(20),
-        |cx| asked(cx, |a| *a == Ask::Secret),
-    );
-    cx.update_window(w, |_, window, cx| {
-        window.render_frame(cx);
-        window.input("hunter2", cx);
-    })
-    .unwrap();
-    click(cx, w, "continue");
 }
 
 #[gpui_kit::test]

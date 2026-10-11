@@ -207,7 +207,7 @@ fn static_of<const N: usize, T>(
 
 impl NewTunnel {
     /// The name, gateway and username fields (journey tests).
-    #[cfg(all(test, target_os = "linux"))]
+    #[cfg(all(test, any(target_os = "linux", windows)))]
     pub(crate) fn fields_for_tests(
         &self,
     ) -> (Entity<InputState>, Entity<InputState>, Entity<InputState>) {

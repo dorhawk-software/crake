@@ -58,6 +58,8 @@ mod tray;
 // With craked over its socket, openconnect and nftables: Linux.
 #[cfg(all(test, target_os = "linux"))]
 mod e2e_tests;
+#[cfg(all(test, any(target_os = "linux", windows)))]
+mod journey_kit;
 #[cfg(all(test, target_os = "linux"))]
 mod journey_tests;
 // The app's side against a real craked: the Linux and Windows tests'.
@@ -67,6 +69,8 @@ mod tunnel_detail;
 #[cfg(all(test, target_os = "linux"))]
 mod wire_tests;
 // With the installed craked service and openconnect: Windows.
+#[cfg(all(test, windows))]
+mod windows_journey;
 #[cfg(all(test, windows))]
 mod windows_tests;
 

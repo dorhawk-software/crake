@@ -574,9 +574,17 @@ The user doesn't want development builds installed on their machine.
   journey`: the service steps aside, the journey runs its own craked with
   the packaged hook and the system's openconnect, nft and ip). Passes on
   Ubuntu 22.04/24.04/26.04, Debian 12/13, Fedora 43/44/45 and Arch; NixOS in its VM test.
-  Windows: `scripts/windows-vm-test.sh` (its basics through the app's
-  client and sign-in, not the windows yet). Still to do: macOS (GitHub's
-  runners).
+  Windows: done, `scripts/windows-vm-test.sh` runs `windows_journey.rs`
+  (the same day: the panel's switch and sign-in, Undo/Redo, Settings,
+  tunnel detail, the log, New tunnel, switching off, the service
+  restarting) against the installed service, with `windows_tests.rs`
+  (helpers shared through `journey_kit.rs` and `test_app.rs`). It found
+  two bugs: a new Wintun adapter's address sat in duplicate-address
+  detection, so the first probe through a fresh tunnel failed (addresses
+  are now created Preferred, as WireGuard does), and a domain kept private
+  for a tunnel that's off beat a tunnel that's up with the same domain
+  (`dns_links::owner` now prefers the tunnel). Still to do: macOS
+  (GitHub's runners; no gateway there).
 - `scripts/netns-test.sh`: real nftables and policy routing inside a
   disposable container with no network (host filesystem read-only).
 - `scripts/e2e-test.sh` (`crates/crake/src/e2e_tests.rs`, skipped unless
@@ -912,7 +920,8 @@ evaluation). `run.ps1` installs Crake, waits for the gateway, runs the
 Windows test (`crates/crake/src/windows_tests.rs`, the app's client and
 sign-in against the installed service: probing, a name only ACME's DNS
 knows, over TCP too, a public name rescued, the charts' counters, names
-refused at once when off, a full tunnel) and checks craked stops
+refused at once when off, a full tunnel), the Windows journey
+(`windows_journey.rs`), and checks craked stops
 leaving no adapters or NRPT rules; it reports on the serial port. The
 test binary and craked are cross-built with MinGW in
 `crake-windows-build`. Not in GitHub's CI (KVM).
