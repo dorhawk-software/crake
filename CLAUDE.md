@@ -831,6 +831,30 @@ release shaders need the Windows SDK's fxc (vkd3d can't compile them:
 no `SV_ClipDistance`; GPUI's debug path reads the shader source from the
 build machine at run time). Not yet tried on a real Windows.
 
+**Phase 3: in progress** (tried in the Windows 11 VM against the test
+gateway VM, see below). Built: craked as the service `craked` (logs to
+ProgramData\Crake\craked.log; `--console` to run by hand); the hook over
+a named pipe through `packaging/windows/crake-hook.js` (openconnect runs
+scripts with cscript.exe, 10 s at most); the app on 127.0.0.1:47366
+(craked lets the console session change things; the app checks the port
+is the service's); the tunnel's address, MTU and DNS route, learned and
+pinned hosts as routes (IP Helper); openconnect stopped with Ctrl+Break /
+Ctrl+C sent by a copy of craked (`--console-event`: whoever sends it gets
+it too, and it ended the service); sockets bound to a tunnel
+(IP_UNICAST_IF); openconnect from Crake's folder; openconnect for Windows
+built by `scripts/build-openconnect-windows.sh` (unbuffered output, else
+its questions never reach sign-in); the app: no console windows, plain
+DWM frames (no square outline), the panel at the tray. Sign-in, switch
+on and off, and DNS through the tunnel work in the VM.
+To do, in order: learning (connection probing from the TCP table, and
+craked's own DNS server for the tunnels' domains through NRPT rules, so
+names are routed before the first packet), keeping names private and
+answering from memory (the same server), the public-DNS rescue, then the
+installer (phase 5). **Also noted (user):** the panel has no shadow on
+Windows (Linux draws one in its transparent margin), and a few white
+pixels show outside the rounded top corners; both look like GPUI's
+DirectX drawing of transparent windows.
+
 ## Someday: other platforms
 
 Wanted one day, not planned yet. Keep the split that makes it possible:
