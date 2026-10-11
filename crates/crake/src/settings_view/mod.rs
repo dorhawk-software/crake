@@ -463,12 +463,10 @@ impl Settings {
                     }
                     cx.notify();
                 }))
+                // A click lands after the hover that opened it: it keeps
+                // it open (moving away closes it), instead of closing it.
                 .on_click(cx.listener(move |this, _, _, cx| {
-                    this.hint = if this.hint == Some(label) {
-                        None
-                    } else {
-                        Some(label)
-                    };
+                    this.hint = Some(label);
                     cx.notify();
                 }))
                 .test_support(),

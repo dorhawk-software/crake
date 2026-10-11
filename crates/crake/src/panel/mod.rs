@@ -99,6 +99,8 @@ pub struct Panel {
     hover: Option<f32>,
     /// The chart's left edge and width (window pixels), from its last paint.
     chart_geometry: std::rc::Rc<std::cell::Cell<(f32, f32)>>,
+    /// The "?" card after "What Crake did" is open.
+    help_open: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -327,6 +329,7 @@ impl Panel {
                 .ok()
                 .and_then(|v| v.strip_prefix("hover:")?.parse().ok()),
             chart_geometry: Default::default(),
+            help_open: false,
             _subscriptions: subscriptions,
         }
     }

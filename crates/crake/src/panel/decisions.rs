@@ -11,7 +11,11 @@ impl Panel {
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let rows = model.decisions(DECISIONS);
-        let mut list = section("What Crake did", t).mt(px(14.));
+        let mut list = div()
+            .mt(px(14.))
+            .border_t_1()
+            .border_color(t.line)
+            .child(self.decisions_heading(model, t, cx));
         if rows.is_empty() {
             list = list.child(
                 div()
@@ -40,6 +44,79 @@ impl Panel {
             });
         }
         list
+    }
+
+    /// "What Crake did", and its "?": a host shows up there once, and how
+    /// long it is kept (hover or click it; Settings' pattern).
+    fn decisions_heading(&self, model: &Model, t: &Theme, cx: &mut Context<Self>) -> Div {
+        let open = self.help_open;
+        let mut q = div().relative().flex_none().child(
+            div()
+                .id("what-crake-did-help")
+                .size(px(18.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded_full()
+                .cursor_pointer()
+                .child(
+                    svg()
+                        .path("crake/help.svg")
+                        .size(px(15.))
+                        .text_color(if open { t.accent } else { t.muted }),
+                )
+                .on_hover(cx.listener(|this, hovered: &bool, _, cx| {
+                    this.help_open = *hovered;
+                    cx.notify();
+                }))
+                // A click lands after the hover that opened it: it keeps
+                // it open (moving away closes it).
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.help_open = true;
+                    cx.notify();
+                }))
+                .test_support(),
+        );
+        if open {
+            let paragraphs = model.what_crake_did_help();
+            let example = paragraphs.last().is_some_and(|p| p.starts_with("Example:"));
+            let count = paragraphs.len();
+            let mut card = div()
+                .id("what-crake-did-card")
+                .absolute()
+                .top(px(24.))
+                .left(px(-96.))
+                .w(px(340.))
+                .py(px(10.))
+                .px(px(12.))
+                .flex()
+                .flex_col()
+                .gap(px(8.))
+                .bg(t.panel)
+                .border_1()
+                .border_color(t.line_strong)
+                .rounded(px(8.))
+                .font_weight(FontWeight::NORMAL)
+                .text_size(px(13.))
+                .line_height(px(19.))
+                .text_color(t.ink);
+            for (i, para) in paragraphs.into_iter().enumerate() {
+                let muted = example && i + 1 == count;
+                card = card.child(div().when(muted, |d| d.text_color(t.muted)).child(para));
+            }
+            q = q.child(gpui_kit::deferred(card.occlude().test_support()).with_priority(2));
+        }
+        div()
+            .pt(px(12.))
+            .pb(px(4.))
+            .px(px(18.))
+            .flex()
+            .items_center()
+            .gap(px(6.))
+            .text_size(px(13.))
+            .font_weight(FontWeight::SEMIBOLD)
+            .child("What Crake did")
+            .child(q)
     }
 
     pub(super) fn decision(

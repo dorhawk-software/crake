@@ -147,3 +147,31 @@ fn the_anyconnect_notice_can_be_dismissed(cx: &mut TestAppContext) {
         other => panic!("{other:?}"),
     }
 }
+
+/// The "?" after "What Crake did" opens its card; a click (after the hover
+/// that opened it) keeps it open instead of closing it.
+#[gpui_kit::test]
+fn what_crake_did_explains_itself(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    let card_shown = |cx: &mut TestAppContext| {
+        cx.update_window(w.window, |_, window, cx| {
+            window.render_frame(cx);
+            window.try_find("what-crake-did-card").is_some()
+        })
+        .unwrap()
+    };
+    assert!(!card_shown(cx));
+    for _ in 0..2 {
+        cx.update_window(w.window, |_, window, cx| {
+            window.render_frame(cx);
+            window.click("what-crake-did-help", cx);
+        })
+        .unwrap();
+        cx.run_until_parked();
+        assert!(card_shown(cx), "open, and it stays open");
+    }
+    assert!(
+        w.requests.try_recv().is_err(),
+        "it asks the app for nothing"
+    );
+}

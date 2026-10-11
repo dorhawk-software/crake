@@ -314,8 +314,13 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    openvpn3). A protocol leaves Beta only after the user (or someone they
    trust) has signed in, connected and had hosts routed through a real
    gateway of that kind; the README's "Speaks" table follows it.
-   **To add (requested):** a "?" help card next to "What Crake did" in the
-   panel, saying a host appears there once, when Crake first sends it
+   **Built (requested; design/proposals/what-crake-did-help.html):** a "?"
+   help card next to "What Crake did" in the panel (`model/kept.rs`: how
+   long a host is kept comes from Learning's "Forget after", or never, and
+   names tunnels that keep theirs differently; the example is the newest
+   host sent through). Hover opens it, a click keeps it open (Settings' "?"
+   too: a click used to close what the hover had just opened). Originally:
+   the card in the panel, saying a host appears there once, when Crake first sends it
    through a tunnel, and is remembered after that (each use keeps it
    another week); tunnel detail shows when it was last used. The user
    expected every visit to show and didn't know it records only the first.

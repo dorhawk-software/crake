@@ -10,6 +10,7 @@ use crate::tray::{MenuTunnel, Shape};
 
 mod days;
 mod demo;
+mod kept;
 
 // The log by day and the sample data, as the rest of the app knows them.
 use self::days::local_time;
