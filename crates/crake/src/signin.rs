@@ -119,6 +119,32 @@ impl Drop for TempCert {
     }
 }
 
+/// How long sign-in waits for the keyring: long enough to type its
+/// password into a prompt.
+const KEYRING_WAIT: Duration = Duration::from_secs(90);
+
+/// What the keyring keeps for this tunnel: its certificate, the
+/// certificate's password, the gateway password. A keyring that never
+/// answers (a request that went astray while GNOME was creating the keyring
+/// left sign-in at "Reaching" for good) doesn't hold sign-in up: after
+/// `KEYRING_WAIT` it carries on as if nothing were kept, and asks.
+type Stored = (Option<Vec<u8>>, Option<Vec<u8>>, Option<Vec<u8>>);
+
+fn stored(spec: &Spec, rt: &tokio::runtime::Runtime) -> Stored {
+    if !spec.keyring {
+        return (None, None, None);
+    }
+    let read = async {
+        (
+            keyring::get(&spec.tunnel, Kind::Certificate).await,
+            keyring::get(&spec.tunnel, Kind::CertificatePassword).await,
+            keyring::get(&spec.tunnel, Kind::Password).await,
+        )
+    };
+    rt.block_on(tokio::time::timeout(KEYRING_WAIT, read))
+        .unwrap_or((None, None, None))
+}
+
 fn certificate_arg(args: &[String]) -> Option<(usize, PathBuf)> {
     args.iter().enumerate().find_map(|(i, a)| {
         a.strip_prefix("--certificate=")
@@ -137,11 +163,7 @@ fn run(
     // A certificate kept in the keyring wins over the file the config names.
     let mut temp = None;
     let mut from_file = certificate_arg(&auth_args).map(|(_, p)| p);
-    let stored_certificate = if spec.keyring {
-        rt.block_on(keyring::get(&spec.tunnel, Kind::Certificate))
-    } else {
-        None
-    };
+    let (stored_certificate, stored_password, stored_login) = stored(spec, rt);
     if let Some(bytes) = stored_certificate {
         let path =
             crate::sys::private_dir()?.join(format!("{}-{}.p12", spec.tunnel, std::process::id()));
@@ -154,16 +176,6 @@ fn run(
         from_file = None;
         temp = Some(TempCert(path));
     }
-    let stored_password = if spec.keyring {
-        rt.block_on(keyring::get(&spec.tunnel, Kind::CertificatePassword))
-    } else {
-        None
-    };
-    let stored_login = if spec.keyring {
-        rt.block_on(keyring::get(&spec.tunnel, Kind::Password))
-    } else {
-        None
-    };
 
     // Gateways that only let Cisco's client in turn openconnect away before
     // asking anything; then it tries once more introducing itself as
