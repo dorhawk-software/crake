@@ -12,6 +12,8 @@ LOCK=${1:-}
 docker run --rm -v "$PWD:/src" -v crake-nix:/nix --device /dev/kvm \
   -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e LOCK="$LOCK" nixos/nix sh -euc '
     git config --global --add safe.directory /src
+    # Nix reads the flake through git, which may store objects as root.
+    trap "chown -R $HOST_UID:$HOST_GID /src/.git" EXIT
     export NIX_CONFIG="experimental-features = nix-command flakes
 system-features = kvm nixos-test benchmark big-parallel"
     cd /src

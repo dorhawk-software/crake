@@ -1,0 +1,8 @@
+# Windows: the C runtime linked into the programs. A fresh Windows 11 has
+# no VCRUNTIME140.dll (it comes with the Visual C++ Redistributable), and
+# crake.exe wouldn't start there (found in a Windows 11 VM).
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.aarch64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

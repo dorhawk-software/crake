@@ -65,6 +65,14 @@ jobs:
         run: cargo test --workspace --locked
       - name: crake.exe, craked.exe and crake-hook.exe (unsigned)
         run: cargo build --release --locked -p crake -p craked
+      - name: No Visual C++ runtime needed (a fresh Windows has none)
+        shell: pwsh
+        run: |
+          foreach ($f in 'crake', 'craked', 'crake-hook') {
+            if (Select-String -Path "target/release/$f.exe" -Pattern 'VCRUNTIME140' -SimpleMatch -Quiet) {
+              throw "$f.exe needs VCRUNTIME140.dll"
+            }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: crake-windows
