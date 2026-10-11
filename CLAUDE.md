@@ -194,7 +194,10 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    answers REFUSED at once (`hush.rs`; netns-tested, and verified with the
    user's systemd-resolved: looking up an internal name with its tunnel
    off fails at once); removed on shutdown.
-   Still open: DNS over TCP, DNS servers reached over IPv6, DNS-over-TLS upstreams (Crake
+   Over TCP too: a tunnel DNS answer that fits one segment (almost every A
+   answer) is held like a UDP one (netns-tested); one spread over several
+   segments isn't read, and probing catches its connection.
+   Still open: DNS over TCP across segments, DNS servers reached over IPv6, DNS-over-TLS upstreams (Crake
    can't see those failures), IPv6 addresses in answers.
 4. Connection probing and automatic learning; undo. **Built**, proven in a
    throwaway namespace (the fake gateway drops packets not from the tunnel

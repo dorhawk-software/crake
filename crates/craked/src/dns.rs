@@ -16,8 +16,29 @@ pub struct Answer {
 }
 
 /// An IPv4 packet carrying a UDP DNS response, as NFQUEUE hands it over.
+/// A tunnel DNS server's answer: over UDP, or over TCP when one segment
+/// carries the whole message.
 pub fn parse_packet(packet: &[u8]) -> Option<Answer> {
-    parse_message(dns_payload(packet)?)
+    parse_message(dns_payload(packet).or_else(|| tcp_dns_payload(packet))?)
+}
+
+/// The DNS message in an IPv4 TCP segment from port 53, when the segment
+/// carries exactly one whole message (its two-byte length first). A message
+/// spread over several segments isn't read; probing still sees the
+/// connection that follows.
+pub fn tcp_dns_payload(packet: &[u8]) -> Option<&[u8]> {
+    if packet.len() < 20 || packet[0] >> 4 != 4 || packet[9] != 6 {
+        return None;
+    }
+    let ihl = usize::from(packet[0] & 0x0f) * 4;
+    let total = usize::from(u16::from_be_bytes([packet[2], packet[3]]));
+    let tcp = packet.get(ihl..total.min(packet.len()))?;
+    if tcp.len() < 20 || u16::from_be_bytes([tcp[0], tcp[1]]) != 53 {
+        return None;
+    }
+    let data = tcp.get(usize::from(tcp[12] >> 4) * 4..)?;
+    let len = usize::from(u16::from_be_bytes([*data.first()?, *data.get(1)?]));
+    (data.len() == 2 + len).then(|| &data[2..])
 }
 
 /// The DNS message inside an IPv4 UDP packet from port 53.
@@ -301,6 +322,36 @@ pub(crate) mod tests {
         let mut m = response(name, &[]);
         m[3] = 0x83;
         m
+    }
+
+    fn tcp_packet(sport: u16, data: &[u8]) -> Vec<u8> {
+        let mut p = vec![
+            0x45, 0, 0, 0, 0, 0, 0, 0, 64, 6, 0, 0, 10, 40, 0, 2, 10, 40, 255, 7,
+        ];
+        p.extend_from_slice(&sport.to_be_bytes());
+        p.extend_from_slice(&[
+            0xd4, 0x31, 0, 0, 0, 1, 0, 0, 0, 1, 0x50, 0x18, 0xff, 0xff, 0, 0, 0, 0,
+        ]);
+        p.extend_from_slice(data);
+        let total = p.len() as u16;
+        p[2..4].copy_from_slice(&total.to_be_bytes());
+        p
+    }
+
+    #[test]
+    fn reads_whole_answers_over_tcp() {
+        let ip: Ipv4Addr = "10.33.7.7".parse().unwrap();
+        let msg = response("git.acme.internal", &[ip]);
+        let mut whole = (msg.len() as u16).to_be_bytes().to_vec();
+        whole.extend_from_slice(&msg);
+        let a = parse_packet(&tcp_packet(53, &whole)).unwrap();
+        assert_eq!((a.name.as_str(), a.addrs), ("git.acme.internal", vec![ip]));
+        // Half a message (the rest in the next segment), another port, no data.
+        assert!(parse_packet(&tcp_packet(53, &whole[..whole.len() - 4])).is_none());
+        assert!(parse_packet(&tcp_packet(5353, &whole)).is_none());
+        assert!(parse_packet(&tcp_packet(53, &[])).is_none());
+        // Never taken for UDP, which the public-DNS rescue rewrites.
+        assert!(dns_payload(&tcp_packet(53, &whole)).is_none());
     }
 
     #[test]

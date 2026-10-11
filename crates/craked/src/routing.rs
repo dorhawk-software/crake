@@ -6,8 +6,9 @@
 //! - chain `out_n` (route, output): destinations in either set get mark M
 //! - chain `nat_n` (nat, postrouting): masquerade out of the tunnel, so the
 //!   source address matches the tunnel's
-//! - chain `dns_n` (filter, input): answers from the tunnel's DNS servers go to
-//!   NFQUEUE so craked can route their addresses first (see `dns_queue`)
+//! - chain `dns_n` (filter, input): answers from the tunnel's DNS servers
+//!   (UDP and TCP) go to NFQUEUE so craked can route their addresses first
+//!   (see `dns_queue`)
 //! - `ip rule fwmark M lookup T`, and table T's default route is the tunnel.
 //!
 //! Base chains are per tunnel so a tunnel can be torn down without touching
@@ -137,7 +138,7 @@ pub fn up_script(plan: &Plan) -> String {
     if !dns.is_empty() {
         let servers: Vec<String> = dns.iter().map(Ipv4Addr::to_string).collect();
         s += &format!(
-            "add rule inet {TABLE} dns_{name} iifname \"{device}\" ip saddr {{ {} }} udp sport 53 queue num {QUEUE_NUM} bypass\n",
+            "add rule inet {TABLE} dns_{name} iifname \"{device}\" ip saddr {{ {} }} meta l4proto {{ udp, tcp }} th sport 53 queue num {QUEUE_NUM} bypass\n",
             servers.join(", ")
         );
     }
@@ -462,7 +463,7 @@ mod tests {
         assert!(s.contains("meta mark set 0x43520001"));
         assert!(s.contains("oifname \"crake-acme\" masquerade"));
         assert!(s.contains(
-            "iifname \"crake-acme\" ip saddr { 10.40.0.53 } udp sport 53 queue num 7300 bypass"
+            "iifname \"crake-acme\" ip saddr { 10.40.0.53 } meta l4proto { udp, tcp } th sport 53 queue num 7300 bypass"
         ));
         assert!(
             !s.contains("meta mark 0 ip daddr !="),

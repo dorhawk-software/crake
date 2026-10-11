@@ -287,23 +287,7 @@ fn nxdomain(query: &[u8]) -> Vec<u8> {
 fn reply(query: &[u8], rcode: u8, addrs: &[Ipv4Addr]) -> Vec<u8> {
     let ihl = usize::from(query[0] & 0x0f) * 4;
     let udp = &query[ihl..];
-    let mut dns = udp[8..].to_vec();
-    dns[2] = 0x81; // response, recursion desired
-    dns[3] = 0x80 | rcode; // recursion available
-    dns[7] = addrs.len() as u8;
-    dns[10] = 0; // drop EDNS from additional count
-    dns[11] = 0;
-    // Cut the additional section: question ends after the name plus 4 bytes.
-    let mut i = 12;
-    while dns[i] != 0 {
-        i += usize::from(dns[i]) + 1;
-    }
-    dns.truncate(i + 5);
-    for addr in addrs {
-        dns.extend_from_slice(&[0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4]);
-        dns.extend_from_slice(&addr.octets());
-    }
-
+    let dns = answer_message(&udp[8..], rcode, addrs);
     let mut udp_out = Vec::new();
     udp_out.extend_from_slice(&udp[2..4]); // sport = their dport (53)
     udp_out.extend_from_slice(&udp[0..2]); // dport = their sport
@@ -320,6 +304,131 @@ fn reply(query: &[u8], rcode: u8, addrs: &[Ipv4Addr]) -> Vec<u8> {
     ip[10..12].copy_from_slice(&c.to_be_bytes());
     ip.extend_from_slice(&udp_out);
     ip
+}
+
+/// The answer to a DNS query message: rcode plus A records.
+fn answer_message(query: &[u8], rcode: u8, addrs: &[Ipv4Addr]) -> Vec<u8> {
+    let mut dns = query.to_vec();
+    dns[2] = 0x81; // response, recursion desired
+    dns[3] = 0x80 | rcode; // recursion available
+    dns[7] = addrs.len() as u8;
+    dns[10] = 0; // drop EDNS from additional count
+    dns[11] = 0;
+    // Cut the additional section: question ends after the name plus 4 bytes.
+    let mut i = 12;
+    while dns[i] != 0 {
+        i += usize::from(dns[i]) + 1;
+    }
+    dns.truncate(i + 5);
+    for addr in addrs {
+        dns.extend_from_slice(&[0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4]);
+        dns.extend_from_slice(&addr.octets());
+    }
+    dns
+}
+
+/// A reply segment to the client's `seg` (PSH|ACK) from the server at `seq`,
+/// acknowledging what `seg` carried.
+fn tcp_reply(seg: &[u8], seq: u32, data: &[u8]) -> Vec<u8> {
+    let ihl = usize::from(seg[0] & 0x0f) * 4;
+    let t = &seg[ihl..];
+    let carried = seg.len() - ihl - usize::from(t[12] >> 4) * 4;
+    let their_seq = u32::from_be_bytes([t[4], t[5], t[6], t[7]]);
+    let mut tcp = vec![0u8; 20];
+    tcp[0..2].copy_from_slice(&t[2..4]);
+    tcp[2..4].copy_from_slice(&t[0..2]);
+    tcp[4..8].copy_from_slice(&seq.to_be_bytes());
+    tcp[8..12].copy_from_slice(&their_seq.wrapping_add(carried as u32).to_be_bytes());
+    tcp[12] = 5 << 4;
+    tcp[13] = 0x18;
+    tcp[14..16].copy_from_slice(&65535u16.to_be_bytes());
+    tcp.extend_from_slice(data);
+    let (src, dst) = (&seg[16..20], &seg[12..16]);
+    let mut pseudo = Vec::new();
+    pseudo.extend_from_slice(src);
+    pseudo.extend_from_slice(dst);
+    pseudo.extend_from_slice(&[0, 6]);
+    pseudo.extend_from_slice(&(tcp.len() as u16).to_be_bytes());
+    let sum = |d: &[u8]| -> u32 {
+        d.chunks(2)
+            .map(|c| u32::from(u16::from_be_bytes([c[0], c.get(1).copied().unwrap_or(0)])))
+            .sum()
+    };
+    let mut s = sum(&pseudo) + sum(&tcp);
+    while s >> 16 != 0 {
+        s = (s & 0xffff) + (s >> 16);
+    }
+    tcp[16..18].copy_from_slice(&(!(s as u16)).to_be_bytes());
+    let mut ip = vec![0x45, 0, 0, 0, 0, 0, 0, 0, 64, 6, 0, 0];
+    ip.extend_from_slice(src);
+    ip.extend_from_slice(dst);
+    ip[2..4].copy_from_slice(&((20 + tcp.len()) as u16).to_be_bytes());
+    let c = checksum(&ip);
+    ip[10..12].copy_from_slice(&c.to_be_bytes());
+    ip.extend_from_slice(&tcp);
+    ip
+}
+
+/// A TCP packet leaving through the TUN that matches `want`, within 5 s.
+fn read_tcp(tun: &mut File, want: impl Fn(&[u8]) -> bool) -> Vec<u8> {
+    let start = Instant::now();
+    let mut buf = [0u8; 2048];
+    while start.elapsed() < Duration::from_secs(5) {
+        match tun.read(&mut buf) {
+            Ok(n) if n >= 40 && buf[0] >> 4 == 4 && buf[9] == 6 && want(&buf[..n]) => {
+                return buf[..n].to_vec();
+            }
+            _ => std::thread::sleep(Duration::from_millis(2)),
+        }
+    }
+    panic!("no such TCP packet left through the tunnel");
+}
+
+/// Ask the tunnel's DNS for `name` over TCP (as resolved does when an answer
+/// is too big for UDP); the test answers `addr` in one segment. Returns
+/// whether the app's first packet to `addr` left through the tunnel.
+fn ask_tcp(tun: &mut File, name: &str, addr: Ipv4Addr) -> bool {
+    let msg = query(name);
+    let app = std::thread::spawn(move || {
+        let mut s = std::net::TcpStream::connect_timeout(
+            &"10.40.0.2:53".parse().unwrap(),
+            Duration::from_secs(5),
+        )
+        .unwrap();
+        s.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        let mut framed = (msg.len() as u16).to_be_bytes().to_vec();
+        framed.extend_from_slice(&msg);
+        s.write_all(&framed).unwrap();
+        let mut len = [0u8; 2];
+        s.read_exact(&mut len).unwrap();
+        let mut answer = vec![0u8; usize::from(u16::from_be_bytes(len))];
+        s.read_exact(&mut answer).unwrap();
+        // The app's first packet, sent the moment it has the answer.
+        let sock = UdpSocket::bind("0.0.0.0:0").unwrap();
+        let _ = sock.send_to(b"first", (addr, 443));
+        answer
+    });
+    let syn = read_tcp(tun, |p| {
+        syn_to(p) == Some(("10.40.0.2".parse().unwrap(), 53))
+    });
+    tun.write_all(&tcp_synack(&syn)).unwrap();
+    // The client's segment carrying the query (after its bare ACK).
+    let seg = read_tcp(tun, |p| {
+        let ihl = usize::from(p[0] & 0x0f) * 4;
+        p.len() > ihl + usize::from(p[ihl + 12] >> 4) * 4
+    });
+    let ihl = usize::from(seg[0] & 0x0f) * 4;
+    let data = &seg[ihl + usize::from(seg[ihl + 12] >> 4) * 4..];
+    let reply = answer_message(&data[2..], 0, &[addr]);
+    let mut framed = (reply.len() as u16).to_be_bytes().to_vec();
+    framed.extend_from_slice(&reply);
+    tun.write_all(&tcp_reply(&seg, 777_001, &framed)).unwrap();
+    let got = app.join().unwrap();
+    assert!(
+        got.windows(4).any(|w| w == addr.octets()),
+        "the app got the answer"
+    );
+    first_packet_through_tunnel(tun, addr)
 }
 
 fn query(name: &str) -> Vec<u8> {
@@ -425,6 +534,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
 
     let git: Ipv4Addr = "10.33.7.7".parse().unwrap();
     let wiki: Ipv4Addr = "10.33.8.8".parse().unwrap();
+    let big: Ipv4Addr = "10.33.9.9".parse().unwrap();
     let public: Ipv4Addr = "93.184.215.14".parse().unwrap();
     let gw: Ipv4Addr = "192.0.2.10".parse().unwrap();
 
@@ -483,6 +593,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
             ask(&mut tun, "wiki.corp.example", wiki),
             ask(&mut tun, "www.example.com", public),
             ask(&mut tun, "vpn.acme.internal", gw),
+            ask_tcp(&mut tun, "big.acme.internal", big),
         );
         (tun, r, publics, splits)
     })
@@ -527,7 +638,11 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     assert_eq!(www.addrs, vec![www_public], "{www:?}");
     assert!(!www.first_through_tunnel, "{www:?}");
 
-    let (git_first, wiki_first, public_routed, gw_routed) = results;
+    let (git_first, wiki_first, public_routed, gw_routed, tcp_first) = results;
+    assert!(
+        tcp_first,
+        "an answer over TCP: the first packet went through the tunnel"
+    );
     assert!(
         git_first,
         "pushed domain: the first packet went through the tunnel"
