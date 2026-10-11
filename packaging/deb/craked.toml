@@ -1,0 +1,13 @@
+# Crake's daemon. Tunnels are added in the Crake app (kept in
+# /var/lib/crake/tunnels.json); IT's in /etc/crake/managed.d/*.toml.
+# Everything below is optional; shown with its default.
+#
+# log_path    = "/var/lib/crake/log"
+# state_path  = "/var/lib/crake/hosts.json"
+# learned_expiry_days = 7
+# probing = true            # try connections that fail directly through the tunnels
+# probe_wait_secs = 3       # 1, 2, 3 or 5
+# never = ["203.0.113.0/24"] # never through any tunnel
+#
+# Tunnels can also be listed here; see
+# /usr/share/doc/crake/craked.toml.example.

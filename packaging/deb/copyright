@@ -1,0 +1,16 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: crake
+Source: https://dorhawk.software
+
+Files: *
+Copyright: dorhawk.software
+License: GPL-3.0-or-later
+ On Debian systems, the full text of the GNU General Public License
+ version 3 can be found in /usr/share/common-licenses/GPL-3.
+
+Files: assets/fonts/*
+Copyright: 2020-2024 The Atkinson Hyperlegible Next Project Authors
+           2020-2024 The Atkinson Hyperlegible Mono Project Authors
+License: OFL-1.1
+ Atkinson Hyperlegible Next and Mono, embedded in the crake binary. The
+ licence text is in /usr/share/doc/crake/OFL-AtkinsonHyperlegible*.txt.

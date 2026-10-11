@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload >/dev/null || true
+fi
+if [ "$1" = remove ]; then
+    deb-systemd-helper mask craked.service >/dev/null || true
+fi
+if [ "$1" = purge ]; then
+    deb-systemd-helper purge craked.service >/dev/null || true
+    deb-systemd-helper unmask craked.service >/dev/null || true
+    # What craked learned and logged.
+    rm -rf /var/lib/crake
+fi

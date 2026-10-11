@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+    # D-Bus reads the new policy; systemd the new unit.
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload >/dev/null || true
+        systemctl reload dbus.service >/dev/null 2>&1 || true
+    fi
+    deb-systemd-helper unmask craked.service >/dev/null || true
+    deb-systemd-helper enable craked.service >/dev/null || true
+    if [ -d /run/systemd/system ]; then
+        deb-systemd-invoke restart craked.service >/dev/null || true
+    fi
+fi

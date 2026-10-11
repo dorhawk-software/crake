@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Crake
+Comment=VPN that routes only what needs the tunnel
+Exec=crake
+Icon=network-vpn
+Categories=Network;
+Keywords=VPN;AnyConnect;OpenVPN;tunnel;
+StartupNotify=false

@@ -614,6 +614,24 @@ it doesn't, bundle, and own the updates.**
   `apt install crake` and updates work everywhere. Depends need
   alternatives for older releases: `systemd-resolved | systemd (<< 252)`,
   `polkitd | policykit-1`.
+- **The .deb: built.** `scripts/build-deb.sh` builds it in an Ubuntu 22.04
+  container with rustup's stable Rust (`packaging/deb/`: control with the
+  Depends above plus `dpkg-shlibdeps`' libraries, maintainer scripts that
+  enable and start `craked.service`, a desktop entry, a comment-only
+  `/etc/crake/craked.toml` conffile; purge removes `/var/lib/crake`).
+  Layout: `/usr/bin/crake`, `/usr/sbin/craked`, `/usr/libexec/crake/hook`,
+  the unit, D-Bus policy and polkit action under `/usr/lib` and
+  `/usr/share`. `scripts/deb-test.sh` installs it in throwaway containers
+  that boot systemd (22.04, 24.04, 26.04; the container's own cgroups made
+  writable, real `ip_unprivileged_port_start`): apt resolves the Depends,
+  craked runs as the service, polkit refuses users without an active
+  session, then, cut off from every network, a real tunnel through the
+  installed service (ocserv in a namespace of its own): probing, DNS via
+  systemd-resolved, names kept private by craked's DNS on port 53; remove
+  and purge leave nothing. It found the unit lacking
+  `CAP_NET_BIND_SERVICE` (craked's own DNS couldn't bind port 53). Still
+  to do, with the user: the signed apt repository (their key) and its
+  publishing.
 - **At runtime (built, `engines.rs`):** the app checks which engines exist
   (openconnect on PATH, or `CRAKE_OPENCONNECT`; openvpn3's D-Bus
   configuration service file). New tunnel shows every protocol; one whose

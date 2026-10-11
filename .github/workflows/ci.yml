@@ -1,6 +1,7 @@
 # Every push and pull request: the lint gate, the tests and the coverage
-# floors; then the tests that need real networking, each in throwaway
-# containers with no network (scripts/netns-test.sh, scripts/e2e-test.sh).
+# floors; the tests that need real networking, each in throwaway containers
+# with no network (scripts/netns-test.sh, scripts/e2e-test.sh); and the .deb,
+# built on 22.04 and installed and used on every supported release.
 name: CI
 
 on:
@@ -50,3 +51,16 @@ jobs:
         run: scripts/netns-test.sh
       - name: End to end against ocserv
         run: scripts/e2e-test.sh
+
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the .deb on Ubuntu 22.04
+        run: scripts/build-deb.sh
+      - name: Install and use it on 22.04, 24.04 and 26.04
+        run: scripts/deb-test.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crake-deb
+          path: target/deb/*.deb
