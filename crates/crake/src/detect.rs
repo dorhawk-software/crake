@@ -17,25 +17,46 @@ pub enum Found {
     Unreachable,
 }
 
-/// Ask `gateway` (blocking, at most `wait`).
+/// Ask `gateway` (blocking, at most `wait`). A gateway whose certificate
+/// this computer doesn't trust (a company's own authority) is asked again,
+/// pinned to the certificate it showed: nothing is signed in here, and
+/// sign-in still asks the user to trust it.
 pub fn gateway(gateway: &str, wait: Duration) -> Found {
-    let program = crate::engines::openconnect();
-    let Ok(mut child) = Command::new(program)
-        .args([
-            "--authenticate",
-            "--non-inter",
-            "--protocol=anyconnect",
-            "--useragent=AnyConnect",
-            "--",
+    let start = Instant::now();
+    let text = ask(gateway, None, wait);
+    let found = read(&text);
+    match (&found, pin(&text)) {
+        (Found::Unknown, Some(pin)) => read(&ask(
             gateway,
-        ])
+            Some(&pin),
+            wait.saturating_sub(start.elapsed()),
+        )),
+        _ => found,
+    }
+}
+
+/// What openconnect says on stderr, asking as AnyConnect within `wait`.
+fn ask(gateway: &str, servercert: Option<&str>, wait: Duration) -> String {
+    let program = crate::engines::openconnect();
+    let mut cmd = Command::new(program);
+    cmd.args([
+        "--authenticate",
+        "--non-inter",
+        "--protocol=anyconnect",
+        "--useragent=AnyConnect",
+    ]);
+    if let Some(pin) = servercert {
+        cmd.arg(format!("--servercert={pin}"));
+    }
+    let Ok(mut child) = cmd
+        .args(["--", gateway])
         .env("LC_ALL", "C")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
     else {
-        return Found::Unknown;
+        return String::new();
     };
     let start = Instant::now();
     while start.elapsed() < wait {
@@ -50,7 +71,16 @@ pub fn gateway(gateway: &str, wait: Duration) -> Found {
     if let Some(mut err) = child.stderr.take() {
         let _ = err.read_to_string(&mut text);
     }
-    read(&text)
+    text
+}
+
+/// The certificate openconnect wouldn't trust, as it suggests pinning it
+/// ("--servercert pin-sha256:...").
+fn pin(text: &str) -> Option<String> {
+    text.lines().find_map(|l| {
+        let pin = l.trim().strip_prefix("--servercert ")?;
+        pin.starts_with("pin-sha256:").then(|| pin.to_owned())
+    })
 }
 
 /// What openconnect's output says about the gateway.
@@ -119,5 +149,24 @@ mod tests {
             read("getaddrinfo failed for host 'nope.example': Name or service not known\n"),
             Found::Unreachable
         );
+    }
+
+    #[test]
+    fn sees_past_a_certificate_this_computer_does_not_trust() {
+        // A company's own certificate authority, not installed here.
+        let untrusted = "POST https://vpn.acme.example/\nConnected to 203.0.113.10:443\n\
+                         SSL negotiation with vpn.acme.example\n\
+                         Server certificate verify failed: signer not found\n\n\
+                         Certificate from VPN server \"vpn.acme.example\" failed verification.\n\
+                         Reason: signer not found\n\
+                         To trust this server in future, perhaps add this to your command line:\n    \
+                         --servercert pin-sha256:QUNNRSBleGFtcGxlIGNlcnRpZmljYXRlIHBpbg==\n\
+                         SSL connection failure: Error in the certificate.\n";
+        assert_eq!(read(untrusted), Found::Unknown);
+        assert_eq!(
+            pin(untrusted).as_deref(),
+            Some("pin-sha256:QUNNRSBleGFtcGxlIGNlcnRpZmljYXRlIHBpbg==")
+        );
+        assert_eq!(pin("Connected to 192.0.2.1:443\nXML POST enabled\n"), None);
     }
 }
