@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-GPL--3.0-0F766E?style=flat-square" alt="Licence GPL-3.0" /></a>
-  <a href="#building-and-trying-it"><img src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20Ubuntu%20first-115E59?style=flat-square" alt="Platform: Linux, Ubuntu first" /></a>
+  <a href="#building-and-trying-it"><img src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20Ubuntu%20%C2%B7%20Debian-115E59?style=flat-square" alt="Platform: Linux, Ubuntu and Debian" /></a>
   <a href="Cargo.toml"><img src="https://img.shields.io/badge/Rust-2024%20%C2%B7%20GPUI-0F766E?style=flat-square" alt="Rust 2024 and GPUI" /></a>
   <a href="#status"><img src="https://img.shields.io/badge/status-coming%20soon-5A5F64?style=flat-square" alt="Status: coming soon" /></a>
   <a href="#built-with-ai"><img src="https://img.shields.io/badge/built%20with-Claude-5A5F64?style=flat-square" alt="Built with Claude" /></a>
@@ -271,12 +271,16 @@ forgotten so the app's next try goes through.
 - ✅ Gateways that only admit Cisco's client, said openly
 - ✅ OpenVPN 3 profiles, including sessions started elsewhere
 - ✅ Tray, panel, log, settings, new tunnel, sign-in, tunnel detail; light and dark
-- 🟡 Networks that block UDP: built, not yet tried on such a network
+- 🟡 Networks that block UDP: built and tested against a real AnyConnect server, not yet tried on
+  such a network
 - 🟡 GlobalProtect, Ivanti/Pulse, Juniper, Fortinet, F5 and Array: spoken through openconnect,
   marked Beta in the app until each has been used against a real gateway
 - ✅ Tunnels that can't be up together: refused with the reason, before they half-work
-- ⚪ A tunnel's DNS that stops answering: say so, keep known names working
-- ⚪ Packaging: a systemd service, polkit, a `.deb` for Ubuntu
+- ✅ A tunnel's DNS that stops answering: said so, known names keep working
+- ✅ One `.deb` for Ubuntu 26.04, 24.04 and 22.04 (password or certificate sign-in there: its
+  openconnect is too old for the browser) and Debian 13 and 12, each installed and tested;
+  a systemd service, polkit, an AppArmor profile; upgrades keep tunnels signed in
+- ⚪ Fedora (RPM), then Arch and NixOS
 - ⚪ IPv6
 
 <br/>
