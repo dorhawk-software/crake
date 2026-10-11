@@ -938,9 +938,8 @@ code Windows used, now shared), the private folder in the user's
 $TMPDIR, plain notifications (notify-rust has no actions there); no
 connection to craked yet. What Linux and macOS do alike lives in
 `sys/unix.rs` in both crates. craked type-checks for macOS in a plain
-Linux container (`cargo clippy --target aarch64-apple-darwin -p craked
---all-targets`, rust:1-bookworm with the target added); the app needs a
-Mac's toolchain, so CI job `macos` (macos-latest) runs clippy, the
+Linux container (`scripts/macos-check.sh`); the app needs a Mac's
+toolchain, so CI job `macos` (macos-latest) runs clippy, the
 portable tests, and `crates/craked/tests/macos.rs` as root: a utun
 device the test makes itself, its address, DNS route, learned and pinned
 routes, and an /etc/resolver file that macOS really follows to a
