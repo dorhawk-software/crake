@@ -52,6 +52,22 @@ jobs:
       - name: End to end against ocserv
         run: scripts/e2e-test.sh
 
+  nixos:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Let the test's VMs use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: system-features = kvm nixos-test benchmark big-parallel
+      - name: Build Crake with Nix
+        run: nix build --print-build-logs .#default
+      - name: The NixOS module, end to end (a gateway and a client VM)
+        run: nix build --print-build-logs .#checks.x86_64-linux.vm
+
   package:
     runs-on: ubuntu-24.04
     steps:

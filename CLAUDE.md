@@ -17,7 +17,10 @@ visual identity; Crake's is documented in `design/DESIGN.md`.
   never use another address).
 - Never include a Claude session ID or session URL in commit messages or PR
   descriptions. Never, under any circumstances.
-- Nothing is pushed until the user asks; the code isn't public yet.
+- The repository is public: github.com/dorhawk-software/crake. The user
+  allows pushing once work is done and tested (2026-10-11); push with
+  `git push` (this repository's credential helper is gh's, the user's
+  personal account).
 - Nothing customer-specific is ever committed: no real gateways, company
   names, hosts or addresses of the user's clients, in code, tests, demo
   data, designs or these notes. Use ACME, Nordbank, Globex, Initech,
@@ -715,6 +718,21 @@ it doesn't, bundle, and own the updates.**
   AUR needs the user's AUR account.
 - **Not Flatpak or Snap:** craked needs root-level network control on the
   host (nftables, policy routing, resolved), which sandboxes don't allow.
+- **NixOS: built.** `flake.nix`: `packages.x86_64-linux.default`
+  (`packaging/nix/package.nix`, buildRustPackage from Cargo.lock; GPUI's
+  run-time libraries added to the app's rpath), `nixosModules.default`
+  (`services.crake.enable`: craked's service as packaging/craked.service
+  with nftables, iproute2 and openconnect on its path, D-Bus, polkit,
+  resolved, /etc/crake/craked.toml with the hook's store path; dhcpcd and
+  NetworkManager told to leave `crake-*` alone: dhcpcd took crake-acme and
+  the DNS craked had handed resolved for it was gone). `checks.x86_64-linux.vm`
+  (`packaging/nix/test.nix`): two VMs on the test's own network, ocserv
+  behind which ACME's network sits, and a client with the module: sign-in,
+  connect over D-Bus, probing, DNS, names kept private.
+  `scripts/nix-test.sh` runs it in the nixos/nix container (no Nix on this
+  machine), CI with install-nix-action. Not done there: an upgrade
+  (nixos-rebuild switch) restarts craked without the handover, so tunnels
+  sign out.
 - **macOS and Windows (someday):** no package manager to pull engines in,
   so the installer bundles them: openconnect (Windows: its DLL plus Wintun;
   macOS: inside the signed, notarized .app). Bundling makes Crake
