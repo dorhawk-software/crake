@@ -15,9 +15,9 @@ HOOK="$CRAKE_TEST_HOOK"
 export TUNDEV=crake-acme INTERNAL_IP4_ADDRESS=10.40.1.7 INTERNAL_IP4_NETMASK=255.255.255.0 \
   INTERNAL_IP4_DNS="10.40.0.2" CISCO_DEF_DOMAIN=acme.internal \
   CISCO_SPLIT_INC=1 CISCO_SPLIT_INC_0_ADDR=10.40.0.0 CISCO_SPLIT_INC_0_MASKLEN=16
+trap 'reason=disconnect "$HOOK"; exit 0' TERM
 reason=pre-init "$HOOK" || exit 1
 reason=connect "$HOOK" || exit 1
-trap 'reason=disconnect "$HOOK"; exit 0' TERM
 while :; do sleep 0.1; done
 "#;
 
@@ -144,9 +144,9 @@ const FAKE_COOKIE: &str = r#"#!/bin/sh
 case "$*" in *--cookie-on-stdin*--servercert=pin-sha256:abc*" -- https://vpn.acme.example/"*) ;; *) echo "bad args: $*" >&2; exit 2 ;; esac
 read -r cookie
 [ "$cookie" = "s3cret" ] || { echo "bad cookie" >&2; exit 3; }
+trap 'exit 0' TERM
 export TUNDEV=crake-acme INTERNAL_IP4_ADDRESS=10.40.1.7
 reason=connect "$CRAKE_TEST_HOOK" || exit 1
-trap 'exit 0' TERM
 while :; do sleep 0.1; done
 "#;
 
@@ -172,12 +172,12 @@ async fn connects_with_a_signed_in_session() {
 
 /// UDP doesn't get through: DTLS never comes up unless told not to try.
 const FAKE_NO_UDP: &str = r#"#!/bin/sh
+trap 'exit 0' TERM HUP
 echo "$*" >> "$CRAKE_TEST_CALLS"
 read -r cookie
 export TUNDEV=crake-acme INTERNAL_IP4_ADDRESS=10.40.1.7
 reason=connect "$CRAKE_TEST_HOOK" || exit 1
 case "$*" in *--no-dtls*) ;; *) echo "DTLS handshake timed out" >&2 ;; esac
-trap 'exit 0' TERM HUP
 while :; do sleep 0.1; done
 "#;
 
@@ -667,13 +667,15 @@ async fn hosts_learned_under_a_name_are_answered_too() {
 }
 
 /// Records each run (the cookie it was given) and how it was stopped.
+// The traps come first: craked may stop it the moment the hook says
+// it's connected.
 const FAKE_HANDOVER: &str = r#"#!/bin/sh
+trap 'echo hup >> "$CRAKE_TEST_HANDOVER"; exit 0' HUP
+trap 'echo term >> "$CRAKE_TEST_HANDOVER"; exit 0' TERM
 read -r cookie
 echo "run cookie=$cookie" >> "$CRAKE_TEST_HANDOVER"
 export TUNDEV=crake-acme INTERNAL_IP4_ADDRESS=10.40.1.7
 reason=connect "$CRAKE_TEST_HOOK" || exit 1
-trap 'echo hup >> "$CRAKE_TEST_HANDOVER"; exit 0' HUP
-trap 'echo term >> "$CRAKE_TEST_HANDOVER"; exit 0' TERM
 while :; do sleep 0.1; done
 "#;
 

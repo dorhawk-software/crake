@@ -4,9 +4,16 @@
 //! one with the bird's call ("crex crex").
 
 use crake_proto::{LogEntry, LogKind};
-use notify_rust::{Notification, Timeout, Urgency};
+use notify_rust::Notification;
+#[cfg(not(target_os = "macos"))]
+use notify_rust::{Timeout, Urgency};
 
 use crate::Request;
+
+// macOS: notify-rust shows plain notifications there (no actions, no
+// urgency); the panel offers what the buttons would.
+#[cfg(target_os = "macos")]
+pub use plain::{also_answered, asked, routed};
 
 /// Crake decided it, not you.
 pub fn worth_telling(entry: &LogEntry) -> bool {
@@ -16,6 +23,7 @@ pub fn worth_telling(entry: &LogEntry) -> bool {
 }
 
 /// What every notification starts from: the entry's message and reason.
+#[cfg(not(target_os = "macos"))]
 fn note(entry: &LogEntry, urgency: Urgency, timeout_ms: u32) -> Notification {
     let mut n = Notification::new();
     n.appname("Crake")
@@ -29,6 +37,7 @@ fn note(entry: &LogEntry, urgency: Urgency, timeout_ms: u32) -> Notification {
     n
 }
 
+#[cfg(not(target_os = "macos"))]
 pub fn routed(entry: &LogEntry, requests: async_channel::Sender<Request>) {
     let (Some(tunnel), hosts) = (entry.tunnel.clone(), entry.hosts.clone()) else {
         return;
@@ -51,6 +60,7 @@ pub fn routed(entry: &LogEntry, requests: async_channel::Sender<Request>) {
 
 /// Another tunnel answered for a host too ("When two tunnels answer: Ask
 /// me"): offer to move it. `others` are (name, display) of those tunnels.
+#[cfg(not(target_os = "macos"))]
 pub fn also_answered(
     entry: &LogEntry,
     others: Vec<(String, String)>,
@@ -81,6 +91,7 @@ pub fn also_answered(
 }
 
 /// "Ask me first": a host needs the tunnel; send it through, or leave it.
+#[cfg(not(target_os = "macos"))]
 pub fn asked(entry: &LogEntry, display: String, requests: async_channel::Sender<Request>) {
     let (Some(tunnel), hosts) = (entry.tunnel.clone(), entry.hosts.clone()) else {
         return;
@@ -96,6 +107,37 @@ pub fn asked(entry: &LogEntry, display: String, requests: async_channel::Sender<
             }
         });
     });
+}
+
+#[cfg(target_os = "macos")]
+mod plain {
+    use super::{LogEntry, Notification, Request};
+
+    fn show(entry: &LogEntry) {
+        let mut n = Notification::new();
+        n.appname("Crake")
+            .summary(&entry.message)
+            .body(entry.reason.as_deref().unwrap_or(""));
+        std::thread::spawn(move || {
+            let _ = n.show();
+        });
+    }
+
+    pub fn routed(entry: &LogEntry, _requests: async_channel::Sender<Request>) {
+        show(entry);
+    }
+
+    pub fn also_answered(
+        entry: &LogEntry,
+        _others: Vec<(String, String)>,
+        _requests: async_channel::Sender<Request>,
+    ) {
+        show(entry);
+    }
+
+    pub fn asked(entry: &LogEntry, _display: String, _requests: async_channel::Sender<Request>) {
+        show(entry);
+    }
 }
 
 /// The corncrake's call, "crex crex": two short rasps, made here (no sound
