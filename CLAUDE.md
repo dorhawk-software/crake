@@ -572,11 +572,23 @@ Any lint stops the build; fix it and build again, never silence it.
   Past that, split by topic: a folder module with one file per part (the
   pattern of `manager/`, `new_tunnel/`, `settings_view/`, `panel/`), or a
   function's parts into named helpers.
+- Magic numbers (requested 2026-10-12): `crates/lint-literals`, run by
+  `scripts/lint.sh`, fails on a number in a crate's own code (not its
+  tests) that has no name. Name it (a const, a static, an enum
+  discriminant), or keep it with `// literal: <reason>` on its line or
+  alone on the line above; a reason alone above an item (fn, impl,
+  `mod x;`) keeps the whole item, for data copied from elsewhere (the
+  design's drawings, demo data, a protocol's table). Free without a name:
+  0, 1, 2, and UI layout inside `px(..)`/`rgb(..)`/`rgba(..)` (it mirrors
+  design/screens and DESIGN.md's tokens). It follows each crate's module
+  tree from its roots, so `#[cfg(test)]` modules are left out. A crate
+  joins the list in lint.sh once it's clean (today crake-proto and the
+  tool itself; craked and crake next).
 - `.claude/settings.json`: a PostToolUse hook runs `scripts/lint.sh` after
   every `cargo build` / `cargo test` from Claude Code and blocks on failure.
 - Coverage (`scripts/check-coverage.sh`, cargo-llvm-cov, about a minute):
   each crate's share of lines run by the tests stays at or above its floor
-  (crake 66%, craked 63%, crake-proto 98% as of Oct 2026). The pre-commit
+  (crake 66%, craked 63%, crake-proto 98%, lint-literals 82% as of Oct 2026). The pre-commit
   hook runs it when Rust files are committed. Raise a floor as tests grow;
   never lower one to let a change through.
 

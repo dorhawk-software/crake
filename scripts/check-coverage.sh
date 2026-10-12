@@ -16,6 +16,7 @@ declare -A floor=(
     [crake]=66
     [craked]=63
     [crake-proto]=98
+    [lint-literals]=82
 )
 
 # Every test runs here (cargo llvm-cov is cargo test, measured): a failing

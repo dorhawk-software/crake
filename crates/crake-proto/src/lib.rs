@@ -177,6 +177,10 @@ impl std::fmt::Debug for Session {
     }
 }
 
+/// The longest user agent a session may carry to craked (a plain client
+/// name such as "AnyConnect", never a whole header).
+const USER_AGENT_MAX: usize = 64;
+
 impl Session {
     /// Parse `KEY='value'` lines, shell-quoted as openconnect writes them.
     pub fn parse(stdout: &str) -> Result<Self, &'static str> {
@@ -243,7 +247,7 @@ impl Session {
             user_agent: m
                 .get("user_agent")
                 .filter(|u| {
-                    (1..=64).contains(&u.len())
+                    (1..=USER_AGENT_MAX).contains(&u.len())
                         && !u.starts_with('-')
                         && u.chars()
                             .all(|c| c.is_ascii_alphanumeric() || " ._/-".contains(c))
