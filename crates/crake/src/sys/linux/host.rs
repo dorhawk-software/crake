@@ -49,7 +49,7 @@ pub fn private_dir() -> Result<PathBuf, String> {
     let dir = PathBuf::from(base).join("crake");
     std::fs::DirBuilder::new()
         .recursive(true)
-        .mode(0o700)
+        .mode(crate::sys::OWNER_ONLY_DIR)
         .create(&dir)
         .map_err(|e| e.to_string())?;
     Ok(dir)

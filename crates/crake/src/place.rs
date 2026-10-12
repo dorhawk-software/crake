@@ -8,6 +8,27 @@
 
 pub use crate::sys::monitors;
 
+/// Bars, when they don't say: Windows' taskbar and Dash to Panel's (48),
+/// GNOME's top bar (32); a size outside BAR_SIZES isn't a bar's; the tray's
+/// icons sit about TRAY_FROM_RIGHT from the bar's right end.
+const TASKBAR: f32 = 48.;
+const TOP_BAR: f32 = 32.;
+const BAR_SIZES: std::ops::RangeInclusive<f32> = 16. ..=128.;
+const TRAY_FROM_RIGHT: f32 = 200.;
+
+/// A window's tallest: its screen less room for the bars (or, with no
+/// screen known, a laptop's).
+pub fn max_window_height() -> f32 {
+    const UNKNOWN_SCREEN: f32 = 1000.;
+    max_window_height_or(UNKNOWN_SCREEN)
+}
+
+/// The same, with `fallback` when no screen is known.
+pub fn max_window_height_or(fallback: f32) -> f32 {
+    const SCREEN_ROOM: f32 = 120.;
+    monitors().first().map_or(fallback, |m| m.h - SCREEN_ROOM)
+}
+
 /// A rectangle in screen pixels.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Rect {
@@ -81,7 +102,7 @@ impl Bar {
         if cfg!(windows) {
             return Bar {
                 bottom: true,
-                thickness: 48.,
+                thickness: TASKBAR,
             };
         }
         let read = |key: &str| {
@@ -96,7 +117,7 @@ impl Bar {
         if !enabled.contains("dash-to-panel@") {
             return Bar {
                 bottom: false,
-                thickness: 32.,
+                thickness: TOP_BAR,
             };
         }
         let positions = read("/org/gnome/shell/extensions/dash-to-panel/panel-positions");
@@ -118,9 +139,9 @@ impl Bar {
                     .parse::<f32>()
                     .ok()
             })
-            .filter(|n| (16. ..=128.).contains(n))
+            .filter(|n| BAR_SIZES.contains(n))
             .fold(None, |m: Option<f32>, n| Some(m.map_or(n, |m| m.max(n))))
-            .unwrap_or(48.);
+            .unwrap_or(TASKBAR);
         Bar { bottom, thickness }
     }
 
@@ -133,7 +154,7 @@ impl Bar {
         } else {
             s.y + self.thickness / 2.
         };
-        Some((s.x + s.w - 200., y))
+        Some((s.x + s.w - TRAY_FROM_RIGHT, y))
     }
 }
 

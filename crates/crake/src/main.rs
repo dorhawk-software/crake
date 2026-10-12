@@ -56,6 +56,12 @@ mod theme;
 mod timeline;
 mod tray;
 
+mod units;
+
+/// CRAKE_DEMO=arrive: a decision this often, for hosts 1 to LAST_HOST.
+const ARRIVE_EVERY: Duration = Duration::from_secs(8);
+const LAST_HOST: u8 = 250;
+
 // With craked over its socket, openconnect and nftables: Linux.
 #[cfg(all(test, target_os = "linux"))]
 mod e2e_tests;
@@ -351,8 +357,8 @@ fn main() {
             if std::env::var("CRAKE_DEMO").as_deref() == Ok("arrive") {
                 cx.spawn(async move |cx| {
                     // 1 to 250, over and over: the hosts stay valid addresses.
-                    for n in (1..=250u8).cycle() {
-                        cx.background_executor().timer(Duration::from_secs(8)).await;
+                    for n in (1..=LAST_HOST).cycle() {
+                        cx.background_executor().timer(ARRIVE_EVERY).await;
                         let entry = crake_proto::LogEntry {
                             ts: jiff::Timestamp::now().to_string(),
                             kind: crake_proto::LogKind::Routed,

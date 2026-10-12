@@ -10,7 +10,7 @@ impl NewTunnel {
         id: &'static str,
         options: Vec<(String, String)>,
         current: String,
-        width: Option<f32>,
+        width: Option<Pixels>,
         t: &Theme,
         cx: &mut Context<Self>,
         pick: impl Fn(&mut Self, String) + Clone + 'static,
@@ -23,7 +23,7 @@ impl NewTunnel {
         let mut picker = div().relative().child(
             div()
                 .id(id)
-                .when_some(width, |d, w| d.w(px(w)))
+                .when_some(width, |d, w| d.w(w))
                 .when(width.is_none(), |d| d.w_full())
                 .h(px(42.))
                 .pl(px(12.))

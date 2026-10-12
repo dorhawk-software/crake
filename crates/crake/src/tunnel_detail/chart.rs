@@ -20,8 +20,8 @@ impl TunnelDetail {
             1 => "1 host".to_owned(),
             n => format!("{n} hosts"),
         };
-        // About one bar per 7 px of the design's 836.
-        let bin = (now / (836. / 7.)).max(1.);
+        // About one bar per PX_PER_BAR of the design's width.
+        let bin = (now / (DESIGN_WIDTH / PX_PER_BAR)).max(1.);
         let mut bins: Vec<(f32, u64)> = Vec::new();
         for (m, bytes) in traffic {
             let start = (m / bin).floor() * bin;
@@ -35,10 +35,10 @@ impl TunnelDetail {
             .map(|(start, bytes)| ((now - start - bin / 2.).max(0.), bytes))
             .collect();
         // A whole hour about halfway, as in the design's "06:00".
-        let middle = ((now / 60. / 2.).floor() * 60.).max(0.);
+        let middle = ((now / HOUR / 2.).floor() * HOUR).max(0.);
         let mut axis = vec![(0., "00:00".to_owned())];
-        if middle >= 120. && now - middle >= 120. {
-            axis.push((middle / now, format!("{:02}:00", (middle / 60.) as u32)));
+        if middle >= AXIS_CLEAR && now - middle >= AXIS_CLEAR {
+            axis.push((middle / now, format!("{:02}:00", (middle / HOUR) as u32)));
         }
         axis.push((1., "now".to_owned()));
         let display = tunnel.display.clone();
@@ -83,10 +83,7 @@ impl TunnelDetail {
 
 /// Today's minutes of a tunnel's traffic: (minutes since midnight, bytes).
 pub(super) fn today(minutes: Option<&Vec<(u64, u64)>>) -> Vec<(f32, u64)> {
-    let midnight = jiff::Zoned::now()
-        .start_of_day()
-        .map(|z| z.timestamp().as_second() as u64 / 60)
-        .unwrap_or(0);
+    let midnight = crate::units::midnight_minute();
     minutes
         .map(|v| {
             v.iter()
@@ -97,8 +94,12 @@ pub(super) fn today(minutes: Option<&Vec<(u64, u64)>>) -> Vec<(f32, u64)> {
         .unwrap_or_default()
 }
 
-/// Minutes since local midnight, now.
-pub(super) fn now_minutes() -> f32 {
-    let now = jiff::Zoned::now();
-    (now.hour() as f32 * 60. + now.minute() as f32 + now.second() as f32 / 60.).max(1.)
-}
+pub(super) use crate::units::minutes_today as now_minutes;
+
+/// The design's chart width (tunnel-detail.html), and a bar per this many
+/// pixels of it.
+pub(super) const DESIGN_WIDTH: f32 = 836.;
+const PX_PER_BAR: f32 = 7.;
+/// The axis's middle label: a whole hour, at least two hours from each end.
+const HOUR: f32 = crate::units::MINUTES_PER_HOUR_F;
+const AXIS_CLEAR: f32 = 2. * HOUR;

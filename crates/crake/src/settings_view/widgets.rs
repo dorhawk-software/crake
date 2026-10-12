@@ -109,7 +109,7 @@ pub(super) fn small_button(
 pub(super) fn select(
     this: &Settings,
     id: &'static str,
-    width: f32,
+    width: Pixels,
     options: &[(&'static str, &'static str)],
     current: &str,
     t: &Theme,
@@ -124,7 +124,7 @@ pub(super) fn select(
     let mut picker = div().relative().child(
         div()
             .id(id)
-            .w(px(width))
+            .w(width)
             .h(px(38.))
             .pl(px(14.))
             .pr(px(10.))

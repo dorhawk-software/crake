@@ -34,6 +34,6 @@ step "private names" scripts/check-private.sh
 step "file sizes" scripts/check-size.sh
 step "patched GPUI in use" scripts/check-gpui-patch.sh
 # Crates join this list as their magic numbers get names.
-step "magic numbers" cargo run --quiet -p lint-literals -- crates/crake-proto crates/craked crates/lint-literals
+step "magic numbers" cargo run --quiet -p lint-literals -- crates/crake-proto crates/craked crates/crake crates/lint-literals
 
 exit $fail

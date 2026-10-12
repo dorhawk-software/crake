@@ -25,6 +25,16 @@ const ROUTED_SHAPE_FOR: Duration = Duration::from_secs(4);
 /// How many log entries are kept in memory.
 const KEEP: usize = 500;
 
+/// Bytes in a kilobyte, megabyte, gigabyte (decimal, as people read them).
+const KB: f64 = 1e3;
+const MB: f64 = 1e6;
+const GB: f64 = 1e9;
+/// Decisions in a helpdesk copy.
+const HELPDESK_DECISIONS: usize = 20;
+
+/// How long a failed command's sentence stays on screen.
+pub const FAILURE_SHOWN: Duration = Duration::from_secs(8);
+
 #[derive(Clone, Default)]
 pub struct Model {
     /// `None` until the first attempt to reach craked has settled.
@@ -33,7 +43,8 @@ pub struct Model {
     /// Oldest first.
     pub log: Vec<LogEntry>,
     pub routed_at: Option<Instant>,
-    /// craked's sentence for a command that failed, and when.
+    /// craked's sentence for a command that failed, and when (shown for
+    /// FAILURE_SHOWN).
     pub failed: Option<(String, Instant)>,
     pub copied_at: Option<Instant>,
     /// Direct traffic per minute: (minute since the epoch, bytes).
@@ -232,12 +243,12 @@ fn join_and(items: &[&str]) -> String {
 /// "850 KB", "6.7 MB", "1.2 GB".
 pub fn human_bytes(bytes: u64) -> String {
     let b = bytes as f64;
-    if b >= 1e9 {
-        format!("{:.1} GB", b / 1e9)
-    } else if b >= 1e6 {
-        format!("{:.1} MB", b / 1e6)
+    if b >= GB {
+        format!("{:.1} GB", b / GB)
+    } else if b >= MB {
+        format!("{:.1} MB", b / MB)
     } else {
-        format!("{:.0} KB", (b / 1e3).max(1.))
+        format!("{:.0} KB", (b / KB).max(1.))
     }
 }
 
@@ -493,7 +504,7 @@ impl Model {
     /// decisions as two-stroke ticks, left-alone ones as circles; marks less
     /// than a minute and a half apart merge into one, with a count.
     pub fn marks(&self) -> Vec<Mark> {
-        self.marks_within(60., None, MERGE_MINUTES)
+        self.marks_within(crate::units::MINUTES_PER_HOUR_F, None, MERGE_MINUTES)
     }
 
     /// The marks of the last `span` minutes (of one tunnel's decisions, or
@@ -507,7 +518,8 @@ impl Model {
             .filter(|e| tunnel.is_none_or(|t| e.tunnel.as_deref() == Some(t)))
             .filter_map(|e| {
                 let t: jiff::Timestamp = e.ts.parse().ok()?;
-                let ago = (now.as_second() - t.as_second()) as f32 / 60.;
+                let ago =
+                    (now.as_second() - t.as_second()) as f32 / crate::units::SECS_PER_MINUTE_F;
                 (0. ..=span).contains(&ago).then_some((ago, e))
             })
             .collect();
@@ -558,7 +570,7 @@ impl Model {
             s += "\n";
         }
         s += "\nRecent decisions (newest first)\n";
-        let recent = self.decisions(20);
+        let recent = self.decisions(HELPDESK_DECISIONS);
         if recent.is_empty() {
             s += "  (none)\n";
         }

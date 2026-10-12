@@ -2,6 +2,10 @@
 //! gateway) with Pin and Forget, and Add a host.
 
 use super::*;
+use crate::units::{SECS_PER_DAY as DAY, SECS_PER_HOUR as HOUR, SECS_PER_MINUTE as MINUTE};
+
+/// Used within this many seconds: "now".
+const JUST_NOW: u64 = 90;
 
 impl TunnelDetail {
     /// The tabs, their rows, and "Add a host".
@@ -218,10 +222,10 @@ impl TunnelDetail {
             learned_how(r)
         };
         let used = match r.used_ago {
-            Some(s) if s < 90 => "Used now".to_owned(),
-            Some(s) if s < 3600 => format!("{} min ago", s / 60),
-            Some(s) if s < 86_400 => format!("{} h ago", s / 3600),
-            Some(s) => match s / 86_400 {
+            Some(s) if s < JUST_NOW => "Used now".to_owned(),
+            Some(s) if s < HOUR => format!("{} min ago", s / MINUTE),
+            Some(s) if s < DAY => format!("{} h ago", s / HOUR),
+            Some(s) => match s / DAY {
                 1 => "Yesterday".to_owned(),
                 d => format!("{d} days ago"),
             },

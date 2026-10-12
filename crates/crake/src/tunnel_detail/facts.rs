@@ -264,7 +264,11 @@ pub fn protocol_name(protocol: &str) -> &str {
 
 /// "4 h 53 min", "12 min", "2 days 3 h".
 pub(super) fn duration(secs: u64) -> String {
-    let (d, h, m) = (secs / 86_400, secs % 86_400 / 3600, secs % 3600 / 60);
+    let (d, h, m) = (
+        secs / crate::units::SECS_PER_DAY,
+        secs % crate::units::SECS_PER_DAY / crate::units::SECS_PER_HOUR,
+        secs % crate::units::SECS_PER_HOUR / crate::units::SECS_PER_MINUTE,
+    );
     match (d, h) {
         (0, 0) => format!("{} min", m.max(1)),
         (0, _) => format!("{h} h {m} min"),

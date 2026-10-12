@@ -3,6 +3,15 @@
 
 use super::*;
 
+/// A tunnel switched on for a new connection waits for the tunnel list to
+/// catch up; the tray's "routed" shape shows a few seconds; OpenVPN 3
+/// sessions started elsewhere are looked for this often; the tray's frames
+/// are FRAME_MS apart (CLAUDE.md, 7c).
+const AFTER_TUNNELS: Duration = Duration::from_millis(400);
+const ROUTED_SHOWN: Duration = Duration::from_secs(5);
+const OPENVPN3_LOOK: Duration = Duration::from_secs(3);
+const FRAME_MS: u64 = 70;
+
 pub(super) fn on_update(update: client::Update, cx: &mut App) {
     // craked refused an OpenVPN 3 session (it clashes with a tunnel that's
     // up; the log says which): end it, so it doesn't stay up unrouted.
@@ -23,9 +32,7 @@ pub(super) fn on_update(update: client::Update, cx: &mut App) {
         let name = name.clone();
         // After the tunnel list has caught up (TunnelChanged follows).
         cx.spawn(async move |cx| {
-            cx.background_executor()
-                .timer(Duration::from_millis(400))
-                .await;
+            cx.background_executor().timer(AFTER_TUNNELS).await;
             requests.send(Request::Switch(name, true)).await.ok();
         })
         .detach();
@@ -66,7 +73,7 @@ pub(super) fn on_update(update: client::Update, cx: &mut App) {
         }
         // The tray's "routed" shape is shown for a few seconds.
         cx.spawn(async move |cx| {
-            cx.background_executor().timer(Duration::from_secs(5)).await;
+            cx.background_executor().timer(ROUTED_SHOWN).await;
             cx.update(refresh_tray);
         })
         .detach();
@@ -82,7 +89,7 @@ pub(super) fn on_update(update: client::Update, cx: &mut App) {
 pub(super) fn watch_openvpn3(cx: &mut App) {
     cx.spawn(async move |cx| {
         loop {
-            cx.background_executor().timer(Duration::from_secs(3)).await;
+            cx.background_executor().timer(OPENVPN3_LOOK).await;
             // Crake's OpenVPN 3 tunnels it isn't already following.
             let wanted = cx.update(|cx| {
                 let shell = cx.global::<Shell>();
@@ -183,7 +190,7 @@ pub(super) fn animate_tray(from: tray::Shape, to: tray::Shape, cx: &mut App) {
                 handle.update(move |t| t.frame = Some(frame));
                 cx.background_executor()
                     .timer(std::time::Duration::from_millis(
-                        70 * u64::from(motion::slowed()),
+                        FRAME_MS * u64::from(motion::slowed()),
                     ))
                     .await;
             }

@@ -3,12 +3,10 @@
 //! the app's own (appearance, notifications, the bird, start at login,
 //! helpdesk copies) live in `prefs`.
 
-use std::time::Duration;
-
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyElement, Context, Div, Entity, FocusHandle, FontWeight, Stateful, Subscription,
+    AnyElement, Context, Div, Entity, FocusHandle, FontWeight, Pixels, Stateful, Subscription,
     TestSupportExt, Window, div, px, svg,
 };
 
@@ -180,7 +178,7 @@ impl Render for Settings {
         let failed = model
             .failed
             .as_ref()
-            .filter(|(_, at)| at.elapsed() < Duration::from_secs(8))
+            .filter(|(_, at)| at.elapsed() < crate::model::FAILURE_SHOWN)
             .map(|(text, _)| text.clone());
 
         div()
@@ -523,7 +521,7 @@ impl Settings {
                     .pt(px(4.))
                     .px(px(10.))
                     .pb(px(16.))
-                    .child(bird(22., "crake/bird.svg", "crake/call.svg", t))
+                    .child(bird(px(22.), "crake/bird.svg", "crake/call.svg", t))
                     .child(
                         div()
                             .text_size(px(17.))

@@ -11,6 +11,11 @@ use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::time::Duration;
 
+/// openconnect's output, read in pieces this big; its next piece is waited
+/// for this long before the questions so far are looked at.
+const READ_BUFFER: usize = 4096;
+const OUTPUT_WAIT: Duration = Duration::from_millis(250);
+
 use crake_proto::Session;
 
 use crate::keyring::{self, Kind};
@@ -338,7 +343,7 @@ fn attempt(
 
     let (chunks_tx, chunks) = mpsc::channel::<Vec<u8>>();
     std::thread::spawn(move || {
-        let mut buf = [0u8; 4096];
+        let mut buf = [0u8; READ_BUFFER];
         while let Ok(n) = stderr.read(&mut buf) {
             if n == 0 || chunks_tx.send(buf[..n].to_vec()).is_err() {
                 break;
@@ -355,7 +360,7 @@ fn attempt(
     let mut pending = String::new();
     let mut reached = false;
     loop {
-        match chunks.recv_timeout(Duration::from_millis(250)) {
+        match chunks.recv_timeout(OUTPUT_WAIT) {
             Ok(bytes) => {
                 pending.push_str(&String::from_utf8_lossy(&bytes));
                 while let Some(nl) = pending.find('\n') {

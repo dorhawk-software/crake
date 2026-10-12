@@ -87,10 +87,26 @@ pub struct Timeline {
 /// "13:21", local time, `ago` minutes ago.
 pub fn clock(ago: f32) -> String {
     jiff::Zoned::now()
-        .checked_sub(jiff::SignedDuration::from_secs((ago * 60.) as i64))
+        .checked_sub(jiff::SignedDuration::from_secs(
+            (ago * crate::units::SECS_PER_MINUTE_F) as i64,
+        ))
         .map(|z| z.strftime("%H:%M").to_string())
         .unwrap_or_default()
 }
+
+use crate::chart::INSET;
+
+/// What the pointer readout and the painting agree on: a "left alone" ring
+/// (its centre above the baseline, its radius), the clear space kept around
+/// a tick, and how far short of what it points at the hairline stops.
+const RING_LIFT: f32 = 10.;
+const RING_R: f32 = 4.5;
+const CLEARANCE: f32 = 1.5;
+const HAIRLINE_GAP: f32 = 3.;
+/// The pointer is on a mark within this many pixels of it (on a chart at
+/// least MIN_POINT_WIDTH wide).
+const NEAR_PX: f32 = 6.;
+const MIN_POINT_WIDTH: f32 = 100.;
 
 impl Timeline {
     fn bar_height(&self, bytes: u64, max: f32) -> f32 {
@@ -103,8 +119,8 @@ impl Timeline {
     /// the hairline stops.)
     fn pointed(&self, at: f32, width: f32) -> (f32, Option<f32>, String, String, f32) {
         let s = self.shape;
-        // Within about 6 px of a mark: the mark.
-        let near = self.span * 6. / width.max(100.);
+        // Within about NEAR_PX of a mark: the mark.
+        let near = self.span * NEAR_PX / width.max(MIN_POINT_WIDTH);
         let mark = self
             .marks
             .iter()
@@ -116,8 +132,8 @@ impl Timeline {
             let tallest = s.baseline - s.tick_heights[0];
             let top = match (m.routed, m.count) {
                 (true, n) if n > 1 => s.count_top,
-                (true, _) => tallest - 1.5,
-                (false, _) => s.baseline - 10. - 4.5,
+                (true, _) => tallest - CLEARANCE,
+                (false, _) => s.baseline - RING_LIFT - RING_R,
             };
             return (m.ago, None, m.time.clone(), m.text.clone(), top);
         }
@@ -136,7 +152,13 @@ impl Timeline {
                 (self.words)(bytes),
                 s.baseline - self.bar_height(bytes, max),
             ),
-            _ => (at, None, clock(at), self.nothing.clone(), s.baseline + 3.),
+            _ => (
+                at,
+                None,
+                clock(at),
+                self.nothing.clone(),
+                s.baseline + HAIRLINE_GAP,
+            ),
         }
     }
 
@@ -224,11 +246,12 @@ impl Timeline {
                         cx.listener(move |this, e: &gpui_kit::MouseMoveEvent, _, cx| {
                             let hover = get(this);
                             let (left, width) = hover.geometry.get();
-                            if width <= 4. {
+                            if width <= 2. * INSET {
                                 return;
                             }
                             let x = f32::from(e.position.x) - left;
-                            let ago = (span * (1. - (x - 2.) / (width - 4.))).clamp(0., span);
+                            let plot = width - 2. * INSET;
+                            let ago = (span * (1. - (x - INSET) / plot)).clamp(0., span);
                             if hover.at != Some(ago) {
                                 hover.at = Some(ago);
                                 cx.notify();
@@ -302,13 +325,14 @@ struct Paint {
 }
 
 impl Paint {
+    // literal: the chart's drawing (DESIGN.md, Charts)
     fn paint(&self, bounds: gpui_kit::Bounds<gpui_kit::Pixels>, window: &mut Window) {
         let tl = &self.timeline;
         let s = tl.shape;
         let w = f32::from(bounds.size.width);
         let (left, top) = (f32::from(bounds.left()), f32::from(bounds.top()));
         let baseline = top + s.baseline;
-        let x_of = |ago: f32| left + 2. + (w - 4.) * (tl.span - ago) / tl.span;
+        let x_of = |ago: f32| left + INSET + (w - 2. * INSET) * (tl.span - ago) / tl.span;
         for (ago, bytes) in &tl.bars {
             if *bytes == 0 {
                 continue;
@@ -325,7 +349,7 @@ impl Paint {
         // 3 px above whatever stands at that moment.
         if let Some((ago, stop)) = self.hover_x {
             let x = x_of(ago);
-            let end = top + stop - 3.;
+            let end = top + stop - HAIRLINE_GAP;
             if end - (top + 2.) >= 4. {
                 let mut line = PathBuilder::stroke(px(1.)).dash_array(&[px(2.), px(3.)]);
                 line.move_to(point(px(x), px(top + 2.)));
@@ -336,7 +360,8 @@ impl Paint {
             }
         }
         // A stroke grown `g` of the way up from the baseline.
-        let stroke_top = |height: f32, g: f32| (baseline - height * g).min(baseline - 1.6);
+        let stroke_top =
+            |height: f32, g: f32| (baseline - height * g).min(baseline - crate::chart::LINE);
         let strokes = |x: f32| {
             [
                 (x, s.tick_heights[0]),
@@ -354,7 +379,7 @@ impl Paint {
                 }
                 let gap = crate::chart::rounded_bar(
                     x,
-                    stroke_top(height, g) - 1.5,
+                    stroke_top(height, g) - CLEARANCE,
                     baseline,
                     s.tick + 3.,
                 );
@@ -383,10 +408,11 @@ impl Paint {
                     }
                 }
             } else {
-                if let Some(p) = crate::chart::circle(x, baseline - 10., 4.5, None) {
+                if let Some(p) = crate::chart::circle(x, baseline - RING_LIFT, RING_R, None) {
                     window.paint_path(p, self.panel);
                 }
-                if let Some(p) = crate::chart::circle(x, baseline - 10., 4.5, Some(1.6)) {
+                let ring = Some(crate::chart::LINE);
+                if let Some(p) = crate::chart::circle(x, baseline - RING_LIFT, RING_R, ring) {
                     window.paint_path(p, self.muted);
                 }
             }

@@ -24,6 +24,9 @@ mod hosts;
 #[cfg(test)]
 mod tests;
 
+/// Decisions this close on the design's chart share a tick.
+const MERGE_PX: f32 = 12.;
+
 use self::chart::{now_minutes, today};
 use self::facts::{facts, policy, title_row};
 
@@ -82,11 +85,15 @@ impl Render for TunnelDetail {
         // Decisions about 12 px apart or closer share a tick (the design's
         // 836 px for the day so far).
         let span = now_minutes();
-        let marks = model.marks_within(span, Some(&self.tunnel), span * 12. / 836.);
+        let marks = model.marks_within(
+            span,
+            Some(&self.tunnel),
+            span * MERGE_PX / chart::DESIGN_WIDTH,
+        );
         let failed = model
             .failed
             .as_ref()
-            .filter(|(_, at)| at.elapsed() < Duration::from_secs(8))
+            .filter(|(_, at)| at.elapsed() < crate::model::FAILURE_SHOWN)
             .map(|(text, _)| text.clone());
         let on = matches!(tunnel.state.as_str(), "connected" | "connecting");
         let max_height = self.max_height;
@@ -95,7 +102,9 @@ impl Render for TunnelDetail {
         let fit = canvas(
             move |bounds, window, _| {
                 let want = (f32::from(bounds.size.height) + 2.).min(max_height);
-                if (f32::from(window.viewport_size().height) - want).abs() > 0.5 {
+                if (f32::from(window.viewport_size().height) - want).abs()
+                    > crate::windows::FIT_SLACK
+                {
                     window.on_next_frame(move |window, _| {
                         window.resize(gpui_kit::size(px(WIDTH), px(want)));
                     });
@@ -282,9 +291,7 @@ impl TunnelDetail {
             }
         })
         .detach();
-        let max_height = crate::place::monitors()
-            .first()
-            .map_or(1000., |m| m.h - 120.);
+        let max_height = crate::place::max_window_height();
         Self {
             tunnel,
             model,

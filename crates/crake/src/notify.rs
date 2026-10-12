@@ -22,6 +22,15 @@ pub fn worth_telling(entry: &LogEntry) -> bool {
         && !entry.reason.as_deref().unwrap_or("").starts_with("You ")
 }
 
+/// How long each notification stays, in ms: a routed host (quiet, brief),
+/// another tunnel answering too, a host waiting for your decision.
+#[cfg(not(target_os = "macos"))]
+const ROUTED_SHOWN: u32 = 8000;
+#[cfg(not(target_os = "macos"))]
+const ALSO_ANSWERED_SHOWN: u32 = 15_000;
+#[cfg(not(target_os = "macos"))]
+const ASKED_SHOWN: u32 = 20_000;
+
 /// What every notification starts from: the entry's message and reason.
 #[cfg(not(target_os = "macos"))]
 fn note(entry: &LogEntry, urgency: Urgency, timeout_ms: u32) -> Notification {
@@ -42,7 +51,7 @@ pub fn routed(entry: &LogEntry, requests: async_channel::Sender<Request>) {
     let (Some(tunnel), hosts) = (entry.tunnel.clone(), entry.hosts.clone()) else {
         return;
     };
-    let mut n = note(entry, Urgency::Low, 8000);
+    let mut n = note(entry, Urgency::Low, ROUTED_SHOWN);
     n.action("undo", "Undo").action("default", "Open Crake");
     std::thread::spawn(move || {
         let Ok(handle) = n.show() else { return };
@@ -69,7 +78,7 @@ pub fn also_answered(
     let (Some(from), hosts) = (entry.tunnel.clone(), entry.hosts.clone()) else {
         return;
     };
-    let mut n = note(entry, Urgency::Normal, 15000);
+    let mut n = note(entry, Urgency::Normal, ALSO_ANSWERED_SHOWN);
     for (name, display) in &others {
         n.action(name, &format!("Use {display}"));
     }
@@ -96,7 +105,7 @@ pub fn asked(entry: &LogEntry, display: String, requests: async_channel::Sender<
     let (Some(tunnel), hosts) = (entry.tunnel.clone(), entry.hosts.clone()) else {
         return;
     };
-    let mut n = note(entry, Urgency::Normal, 20000);
+    let mut n = note(entry, Urgency::Normal, ASKED_SHOWN);
     n.action("send", &format!("Send through {display}"))
         .action("leave", "Leave it");
     std::thread::spawn(move || {
@@ -170,17 +179,19 @@ pub fn crex() {
     });
 }
 
-/// Two rasping syllables of rapid clicks, as a 16-bit mono WAV.
+/// The call as a WAV file: 16-bit mono.
 fn call_wav() -> Vec<u8> {
-    const RATE: u32 = 22_050;
+    wav(&call_samples(), RATE)
+}
+
+/// The call's sample rate: plenty for a rasp.
+const RATE: u32 = 22_050;
+
+/// Two rasping syllables of rapid clicks.
+// literal: the call's sound, tuned by ear to a corncrake's rasp
+fn call_samples() -> Vec<i16> {
     let mut samples: Vec<i16> = Vec::new();
-    let mut seed: u32 = 0x00c0_ffee;
-    let mut noise = move || {
-        seed ^= seed << 13;
-        seed ^= seed >> 17;
-        seed ^= seed << 5;
-        (seed as f32 / u32::MAX as f32) * 2. - 1.
-    };
+    let mut noise = Noise(0x00c0_ffee);
     let ms = |m: f32| (RATE as f32 * m / 1000.) as usize;
     for syllable in 0..2 {
         // About 14 clicks in a fifth of a second: the rasp.
@@ -191,7 +202,7 @@ fn call_wav() -> Vec<u8> {
                 let env = (1. - i as f32 / len as f32).powi(2);
                 let tone = (t * 2200. * std::f32::consts::TAU).sin() * 0.5
                     + (t * 3300. * std::f32::consts::TAU).sin() * 0.25;
-                let v = (tone + noise() * 0.6) * env * 0.33;
+                let v = (tone + noise.next() * 0.6) * env * 0.33;
                 samples.push((v * i16::MAX as f32) as i16);
             }
             let gap = ms(7.5) + (click % 3) * ms(0.6);
@@ -201,18 +212,50 @@ fn call_wav() -> Vec<u8> {
             samples.extend(std::iter::repeat_n(0, ms(160.)));
         }
     }
-    let data_len = (samples.len() * 2) as u32;
-    let mut wav = Vec::with_capacity(44 + data_len as usize);
+    samples
+}
+
+/// White noise from Marsaglia's xorshift (shifts 13, 17, 5): the same every
+/// time, from -1 to 1.
+struct Noise(u32);
+
+impl Noise {
+    const A: u32 = 13;
+    const B: u32 = 17;
+    const C: u32 = 5;
+
+    fn next(&mut self) -> f32 {
+        self.0 ^= self.0 << Self::A;
+        self.0 ^= self.0 >> Self::B;
+        self.0 ^= self.0 << Self::C;
+        (self.0 as f32 / u32::MAX as f32) * 2. - 1.
+    }
+}
+
+/// 16-bit mono PCM samples at `rate` as a WAV (RIFF) file.
+fn wav(samples: &[i16], rate: u32) -> Vec<u8> {
+    /// "RIFF" and the file's size, then "WAVE".
+    const PREAMBLE: u32 = 8;
+    /// "WAVE", the fmt chunk (its header and 16 bytes) and the data chunk's
+    /// header: what the RIFF size counts besides the samples.
+    const HEADERS: u32 = 36;
+    const FMT_LENGTH: u32 = 16;
+    const PCM: u16 = 1;
+    const MONO: u16 = 1;
+    const SAMPLE: u16 = size_of::<i16>() as u16;
+    const BITS: u16 = SAMPLE * u8::BITS as u16;
+    let data_len = size_of_val(samples) as u32;
+    let mut wav = Vec::with_capacity((PREAMBLE + HEADERS + data_len) as usize);
     wav.extend_from_slice(b"RIFF");
-    wav.extend_from_slice(&(36 + data_len).to_le_bytes());
+    wav.extend_from_slice(&(HEADERS + data_len).to_le_bytes());
     wav.extend_from_slice(b"WAVEfmt ");
-    wav.extend_from_slice(&16u32.to_le_bytes());
-    wav.extend_from_slice(&1u16.to_le_bytes()); // PCM
-    wav.extend_from_slice(&1u16.to_le_bytes()); // mono
-    wav.extend_from_slice(&RATE.to_le_bytes());
-    wav.extend_from_slice(&(RATE * 2).to_le_bytes());
-    wav.extend_from_slice(&2u16.to_le_bytes());
-    wav.extend_from_slice(&16u16.to_le_bytes());
+    wav.extend_from_slice(&FMT_LENGTH.to_le_bytes());
+    wav.extend_from_slice(&PCM.to_le_bytes());
+    wav.extend_from_slice(&MONO.to_le_bytes());
+    wav.extend_from_slice(&rate.to_le_bytes());
+    wav.extend_from_slice(&(rate * u32::from(SAMPLE)).to_le_bytes()); // bytes a second
+    wav.extend_from_slice(&SAMPLE.to_le_bytes()); // bytes a frame
+    wav.extend_from_slice(&BITS.to_le_bytes());
     wav.extend_from_slice(b"data");
     wav.extend_from_slice(&data_len.to_le_bytes());
     for s in samples {

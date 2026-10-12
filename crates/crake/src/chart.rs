@@ -2,6 +2,12 @@
 
 use gpui_kit::{PathBuilder, Pixels, point, px};
 
+/// The plot's margin inside a chart, each side: the first and last bars stay
+/// clear of the edge. Painting and pointing both go by it.
+pub const INSET: f32 = 2.;
+/// The charts' line: a ring's outline, the lowest a tick stroke sits.
+pub const LINE: f32 = 1.6;
+
 /// A traffic bar centred on `x`, `width` wide, standing on `base`, `height`
 /// tall. Its edges snap to whole device pixels and every bar gets the same
 /// pixel width: at fractional positions anti-aliasing would draw some bars

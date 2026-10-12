@@ -3,6 +3,9 @@
 
 use super::*;
 
+/// The wider of the two columns grows this much more than the other.
+const WIDE_COLUMN: f32 = 1.4;
+
 impl NewTunnel {
     pub(super) fn server(&self, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {
         // The detection line under the fields.
@@ -43,7 +46,7 @@ impl NewTunnel {
                     )
                     .child(
                         // 1 : 1.4, as the design's grid.
-                        div().flex_basis(px(0.)).flex_grow(1.4).min_w_0().child(
+                        div().flex_basis(px(0.)).flex_grow(WIDE_COLUMN).min_w_0().child(
                             if self.protocol == "openvpn3" {
                                 let options: Vec<(String, String)> = self
                                     .profiles
@@ -257,7 +260,7 @@ impl NewTunnel {
                             "The gateway offers {} groups. Ask your IT team if you\u{2019}re not sure.",
                             match groups.len() {
                                 2 => "two".to_owned(),
-                                3 => "three".to_owned(),
+                                3 => "three".to_owned(), // literal: a number in words
                                 n => n.to_string(),
                             }
                         )),

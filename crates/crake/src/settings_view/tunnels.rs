@@ -3,6 +3,9 @@
 
 use super::*;
 
+/// An element id's number for a tunnel not in the try order.
+const UNPLACED: usize = 99;
+
 impl Settings {
     /// Settings → Tunnels (design/proposals/settings-tunnels.html): every
     /// tunnel in the order Crake tries them, then the full tunnels that take
@@ -298,7 +301,7 @@ impl Settings {
                     .flex_none()
                     .child(
                         small_button(
-                            ("edit", position.unwrap_or(99)),
+                            ("edit", position.unwrap_or(UNPLACED)),
                             "Edit",
                             None,
                             t.line,
@@ -314,7 +317,7 @@ impl Settings {
                     )
                     .child(
                         small_button(
-                            ("remove", position.unwrap_or(99)),
+                            ("remove", position.unwrap_or(UNPLACED)),
                             "Remove\u{2026}",
                             Some("crake/trash.svg"),
                             t.danger,

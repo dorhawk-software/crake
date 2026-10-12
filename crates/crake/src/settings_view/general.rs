@@ -2,6 +2,9 @@
 
 use super::*;
 
+/// A row that doesn't apply yet.
+const DIMMED: f32 = 0.45;
+
 impl Settings {
     pub(super) fn general(&self, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {
         let prefs = cx.global::<Prefs>().clone();
@@ -9,7 +12,7 @@ impl Settings {
         let notify = select(
             self,
             "notify",
-            221.,
+            px(221.),
             &[
                 ("none", "Say nothing"),
                 ("quiet", "Quiet notification"),
@@ -23,7 +26,7 @@ impl Settings {
         let appearance = select(
             self,
             "appearance",
-            153.,
+            px(153.),
             &[
                 ("system", "Follow the system"),
                 ("light", "Light"),
@@ -60,7 +63,7 @@ impl Settings {
                             .pl(px(24.))
                             .border_t_1()
                             .border_color(t.line)
-                            .when(!starts, |r| r.opacity(0.45))
+                            .when(!starts, |r| r.opacity(DIMMED))
                             .child(row(
                                 self.title("Switch on the tunnels you left on", t, cx),
                                 Some("Some may ask you to sign in."),

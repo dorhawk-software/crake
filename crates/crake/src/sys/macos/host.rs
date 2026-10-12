@@ -19,7 +19,7 @@ pub fn private_dir() -> Result<PathBuf, String> {
     let dir = std::env::temp_dir().join("crake");
     std::fs::DirBuilder::new()
         .recursive(true)
-        .mode(0o700)
+        .mode(crate::sys::OWNER_ONLY_DIR)
         .create(&dir)
         .map_err(|e| e.to_string())?;
     Ok(dir)
@@ -58,5 +58,6 @@ pub fn light_bar() -> bool {
 
 /// The menu bar's icon size in pixels: 18 points, on a Retina screen.
 pub fn tray_icon_size() -> u32 {
-    36
+    const RETINA_18_POINTS: u32 = 36;
+    RETINA_18_POINTS
 }

@@ -4,6 +4,10 @@
 
 use std::sync::LazyLock;
 
+/// CRAKE_MOTION=slow: this many times slower. ease_out's curve: cubic.
+const SLOW: u32 = 10;
+const CUBIC: i32 = 3;
+
 static ENABLED: LazyLock<bool> = LazyLock::new(|| {
     if std::env::var("CRAKE_MOTION").as_deref() == Ok("off") {
         return false;
@@ -22,7 +26,7 @@ pub fn enabled() -> bool {
 /// CRAKE_MOTION=slow (development): everything ten times slower, to look at.
 pub fn slowed() -> u32 {
     if std::env::var("CRAKE_MOTION").as_deref() == Ok("slow") {
-        10
+        SLOW
     } else {
         1
     }
@@ -31,5 +35,5 @@ pub fn slowed() -> u32 {
 /// cubic-bezier(.2, 0, 0, 1)-like: quick start, gentle landing.
 pub fn ease_out(t: f32) -> f32 {
     let t = t.clamp(0., 1.);
-    1. - (1. - t).powi(3)
+    1. - (1. - t).powi(CUBIC)
 }

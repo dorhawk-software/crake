@@ -6,6 +6,11 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+/// Traffic is fetched this often; the log's last LOG_ENTRIES entries are
+/// enough for the log window's days (kept 30 days).
+const TRAFFIC_EVERY: Duration = Duration::from_secs(20);
+const LOG_ENTRIES: u32 = 5000;
+
 use crake_proto::{BUS_NAME, BUS_PATH, LogEntry};
 use futures_util::StreamExt;
 use zbus::Connection;
@@ -299,10 +304,10 @@ async fn session(
     let mut signals = zbus::MessageStream::for_match_rule(rule, &conn, None).await?;
 
     let send = |u: Update| async { updates.send(u).await.is_ok() };
-    let mut traffic_tick = tokio::time::interval(Duration::from_secs(20));
+    let mut traffic_tick = tokio::time::interval(TRAFFIC_EVERY);
     let tunnels = api.tunnels().await?;
     // Enough for the log window's days (kept for 30 days).
-    let log = api.log(5000).await?;
+    let log = api.log(LOG_ENTRIES).await?;
     // Older craked without settings: the window shows the defaults.
     let settings = api
         .call::<_, HashMap<String, String>>("Settings", &())
@@ -424,7 +429,7 @@ async fn session(
                     Command::ClearLog => {
                         let done = api.call::<_, ()>("ClearLog", &()).await;
                         if done.is_ok() {
-                            let log = api.log(5000).await?;
+                            let log = api.log(LOG_ENTRIES).await?;
                             if !send(Update::Log(log)).await { return Ok(()); }
                         }
                         done

@@ -156,7 +156,9 @@ fn argb(tree: &resvg::usvg::Tree, size: u32) -> Vec<u8> {
         resvg::tiny_skia::Transform::from_scale(scale, scale),
         &mut pixmap.as_mut(),
     );
-    let mut data = Vec::with_capacity((size * size * 4) as usize);
+    // Four bytes a pixel: alpha, red, green, blue.
+    const ARGB: u32 = 4;
+    let mut data = Vec::with_capacity((size * size * ARGB) as usize);
     for p in pixmap.pixels() {
         let c = p.demultiply();
         data.extend_from_slice(&[c.alpha(), c.red(), c.green(), c.blue()]);
@@ -190,6 +192,7 @@ const TUCK_SCALE: f32 = 0.82;
 /// How bright an asleep head is.
 const ASLEEP: f32 = 0.45;
 
+// literal: the head's drawing (assets/icons/tray-head-*.svg)
 /// The head's transform at `tuck`: about (14, 13), then re-centred in the box.
 fn tuck_transform(t: f32) -> String {
     if t <= 0. {
@@ -211,6 +214,7 @@ const MARK_2: &str = "M19.2 11.25l1.9-.8";
 const MARK_LENGTH: f32 = 2.45;
 
 impl Art {
+    // literal: the head's drawing (assets/icons/tray-head-*.svg)
     pub fn svg(&self) -> String {
         let mut holes = String::new();
         if self.eye > 0.02 {
@@ -302,6 +306,7 @@ fn rest(shape: Shape) -> Art {
     }
 }
 
+// literal: the icon's motion, frame by frame (design/proposals/animations.html)
 /// The frames from one state to the next (every ~70 ms), ending at the
 /// resting look of `to`. Connecting has its own loop (`connecting_loop`).
 pub fn transition(from: Shape, to: Shape) -> Vec<Art> {
@@ -396,6 +401,7 @@ pub fn transition(from: Shape, to: Shape) -> Vec<Art> {
     }
 }
 
+// literal: the icon's motion, frame by frame (design/proposals/animations.html)
 /// Connecting: the outline draws itself, holds a moment, and starts again.
 pub fn connecting_loop() -> Vec<Art> {
     let mut v: Vec<Art> = (1..=12)

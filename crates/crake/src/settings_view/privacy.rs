@@ -13,7 +13,7 @@ impl Settings {
         let keep = select(
             self,
             "keep",
-            142.,
+            px(142.),
             &[
                 ("1", "1 day"),
                 ("7", "7 days"),

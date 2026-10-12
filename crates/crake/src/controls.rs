@@ -1,7 +1,7 @@
 //! Small controls shared by the windows.
 
 use gpui_kit::prelude::*;
-use gpui_kit::{Div, ElementId, Stateful, div, px};
+use gpui_kit::{Div, ElementId, Pixels, Stateful, div, px};
 
 use crate::theme::Theme;
 
@@ -13,7 +13,7 @@ pub fn segment(
     i: usize,
     count: usize,
     chosen: Option<usize>,
-    height: f32,
+    height: Pixels,
     t: &Theme,
 ) -> Stateful<Div> {
     let on = chosen == Some(i);
@@ -23,7 +23,7 @@ pub fn segment(
     let after_chosen = i > 0 && chosen == Some(i - 1);
     div()
         .id(id)
-        .h(px(height))
+        .h(height)
         .flex()
         .items_center()
         .justify_center()

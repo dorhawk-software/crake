@@ -4,23 +4,17 @@ use super::*;
 
 /// The line bird with its teal call marks.
 pub(super) fn bird(
-    size: f32,
+    size: Pixels,
     body: &'static str,
     call: &'static str,
     t: &Theme,
 ) -> impl IntoElement {
     div()
         .relative()
-        .size(px(size))
+        .size(size)
         .flex_none()
-        .child(svg().path(body).size(px(size)).text_color(t.ink).absolute())
-        .child(
-            svg()
-                .path(call)
-                .size(px(size))
-                .text_color(t.accent)
-                .absolute(),
-        )
+        .child(svg().path(body).size(size).text_color(t.ink).absolute())
+        .child(svg().path(call).size(size).text_color(t.accent).absolute())
 }
 
 pub(super) fn about(t: &Theme, cx: &mut Context<Settings>) -> impl IntoElement {
@@ -42,7 +36,7 @@ pub(super) fn about(t: &Theme, cx: &mut Context<Settings>) -> impl IntoElement {
                 .flex()
                 .gap(px(16.))
                 .items_center()
-                .child(bird(56., "crake/bird-thin.svg", "crake/call-thin.svg", t))
+                .child(bird(px(56.), "crake/bird-thin.svg", "crake/call-thin.svg", t))
                 .child(
                     div()
                         .child(

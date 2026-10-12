@@ -2,6 +2,14 @@
 
 use super::*;
 
+/// The last hour, in minutes; its middle label sits halfway.
+const HOUR: f32 = crate::units::MINUTES_PER_HOUR_F;
+const HALFWAY: f32 = 0.5;
+/// A new tick grows in two beats: each stroke over this many ms, the second
+/// starting a little after the first (CLAUDE.md, 7c).
+const TICK_GROWS: u64 = 260;
+const SECOND_STROKE_AFTER: u64 = 90;
+
 impl Panel {
     /// "Last hour" (DESIGN.md, Charts): grey bars are how much traffic went
     /// direct per minute, the marks Crake's decisions (`crate::timeline`,
@@ -15,22 +23,25 @@ impl Panel {
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let marks = model.marks();
-        let now_minute = jiff::Timestamp::now().as_second() as u64 / 60;
+        let now_minute = crate::units::epoch_minute();
         let bars: Vec<(f32, u64)> = model
             .traffic
             .iter()
-            .filter(|(m, _)| now_minute.saturating_sub(*m) <= 60)
+            .filter(|(m, _)| now_minute.saturating_sub(*m) <= crate::units::MINUTES_PER_HOUR)
             .map(|(m, bytes)| ((now_minute - m) as f32, *bytes))
             .collect();
         let grown = marks
             .iter()
             .map(|m| match self.motion.arrival(&m.ts) {
-                Some(at) => [phase(at, 0, 260, window), phase(at, 90, 260, window)],
+                Some(at) => [
+                    phase(at, 0, TICK_GROWS, window),
+                    phase(at, SECOND_STROKE_AFTER, TICK_GROWS, window),
+                ],
                 None => [1., 1.],
             })
             .collect();
         let timeline = crate::timeline::Timeline {
-            span: 60.,
+            span: HOUR,
             bars,
             bin: 1.,
             marks,
@@ -38,8 +49,8 @@ impl Panel {
             words: Box::new(|b| format!("{} went direct", crate::model::human_bytes(b))),
             nothing: "Nothing went direct".into(),
             axis: vec![
-                (0., crate::timeline::clock(60.)),
-                (0.5, crate::timeline::clock(30.)),
+                (0., crate::timeline::clock(HOUR)),
+                (HALFWAY, crate::timeline::clock(HOUR / 2.)),
                 (1., "now".into()),
             ],
             shape: crate::timeline::LAST_HOUR,

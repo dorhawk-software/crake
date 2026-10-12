@@ -26,6 +26,24 @@ mod tests;
 
 pub const WIDTH: f32 = 452.;
 
+/// The panel's rows, as tall as in design/screens/tray-panel.html: the
+/// header, the chart, each section's heading, a decision, a tunnel, the
+/// footer.
+const HEADER: f32 = 62.;
+const CHART: f32 = 128.;
+const SECTION: f32 = 44.;
+const DECISION: f32 = 66.;
+const TUNNEL: f32 = 62.;
+const FOOTER: f32 = 72.;
+/// Motion (CLAUDE.md, 7c): the panel opens rising RISE px over OPENS ms; a
+/// switch slides on a critically damped spring (damping = 2 * sqrt of the
+/// stiffness), settling in about 150 ms.
+const OPENS: u64 = 180;
+const RISE: f32 = 8.;
+const SPRING_STIFFNESS: f32 = 1600.;
+const SPRING_DAMPING: f32 = 80.;
+const MS_PER_SEC: f32 = 1000.;
+
 /// Transparent room around the panel (only its rounded corners need any).
 pub const MARGIN: f32 = 0.;
 
@@ -77,7 +95,7 @@ fn phase(since: Instant, delay: u64, ms: u64, window: &mut Window) -> f32 {
         return 1.;
     }
     let slow = crate::motion::slowed() as f32;
-    let t = (since.elapsed().as_secs_f32() * 1000. / slow - delay as f32) / ms as f32;
+    let t = (since.elapsed().as_secs_f32() * MS_PER_SEC / slow - delay as f32) / ms as f32;
     if t < 1. {
         window.request_animation_frame();
     }
@@ -133,7 +151,7 @@ impl Render for Panel {
             panel = panel.child(not_running(model, &t));
         }
         if let Some((text, at)) = &model.failed
-            && at.elapsed() < Duration::from_secs(8)
+            && at.elapsed() < crate::model::FAILURE_SHOWN
         {
             panel = panel.child(
                 div()
@@ -145,8 +163,8 @@ impl Render for Panel {
             );
         }
         // It rises from a bottom bar (drops from a top one) and fades in.
-        let open = phase(self.motion.opened, 0, 180, window);
-        let rise = if self.upward { 8. } else { -8. };
+        let open = phase(self.motion.opened, 0, OPENS, window);
+        let rise = if self.upward { RISE } else { -RISE };
         let panel = panel.top(px(rise * (1. - open))).opacity(open);
         // The window is the panel; it follows the panel's height.
         div()
@@ -231,8 +249,12 @@ pub(crate) fn switch(id: impl Into<gpui_kit::ElementId>, on: bool, t: &Theme) ->
     use gpui_kit::{AnimationExt, SpringAnimation, SpringConfig};
     // Critically damped (damping = 2 * sqrt(stiffness)): settles in ~150 ms.
     let slow = crate::motion::slowed() as f32;
-    let spring =
-        SpringAnimation::new(SpringConfig::new(1600. / (slow * slow), 80. / slow, 1.)).to(on);
+    let spring = SpringAnimation::new(SpringConfig::new(
+        SPRING_STIFFNESS / (slow * slow),
+        SPRING_DAMPING / slow,
+        1.,
+    ))
+    .to(on);
     let (off_color, on_color) = (t.track, t.accent);
     div()
         .id(id)
@@ -270,7 +292,7 @@ fn fit_window(upward: bool) -> impl IntoElement {
             let height = f32::from(bounds.size.height) + 2.;
             let want = gpui_kit::size(px(WIDTH + 2. * MARGIN), px(height + 2. * MARGIN));
             let have = window.viewport_size();
-            if (f32::from(have.height) - f32::from(want.height)).abs() > 0.5 {
+            if (f32::from(have.height) - f32::from(want.height)).abs() > crate::windows::FIT_SLACK {
                 window.on_next_frame(move |window, cx| {
                     if upward {
                         crate::refit_panel(height, cx);
@@ -335,7 +357,7 @@ impl Panel {
     pub fn height(model: &Model) -> f32 {
         let decisions = model.decisions(DECISIONS).len().max(1) as f32;
         let tunnels = model.tunnels.len().max(1) as f32;
-        62. + 128. + 44. + decisions * 66. + 44. + tunnels * 62. + 72.
+        HEADER + CHART + SECTION + decisions * DECISION + SECTION + tunnels * TUNNEL + FOOTER
     }
 
     fn send(&self, r: Request) {

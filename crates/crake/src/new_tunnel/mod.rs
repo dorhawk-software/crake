@@ -8,8 +8,8 @@ use std::time::Duration;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyElement, Context, Div, Entity, FocusHandle, FontWeight, Stateful, Subscription, Task,
-    TestSupportExt, Window, div, px, svg,
+    AnyElement, Context, Div, Entity, FocusHandle, FontWeight, Pixels, Stateful, Subscription,
+    Task, TestSupportExt, Window, div, px, svg,
 };
 
 use crate::Request;
@@ -30,6 +30,14 @@ mod widgets;
 
 #[cfg(test)]
 mod tests;
+
+/// Steps 0 to 3: the server, sign-in, routing, the summary.
+const LAST_STEP: usize = 3;
+
+/// "Asking the gateway" shows at least this long, so it doesn't flicker;
+/// the question itself gets DETECT_TIMEOUT.
+const ASKING_AT_LEAST: Duration = Duration::from_millis(900);
+const DETECT_TIMEOUT: Duration = Duration::from_secs(12);
 
 // What the steps share, and what the rest of the app uses.
 pub use self::server::{beta, beta_tag};
@@ -374,9 +382,7 @@ impl NewTunnel {
             open_select: None,
             problem: None,
             browser: default_browser(),
-            max_height: crate::place::monitors()
-                .first()
-                .map_or(1000., |m| m.h - 120.),
+            max_height: crate::place::max_window_height(),
             profiles: Vec::new(),
             engines: demo.then_some(crate::engines::Engines::ALL),
             profile: (field("protocol") == "openvpn3")
@@ -399,12 +405,10 @@ impl NewTunnel {
         }
         self.detect = Detect::Asking;
         self.detecting = Some(cx.spawn(async move |this, cx| {
-            cx.background_executor()
-                .timer(Duration::from_millis(900))
-                .await;
+            cx.background_executor().timer(ASKING_AT_LEAST).await;
             let found = cx
                 .background_executor()
-                .spawn(async move { crate::detect::gateway(&gateway, Duration::from_secs(12)) })
+                .spawn(async move { crate::detect::gateway(&gateway, DETECT_TIMEOUT) })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 if let Found::AnyConnect { groups } = &found
@@ -527,7 +531,7 @@ impl NewTunnel {
             cx.notify();
             return;
         }
-        if self.step < 3 {
+        if self.step < LAST_STEP {
             self.step += 1;
             cx.notify();
             return;

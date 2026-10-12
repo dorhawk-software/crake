@@ -7,6 +7,9 @@ use std::io::Read;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+/// How often a running detection is looked at.
+const POLL: Duration = Duration::from_millis(100);
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Found {
     /// An AnyConnect (or ocserv) gateway; the groups it offers, if any.
@@ -64,7 +67,7 @@ fn ask(gateway: &str, servercert: Option<&str>, wait: Duration) -> String {
         if let Ok(Some(_)) = child.try_wait() {
             break;
         }
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(POLL);
     }
     let _ = child.kill();
     let _ = child.wait();

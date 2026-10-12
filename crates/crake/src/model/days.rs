@@ -113,8 +113,12 @@ impl Model {
             .filter(|e| matches!(e.kind, LogKind::Routed | LogKind::LeftAlone))
             .filter_map(|e| {
                 let at = e.ts.parse::<jiff::Timestamp>().ok()?.to_zoned(tz.clone());
-                (at.date() == today)
-                    .then(|| (at.hour() as f32 * 60. + at.minute() as f32, e.clone()))
+                (at.date() == today).then(|| {
+                    (
+                        at.hour() as f32 * crate::units::MINUTES_PER_HOUR_F + at.minute() as f32,
+                        e.clone(),
+                    )
+                })
             })
             .collect()
     }
@@ -123,7 +127,7 @@ impl Model {
     pub fn today_traffic(&self) -> Vec<(f32, u64)> {
         let midnight = jiff::Zoned::now()
             .start_of_day()
-            .map(|z| z.timestamp().as_second() as u64 / 60)
+            .map(|z| z.timestamp().as_second() as u64 / crate::units::SECS_PER_MINUTE)
             .unwrap_or(0);
         self.days
             .iter()

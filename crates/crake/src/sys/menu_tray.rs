@@ -6,6 +6,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// A pixel's four bytes; the head's ink on a light bar.
+const ARGB: usize = 4;
+const DARK: [u8; 3] = [0x1f; 3];
+
 use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
@@ -136,15 +140,13 @@ fn drawn_at(icon: &Icon, size: u32) -> (u32, &[u8]) {
 /// bar, the white head drawn dark (the coloured marks as they are).
 fn rgba(size: u32, argb: &[u8], light: bool) -> Option<tray_icon::Icon> {
     let data = argb
-        .chunks(4)
-        .flat_map(|p| {
-            let grey = p[1] == p[2] && p[2] == p[3];
-            let [r, g, b] = if light && grey {
-                [0x1f; 3]
-            } else {
-                [p[1], p[2], p[3]]
-            };
-            [r, g, b, p[0]]
+        .as_chunks::<ARGB>()
+        .0
+        .iter()
+        .flat_map(|&[a, r, g, b]| {
+            let grey = r == g && g == b;
+            let [r, g, b] = if light && grey { DARK } else { [r, g, b] };
+            [r, g, b, a]
         })
         .collect();
     tray_icon::Icon::from_rgba(data, size, size).ok()

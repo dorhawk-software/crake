@@ -187,7 +187,7 @@ impl NewTunnel {
                             ("never".into(), "Never".into()),
                         ],
                         self.forget.clone(),
-                        Some(92.),
+                        Some(px(92.)),
                         t,
                         cx,
                         |this, v| this.forget = v,

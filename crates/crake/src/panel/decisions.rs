@@ -2,6 +2,9 @@
 
 use super::*;
 
+/// A new decision's row slides in over this many ms.
+const SLIDES_IN: u64 = 220;
+
 impl Panel {
     pub(super) fn decisions(
         &self,
@@ -32,7 +35,7 @@ impl Panel {
             let row = self.decision(i, d, t, cx);
             list = list.child(match arrived {
                 Some(at) => {
-                    let p = phase(at, 0, 220, window);
+                    let p = phase(at, 0, SLIDES_IN, window);
                     div()
                         .relative()
                         .top(px(-6. * (1. - p)))

@@ -23,6 +23,9 @@ mod widgets;
 #[cfg(all(test, target_os = "linux"))]
 mod tests;
 
+/// "Connected" shows this long before the window closes.
+const CONNECTED_SHOWN: Duration = Duration::from_millis(900);
+
 use self::explain::explain;
 use self::widgets::{Look, button, buttons, checkbox, link, lower_first, para, steps, title};
 
@@ -50,7 +53,7 @@ impl Stage {
             Stage::Reaching => 0,
             Stage::SigningIn | Stage::Asking(_) => 1,
             Stage::Connecting => 2,
-            Stage::Up => 3,
+            Stage::Up => 3, // literal: the fourth of the steps shown
             Stage::Failed { at, .. } => *at,
         }
     }
@@ -210,7 +213,7 @@ fn fit_window() -> impl IntoElement {
             // Measured inside the card's 1 px border: add it back.
             let want = gpui_kit::size(px(WIDTH), bounds.size.height + px(2.));
             let have = window.viewport_size();
-            if (f32::from(have.height) - f32::from(want.height)).abs() > 0.5 {
+            if (f32::from(have.height) - f32::from(want.height)).abs() > crate::windows::FIT_SLACK {
                 window.on_next_frame(move |window, _| window.resize(want));
             }
         },
@@ -277,9 +280,7 @@ impl SignIn {
                     Some("connected") => {
                         this.stage = Stage::Up;
                         cx.spawn(async move |this, cx| {
-                            cx.background_executor()
-                                .timer(Duration::from_millis(900))
-                                .await;
+                            cx.background_executor().timer(CONNECTED_SHOWN).await;
                             let _ = this.update(cx, |_, cx| cx.emit(Close));
                         })
                         .detach();

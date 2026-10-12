@@ -582,8 +582,8 @@ Any lint stops the build; fix it and build again, never silence it.
   0, 1, 2, and UI layout inside `px(..)`/`rgb(..)`/`rgba(..)` (it mirrors
   design/screens and DESIGN.md's tokens). It follows each crate's module
   tree from its roots, so `#[cfg(test)]` modules are left out. A crate
-  joins the list in lint.sh once it's clean (today crake-proto, craked
-  and the tool itself; crake next).
+  is in the list in lint.sh: every crate (crake-proto, craked, crake and
+  the tool itself) is clean.
 - `.claude/settings.json`: a PostToolUse hook runs `scripts/lint.sh` after
   every `cargo build` / `cargo test` from Claude Code and blocks on failure.
 - Coverage (`scripts/check-coverage.sh`, cargo-llvm-cov, about a minute):

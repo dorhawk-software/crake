@@ -155,7 +155,7 @@ impl NewTunnel {
                             ("file".into(), "A file\u{2026}".into()),
                         ],
                         self.cert_source.to_owned(),
-                        Some(320.),
+                        Some(px(320.)),
                         t,
                         cx,
                         |this, v| {

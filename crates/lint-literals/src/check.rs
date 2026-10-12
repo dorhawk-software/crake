@@ -119,8 +119,22 @@ impl Checker<'_> {
 
     /// A whole item kept with one reason above it (data copied from
     /// elsewhere: the design's drawings, demo data, a protocol's table).
+    /// The reason may stand above the item or anywhere among its attributes
+    /// and doc comments, up to the line it starts on.
     fn item_explained(&self, item: &impl syn::spanned::Spanned) -> bool {
-        self.reason_above(item.span().start().line)
+        let start = item.span().start().line;
+        let mut head = start;
+        while self.line(head).is_some_and(|l| {
+            let l = l.trim_start();
+            l.starts_with("#[") || l.starts_with("//")
+        }) {
+            head += 1;
+        }
+        (start.saturating_sub(1)..head).any(|line| {
+            self.line(line)
+                .is_some_and(|l| l.trim_start().starts_with(MARKER))
+                && self.reason_on(line)
+        })
     }
 
     /// A macro that isn't a list of expressions (`vec![0; 512]`, `json!`):
@@ -378,6 +392,8 @@ mod tests {
         assert_eq!(hits(art), NONE);
         let attrs = "// literal: the design's drawing\n/// Doc.\n#[inline]\nfn art() { g(14.) }";
         assert_eq!(hits(attrs), NONE, "above its doc and attributes");
+        let among = "/// Doc.\n// literal: the design's drawing\n#[inline]\nfn art() { g(14.) }";
+        assert_eq!(hits(among), NONE, "among its doc and attributes");
         assert_eq!(
             hits("// literal:\nfn f() { g(14.) }"),
             ["14."],

@@ -3,6 +3,7 @@
 
 use super::*;
 
+// literal: the design's sample data (design/screens), for CRAKE_DEMO
 /// The design's sample (design/screens/tray-panel.html), for `CRAKE_DEMO=1`:
 /// a panel to compare with the screen, with no craked needed.
 pub fn demo() -> Model {
@@ -32,10 +33,10 @@ pub fn demo() -> Model {
     };
     // Steady traffic with two busier stretches, like the design's.
     let minute = now.as_second() as u64 / 60;
-    let mut seed = 5u64;
+    let mut walk = Walk(5);
     let traffic = (0..=60u64)
         .map(|i| {
-            seed = (seed * 9301 + 49297) % 233_280;
+            let seed = walk.next();
             let busy = (8..22).contains(&i) || (40..52).contains(&i);
             let bytes = 200_000 + seed * if busy { 40 } else { 8 };
             (minute - 60 + i, bytes)
@@ -179,6 +180,7 @@ pub fn demo() -> Model {
     }
 }
 
+// literal: the design's sample data (design/screens), for CRAKE_DEMO
 /// Tunnel detail's sample (design/screens/tunnel-detail.html), for
 /// `CRAKE_DEMO=1 CRAKE_SHOW=detail:acme`: ACME connected for 4 h 53 min,
 /// its five learned hosts (wiki pinned), its DNS and pushed network, and
@@ -224,10 +226,10 @@ pub fn demo_detail() -> Model {
     );
     // Busy since about 4 h 54 min ago, as the design's 8:30 to 13:24.
     let minute = now / 60;
-    let mut seed = 9u64;
+    let mut walk = Walk(9);
     let traffic = (0..=294u64)
         .map(|i| {
-            seed = (seed * 9301 + 49297) % 233_280;
+            let seed = walk.next();
             (minute - 294 + i, 50_000 + seed * 40)
         })
         .collect();
@@ -251,6 +253,7 @@ pub fn demo_detail() -> Model {
     m
 }
 
+// literal: the design's sample data (design/screens), for CRAKE_DEMO
 /// The log design's sample (design/screens/log.html), for `CRAKE_DEMO=log`:
 /// the same rows at the same times today and yesterday, and a day of
 /// traffic that gets busy at 8:18, as in its chart.
@@ -258,6 +261,7 @@ pub fn demo_log() -> Model {
     log_until(jiff::Timestamp::now())
 }
 
+// literal: the design's sample data (design/screens), for CRAKE_DEMO
 /// The whole of today's sample, later entries too: what tests use, so they
 /// don't depend on the time of day.
 #[cfg(test)]
@@ -265,6 +269,7 @@ pub fn demo_log_whole_day() -> Model {
     log_until(jiff::Timestamp::MAX)
 }
 
+// literal: the design's sample data (design/screens), for CRAKE_DEMO
 /// The sample as it stands at `until`: entries after it haven't happened.
 fn log_until(until: jiff::Timestamp) -> Model {
     use LogKind::*;
@@ -409,12 +414,12 @@ fn log_until(until: jiff::Timestamp) -> Model {
         .map(|z| z.timestamp().as_second() as u64 / 60)
         .unwrap_or(0);
     let now = jiff::Timestamp::now().as_second() as u64 / 60;
-    let mut seed = 3u64;
+    let mut walk = Walk(3);
     m.days = (0..)
         .map(|i| midnight + i)
         .take_while(|slot| *slot <= now)
         .map(|slot| {
-            seed = (seed * 9301 + 49297) % 233_280;
+            let seed = walk.next();
             let hour = (slot - midnight) as f32 / 60.;
             let busy = hour > 8.3;
             let bytes = if busy {
@@ -428,4 +433,19 @@ fn log_until(until: jiff::Timestamp) -> Model {
         })
         .collect();
     m
+}
+
+/// A small random walk for the demo's charts, the same every run: a linear
+/// congruential generator with Numerical Recipes' short constants.
+struct Walk(u64);
+
+impl Walk {
+    const MULTIPLIER: u64 = 9301;
+    const INCREMENT: u64 = 49297;
+    const MODULUS: u64 = 233_280;
+
+    fn next(&mut self) -> u64 {
+        self.0 = (self.0 * Self::MULTIPLIER + Self::INCREMENT) % Self::MODULUS;
+        self.0
+    }
 }

@@ -2,6 +2,22 @@
 
 use super::*;
 
+use crate::units::{HOURS_PER_DAY, MINUTES_PER_HOUR, minutes_today as now_minutes};
+
+/// Within half a minute of now (or of the whole day) counts as "now".
+const NOW_SLACK: f32 = 0.5;
+/// The chart's width until it's been measured.
+const MIN_WIDTH: f32 = 900.;
+/// Round times to label the axis with, in minutes: 6 h down to 1 min.
+const LABEL_STEPS: [f32; 8] = [360., 120., 60., 30., 15., 10., 5., 1.];
+/// A wheel step narrows or widens the shown span by this much.
+const ZOOM_IN: f32 = 0.8;
+const ZOOM_OUT: f32 = 1.25;
+/// Bar sizes to choose from, in minutes, finest first; bars stay at least
+/// BAR_SPACING pixels apart.
+const BIN_SIZES: [f32; 6] = [1., 2., 5., 10., 15., 30.];
+const BAR_SPACING: f32 = 6.;
+
 impl Log {
     /// The minutes shown: (from, to) since midnight; the whole day when not zoomed.
     pub(super) fn span(&self) -> (f32, f32) {
@@ -14,7 +30,7 @@ impl Log {
         let (a, b) = self.span();
         let span = ((b - a) * factor).clamp(MIN_SPAN.min(now), now);
         let from = (at - (at - a) * span / (b - a)).clamp(0., (now - span).max(0.));
-        self.view = if span >= now - 0.5 {
+        self.view = if span >= now - NOW_SLACK {
             None
         } else {
             Some((from, from + span))
@@ -47,7 +63,7 @@ impl Log {
             )
             .child(div().flex_1());
         if self.view.is_some() {
-            let bin = bin_minutes(b - a, self.chart_geometry.get().1.max(900.));
+            let bin = bin_minutes(b - a, self.chart_geometry.get().1.max(MIN_WIDTH));
             let bars = if bin as i32 == 1 {
                 "1-minute bars".to_owned()
             } else {
@@ -62,7 +78,7 @@ impl Log {
                         .child(format!("{}\u{2013}{} \u{b7} {bars}", hm(a), hm(b))),
                 )
                 .child(
-                    outline_button("whole-day", "Whole day", 30., t)
+                    outline_button("whole-day", "Whole day", px(30.), t)
                         .px(px(10.))
                         .text_size(px(13.))
                         .on_click(cx.listener(|this, _, _, cx| {
@@ -86,7 +102,7 @@ impl Log {
     ) -> impl IntoElement {
         let (a, b) = self.span();
         let span = (b - a).max(1.);
-        let width = self.chart_geometry.get().1.max(900.);
+        let width = self.chart_geometry.get().1.max(MIN_WIDTH);
         let x_frac = |m: f32| (m - a) / span;
         let bin = bin_minutes(span, width);
 
@@ -137,7 +153,7 @@ impl Log {
         // Under the chart: round times, or one line about what's pointed at.
         let now = now_minutes();
         let label = |m: f32| {
-            if (m - now).abs() < 0.5 {
+            if (m - now).abs() < NOW_SLACK {
                 "now".to_owned()
             } else {
                 hm(m)
@@ -159,7 +175,7 @@ impl Log {
                         .child(text.clone()),
                 ),
             None => {
-                let step = [360., 120., 60., 30., 15., 10., 5., 1.]
+                let step = LABEL_STEPS
                     .into_iter()
                     .find(|s| span / s >= 2.)
                     .unwrap_or(1.);
@@ -194,7 +210,7 @@ impl Log {
                     .cursor_grab()
                     .on_scroll_wheel(cx.listener(|this, e: &gpui_kit::ScrollWheelEvent, _, cx| {
                         let (left, width) = this.chart_geometry.get();
-                        if width <= 4. {
+                        if width <= 2. * crate::chart::INSET {
                             return;
                         }
                         let dy = f32::from(e.delta.pixel_delta(px(20.)).y);
@@ -204,7 +220,7 @@ impl Log {
                         let (a, b) = this.span();
                         let at =
                             a + (b - a) * ((f32::from(e.position.x) - left) / width).clamp(0., 1.);
-                        this.zoom(at, if dy > 0. { 0.8 } else { 1.25 });
+                        this.zoom(at, if dy > 0. { ZOOM_IN } else { ZOOM_OUT });
                         cx.stop_propagation();
                         cx.notify();
                     }))
@@ -227,7 +243,7 @@ impl Log {
                     )
                     .on_mouse_move(cx.listener(|this, e: &gpui_kit::MouseMoveEvent, _, cx| {
                         let (left, width) = this.chart_geometry.get();
-                        if width <= 4. {
+                        if width <= 2. * crate::chart::INSET {
                             return;
                         }
                         let x = f32::from(e.position.x);
@@ -280,26 +296,23 @@ impl Log {
     }
 }
 
-/// Minutes since local midnight, now.
-pub(super) fn now_minutes() -> f32 {
-    let now = jiff::Zoned::now();
-    (now.hour() as f32 * 60. + now.minute() as f32 + now.second() as f32 / 60.).max(1.)
-}
-
 /// "09:14".
 pub(super) fn hm(minutes: f32) -> String {
     let m = minutes.max(0.).round() as u32;
-    format!("{:02}:{:02}", (m / 60).min(23), m % 60)
+    let per_hour = MINUTES_PER_HOUR as u32;
+    let last_hour = HOURS_PER_DAY as u32 - 1;
+    format!("{:02}:{:02}", (m / per_hour).min(last_hour), m % per_hour)
 }
 
 /// The finest bar size that keeps bars about 6 px apart.
 pub(super) fn bin_minutes(span: f32, width: f32) -> f32 {
-    [1., 2., 5., 10., 15., 30.]
+    BIN_SIZES
         .into_iter()
-        .find(|n| n / span * width >= 6.)
-        .unwrap_or(30.)
+        .find(|n| n / span * width >= BAR_SPACING)
+        .unwrap_or(BIN_SIZES[BIN_SIZES.len() - 1])
 }
 
+// literal: the chart's drawing (DESIGN.md, Charts; design/screens/log.html)
 pub(super) fn ring(
     cx: f32,
     cy: f32,
@@ -335,6 +348,7 @@ struct DayPaint {
     grey: gpui_kit::Rgba,
 }
 
+// literal: the chart's drawing (DESIGN.md, Charts; design/screens/log.html)
 /// Draw the day chart into `bounds`.
 fn paint_day(bounds: gpui_kit::Bounds<gpui_kit::Pixels>, window: &mut Window, p: &DayPaint) {
     let DayPaint {
@@ -438,6 +452,7 @@ fn day_bins(model: &Model, a: f32, b: f32, bin: f32) -> Vec<(f32, u64)> {
     bins
 }
 
+// literal: the chart's drawing (DESIGN.md, Charts; design/screens/log.html)
 /// Today's decisions between minutes `a` and `b`: marks less than 8 px apart
 /// share one, with its entries (minute, routed, entries).
 fn day_marks(
@@ -473,6 +488,7 @@ struct Scale {
     max: f32,
 }
 
+// literal: the chart's drawing (DESIGN.md, Charts; design/screens/log.html)
 /// What the pointer at minute `h` is on: a mark close by, else that bin.
 /// (minute, the bin's start, time label, sentence, where the hairline stops)
 fn pointed_at(

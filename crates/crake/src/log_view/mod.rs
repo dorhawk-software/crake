@@ -104,7 +104,7 @@ impl Render for Log {
             if i + 1 == count && more && !self.earlier_days {
                 body = body.child(
                     div().px(px(20.)).child(
-                        outline_button("earlier", "Show earlier days", 38., &t)
+                        outline_button("earlier", "Show earlier days", px(38.), &t)
                             .mt(px(8.))
                             .px(px(14.))
                             .on_click(cx.listener(|this, _, _, cx| {
@@ -165,13 +165,18 @@ fn kept_for(days: &str) -> String {
     }
 }
 
-fn outline_button(id: &'static str, label: &'static str, height: f32, t: &Theme) -> Stateful<Div> {
+fn outline_button(
+    id: &'static str,
+    label: &'static str,
+    height: Pixels,
+    t: &Theme,
+) -> Stateful<Div> {
     div()
         .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
             cx.stop_propagation()
         })
         .id(id)
-        .h(px(height))
+        .h(height)
         .flex()
         .items_center()
         .justify_center()
@@ -327,7 +332,7 @@ impl Log {
                     } else {
                         "Copy for helpdesk"
                     },
-                    36.,
+                    px(36.),
                     t,
                 )
                 .px(px(12.))
@@ -335,7 +340,7 @@ impl Log {
                 .test_support(),
             )
             .child(
-                outline_button("export", "Export\u{2026}", 36., t)
+                outline_button("export", "Export\u{2026}", px(36.), t)
                     .px(px(12.))
                     .on_click(cx.listener(|this, _, _, cx| this.export(cx))),
             )
@@ -370,7 +375,7 @@ impl Log {
         let chosen = Show::ALL.iter().position(|s| *s == self.show);
         for (i, show) in Show::ALL.into_iter().enumerate() {
             kinds = kinds.child(
-                crate::controls::segment(("show", i), i, Show::ALL.len(), chosen, 38., t)
+                crate::controls::segment(("show", i), i, Show::ALL.len(), chosen, px(38.), t)
                     .px(px(12.))
                     .font_weight(FontWeight::SEMIBOLD)
                     .child(show.label())

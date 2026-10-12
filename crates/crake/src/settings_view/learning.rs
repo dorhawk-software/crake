@@ -19,7 +19,7 @@ impl Settings {
         let mut waits = div().flex().mt(px(10.));
         for (i, n) in values.into_iter().enumerate() {
             waits = waits.child(
-                crate::controls::segment(("wait", i), i, values.len(), chosen, 36., t)
+                crate::controls::segment(("wait", i), i, values.len(), chosen, px(36.), t)
                     .min_w(px(56.))
                     .px(px(12.))
                     .font_family(fonts::MONO)
@@ -35,7 +35,7 @@ impl Settings {
         let both = select(
             self,
             "both",
-            170.,
+            px(170.),
             &[
                 ("ask", "Ask me"),
                 ("faster", "Use the faster one"),
@@ -49,7 +49,7 @@ impl Settings {
         let forget = select(
             self,
             "forget",
-            92.,
+            px(92.),
             &[
                 ("1", "1 day"),
                 ("7", "7 days"),

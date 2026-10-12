@@ -33,7 +33,7 @@ pub(super) fn steps(at: usize, failed: Option<(usize, String)>, spec: &Spec, t: 
             .text_size(px(13.))
             .child(spec.gateway.clone())
     };
-    let rows: [(Div, Div); 3] = [
+    let rows = [
         (
             div().flex().gap(px(4.)).child("Reached").child(gateway()),
             div().flex().gap(px(4.)).child("Reaching").child(gateway()),

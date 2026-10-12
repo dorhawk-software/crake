@@ -3,6 +3,10 @@
 
 use std::path::{Path, PathBuf};
 
+/// Windows' 100 %: 96 dots an inch; its small icon at that scale.
+const BASE_DPI: u32 = 96;
+const SMALL_ICON: u32 = 16;
+
 use windows_sys::Win32::Foundation::{LPARAM, RECT};
 use windows_sys::Win32::Graphics::Gdi::{
     EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO,
@@ -45,7 +49,7 @@ unsafe extern "system" fn each_monitor(
         // SAFETY: a plain C struct, all zero is valid.
         ..unsafe { std::mem::zeroed() }
     };
-    let (mut dpi, mut _y) = (96, 96);
+    let (mut dpi, mut _y) = (BASE_DPI, BASE_DPI);
     // SAFETY: `monitor` comes from Windows for this call; `info` is sized.
     unsafe {
         if GetMonitorInfoW(monitor, &raw mut info) == 0 {
@@ -53,7 +57,7 @@ unsafe extern "system" fn each_monitor(
         }
         GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &raw mut dpi, &raw mut _y);
     }
-    let scale = dpi.max(1) as f32 / 96.;
+    let scale = dpi.max(1) as f32 / BASE_DPI as f32;
     let r = info.rcMonitor;
     found.push((
         info.dwFlags & MONITORINFOF_PRIMARY != 0,
@@ -179,7 +183,7 @@ fn listening_pid(address: std::net::SocketAddrV4) -> Option<u32> {
             0,
         );
     }
-    let mut buf = vec![0u64; (size as usize).div_ceil(8)];
+    let mut buf = vec![0u64; (size as usize).div_ceil(size_of::<u64>())];
     // SAFETY: `buf` holds `size` bytes, 8-byte aligned.
     let got = unsafe {
         GetExtendedTcpTable(
@@ -251,13 +255,13 @@ pub fn logical(x: f64, y: f64) -> (i32, i32) {
         x: x as i32,
         y: y as i32,
     };
-    let (mut dpi, mut _y) = (96, 96);
+    let (mut dpi, mut _y) = (BASE_DPI, BASE_DPI);
     // SAFETY: a monitor handle from Windows, out pointers for the call.
     unsafe {
         let monitor = MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST);
         GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &raw mut dpi, &raw mut _y);
     }
-    let scale = f64::from(dpi.max(1)) / 96.;
+    let scale = f64::from(dpi.max(1)) / f64::from(BASE_DPI);
     ((x / scale) as i32, (y / scale) as i32)
 }
 
@@ -294,5 +298,8 @@ pub fn tray_icon_size() -> u32 {
     use windows_sys::Win32::UI::WindowsAndMessaging::SM_CXSMICON;
     // SAFETY: plain queries.
     let size = unsafe { GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForSystem()) };
-    u32::try_from(size).ok().filter(|s| *s > 0).unwrap_or(16)
+    u32::try_from(size)
+        .ok()
+        .filter(|s| *s > 0)
+        .unwrap_or(SMALL_ICON)
 }

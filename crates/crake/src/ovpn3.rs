@@ -10,6 +10,12 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
+/// OpenVPN 3's backend may still be starting: tried every READY_POLL, up
+/// to 10 s. A session missing from GONE_AFTER looks in a row is gone.
+const READY_ATTEMPTS: u32 = 50;
+const READY_POLL: Duration = Duration::from_millis(200);
+const GONE_AFTER: u32 = 3;
+
 use futures_util::StreamExt;
 use zbus::Connection;
 use zbus::zvariant::{OwnedObjectPath, OwnedValue};
@@ -213,11 +219,11 @@ async fn run(
                 Err(e) => {
                     // The backend may still be starting.
                     attempts += 1;
-                    if attempts > 50 {
+                    if attempts > READY_ATTEMPTS {
                         disconnect(&conn, &path).await;
                         return Err(format!("OpenVPN 3 wasn\u{2019}t ready: {e}"));
                     }
-                    tokio::time::sleep(Duration::from_millis(200)).await;
+                    tokio::time::sleep(READY_POLL).await;
                 }
             }
         }
@@ -254,7 +260,7 @@ async fn run(
         }
         let Some((minor, text)) = status(&conn, &path).await else {
             unseen += 1;
-            if unseen >= 3 {
+            if unseen >= GONE_AFTER {
                 return Err("The OpenVPN 3 session is gone.".into());
             }
             continue;
@@ -461,7 +467,7 @@ async fn follow(
         let ended = match status(conn, path).await {
             None => {
                 unseen += 1;
-                (unseen >= 3).then(|| Some("The OpenVPN 3 session is gone.".to_owned()))
+                (unseen >= GONE_AFTER).then(|| Some("The OpenVPN 3 session is gone.".to_owned()))
             }
             Some((minor, text)) => {
                 unseen = 0;

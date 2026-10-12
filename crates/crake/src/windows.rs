@@ -3,11 +3,24 @@
 
 use super::*;
 
+/// A window refits to its content only when it's off by more than this
+/// (half a pixel: rounding is not a change).
+pub const FIT_SLACK: f32 = 0.5;
+/// A click on the tray right after the panel lost focus is the click that
+/// closed it.
+const BLURRED_JUST_NOW: Duration = Duration::from_millis(500);
+/// Windows' first heights (they then fit their content): tunnel detail,
+/// sign-in, the log (and the tallest it opens).
+const DETAIL_HEIGHT: f32 = 900.;
+const SIGNIN_HEIGHT: f32 = 360.;
+const LOG_HEIGHT: f32 = 860.;
+const LOG_TALLEST: f32 = 900.;
+
 pub(super) fn blurred_just_now(cx: &mut App) -> bool {
     let shell = cx.global_mut::<Shell>();
     let recent = shell
         .panel_blurred
-        .is_some_and(|at| at.elapsed() < Duration::from_millis(500));
+        .is_some_and(|at| at.elapsed() < BLURRED_JUST_NOW);
     shell.panel_blurred = None;
     recent
 }
@@ -238,7 +251,7 @@ pub(super) fn open_detail(tunnel: String, cx: &mut App) {
     let (model, requests) = (shell.model.clone(), shell.requests.clone());
     // Opened tall, then it fits its content (a window can shrink at once;
     // growing past the screen is refused).
-    let height = place::monitors().first().map_or(900., |m| m.h - 120.);
+    let height = place::max_window_height_or(DETAIL_HEIGHT);
     let bounds = centered(tunnel_detail::WIDTH, height, cx);
     let name = tunnel.clone();
     let opened = cx.open_window(
@@ -295,9 +308,7 @@ pub(super) fn open_new_tunnel(editing: Option<String>, cx: &mut App) {
     });
     // Opened tall, then it shrinks to each step (the desktop may refuse to
     // grow a window past the screen's edge; shrinking always works).
-    let height = place::monitors()
-        .first()
-        .map_or(new_tunnel::HEIGHT, |m| m.h - 120.);
+    let height = place::max_window_height_or(new_tunnel::HEIGHT);
     let bounds = centered(new_tunnel::WIDTH, height, cx);
     let opened = cx.open_window(
         WindowOptions {
@@ -354,7 +365,7 @@ pub(super) fn open_sign_in(tunnel: client::Tunnel, cx: &mut App) {
         keyring: !shell.demo,
         openconnect: None,
     };
-    let bounds = centered(signin_view::WIDTH, 360., cx);
+    let bounds = centered(signin_view::WIDTH, SIGNIN_HEIGHT, cx);
     // A plain transparent window: the card draws its own rounded frame, as
     // in sign-in.html (gpui-kit's frame is square). A pop-up, because it
     // answers the user's own click: in front and above.
@@ -412,9 +423,7 @@ pub(super) fn open_log(cx: &mut App) {
         return;
     }
     let model = cx.global::<Shell>().model.clone();
-    let height = place::monitors()
-        .first()
-        .map_or(860., |m| (m.h - 120.).min(900.));
+    let height = place::max_window_height_or(LOG_HEIGHT).min(LOG_TALLEST);
     let bounds = centered(log_view::WIDTH, height, cx);
     // A plain transparent window: the card draws its own 12 px frame, as in
     // log.html. A normal window (it stays, in the taskbar), not a pop-up.

@@ -85,8 +85,8 @@ impl Render for NewTunnel {
             _ => self.routing(&t, cx).into_any_element(),
         };
         let next_label = match (self.step, &self.editing) {
-            (3, Some(_)) => "Save",
-            (3, None) => "Add and connect",
+            (LAST_STEP, Some(_)) => "Save",
+            (LAST_STEP, None) => "Add and connect",
             _ => "Continue",
         };
         let max_height = self.max_height;
@@ -96,7 +96,9 @@ impl Render for NewTunnel {
                 // Measured inside the card's 1 px border: add it back, or
                 // each resize comes out 2 px short.
                 let want = (f32::from(bounds.size.height) + 2.).min(max_height);
-                if (f32::from(window.viewport_size().height) - want).abs() > 0.5 {
+                if (f32::from(window.viewport_size().height) - want).abs()
+                    > crate::windows::FIT_SLACK
+                {
                     window.on_next_frame(move |window, _| {
                         window.resize(gpui_kit::size(px(WIDTH), px(want)));
                     });
