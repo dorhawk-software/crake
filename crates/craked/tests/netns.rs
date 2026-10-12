@@ -184,6 +184,11 @@ async fn routes_only_what_it_is_told() {
     assert!(goes_through_tunnel("10.33.1.3"));
     assert!(!sh("nft list set inet crake learned_acme").contains("10.33.1.3"));
 
+    // A host pinned inside a pinned network (nft's interval sets refuse
+    // overlaps: it once failed this pin and every later connect).
+    mgr.pin("acme", "10.40.5.5").await.unwrap();
+    assert!(goes_through_tunnel("10.40.5.5"));
+
     // Never the gateway itself.
     let err = mgr.pin("acme", "192.0.2.0/24").await.unwrap_err();
     assert!(err.to_string().contains("gateway"), "{err}");
@@ -210,6 +215,10 @@ async fn routes_only_what_it_is_told() {
     assert!(goes_through_tunnel("10.40.7.7"));
     assert!(goes_through_tunnel("10.33.1.3"));
     assert!(!goes_through_tunnel("10.33.1.1"));
+    // The network unpinned: the host pinned inside it stays.
+    mgr.unpin("acme", "10.40.0.0/16").await.unwrap();
+    assert!(!goes_through_tunnel("10.40.7.7"));
+    assert!(goes_through_tunnel("10.40.5.5"));
     mgr.shutdown().await;
     // Off is gone: nothing of Crake's is left in the network setup.
     assert!(
@@ -237,7 +246,8 @@ async fn routes_only_what_it_is_told() {
         "Pinned 10.40.0.0/16 to ACME.",
         "Sent 10.33.1.1 through ACME.",
         "Stopped sending 10.33.1.1 through ACME.",
-        "ACME is up. Sending 2 known destinations through it.",
+        "Unpinned 10.40.0.0/16 from ACME.",
+        "ACME is up. Sending 3 known destinations through it.",
     ] {
         assert!(log.contains(want), "missing {want:?} in\n{log}");
     }

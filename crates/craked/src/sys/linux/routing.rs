@@ -40,19 +40,12 @@ fn pinned6_set(name: &str) -> String {
     format!("pinned6_{name}")
 }
 
-/// The learned/pinned set for `addr`'s family.
+/// The learned set for `addr`'s family.
 fn learned_set_for(name: &str, addr: IpAddr) -> String {
     if addr.is_ipv6() {
         learned6_set(name)
     } else {
         learned_set(name)
-    }
-}
-fn pinned_set_for(name: &str, t: Target) -> String {
-    if t.is_ipv6() {
-        pinned6_set(name)
-    } else {
-        pinned_set(name)
     }
 }
 
@@ -173,6 +166,7 @@ pub fn up_script(plan: &Plan) -> String {
         }
     };
     // Each family goes in its own set (nftables sets hold one family each).
+    let pinned = crate::plan::outermost(pinned);
     let pins = |v6: bool| -> Vec<String> {
         pinned
             .iter()
@@ -191,6 +185,30 @@ pub fn up_script(plan: &Plan) -> String {
     };
     elems(&ls, learns(false), &mut s);
     elems(&ls6, learns(true), &mut s);
+    s
+}
+
+/// A tunnel's pinned sets, rewritten in one transaction: emptied, then
+/// filled with the pins no other pin covers (nft refuses overlapping
+/// intervals, and a host pinned inside a pinned network would otherwise
+/// fail the pin, and every later connect).
+fn pinned_script(name: &str, pins: &[Target]) -> String {
+    let (ps, ps6) = (pinned_set(name), pinned6_set(name));
+    let mut s = format!("flush set inet {TABLE} {ps}\nflush set inet {TABLE} {ps6}\n");
+    let pins = crate::plan::outermost(pins);
+    for (set, v6) in [(&ps, false), (&ps6, true)] {
+        let items: Vec<String> = pins
+            .iter()
+            .filter(|t| t.is_ipv6() == v6)
+            .map(Target::to_string)
+            .collect();
+        if !items.is_empty() {
+            s += &format!(
+                "add element inet {TABLE} {set} {{ {} }}\n",
+                items.join(", ")
+            );
+        }
+    }
     s
 }
 
@@ -484,22 +502,17 @@ impl Routing {
         nft(&format!("add element inet {TABLE} {ls} {{ {addr} }}\ndelete element inet {TABLE} {ls} {{ {addr} }}\n")).await
     }
 
-    pub async fn add_pinned(&self, name: &str, t: Target) -> Result<()> {
+    /// `t` was pinned; `pins` are all the tunnel's pins now. The pinned
+    /// sets are rewritten whole (`pinned_script`).
+    pub async fn add_pinned(&self, name: &str, _t: Target, pins: &[Target]) -> Result<()> {
         let Self::Real = self else { return Ok(()) };
-        nft(&format!(
-            "add element inet {TABLE} {} {{ {t} }}\n",
-            pinned_set_for(name, t)
-        ))
-        .await
+        nft(&pinned_script(name, pins)).await
     }
 
-    pub async fn remove_pinned(&self, name: &str, t: Target) -> Result<()> {
+    /// `t` was unpinned; `pins` are all the tunnel's pins now.
+    pub async fn remove_pinned(&self, name: &str, _t: Target, pins: &[Target]) -> Result<()> {
         let Self::Real = self else { return Ok(()) };
-        let ps = pinned_set_for(name, t);
-        nft(&format!(
-            "add element inet {TABLE} {ps} {{ {t} }}\ndelete element inet {TABLE} {ps} {{ {t} }}\n"
-        ))
-        .await
+        nft(&pinned_script(name, pins)).await
     }
 
     /// Learned hosts as the kernel sees them: address and seconds until expiry.

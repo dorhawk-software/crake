@@ -69,6 +69,11 @@ impl Target {
         host_bits(ip) & self.mask() == host_bits(self.addr)
     }
 
+    /// `other` lies wholly inside this one (the same, or narrower).
+    pub fn covers_target(self, other: Target) -> bool {
+        self.len <= other.len && self.contains(other.addr)
+    }
+
     /// Refuse what would break the machine or can't be meant: loopback,
     /// multicast, link-local, and anything far too wide (wider than a /8 for
     /// IPv4, /16 for IPv6).

@@ -173,11 +173,12 @@ impl Routing {
         self.remove(name, Target::host(addr)).await
     }
 
-    pub async fn add_pinned(&self, name: &str, t: Target) -> Result<()> {
+    /// Routes may overlap here, so only `t` changes (`pins`: all of them).
+    pub async fn add_pinned(&self, name: &str, t: Target, _pins: &[Target]) -> Result<()> {
         self.add(name, t).await
     }
 
-    pub async fn remove_pinned(&self, name: &str, t: Target) -> Result<()> {
+    pub async fn remove_pinned(&self, name: &str, t: Target, _pins: &[Target]) -> Result<()> {
         self.remove(name, t).await
     }
 

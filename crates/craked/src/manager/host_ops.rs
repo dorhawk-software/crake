@@ -327,7 +327,7 @@ impl Manager {
             was
         };
         if self.is_routed(name) {
-            self.routing.add_pinned(name, t).await?;
+            self.routing.add_pinned(name, t, &self.pins(name)).await?;
             if was_learned {
                 self.routing.remove_learned(name, t.addr()).await?;
             }
@@ -340,6 +340,20 @@ impl Manager {
             "It stays until you unpin it.".into(),
         );
         Ok(msg)
+    }
+
+    /// The tunnel's pins that are routed (`apply_routing` leaves out those
+    /// that would cover its gateway).
+    fn pins(&self, name: &str) -> Vec<Target> {
+        let label = self.label(name);
+        let mut store = self.hosts.lock().unwrap();
+        let t = store.tunnel(name);
+        let gw = t.gateway;
+        t.pinned
+            .iter()
+            .copied()
+            .filter(|x| guard(&label, *x, gw, self.routing.routes_ipv6()).is_ok())
+            .collect()
     }
 
     /// Unpin. A host goes back to being learned (and expires); a network goes direct.
@@ -365,7 +379,9 @@ impl Manager {
                     .add_learned(name, t.addr(), self.timeout_for(name))
                     .await?;
             }
-            self.routing.remove_pinned(name, t).await?;
+            self.routing
+                .remove_pinned(name, t, &self.pins(name))
+                .await?;
         }
         let msg = format!("Unpinned {t} from {label}.");
         let reason = if t.is_host() {
@@ -399,7 +415,9 @@ impl Manager {
         }
         if self.is_routed(name) {
             if was_pinned {
-                self.routing.remove_pinned(name, t).await?;
+                self.routing
+                    .remove_pinned(name, t, &self.pins(name))
+                    .await?;
             }
             if was_learned {
                 self.routing.remove_learned(name, t.addr()).await?;
