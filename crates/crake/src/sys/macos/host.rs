@@ -55,3 +55,8 @@ pub fn light_bar() -> bool {
             !String::from_utf8_lossy(&o.stdout).contains("Dark")
         })
 }
+
+/// The menu bar's icon size in pixels: 18 points, on a Retina screen.
+pub fn tray_icon_size() -> u32 {
+    36
+}

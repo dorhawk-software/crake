@@ -9,7 +9,7 @@ use std::rc::Rc;
 use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
-use super::{light_bar, logical};
+use super::{light_bar, logical, tray_icon_size};
 use crate::Request;
 use crate::tray::{Icon, MenuTunnel, State};
 
@@ -39,9 +39,11 @@ impl Handle {
 
 impl Shown {
     fn show(&mut self) {
+        // Drawn at the size the bar shows it: shrunk by the system, the
+        // head looked choppy.
         let icon = self.state.icon();
-        let icon = if light_bar() { on_light(&icon) } else { icon };
-        if let Some(icon) = rgba(&icon) {
+        let (size, data) = drawn_at(&icon, tray_icon_size());
+        if let Some(icon) = rgba(size, data, light_bar()) {
             let _ = self.tray.set_icon(Some(icon));
         }
         let _ = self.tray.set_tooltip(Some(&self.state.summary));
@@ -120,24 +122,30 @@ pub fn start(requests: async_channel::Sender<Request>) -> Option<Handle> {
     Some(Handle(Rc::new(RefCell::new(shown))))
 }
 
-/// The image for a light bar: the white head drawn dark, the coloured
-/// marks as they are.
-fn on_light(icon: &Icon) -> Icon {
-    let mut data = icon.data.clone();
-    for p in data.chunks_mut(4) {
-        if p[1] == p[2] && p[2] == p[3] {
-            p[1..].fill(0x1f);
-        }
-    }
-    Icon { data, ..*icon }
+/// The drawing for a `size` px slot: that size if there is one, else the
+/// smallest larger one (shrunk a little by the system), else the largest.
+fn drawn_at(icon: &Icon, size: u32) -> (u32, &[u8]) {
+    icon.small
+        .iter()
+        .filter(|(s, _)| *s >= size)
+        .min_by_key(|(s, _)| *s)
+        .map_or((icon.width, &icon.data), |(s, d)| (*s, d))
 }
 
-/// ARGB (the tray art's order) as the RGBA tray-icon takes.
-fn rgba(icon: &Icon) -> Option<tray_icon::Icon> {
-    let data = icon
-        .data
+/// ARGB (the tray art's order) as the RGBA tray-icon takes; for a light
+/// bar, the white head drawn dark (the coloured marks as they are).
+fn rgba(size: u32, argb: &[u8], light: bool) -> Option<tray_icon::Icon> {
+    let data = argb
         .chunks(4)
-        .flat_map(|p| [p[1], p[2], p[3], p[0]])
+        .flat_map(|p| {
+            let grey = p[1] == p[2] && p[2] == p[3];
+            let [r, g, b] = if light && grey {
+                [0x1f; 3]
+            } else {
+                [p[1], p[2], p[3]]
+            };
+            [r, g, b, p[0]]
+        })
         .collect();
-    tray_icon::Icon::from_rgba(data, icon.width, icon.height).ok()
+    tray_icon::Icon::from_rgba(data, size, size).ok()
 }

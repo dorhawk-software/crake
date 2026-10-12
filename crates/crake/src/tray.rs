@@ -62,16 +62,24 @@ impl State {
 }
 
 /// An image for the tray: `SIZE` px square, ARGB (StatusNotifierItem's
-/// order), drawn white for a dark bar.
+/// order), drawn white for a dark bar; and the same drawn at each size a
+/// tray shows icons at (`SMALL`), so no tray has to shrink it (a shrunk
+/// 64 px head looked choppy on Windows and soft on GNOME).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Icon {
     pub width: u32,
     pub height: u32,
     pub data: Vec<u8>,
+    /// (size, ARGB) at each of `SMALL`.
+    pub small: Vec<(u32, Vec<u8>)>,
 }
 
-/// The image size sent to the tray; the desktop scales it into its slot.
+/// The largest image sent to the tray.
 const SIZE: u32 = 64;
+/// The sizes trays show icons at: 16 to 24 px (1x and 1.25x and 1.5x
+/// notification areas, GNOME's and KDE's bars), 32 to 48 (2x and more),
+/// 36 (macOS' menu bar on a Retina screen).
+const SMALL: [u32; 9] = [16, 20, 22, 24, 28, 32, 36, 40, 48];
 
 static ICONS: LazyLock<[Icon; 5]> = LazyLock::new(|| {
     // The head alone, solid with the eye cut out: it holds its own next to app
@@ -126,28 +134,34 @@ fn draw(svg: &str) -> Icon {
     render(&svg)
 }
 
-/// An SVG as the tray's 64 px ARGB image.
+/// An SVG as the tray's ARGB images: 64 px, and each of `SMALL`.
 fn render(svg: &str) -> Icon {
     let tree = resvg::usvg::Tree::from_data(svg.as_bytes(), &resvg::usvg::Options::default())
         .expect("tray icons are valid SVG");
-    let mut pixmap = resvg::tiny_skia::Pixmap::new(SIZE, SIZE).expect("non-zero size");
-    let scale = SIZE as f32 / tree.size().width();
+    Icon {
+        width: SIZE,
+        height: SIZE,
+        data: argb(&tree, SIZE),
+        small: SMALL.iter().map(|s| (*s, argb(&tree, *s))).collect(),
+    }
+}
+
+/// The drawing at `size` px square, as the ARGB StatusNotifierItem wants
+/// (from tiny-skia's premultiplied RGBA).
+fn argb(tree: &resvg::usvg::Tree, size: u32) -> Vec<u8> {
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(size, size).expect("non-zero size");
+    let scale = size as f32 / tree.size().width();
     resvg::render(
-        &tree,
+        tree,
         resvg::tiny_skia::Transform::from_scale(scale, scale),
         &mut pixmap.as_mut(),
     );
-    // Premultiplied RGBA to the ARGB StatusNotifierItem wants.
-    let mut data = Vec::with_capacity((SIZE * SIZE * 4) as usize);
+    let mut data = Vec::with_capacity((size * size * 4) as usize);
     for p in pixmap.pixels() {
         let c = p.demultiply();
         data.extend_from_slice(&[c.alpha(), c.red(), c.green(), c.blue()]);
     }
-    Icon {
-        width: SIZE,
-        height: SIZE,
-        data,
-    }
+    data
 }
 
 /// One frame of the head in motion (DESIGN.md, Tray icon; animations.html).

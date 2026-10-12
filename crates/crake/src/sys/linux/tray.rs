@@ -19,13 +19,21 @@ impl ksni::Tray for Sni {
         "Crake".into()
     }
 
+    /// Every size drawn: the bar takes the one that fits its slot.
     fn icon_pixmap(&self) -> Vec<ksni::Icon> {
         let icon = self.state.icon();
-        vec![ksni::Icon {
-            width: icon.width as i32,
-            height: icon.height as i32,
-            data: icon.data,
-        }]
+        let small = icon.small.into_iter().map(|(size, data)| ksni::Icon {
+            width: size as i32,
+            height: size as i32,
+            data,
+        });
+        small
+            .chain([ksni::Icon {
+                width: icon.width as i32,
+                height: icon.height as i32,
+                data: icon.data,
+            }])
+            .collect()
     }
 
     fn tool_tip(&self) -> ksni::ToolTip {

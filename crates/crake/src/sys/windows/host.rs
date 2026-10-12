@@ -286,3 +286,13 @@ pub fn light_bar() -> bool {
 fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain([0]).collect()
 }
+
+/// The notification area's icon size in pixels: Windows' small icon at the
+/// screen's scaling (16 at 100 %, 20 at 125 %, 24 at 150 %, 32 at 200 %).
+pub fn tray_icon_size() -> u32 {
+    use windows_sys::Win32::UI::HiDpi::{GetDpiForSystem, GetSystemMetricsForDpi};
+    use windows_sys::Win32::UI::WindowsAndMessaging::SM_CXSMICON;
+    // SAFETY: plain queries.
+    let size = unsafe { GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForSystem()) };
+    u32::try_from(size).ok().filter(|s| *s > 0).unwrap_or(16)
+}
