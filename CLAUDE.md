@@ -424,6 +424,40 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    today. About a milestone of work. Crake doesn't run FortiClient's host
    check (antivirus etc.); if a gateway refuses clients without one, Crake
    won't fake a compliance report or FortiClient's vendor ID.
+   **EMS (decided with the user, 2026-10-12; the colleague's reply).** A
+   FortiGate managed by **FortiClient EMS** (Endpoint Management Server)
+   admits only endpoints registered with EMS and running FortiClient
+   (telemetry, posture, a ZTNA client certificate). openconnect/Crake is
+   turned away: not a protocol gap, an admission control the gateway
+   operator set. The user does **not** want to spoof a managed/compliant
+   client (vendor ID, EMS serial, posture report) to get past it — that's
+   circumventing the operator's control, not Crake's own auth, and it's why
+   EMS-environment bugs can't go to the client's helpdesk (unsanctioned
+   tool). See [[fortinet-ems-no-spoofing]].
+   Two honest things instead:
+   - **Say so.** When a fortinet sign-in fails the EMS/ZTNA way, Crake tells
+     the user plainly: "This gateway needs FortiClient managed by EMS;
+     Crake can't sign in to EMS-managed gateways," pointing at the plan
+     below. **Not built yet:** the exact failure signatures need a real EMS
+     FortiGate's `openconnect --protocol=fortinet --authenticate` output
+     (like 7d's AnyConnect 404 and 7b's UDP-block strings were pinned to
+     real output; capture in CLAUDE.local.md when the colleague can run it).
+   - **FortiClient connects, Crake routes on top (planned milestone).**
+     The user's idea, and it fits Crake's model: like adopting an
+     externally-started OpenVPN 3 session (7g, `ovpn3::adopt`,
+     `tunnel_of_device`), Crake would **adopt FortiClient's interface** —
+     the user starts FortiClient and signs in (real, EMS-compliant), it
+     brings up its link (Linux: a ppp/tun device) and routes; Crake takes
+     that device's DNS/domains, strips the blanket default route, and
+     routes only the hosts that need it. No faking: auth and compliance are
+     all FortiClient's; Crake only decides what the user's own machine
+     sends through. Beats the colleague's VM workaround (FortiClient in a
+     Linux VM on a MacBook): FortiClient runs on the host, Crake routes
+     there. To prove first: that FortiClient-Linux (or Win/macOS) is even
+     admitted to that EMS gateway, and whether FortiClient re-asserts its
+     routes or ZTNA watches for route changes. Per-OS, milestone-sized; the
+     adopt-and-re-route plumbing exists (openvpn3), a FortiClient engine
+     that finds and takes over its interface is new.
 7g. **OpenVPN 3 (requested; the user has openvpn3 profiles on this PC).
    Built; used on a real session.** The app
    runs the session as the user, who owns the profile (`ovpn3.rs`, D-Bus
