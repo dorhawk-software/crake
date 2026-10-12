@@ -636,14 +636,15 @@ The user doesn't want development builds installed on their machine.
   check 1.3, macOS 1.1, network 1.1 and Nix 3.3 still came to ~10.8 GB
   and Nix's was evicted, so the network job restores but never saves (it
   runs in parallel; uncached it takes about as long as the packages do
-  cached). Still over 10 GB after that, so the `windows` gnu-clippy cache
-  (fastest job) is dropped too and the Nix store is GC'd to 6 G before
-  saving. **GitHub's 10 GB can't be raised** (asked 2026-10-12: same for
-  public/OSS and private, no paid tier). **Proper fix, needs the user:**
-  move the Nix store to **Cachix** (free for open source) so its 3.3 GB
-  leaves GitHub's budget entirely — a Cachix cache + its token as a repo
-  secret, then `cachix/cachix-action` in the nixos job. The NixOS VM-boot
-  (~6-8 min) is uncacheable, so nixos stays the slowest job even cached.
+  cached). **GitHub's 10 GB can't be raised** (asked 2026-10-12: same for
+  public/OSS and private, no paid tier), so the Nix store (the 3.3 GB
+  whale it kept evicting) moved to **Cachix** (free for open source,
+  cache `crake`): the nixos job's `cachix/cachix-action` pushes every path
+  it builds and substitutes from it next time; Cachix has no 10 GB cap, so
+  GitHub's budget now holds only the five Rust caches (~9 GB). Setup (done
+  with the user): a Cachix account, a public cache named `crake`, an auth
+  token as the repo secret `CACHIX_AUTH_TOKEN`. The NixOS VM-boot (~6-8
+  min) is uncacheable, so nixos stays the slowest job even cached.
 - Daily use, nothing installed: `sudo ./target/debug/craked --config dev/<yours>.toml --dev`
   (serves the app on `/run/user/<uid>/crake-dev.sock`), then `./target/debug/crake`.
   The app signs in as the user (`openconnect --authenticate`, questions in

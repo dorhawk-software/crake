@@ -72,9 +72,7 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          # Not saved: the fastest job, and the caches overflow GitHub's
-          # 10 GB (which evicts the Nix store, the slowest to rebuild).
-          save-if: false
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Crake compiles for Windows, lint-clean
         run: scripts/windows-check.sh
 
@@ -149,10 +147,6 @@ jobs:
 
   nixos:
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      # cache-nix-action removes its old caches.
-      actions: write
     steps:
       - uses: actions/checkout@v7
       - name: Let the test's VMs use KVM
@@ -163,19 +157,15 @@ jobs:
         with:
           nix_conf: |
             system-features = kvm nixos-test benchmark big-parallel
-      # The Nix store between runs: Crake's crates.io dependencies are a
-      # derivation of their own (crane), rebuilt only when Cargo.lock changes.
-      - uses: nix-community/cache-nix-action@v7
+      # The Nix store, in Cachix (free for open source), not GitHub's 10 GB
+      # cache: Crake's crates.io dependencies are a derivation of their own
+      # (crane), rebuilt only when Cargo.lock changes. Every path built here
+      # is pushed; later runs substitute from Cachix. A run without the token
+      # (a fork's) still pulls from the public cache, just pushes nothing.
+      - uses: cachix/cachix-action@v17
         with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock', '**/*.nix') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
-          gc-max-store-size-linux: 6G
-          purge: true
-          purge-prefixes: nix-${{ runner.os }}-
-          purge-created: 0
-          purge-last-accessed: P2D
-          purge-primary-key: never
-          save: ${{ github.ref == 'refs/heads/main' }}
+          name: crake
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - name: Build Crake with Nix
         run: nix build --print-build-logs .#default
       - name: The NixOS module, end to end (a gateway and a client VM)
