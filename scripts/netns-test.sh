@@ -4,6 +4,10 @@
 # the host's own nft and ip. Nothing on the host's network is touched.
 set -eu
 cd "$(dirname "$0")/.."
+# These tests exercise craked's routing logic, not interactive GPUI, so the dev
+# profile's opt-level 1 only slows the build. Unoptimised workspace crates build
+# far faster; dependencies keep their opt-level and stay cached.
+export CARGO_PROFILE_DEV_OPT_LEVEL=0
 BINS=$(cargo test -p craked --test netns --test dns_netns --test probe_netns --no-run --message-format=json 2>/dev/null \
   | sed -n 's/.*"executable":"\([^"]*netns-[^"]*\)".*/\1/p')
 [ -n "$BINS" ] || { echo "could not build the tests" >&2; exit 1; }

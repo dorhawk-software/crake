@@ -8,6 +8,11 @@
 # Nothing on the host's network is touched; nothing is installed.
 set -eu
 cd "$(dirname "$0")/.."
+# These tests run the app headless (frames drawn by hand), so they don't need
+# the dev profile's opt-level 1, which is there for interactive GPUI stutter.
+# Building the workspace crates unoptimised cuts the crake crate's compile from
+# minutes to seconds; dependencies keep their own opt-level and stay cached.
+export CARGO_PROFILE_DEV_OPT_LEVEL=0
 cargo build -q -p craked --bin crake-hook
 HOOK=$PWD/target/debug/crake-hook
 BIN=$(cargo test -p crake --no-run --message-format=json 2>/dev/null \
