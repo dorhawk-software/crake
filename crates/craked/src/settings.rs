@@ -65,7 +65,7 @@ impl Settings {
             never: cfg.never.iter().map(Target::to_string).collect(),
             ask_unknown: true,
             keep_private: true,
-            log_days: Some(30),
+            log_days: Some(crate::config::LOG_DAYS),
         }
     }
 
@@ -88,7 +88,7 @@ impl Settings {
 
     /// Learned hosts' lifetime, in seconds. "Never" is ten years.
     pub fn expiry_secs(&self) -> u64 {
-        self.forget_after_days.unwrap_or(3650) * 86_400
+        self.forget_after_days.unwrap_or(crate::config::NEVER_DAYS) * crate::units::SECS_PER_DAY
     }
 
     /// Change one setting from its text form (the D-Bus API). Lists are one
@@ -98,7 +98,7 @@ impl Settings {
             match v {
                 "never" | "off" => Ok(None),
                 n => match n.parse::<u64>() {
-                    Ok(d) if (1..=365).contains(&d) => Ok(Some(d)),
+                    Ok(d) if (1..=crate::config::MAX_DAYS).contains(&d) => Ok(Some(d)),
                     _ => bail!("{v:?} isn't a number of days"),
                 },
             }
@@ -120,7 +120,7 @@ impl Settings {
         match key {
             "probe_wait_secs" => {
                 let n: u64 = value.parse().unwrap_or(0);
-                if ![1, 2, 3, 5].contains(&n) {
+                if !crate::config::PROBE_WAITS.contains(&n) {
                     bail!("Wait 1, 2, 3 or 5 seconds.");
                 }
                 self.probe_wait_secs = n;

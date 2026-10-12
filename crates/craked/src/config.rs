@@ -210,10 +210,10 @@ impl Config {
         if self.tunnels.len() > crate::routing::MAX_TUNNELS {
             bail!("at most {} tunnels", crate::routing::MAX_TUNNELS);
         }
-        if ![1, 2, 3, 5].contains(&self.probe_wait_secs) {
+        if !PROBE_WAITS.contains(&self.probe_wait_secs) {
             bail!("probe_wait_secs must be 1, 2, 3 or 5");
         }
-        if !(1..=365).contains(&self.learned_expiry_days) {
+        if !(1..=MAX_DAYS).contains(&self.learned_expiry_days) {
             bail!("learned_expiry_days must be between 1 and 365");
         }
         let mut seen = std::collections::HashSet::new();
@@ -293,14 +293,27 @@ fn default_log_path() -> PathBuf {
 fn default_state_path() -> PathBuf {
     PathBuf::from(STATE_DIR).join("hosts.json")
 }
+/// The waits for a direct answer to choose from, in seconds (Settings →
+/// Learning), and the one used until one is chosen.
+pub const PROBE_WAITS: [u64; 4] = [1, 2, 3, 5];
+const PROBE_WAIT: u64 = 3;
+/// Learned hosts unused this many days are forgotten, unless set otherwise.
+const EXPIRY_DAYS: u64 = 7;
+/// A number of days (forget after, keep the log): at most a year.
+pub const MAX_DAYS: u64 = 365;
+/// "Never": ten years.
+pub const NEVER_DAYS: u64 = 3650;
+/// The log is kept a month unless set otherwise.
+pub const LOG_DAYS: u64 = 30;
+
 fn default_managed_dir() -> PathBuf {
     MANAGED_DIR.into()
 }
 fn default_expiry_days() -> u64 {
-    7
+    EXPIRY_DAYS
 }
 fn default_probe_wait() -> u64 {
-    3
+    PROBE_WAIT
 }
 fn default_protocol() -> Protocol {
     Protocol::Anyconnect

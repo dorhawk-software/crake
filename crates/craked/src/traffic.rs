@@ -14,6 +14,8 @@ const MINUTES: usize = 61;
 const SLOT_MINUTES: u64 = 1;
 const SLOTS: u64 = 2 * 24 * 60 / SLOT_MINUTES;
 const EVERY: Duration = Duration::from_secs(10);
+/// Saved to disk once a minute.
+const SAVE_EVERY: u32 = (crate::units::SECS_PER_MINUTE / EVERY.as_secs()) as u32;
 
 #[derive(Default)]
 pub struct Traffic {
@@ -60,7 +62,7 @@ impl Traffic {
                 this.sample((physical, tunnels), now);
                 this.sample_tunnels(each, &devices, now);
                 n += 1;
-                if n.is_multiple_of(6) {
+                if n.is_multiple_of(SAVE_EVERY) {
                     this.save(&file);
                 }
             }
@@ -80,7 +82,7 @@ impl Traffic {
             })
         });
         let Ok(saved) = saved else { return };
-        let minute = now / 60;
+        let minute = now / crate::units::SECS_PER_MINUTE;
         let slot = minute / SLOT_MINUTES;
         self.minutes.lock().unwrap().extend(
             saved
@@ -126,7 +128,7 @@ impl Traffic {
         devices: &HashMap<String, String>,
         now: u64,
     ) {
-        let minute = now / 60;
+        let minute = now / crate::units::SECS_PER_MINUTE;
         let mut last = self.last_tunnels.lock().unwrap();
         let mut tunnels = self.tunnels.lock().unwrap();
         for (device, bytes) in each {
@@ -196,7 +198,7 @@ impl Traffic {
         let direct = physical
             .saturating_sub(p0)
             .saturating_sub(tunnels.saturating_sub(t0));
-        let minute = now / 60;
+        let minute = now / crate::units::SECS_PER_MINUTE;
         let mut minutes = self.minutes.lock().unwrap();
         match minutes.back_mut() {
             Some((m, bytes)) if *m == minute => *bytes += direct,

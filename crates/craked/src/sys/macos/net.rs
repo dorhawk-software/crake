@@ -33,7 +33,11 @@ impl Net {
         if let Self::Noop = self {
             return Ok(());
         }
-        let mask = Ipv4Addr::from(u32::MAX.checked_shl(32 - u32::from(prefix)).unwrap_or(0));
+        let mask = Ipv4Addr::from(
+            u32::MAX
+                .checked_shl(Ipv4Addr::BITS - u32::from(prefix))
+                .unwrap_or(0),
+        );
         let (a, m) = (addr.to_string(), mask.to_string());
         let mut args = vec![dev, "inet", &a, &a, "netmask", &m];
         let mtu = mtu.map(|m| m.to_string());
@@ -62,7 +66,7 @@ impl Net {
     /// adds up front).
     pub async fn route_dns(&self, dev: &str, dns: Ipv4Addr) -> Result<()> {
         match self {
-            Self::Ip => cmd::route_add(&dns.to_string(), 32, dev).await,
+            Self::Ip => cmd::route_add(&dns.to_string(), crate::hosts::V4_BITS, dev).await,
             Self::Noop => Ok(()),
         }
     }

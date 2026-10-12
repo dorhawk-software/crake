@@ -12,6 +12,17 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
+/// Address lengths in bits: a single host's prefix.
+pub const V4_BITS: u8 = Ipv4Addr::BITS as u8;
+pub const V6_BITS: u8 = Ipv6Addr::BITS as u8;
+/// The widest networks Crake will route; anything wider is most of the
+/// internet.
+const V4_WIDEST: u8 = 8;
+const V6_WIDEST: u8 = 16;
+/// Link-local unicast, fe80::/10, in an address's first 16 bits.
+const LINK_LOCAL_V6: u16 = 0xfe80;
+const LINK_LOCAL_V6_MASK: u16 = 0xffc0;
+
 /// A host (a full-length prefix: `/32` for IPv4, `/128` for IPv6) or a
 /// network, always stored with host bits cleared. Either address family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -62,7 +73,11 @@ impl Target {
     /// multicast, link-local, and anything far too wide (wider than a /8 for
     /// IPv4, /16 for IPv6).
     pub fn check_routable(self) -> Result<()> {
-        let min = if self.addr.is_ipv6() { 16 } else { 8 };
+        let min = if self.addr.is_ipv6() {
+            V6_WIDEST
+        } else {
+            V4_WIDEST
+        };
         if self.len < min {
             bail!("{self} is too wide; the widest network Crake will route is a /{min}");
         }
@@ -79,7 +94,7 @@ impl Target {
                     || a.is_loopback()
                     || a.is_multicast()
                     // Link-local unicast fe80::/10.
-                    || a.segments()[0] & 0xffc0 == 0xfe80
+                    || a.segments()[0] & LINK_LOCAL_V6_MASK == LINK_LOCAL_V6
             }
         };
         if bad {
@@ -91,7 +106,7 @@ impl Target {
 
 /// How many bits a full-length prefix has for this address's family.
 fn full_len(addr: IpAddr) -> u8 {
-    if addr.is_ipv6() { 128 } else { 32 }
+    if addr.is_ipv6() { V6_BITS } else { V4_BITS }
 }
 
 /// The address as its bits in the low end of a u128 (IPv4 in the low 32).
@@ -108,7 +123,7 @@ fn mask_bits(len: u8, full: u8) -> u128 {
         return 0;
     }
     let full = u32::from(full);
-    let base = if full >= 128 {
+    let base = if full >= u32::from(V6_BITS) {
         u128::MAX
     } else {
         (1u128 << full) - 1
@@ -248,10 +263,9 @@ impl TunnelHosts {
     /// Remember what its DNS said for `name`. True when that's news.
     pub fn remember(&mut self, name: &str, addrs: &[Ipv4Addr], now: u64) -> bool {
         const KEEP: usize = 1000;
-        let fresh = self
-            .answers
-            .get(name)
-            .is_none_or(|(a, at)| a != addrs || now.saturating_sub(*at) > 3600);
+        let fresh = self.answers.get(name).is_none_or(|(a, at)| {
+            a != addrs || now.saturating_sub(*at) > crate::units::SECS_PER_HOUR
+        });
         if fresh {
             self.answers.insert(name.to_owned(), (addrs.to_vec(), now));
             if self.answers.len() > KEEP {

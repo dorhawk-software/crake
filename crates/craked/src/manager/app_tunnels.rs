@@ -3,6 +3,10 @@
 
 use super::*;
 
+/// A tunnel being removed gets 15 s to log off, looked at this often.
+const LOGOFF_POLLS: u32 = 150;
+const LOGOFF_POLL: Duration = Duration::from_millis(100);
+
 impl Manager {
     /// The tunnels added in the app, as they stand.
     pub(super) fn own_tunnels(&self) -> Vec<crate::own::OwnTunnel> {
@@ -132,7 +136,7 @@ impl Manager {
         if let Some(tx) = stop {
             let _ = tx.send(Stop::LogOff);
         }
-        for _ in 0..150 {
+        for _ in 0..LOGOFF_POLLS {
             let running = self
                 .tunnels
                 .lock()
@@ -142,7 +146,7 @@ impl Manager {
             if !running {
                 break;
             }
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            tokio::time::sleep(LOGOFF_POLL).await;
         }
         if self
             .tunnels

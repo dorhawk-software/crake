@@ -10,32 +10,36 @@ use std::net::Ipv4Addr;
 use anyhow::Result;
 use tokio::net::UdpSocket;
 
+use crate::dns;
+
 pub const DEVICE: &str = "crake-hush";
 /// Link-local, on the dummy link only.
 pub const ADDR: Ipv4Addr = Ipv4Addr::new(169, 254, 53, 53);
 
 /// The answer to any question: the same id and question, REFUSED, nothing else.
 pub fn refuse(query: &[u8]) -> Option<Vec<u8>> {
-    reply_code(query, 5)
+    reply_code(query, dns::REFUSED)
 }
 
 /// The same id and question with response code `rcode` (5 REFUSED,
 /// 2 SERVFAIL, 0 with no answers), nothing else.
 pub fn reply_code(query: &[u8], rcode: u8) -> Option<Vec<u8>> {
-    if query.len() < 12 || query[2] & 0x80 != 0 {
+    if query.len() < dns::HEADER || query[dns::FLAGS] & dns::QR != 0 {
         return None; // too short, or itself a response
     }
     let mut out = query.to_vec();
-    out[2] = 0x80 | (query[2] & 0x79); // QR, keep opcode and RD
-    out[3] = 0x80 | (rcode & 0x0f); // RA, the code
+    out[dns::FLAGS] = dns::QR | (query[dns::FLAGS] & dns::OPCODE_AND_RD);
+    out[dns::CODES] = dns::RA | (rcode & dns::RCODE);
     // Keep the question; no answers, authority or additional records.
-    out[6..12].fill(0);
-    let mut i = 12;
-    for _ in 0..u16::from_be_bytes([query[4], query[5]]) {
+    out[dns::RECORD_COUNTS].fill(0);
+    let mut i = dns::HEADER;
+    let questions = u16::from_be_bytes([query[dns::QUESTIONS], query[dns::QUESTIONS + 1]]);
+    for _ in 0..questions {
+        // Labels (a length, then that many bytes) up to the name's end.
         while *out.get(i)? != 0 {
             i += usize::from(out[i]) + 1;
         }
-        i += 5;
+        i += 1 + dns::QUESTION_FIELDS;
     }
     out.truncate(i.min(out.len()));
     Some(out)
@@ -47,8 +51,8 @@ pub async fn serve() -> Result<()> {
     if cfg!(windows) {
         return Ok(());
     }
-    let sock = UdpSocket::bind((ADDR, 53)).await?;
-    let mut buf = vec![0u8; 1500];
+    let sock = UdpSocket::bind((ADDR, dns::PORT)).await?;
+    let mut buf = vec![0u8; dns::BUFFER];
     loop {
         let (n, from) = sock.recv_from(&mut buf).await?;
         if let Some(reply) = refuse(&buf[..n]) {

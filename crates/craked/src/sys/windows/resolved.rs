@@ -6,6 +6,13 @@
 
 use std::net::Ipv4Addr;
 
+/// A child process without a console window of its own.
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+/// An NRPT rule's ConfigOptions: it names generic DNS servers.
+const GENERIC_DNS_SERVERS: u32 = 8;
+/// Room for a registry key's name (they're at most 255 characters).
+const NAME_LEN: usize = 256;
+
 use anyhow::{Result, bail};
 use windows_sys::Win32::Foundation::ERROR_SUCCESS;
 use windows_sys::Win32::System::Registry::{
@@ -80,7 +87,7 @@ impl Resolved {
         if let Self::Real = self {
             let mut cmd = tokio::process::Command::new("ipconfig");
             cmd.arg("/flushdns")
-                .creation_flags(0x0800_0000)
+                .creation_flags(CREATE_NO_WINDOW)
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null());
             let _ = cmd.status().await;
@@ -136,7 +143,12 @@ fn write_rule(device: &str, domains: &[String], everything: bool) -> Result<()> 
     let results = [
         set(key, "Version", REG_DWORD, &2u32.to_le_bytes()),
         // Generic DNS servers: ours.
-        set(key, "ConfigOptions", REG_DWORD, &8u32.to_le_bytes()),
+        set(
+            key,
+            "ConfigOptions",
+            REG_DWORD,
+            &GENERIC_DNS_SERVERS.to_le_bytes(),
+        ),
         set(key, "GenericDNSServers", REG_SZ, bytes(&server)),
         set(key, "IPSECCARestriction", REG_SZ, bytes(&restriction)),
         set(key, "Name", REG_MULTI_SZ, bytes(&names)),
@@ -194,7 +206,7 @@ fn rule_keys() -> Vec<String> {
     }
     let mut found = Vec::new();
     for i in 0.. {
-        let mut name = [0u16; 256];
+        let mut name = [0u16; NAME_LEN];
         let mut len = name.len() as u32;
         // SAFETY: `name` holds `len` characters.
         let err = unsafe {

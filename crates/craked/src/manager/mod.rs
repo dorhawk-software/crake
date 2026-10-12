@@ -172,6 +172,14 @@ const PROBED_FOR: Duration = Duration::from_secs(600);
 
 /// How long a probe through one tunnel may take.
 const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
+/// Does an address answer through a tunnel? Its web ports, each given a
+/// third of the probe's time.
+const WEB_PORTS: [u16; 2] = [443, 80];
+const WEB_PROBE: Duration = Duration::from_secs(PROBE_TIMEOUT.as_secs() / 3);
+/// Changes queued for the D-Bus signal before slow listeners miss some.
+const CHANGES_BACKLOG: usize = 64;
+/// How often the log is pruned to its retention.
+const PRUNE_EVERY: Duration = Duration::from_secs(6 * crate::units::SECS_PER_HOUR);
 
 /// How long a name from a public answer is remembered.
 const SEEN_NAME_FOR: Duration = Duration::from_secs(3600);
@@ -276,7 +284,7 @@ impl Manager {
         let settings =
             crate::settings::Settings::load(&crate::settings::path_for(&cfg.state_path), &cfg);
         log.keep(settings.log_days);
-        let (changes, _) = broadcast::channel(64);
+        let (changes, _) = broadcast::channel(CHANGES_BACKLOG);
         Ok(Arc::new(Self {
             cfg,
             tunnels: Mutex::new(tunnels),
@@ -318,7 +326,7 @@ impl Manager {
                 if let Some(d) = days {
                     this.log.prune(d);
                 }
-                tokio::time::sleep(Duration::from_secs(6 * 3600)).await;
+                tokio::time::sleep(PRUNE_EVERY).await;
             }
         });
         self.traffic
@@ -389,7 +397,7 @@ impl Manager {
     }
 
     fn timeout_for(&self, name: &str) -> u64 {
-        self.forget_after(name).unwrap_or(3650) * 86_400
+        self.forget_after(name).unwrap_or(crate::config::NEVER_DAYS) * crate::units::SECS_PER_DAY
     }
 
     /// How a learned host leaves again, in a sentence.

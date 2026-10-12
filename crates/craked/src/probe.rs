@@ -15,6 +15,7 @@ use tokio::net::TcpSocket;
 use crate::conntrack::{Events, Flow, Kind, TcpState};
 use crate::hosts::Target;
 use crate::manager::Manager;
+use crate::packet;
 
 /// What happened to the direct attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,20 +41,16 @@ impl Direct {
 /// The flow of a first SYN held in NFQUEUE (an IPv4 TCP packet with SYN set
 /// and ACK clear): (source, destination, ports).
 pub fn syn_flow(packet: &[u8]) -> Option<Flow> {
-    if packet.len() < 40 || packet[0] >> 4 != 4 || packet[9] != 6 {
-        return None;
-    }
-    let ihl = usize::from(packet[0] & 0x0f) * 4;
-    let t = packet.get(ihl..)?;
-    // SYN set, ACK clear: the first SYN, not a SYN-ACK.
-    if t.len() < 20 || t[13] & 0x12 != 0x02 {
+    let ip = packet::V4::parse(packet, packet::TCP)?;
+    let tcp = ip.payload()?;
+    if !packet::first_syn(tcp) {
         return None;
     }
     Some(Flow {
-        src: Ipv4Addr::new(packet[12], packet[13], packet[14], packet[15]),
-        dst: Ipv4Addr::new(packet[16], packet[17], packet[18], packet[19]),
-        sport: u16::from_be_bytes([t[0], t[1]]),
-        dport: u16::from_be_bytes([t[2], t[3]]),
+        src: ip.src(),
+        dst: ip.dst(),
+        sport: packet::source_port(tcp)?,
+        dport: packet::destination_port(tcp)?,
     })
 }
 
@@ -87,24 +84,17 @@ pub async fn direct(addr: SocketAddrV4, timeout: Duration) -> DirectTry {
 /// prohibited (never "fragmentation needed", which path MTU discovery uses).
 /// It carries the start of the packet that couldn't be delivered.
 pub fn unreachable(packet: &[u8]) -> Option<Flow> {
+    // Network or host unreachable (0, 1); network, host or anything
+    // administratively prohibited (9, 10, 13).
     const CODES: [u8; 5] = [0, 1, 9, 10, 13];
-    if packet.len() < 20 || packet[0] >> 4 != 4 || packet[9] != 1 {
-        return None;
-    }
-    let icmp = packet.get(usize::from(packet[0] & 0x0f) * 4..)?;
-    if *icmp.first()? != 3 || !CODES.contains(icmp.get(1)?) {
-        return None;
-    }
-    let inner = icmp.get(8..)?;
-    if inner.len() < 20 || inner[0] >> 4 != 4 || inner[9] != 6 {
-        return None;
-    }
-    let tcp = inner.get(usize::from(inner[0] & 0x0f) * 4..)?;
+    let icmp = packet::V4::parse(packet, packet::ICMP)?.payload()?;
+    let inner = packet::V4::parse(packet::unreachable_about(icmp, &CODES)?, packet::TCP)?;
+    let tcp = inner.payload()?;
     Some(Flow {
-        src: Ipv4Addr::new(inner[12], inner[13], inner[14], inner[15]),
-        dst: Ipv4Addr::new(inner[16], inner[17], inner[18], inner[19]),
-        sport: u16::from_be_bytes([*tcp.first()?, *tcp.get(1)?]),
-        dport: u16::from_be_bytes([*tcp.get(2)?, *tcp.get(3)?]),
+        src: inner.src(),
+        dst: inner.dst(),
+        sport: packet::source_port(tcp)?,
+        dport: packet::destination_port(tcp)?,
     })
 }
 
@@ -116,13 +106,16 @@ pub fn unreachable(packet: &[u8]) -> Option<Flow> {
 /// system's first SYN retry (1 s on Linux).
 pub const KNOWN_INSIDE_WAIT: Duration = Duration::from_millis(300);
 
+/// How often the connections still waiting for an answer are looked at.
+const PENDING_CHECK: Duration = Duration::from_millis(100);
+
 /// Watch for the daemon's lifetime.
 pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
     let mut events = Events::open()?;
     tokio::spawn(async move {
         // Each stuck connection: since when, and how long it may take.
         let mut pending: HashMap<Flow, (Instant, Duration)> = HashMap::new();
-        let mut tick = tokio::time::interval(Duration::from_millis(100));
+        let mut tick = tokio::time::interval(PENDING_CHECK);
         loop {
             tokio::select! {
                 batch = events.next() => match batch {

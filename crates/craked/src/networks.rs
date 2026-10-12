@@ -17,6 +17,14 @@ pub fn current() -> Option<String> {
     of(&route, &arp)
 }
 
+/// Columns of /proc/net/route (hex, little-endian) and /proc/net/arp.
+const ROUTE_DESTINATION: usize = 1;
+const ROUTE_GATEWAY: usize = 2;
+const ROUTE_METRIC: usize = 6;
+const ROUTE_MASK: usize = 7;
+const ARP_HW_ADDRESS: usize = 3;
+const HEX: u32 = 16;
+
 fn of(route: &str, arp: &str) -> Option<String> {
     // Iface Destination Gateway Flags RefCnt Use Metric Mask ...; hex, little-endian.
     let (gateway, _) = route
@@ -24,19 +32,25 @@ fn of(route: &str, arp: &str) -> Option<String> {
         .skip(1)
         .filter_map(|l| {
             let f: Vec<&str> = l.split_whitespace().collect();
-            let (dest, gw, metric, mask) = (f.get(1)?, f.get(2)?, f.get(6)?, f.get(7)?);
+            let (dest, gw, metric, mask) = (
+                f.get(ROUTE_DESTINATION)?,
+                f.get(ROUTE_GATEWAY)?,
+                f.get(ROUTE_METRIC)?,
+                f.get(ROUTE_MASK)?,
+            );
             if *dest != "00000000" || *mask != "00000000" || *gw == "00000000" {
                 return None;
             }
-            let gw = Ipv4Addr::from(u32::from_str_radix(gw, 16).ok()?.swap_bytes());
+            let gw = Ipv4Addr::from(u32::from_str_radix(gw, HEX).ok()?.swap_bytes());
             Some((gw, metric.parse::<u32>().ok()?))
         })
         .min_by_key(|(_, metric)| *metric)?;
     // IP address HW type Flags HW address Mask Device
     let mac = arp.lines().skip(1).find_map(|l| {
         let f: Vec<&str> = l.split_whitespace().collect();
-        (f.first()?.parse::<Ipv4Addr>().ok()? == gateway && *f.get(3)? != "00:00:00:00:00:00")
-            .then(|| f[3].to_owned())
+        let hw = *f.get(ARP_HW_ADDRESS)?;
+        (f.first()?.parse::<Ipv4Addr>().ok()? == gateway && hw != "00:00:00:00:00:00")
+            .then(|| hw.to_owned())
     });
     Some(match mac {
         Some(mac) => format!("{gateway} {mac}"),

@@ -5,6 +5,11 @@
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
+/// A tunnel's name, as people see it.
+const MAX_DISPLAY_NAME: usize = 40;
+/// An interface name holds 15 characters; "crake-" takes six.
+const NAME_ROOM: usize = 9;
+
 use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 
@@ -106,8 +111,8 @@ impl OwnTunnel {
     pub fn from_map(name: &str, m: &HashMap<String, String>) -> Result<Self> {
         let get = |k: &str| m.get(k).map(|v| v.trim()).filter(|v| !v.is_empty());
         let display_name = get("display_name").unwrap_or("").to_owned();
-        if display_name.is_empty() || display_name.chars().count() > 40 {
-            bail!("Give it a name of up to 40 characters.");
+        if display_name.is_empty() || display_name.chars().count() > MAX_DISPLAY_NAME {
+            bail!("Give it a name of up to {MAX_DISPLAY_NAME} characters.");
         }
         let gateway = get("gateway").unwrap_or("").to_owned();
         if gateway.is_empty() || gateway.starts_with('-') || gateway.contains(char::is_whitespace) {
@@ -153,7 +158,7 @@ impl OwnTunnel {
             None => None,
             Some("never") => Some(None),
             Some(d) => match d.parse::<u64>() {
-                Ok(n) if (1..=365).contains(&n) => Some(Some(n)),
+                Ok(n) if (1..=crate::config::MAX_DAYS).contains(&n) => Some(Some(n)),
                 _ => bail!("{d:?} isn't a number of days"),
             },
         };
@@ -275,7 +280,7 @@ pub fn name_for(display: &str, taken: &[String]) -> String {
         .filter(|p| !p.is_empty())
         .collect::<Vec<_>>()
         .join("-");
-    let base: String = base.chars().take(9).collect();
+    let base: String = base.chars().take(NAME_ROOM).collect();
     let base = base.trim_end_matches('-');
     let base = if base.is_empty() { "tunnel" } else { base };
     if !taken.iter().any(|t| t == base) {
@@ -283,7 +288,7 @@ pub fn name_for(display: &str, taken: &[String]) -> String {
     }
     for n in 2.. {
         let suffix = n.to_string();
-        let keep = 9 - suffix.len();
+        let keep = NAME_ROOM - suffix.len();
         let candidate = format!("{}{suffix}", &base[..base.len().min(keep)]);
         if !taken.contains(&candidate) {
             return candidate;

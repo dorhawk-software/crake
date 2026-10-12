@@ -72,7 +72,7 @@ fn table() -> io::Result<HashMap<Flow, TcpState>> {
         {
             return Err(io::Error::last_os_error());
         }
-        len += 64 * 1024;
+        len += ROOM;
         let mut buf = vec![0u8; len];
         if libc::sysctlbyname(
             name.as_ptr(),
@@ -96,13 +96,39 @@ const XSO_TCPCB: u32 = 0x20;
 const XINPGEN: usize = 24;
 /// A connection's record says IPv4 (`inp_vflag & INP_IPV4`).
 const INP_IPV4: u8 = 0x1;
+/// The list's size as asked, plus room for connections opened meanwhile.
+const ROOM: usize = 64 * 1024;
+/// Each record starts with its length and kind (u32 each), and is padded to
+/// eight bytes.
+const RECORD_KIND: usize = 4;
+const RECORD_MIN: usize = 8;
+const RECORD_ALIGN: usize = 8;
+/// xinpcb_n: the foreign and local ports.
+const INP_FPORT: usize = 16;
+const INP_LPORT: usize = 18;
+/// Where inp_vflag is: the struct packed to four bytes (104 long; macOS 26)
+/// or not (112).
+const PACKED_LEN: usize = 104;
+const PACKED_VFLAG: usize = 44;
+const ALIGNED_LEN: usize = 112;
+const ALIGNED_VFLAG: usize = 48;
+/// After inp_vflag: the foreign and local addresses, each an in_addr_4in6.
+const FADDR_AFTER_VFLAG: usize = 16;
+const LADDR_AFTER_VFLAG: usize = 32;
+/// xtcpcb_n: t_state.
+const TCP_STATE: usize = 36;
+/// BSD's TCP states (netinet/tcp_fsm.h): closed, a SYN out, established
+/// (and every state after it).
+const TCPS_CLOSED: u32 = 0;
+const TCPS_SYN_SENT: u32 = 2;
+const TCPS_ESTABLISHED: u32 = 4;
 
 /// The list: an `xinpgen`, then per connection its records (`xinpcb_n`,
 /// the socket's, `xtcpcb_n`), each led by its length and kind and padded
 /// to 8 bytes, then another `xinpgen`.
 pub fn parse(buf: &[u8]) -> HashMap<Flow, TcpState> {
     let u32_at = |at: usize| {
-        buf.get(at..at + 4)
+        buf.get(at..at + size_of::<u32>())
             .map(|b| u32::from_ne_bytes(b.try_into().unwrap()))
     };
     let u16_net = |at: usize| {
@@ -110,18 +136,21 @@ pub fn parse(buf: &[u8]) -> HashMap<Flow, TcpState> {
             .map(|b| u16::from_be_bytes(b.try_into().unwrap()))
     };
     let ip_at = |at: usize| {
-        buf.get(at..at + 4)
-            .map(|b| Ipv4Addr::new(b[0], b[1], b[2], b[3]))
+        buf.get(at..at + size_of::<Ipv4Addr>()).map(|b| {
+            let mut octets = [0; size_of::<Ipv4Addr>()];
+            octets.copy_from_slice(b);
+            Ipv4Addr::from(octets)
+        })
     };
     let mut found = HashMap::new();
     let mut current: Option<Flow> = None;
     let mut at = XINPGEN;
     while at + XINPGEN < buf.len() {
-        let (Some(len), Some(kind)) = (u32_at(at), u32_at(at + 4)) else {
+        let (Some(len), Some(kind)) = (u32_at(at), u32_at(at + RECORD_KIND)) else {
             break;
         };
         let len = len as usize;
-        if len < 8 {
+        if len < RECORD_MIN {
             break;
         }
         match kind {
@@ -133,17 +162,17 @@ pub fn parse(buf: &[u8]) -> HashMap<Flow, TcpState> {
             XSO_INPCB => {
                 current = None;
                 let flag = match len {
-                    104 => Some(44),
-                    112 => Some(48),
+                    PACKED_LEN => Some(PACKED_VFLAG),
+                    ALIGNED_LEN => Some(ALIGNED_VFLAG),
                     _ => None,
                 };
                 if let Some(v) = flag
                     && buf.get(at + v).is_some_and(|f| f & INP_IPV4 != 0)
                     && let (Some(dport), Some(sport), Some(dst), Some(src)) = (
-                        u16_net(at + 16),
-                        u16_net(at + 18),
-                        ip_at(at + v + 16),
-                        ip_at(at + v + 32),
+                        u16_net(at + INP_FPORT),
+                        u16_net(at + INP_LPORT),
+                        ip_at(at + v + FADDR_AFTER_VFLAG),
+                        ip_at(at + v + LADDR_AFTER_VFLAG),
                     )
                     && !dst.is_unspecified()
                 {
@@ -157,13 +186,13 @@ pub fn parse(buf: &[u8]) -> HashMap<Flow, TcpState> {
             }
             // xtcpcb_n: t_state at 36.
             XSO_TCPCB => {
-                if let (Some(flow), Some(state)) = (current.take(), u32_at(at + 36)) {
+                if let (Some(flow), Some(state)) = (current.take(), u32_at(at + TCP_STATE)) {
                     found.insert(flow, tcp_state(state));
                 }
             }
             _ => {}
         }
-        at += len.next_multiple_of(8);
+        at += len.next_multiple_of(RECORD_ALIGN);
     }
     found
 }
@@ -171,10 +200,10 @@ pub fn parse(buf: &[u8]) -> HashMap<Flow, TcpState> {
 /// BSD's TCP states (netinet/tcp_fsm.h).
 fn tcp_state(raw: u32) -> TcpState {
     match raw {
-        0 => TcpState::Close,
-        2 => TcpState::SynSent,
+        TCPS_CLOSED => TcpState::Close,
+        TCPS_SYN_SENT => TcpState::SynSent,
         // Established and every state after it: the other side answered.
-        s if s >= 4 => TcpState::Answered,
+        s if s >= TCPS_ESTABLISHED => TcpState::Answered,
         // Listening, a SYN received.
         _ => TcpState::Other,
     }

@@ -4,6 +4,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// The most log entries one call returns.
+const MAX_RECENT: u32 = 10_000;
+
 use zbus::message::Header;
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::{OwnedValue, Value};
@@ -282,7 +285,7 @@ impl Service {
     async fn recent_log(&self, count: u32) -> Vec<String> {
         self.mgr
             .log()
-            .recent(count.min(10_000) as usize)
+            .recent(count.min(MAX_RECENT) as usize)
             .iter()
             .filter_map(|e| serde_json::to_string(e).ok())
             .collect()

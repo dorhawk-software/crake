@@ -83,8 +83,9 @@ fn table() -> io::Result<HashMap<Flow, TcpState>> {
         );
     }
     // Room for connections opened meanwhile.
-    size += 64 * size_of::<MIB_TCPROW_OWNER_PID>() as u32;
-    let mut buf = vec![0u64; (size as usize).div_ceil(8)];
+    const ROOM_ROWS: u32 = 64;
+    size += ROOM_ROWS * size_of::<MIB_TCPROW_OWNER_PID>() as u32;
+    let mut buf = vec![0u64; (size as usize).div_ceil(size_of::<u64>())];
     // SAFETY: `buf` holds `size` bytes, 8-byte aligned.
     let err = unsafe {
         GetExtendedTcpTable(

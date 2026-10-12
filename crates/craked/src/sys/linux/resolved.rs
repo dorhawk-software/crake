@@ -125,7 +125,11 @@ impl Resolved {
             servers
                 .into_iter()
                 .filter(|(family, _)| *family == libc::AF_INET)
-                .filter_map(|(_, a)| <[u8; 4]>::try_from(a).ok().map(Ipv4Addr::from))
+                .filter_map(|(_, a)| {
+                    <[u8; size_of::<Ipv4Addr>()]>::try_from(a)
+                        .ok()
+                        .map(Ipv4Addr::from)
+                })
                 .collect(),
             domains
                 .into_iter()

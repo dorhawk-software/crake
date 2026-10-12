@@ -10,8 +10,10 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use hickory_proto::op::Message;
-use hickory_proto::rr::RecordType;
+use hickory_proto::rr::{DNSClass, RecordType};
 use tokio::net::UdpSocket;
+
+use crate::dns;
 
 pub const DEVICE: &str = "crake-keep";
 /// Link-local, on the dummy link only (next to `hush::ADDR`).
@@ -30,12 +32,14 @@ pub fn question(query: &[u8]) -> Option<(String, RecordType)> {
 /// a name that exists).
 pub fn answer(query: &[u8], addrs: &[Ipv4Addr]) -> Option<Vec<u8>> {
     let mut out = crate::hush::reply_code(query, 0)?;
-    out[7] = u8::try_from(addrs.len()).ok()?; // ANCOUNT (low byte; few records)
+    // Few records: the count fits its low byte.
+    out[dns::ANSWERS_LOW_BYTE] = u8::try_from(addrs.len()).ok()?;
     for a in addrs {
-        // Name: a pointer to the question's (offset 12); type A, class IN.
-        out.extend_from_slice(&[0xc0, 0x0c, 0, 1, 0, 1]);
+        out.extend_from_slice(&dns::NAME_POINTER);
+        out.extend_from_slice(&u16::from(RecordType::A).to_be_bytes());
+        out.extend_from_slice(&u16::from(DNSClass::IN).to_be_bytes());
         out.extend_from_slice(&TTL.to_be_bytes());
-        out.extend_from_slice(&[0, 4]);
+        out.extend_from_slice(&(size_of::<Ipv4Addr>() as u16).to_be_bytes());
         out.extend_from_slice(&a.octets());
     }
     Some(out)
@@ -47,8 +51,8 @@ pub async fn serve(mgr: Arc<crate::manager::Manager>) -> Result<()> {
     if cfg!(windows) {
         return Ok(());
     }
-    let sock = Arc::new(UdpSocket::bind((ADDR, 53)).await?);
-    let mut buf = vec![0u8; 1500];
+    let sock = Arc::new(UdpSocket::bind((ADDR, dns::PORT)).await?);
+    let mut buf = vec![0u8; dns::BUFFER];
     loop {
         let (n, from) = sock.recv_from(&mut buf).await?;
         let query = buf[..n].to_vec();

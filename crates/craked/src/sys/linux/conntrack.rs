@@ -16,11 +16,8 @@ const IPCTNL_MSG_CT_DELETE: u16 = 2;
 const NF_NETLINK_CONNTRACK_NEW: u32 = 1;
 const NF_NETLINK_CONNTRACK_UPDATE: u32 = 2;
 const NF_NETLINK_CONNTRACK_DESTROY: u32 = 4;
-const NLM_F_REQUEST: u16 = 1;
-const NLM_F_ACK: u16 = 4;
 const NLM_F_CREATE: u16 = 0x400;
 const NLA_F_NESTED: u16 = 0x8000;
-const NLA_TYPE_MASK: u16 = !(0x8000 | 0x4000);
 
 const CTA_TUPLE_ORIG: u16 = 1;
 const CTA_PROTOINFO: u16 = 4;
@@ -34,14 +31,34 @@ const CTA_PROTO_DST_PORT: u16 = 3;
 const CTA_PROTOINFO_TCP: u16 = 1;
 const CTA_PROTOINFO_TCP_STATE: u16 = 1;
 
+/// nfnetlink's message types: the subsystem in the high byte, its own
+/// message in the low byte.
+const SUBSYS_SHIFT: u32 = 8;
+const MESSAGE: u16 = 0xff;
+/// `struct nfgenmsg` after the netlink header: family, version, resource id.
+const NFGENMSG: usize = 4;
+/// Bursts of new connections shouldn't overflow the queue (4 MiB); one read
+/// takes up to 64 KiB of events.
+const SOCKET_BUFFER: libc::c_int = 4 << 20;
+const EVENT_BUFFER: usize = 1 << 16;
+/// The kernel's TCP states (enum tcp_conntrack, nf_conntrack_tcp.h): a SYN
+/// out, then everything after a reply, then a close.
+const SYN_SENT: u8 = 1;
+const SYN_RECV: u8 = 2;
+const TIME_WAIT: u8 = 7;
+const CLOSE: u8 = 8;
+const SYN_SENT2: u8 = 9;
+
+use super::netlink;
+
 pub use crate::flows::{Event, Flow, Kind, TcpState};
 
 impl TcpState {
     fn from_raw(s: u8) -> Self {
         match s {
-            1 | 9 => Self::SynSent,
-            2..=7 => Self::Answered,
-            8 => Self::Close,
+            SYN_SENT | SYN_SENT2 => Self::SynSent,
+            SYN_RECV..=TIME_WAIT => Self::Answered,
+            CLOSE => Self::Close,
             _ => Self::Other,
         }
     }
@@ -58,8 +75,7 @@ impl Events {
         let groups =
             NF_NETLINK_CONNTRACK_NEW | NF_NETLINK_CONNTRACK_UPDATE | NF_NETLINK_CONNTRACK_DESTROY;
         let fd = netlink_socket(groups, true).context("conntrack events")?;
-        // Bursts of new connections shouldn't overflow the queue.
-        let size: libc::c_int = 4 << 20;
+        let size = SOCKET_BUFFER;
         // SAFETY: plain setsockopt with an int.
         unsafe {
             libc::setsockopt(
@@ -72,7 +88,7 @@ impl Events {
         }
         Ok(Self {
             fd: AsyncFd::new(fd)?,
-            buf: vec![0; 1 << 16],
+            buf: vec![0; EVENT_BUFFER],
         })
     }
 
@@ -144,124 +160,89 @@ pub async fn close_to(target: crate::hosts::Target) {
 pub fn delete(flow: Flow) -> io::Result<()> {
     let fd = netlink_socket(0, false)?;
     let mut ip = Vec::new();
-    put_attr(&mut ip, CTA_IP_V4_SRC, &flow.src.octets());
-    put_attr(&mut ip, CTA_IP_V4_DST, &flow.dst.octets());
+    netlink::put_attr(&mut ip, CTA_IP_V4_SRC, &flow.src.octets());
+    netlink::put_attr(&mut ip, CTA_IP_V4_DST, &flow.dst.octets());
     let mut proto = Vec::new();
-    put_attr(&mut proto, CTA_PROTO_NUM, &[libc::IPPROTO_TCP as u8]);
-    put_attr(&mut proto, CTA_PROTO_SRC_PORT, &flow.sport.to_be_bytes());
-    put_attr(&mut proto, CTA_PROTO_DST_PORT, &flow.dport.to_be_bytes());
+    netlink::put_attr(&mut proto, CTA_PROTO_NUM, &[libc::IPPROTO_TCP as u8]);
+    netlink::put_attr(&mut proto, CTA_PROTO_SRC_PORT, &flow.sport.to_be_bytes());
+    netlink::put_attr(&mut proto, CTA_PROTO_DST_PORT, &flow.dport.to_be_bytes());
     let mut tuple = Vec::new();
-    put_attr(&mut tuple, CTA_TUPLE_IP | NLA_F_NESTED, &ip);
-    put_attr(&mut tuple, CTA_TUPLE_PROTO | NLA_F_NESTED, &proto);
+    netlink::put_attr(&mut tuple, CTA_TUPLE_IP | NLA_F_NESTED, &ip);
+    netlink::put_attr(&mut tuple, CTA_TUPLE_PROTO | NLA_F_NESTED, &proto);
     let mut body = vec![libc::AF_INET as u8, 0, 0, 0]; // nfgenmsg
-    put_attr(&mut body, CTA_TUPLE_ORIG | NLA_F_NESTED, &tuple);
+    netlink::put_attr(&mut body, CTA_TUPLE_ORIG | NLA_F_NESTED, &tuple);
 
-    let len = 16 + body.len();
-    let mut msg = Vec::with_capacity(len);
-    msg.extend_from_slice(&(len as u32).to_ne_bytes());
-    msg.extend_from_slice(&((NFNL_SUBSYS_CTNETLINK << 8) | IPCTNL_MSG_CT_DELETE).to_ne_bytes());
-    msg.extend_from_slice(&(NLM_F_REQUEST | NLM_F_ACK).to_ne_bytes());
-    msg.extend_from_slice(&1u32.to_ne_bytes()); // seq
-    msg.extend_from_slice(&0u32.to_ne_bytes()); // pid
-    msg.extend_from_slice(&body);
+    let msg = netlink::request(
+        (NFNL_SUBSYS_CTNETLINK << SUBSYS_SHIFT) | IPCTNL_MSG_CT_DELETE,
+        &body,
+    );
 
     // SAFETY: send/recv on our own socket and buffers.
     unsafe {
         if libc::send(fd.as_raw_fd(), msg.as_ptr().cast(), msg.len(), 0) < 0 {
             return Err(io::Error::last_os_error());
         }
-        let mut ack = [0u8; 256];
+        let mut ack = [0u8; netlink::ACK_BUFFER];
         let n = libc::recv(fd.as_raw_fd(), ack.as_mut_ptr().cast(), ack.len(), 0);
-        if n >= 20 {
-            let err = i32::from_ne_bytes([ack[16], ack[17], ack[18], ack[19]]);
-            // ENOENT: already gone, which is what we wanted.
-            if err != 0 && -err != libc::ENOENT {
-                return Err(io::Error::from_raw_os_error(-err));
-            }
+        let code = usize::try_from(n)
+            .ok()
+            .and_then(|n| netlink::ack_code(&ack[..n]));
+        // ENOENT: already gone, which is what we wanted.
+        if let Some(err) = code
+            && err != 0
+            && -err != libc::ENOENT
+        {
+            return Err(io::Error::from_raw_os_error(-err));
         }
     }
     Ok(())
-}
-
-fn put_attr(buf: &mut Vec<u8>, kind: u16, payload: &[u8]) {
-    let len = 4 + payload.len();
-    buf.extend_from_slice(&(len as u16).to_ne_bytes());
-    buf.extend_from_slice(&kind.to_ne_bytes());
-    buf.extend_from_slice(payload);
-    buf.resize(buf.len() + (4 - len % 4) % 4, 0);
-}
-
-/// Attributes of one nested level: (type, payload).
-fn attrs(mut b: &[u8]) -> Vec<(u16, &[u8])> {
-    let mut out = Vec::new();
-    while b.len() >= 4 {
-        let len = usize::from(u16::from_ne_bytes([b[0], b[1]]));
-        let kind = u16::from_ne_bytes([b[2], b[3]]) & NLA_TYPE_MASK;
-        if len < 4 || len > b.len() {
-            break;
-        }
-        out.push((kind, &b[4..len]));
-        let next = (len + 3) & !3;
-        b = &b[next.min(b.len())..];
-    }
-    out
 }
 
 fn child<'a>(list: &[(u16, &'a [u8])], kind: u16) -> Option<&'a [u8]> {
     list.iter().find(|(k, _)| *k == kind).map(|(_, v)| *v)
 }
 
-pub fn parse_messages(mut b: &[u8]) -> Vec<Event> {
-    let mut out = Vec::new();
-    while b.len() >= 16 {
-        let len = u32::from_ne_bytes([b[0], b[1], b[2], b[3]]) as usize;
-        if len < 16 || len > b.len() {
-            break;
-        }
-        let kind = u16::from_ne_bytes([b[4], b[5]]);
-        let flags = u16::from_ne_bytes([b[6], b[7]]);
-        if kind >> 8 == NFNL_SUBSYS_CTNETLINK && len >= 20 && b[16] == libc::AF_INET as u8 {
-            let kind = match kind & 0xff {
-                IPCTNL_MSG_CT_NEW if flags & NLM_F_CREATE != 0 => Some(Kind::New),
-                IPCTNL_MSG_CT_NEW => Some(Kind::Update),
-                IPCTNL_MSG_CT_DELETE => Some(Kind::Destroy),
-                _ => None,
-            };
-            if let Some(kind) = kind
-                && let Some(ev) = parse_event(kind, &b[20..len])
+pub fn parse_messages(b: &[u8]) -> Vec<Event> {
+    netlink::messages(b)
+        .into_iter()
+        .filter_map(|(kind, flags, body)| {
+            if kind >> SUBSYS_SHIFT != NFNL_SUBSYS_CTNETLINK
+                || body.first() != Some(&(libc::AF_INET as u8))
             {
-                out.push(ev);
+                return None;
             }
-        }
-        b = &b[((len + 3) & !3).min(b.len())..];
-    }
-    out
+            let kind = match kind & MESSAGE {
+                IPCTNL_MSG_CT_NEW if flags & NLM_F_CREATE != 0 => Kind::New,
+                IPCTNL_MSG_CT_NEW => Kind::Update,
+                IPCTNL_MSG_CT_DELETE => Kind::Destroy,
+                _ => return None,
+            };
+            parse_event(kind, body.get(NFGENMSG..)?)
+        })
+        .collect()
 }
 
 fn parse_event(kind: Kind, body: &[u8]) -> Option<Event> {
-    let top = attrs(body);
-    let tuple = attrs(child(&top, CTA_TUPLE_ORIG)?);
-    let ip = attrs(child(&tuple, CTA_TUPLE_IP)?);
-    let proto = attrs(child(&tuple, CTA_TUPLE_PROTO)?);
+    let top = netlink::attrs(body);
+    let tuple = netlink::attrs(child(&top, CTA_TUPLE_ORIG)?);
+    let ip = netlink::attrs(child(&tuple, CTA_TUPLE_IP)?);
+    let proto = netlink::attrs(child(&tuple, CTA_TUPLE_PROTO)?);
     if child(&proto, CTA_PROTO_NUM)?.first() != Some(&(libc::IPPROTO_TCP as u8)) {
         return None;
     }
     let v4 = |k| -> Option<Ipv4Addr> {
         let v = child(&ip, k)?;
-        Some(Ipv4Addr::new(
-            *v.first()?,
-            *v.get(1)?,
-            *v.get(2)?,
-            *v.get(3)?,
-        ))
+        let octets: [u8; size_of::<Ipv4Addr>()] =
+            v.get(..size_of::<Ipv4Addr>())?.try_into().ok()?;
+        Some(Ipv4Addr::from(octets))
     };
     let port = |k| -> Option<u16> {
         let v = child(&proto, k)?;
         Some(u16::from_be_bytes([*v.first()?, *v.get(1)?]))
     };
     let state = child(&top, CTA_PROTOINFO)
-        .and_then(|p| child(&attrs(p), CTA_PROTOINFO_TCP))
-        .and_then(|t| child(&attrs(t), CTA_PROTOINFO_TCP_STATE))
+        .and_then(|p| child(&netlink::attrs(p), CTA_PROTOINFO_TCP))
+        .and_then(|t| child(&netlink::attrs(t), CTA_PROTOINFO_TCP_STATE))
         .and_then(|s| s.first().copied())
         .map(TcpState::from_raw);
     Some(Event {
@@ -283,23 +264,23 @@ mod tests {
     /// Build an event message the way the kernel does.
     fn message(msg: u16, flags: u16, state: u8) -> Vec<u8> {
         let mut ip = Vec::new();
-        put_attr(&mut ip, CTA_IP_V4_SRC, &[192, 168, 0, 242]);
-        put_attr(&mut ip, CTA_IP_V4_DST, &[10, 58, 70, 119]);
+        netlink::put_attr(&mut ip, CTA_IP_V4_SRC, &[192, 168, 0, 242]);
+        netlink::put_attr(&mut ip, CTA_IP_V4_DST, &[10, 58, 70, 119]);
         let mut proto = Vec::new();
-        put_attr(&mut proto, CTA_PROTO_NUM, &[6]);
-        put_attr(&mut proto, CTA_PROTO_SRC_PORT, &40000u16.to_be_bytes());
-        put_attr(&mut proto, CTA_PROTO_DST_PORT, &5432u16.to_be_bytes());
+        netlink::put_attr(&mut proto, CTA_PROTO_NUM, &[6]);
+        netlink::put_attr(&mut proto, CTA_PROTO_SRC_PORT, &40000u16.to_be_bytes());
+        netlink::put_attr(&mut proto, CTA_PROTO_DST_PORT, &5432u16.to_be_bytes());
         let mut tuple = Vec::new();
-        put_attr(&mut tuple, CTA_TUPLE_IP | NLA_F_NESTED, &ip);
-        put_attr(&mut tuple, CTA_TUPLE_PROTO | NLA_F_NESTED, &proto);
+        netlink::put_attr(&mut tuple, CTA_TUPLE_IP | NLA_F_NESTED, &ip);
+        netlink::put_attr(&mut tuple, CTA_TUPLE_PROTO | NLA_F_NESTED, &proto);
         let mut tcp = Vec::new();
-        put_attr(&mut tcp, CTA_PROTOINFO_TCP_STATE, &[state]);
+        netlink::put_attr(&mut tcp, CTA_PROTOINFO_TCP_STATE, &[state]);
         let mut info = Vec::new();
-        put_attr(&mut info, CTA_PROTOINFO_TCP | NLA_F_NESTED, &tcp);
+        netlink::put_attr(&mut info, CTA_PROTOINFO_TCP | NLA_F_NESTED, &tcp);
         let mut body = vec![libc::AF_INET as u8, 0, 0, 0];
-        put_attr(&mut body, CTA_TUPLE_ORIG | NLA_F_NESTED, &tuple);
-        put_attr(&mut body, 3, &2u32.to_be_bytes()); // CTA_STATUS, skipped
-        put_attr(&mut body, CTA_PROTOINFO | NLA_F_NESTED, &info);
+        netlink::put_attr(&mut body, CTA_TUPLE_ORIG | NLA_F_NESTED, &tuple);
+        netlink::put_attr(&mut body, 3, &2u32.to_be_bytes()); // CTA_STATUS, skipped
+        netlink::put_attr(&mut body, CTA_PROTOINFO | NLA_F_NESTED, &info);
         let len = 16 + body.len();
         let mut m = Vec::new();
         m.extend_from_slice(&(len as u32).to_ne_bytes());

@@ -6,6 +6,8 @@ use std::net::Ipv4Addr;
 use anyhow::{Context, Result, bail};
 use tokio::process::Command;
 
+use super::netlink;
+
 #[derive(Debug, Clone, Copy)]
 pub enum Net {
     /// Shell out to iproute2.
@@ -86,42 +88,20 @@ const DEVCONF_RP_FILTER: u16 = 8;
 const IFLA_AF_SPEC: u16 = 26;
 const IFLA_INET_CONF: u16 = 1;
 
-/// An attribute: length, type, payload, padded to 4 bytes.
-fn attr(kind: u16, payload: &[u8]) -> Vec<u8> {
-    let len = 4 + payload.len();
-    let mut a = Vec::with_capacity(len.next_multiple_of(4));
-    a.extend_from_slice(&u16::try_from(len).unwrap_or(u16::MAX).to_ne_bytes());
-    a.extend_from_slice(&kind.to_ne_bytes());
-    a.extend_from_slice(payload);
-    a.resize(len.next_multiple_of(4), 0);
-    a
-}
-
 /// RTM_SETLINK for interface `index`: its rp_filter set to `value`.
 fn rp_filter_message(index: u32, value: u32) -> Vec<u8> {
-    let conf = attr(
+    use std::mem::offset_of;
+    let conf = netlink::attr(
         IFLA_INET_CONF,
-        &attr(DEVCONF_RP_FILTER, &value.to_ne_bytes()),
+        &netlink::attr(DEVCONF_RP_FILTER, &value.to_ne_bytes()),
     );
-    let spec = attr(IFLA_AF_SPEC, &attr(libc::AF_INET as u16, &conf));
-    // struct ifinfomsg: family, pad, type, index, flags, change.
-    let mut body = vec![0u8; 16];
-    body[4..8].copy_from_slice(&index.to_ne_bytes());
+    let spec = netlink::attr(IFLA_AF_SPEC, &netlink::attr(libc::AF_INET as u16, &conf));
+    // struct ifinfomsg: all zero (any family, type, flags) but the index.
+    let mut body = vec![0u8; size_of::<libc::ifinfomsg>()];
+    let at = offset_of!(libc::ifinfomsg, ifi_index);
+    body[at..at + size_of::<i32>()].copy_from_slice(&index.to_ne_bytes());
     body.extend_from_slice(&spec);
-    // struct nlmsghdr: length, type, flags, sequence, port.
-    let mut msg = Vec::with_capacity(16 + body.len());
-    msg.extend_from_slice(
-        &u32::try_from(16 + body.len())
-            .unwrap_or(u32::MAX)
-            .to_ne_bytes(),
-    );
-    msg.extend_from_slice(&libc::RTM_SETLINK.to_ne_bytes());
-    let flags = (libc::NLM_F_REQUEST | libc::NLM_F_ACK) as u16;
-    msg.extend_from_slice(&flags.to_ne_bytes());
-    msg.extend_from_slice(&1u32.to_ne_bytes());
-    msg.extend_from_slice(&0u32.to_ne_bytes());
-    msg.extend_from_slice(&body);
-    msg
+    netlink::request(libc::RTM_SETLINK, &body)
 }
 
 /// Send one rtnetlink request and read its acknowledgement.
@@ -145,22 +125,18 @@ fn set_link(msg: &[u8]) -> Result<()> {
     if sent < 0 {
         return Err(std::io::Error::last_os_error().into());
     }
-    let mut buf = [0u8; 512];
+    let mut buf = [0u8; netlink::ACK_BUFFER];
     // SAFETY: receiving into a valid buffer of the given length.
     let n = unsafe { libc::recv(sock.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len(), 0) };
     if n < 0 {
         return Err(std::io::Error::last_os_error().into());
     }
     // NLMSG_ERROR with error 0 is the acknowledgement.
-    let n = usize::try_from(n).unwrap_or(0);
-    if n >= 20 && u16::from_ne_bytes([buf[4], buf[5]]) == libc::NLMSG_ERROR as u16 {
-        let code = i32::from_ne_bytes([buf[16], buf[17], buf[18], buf[19]]);
-        if code != 0 {
-            return Err(std::io::Error::from_raw_os_error(-code).into());
-        }
-        return Ok(());
+    match netlink::ack_code(&buf[..usize::try_from(n).unwrap_or(0)]) {
+        Some(0) => Ok(()),
+        Some(code) => Err(std::io::Error::from_raw_os_error(-code).into()),
+        None => bail!("no acknowledgement from the kernel"),
     }
-    bail!("no acknowledgement from the kernel")
 }
 
 async fn ip(args: &[&str]) -> Result<()> {

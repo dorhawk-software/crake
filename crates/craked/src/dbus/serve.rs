@@ -42,7 +42,10 @@ pub fn serve_p2p(mgr: Arc<Manager>, path: &std::path::Path, owner: u32) -> anyho
     use std::os::unix::fs::PermissionsExt;
     let _ = std::fs::remove_file(path);
     let listener = tokio::net::UnixListener::bind(path)?;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    std::fs::set_permissions(
+        path,
+        std::fs::Permissions::from_mode(crate::sys::OWNER_ONLY),
+    )?;
     std::os::unix::fs::chown(path, Some(owner), None)?;
     tokio::spawn(async move {
         loop {
@@ -73,6 +76,10 @@ pub fn serve_p2p(mgr: Arc<Manager>, path: &std::path::Path, owner: u32) -> anyho
     Ok(())
 }
 
+/// The macOS console socket: anyone may open it; the API checks who asks.
+#[cfg(target_os = "macos")]
+const ANYONE: u32 = 0o666;
+
 /// macOS: the same API on a Unix socket anyone may open
 /// (`crake_proto::APP_SOCKET`); changes need the console's user.
 #[cfg(target_os = "macos")]
@@ -80,7 +87,7 @@ pub fn serve_console(mgr: Arc<Manager>, path: &std::path::Path) -> anyhow::Resul
     use std::os::unix::fs::PermissionsExt;
     let _ = std::fs::remove_file(path);
     let listener = tokio::net::UnixListener::bind(path)?;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o666))?;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(ANYONE))?;
     tokio::spawn(async move {
         loop {
             let Ok((stream, _)) = listener.accept().await else {

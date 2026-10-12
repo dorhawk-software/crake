@@ -33,7 +33,7 @@ impl TunnelInfo {
             (Some(len), _) => Some(
                 len.parse::<u8>()
                     .ok()
-                    .filter(|l| *l <= 32)
+                    .filter(|l| *l <= crate::hosts::V4_BITS)
                     .context("INTERNAL_IP4_NETMASKLEN")?,
             ),
             (None, Some(mask)) => Some(
@@ -43,7 +43,7 @@ impl TunnelInfo {
                     .context("INTERNAL_IP4_NETMASK")?,
             ),
             // openconnect omits the mask for a point-to-point address.
-            (None, None) => address.map(|_| 32),
+            (None, None) => address.map(|_| crate::hosts::V4_BITS),
         };
         let mtu = get("INTERNAL_IP4_MTU").and_then(|m| m.parse().ok());
         let dns = get("INTERNAL_IP4_DNS")
@@ -79,14 +79,19 @@ impl TunnelInfo {
     }
 }
 
+/// More split networks than any gateway pushes: the rest is ignored.
+const MAX_SPLITS: usize = 1024;
+
 fn split_list(env: &BTreeMap<String, String>, base: &str) -> Vec<String> {
     let n: usize = env.get(base).and_then(|n| n.parse().ok()).unwrap_or(0);
-    (0..n.min(1024))
+    (0..n.min(MAX_SPLITS))
         .filter_map(|i| {
             let addr = env.get(&format!("{base}_{i}_ADDR"))?;
             let len = env.get(&format!("{base}_{i}_MASKLEN"))?;
             addr.parse::<Ipv4Addr>().ok()?;
-            len.parse::<u8>().ok().filter(|l| *l <= 32)?;
+            len.parse::<u8>()
+                .ok()
+                .filter(|l| *l <= crate::hosts::V4_BITS)?;
             Some(format!("{addr}/{len}"))
         })
         .collect()

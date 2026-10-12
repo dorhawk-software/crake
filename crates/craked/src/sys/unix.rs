@@ -60,13 +60,15 @@ pub async fn stop(child: &mut Child, keep_session: bool) {
         // SAFETY: plain signal to a child we own.
         unsafe { libc::kill(pid as i32, signal) };
     }
-    if tokio::time::timeout(Duration::from_secs(10), child.wait())
-        .await
-        .is_err()
-    {
+    if tokio::time::timeout(STOP_WAIT, child.wait()).await.is_err() {
         let _ = child.kill().await;
     }
 }
+
+/// Read and written by its owner alone.
+pub const OWNER_ONLY: u32 = 0o600;
+/// A stopped child gets this long before it's killed.
+const STOP_WAIT: Duration = Duration::from_secs(10);
 
 /// A new file for root alone (0600), replacing any older one.
 pub fn create_private(path: &Path) -> std::io::Result<std::fs::File> {
@@ -75,6 +77,6 @@ pub fn create_private(path: &Path) -> std::io::Result<std::fs::File> {
     std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
-        .mode(0o600)
+        .mode(OWNER_ONLY)
         .open(path)
 }

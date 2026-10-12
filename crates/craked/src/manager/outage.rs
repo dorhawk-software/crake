@@ -228,8 +228,8 @@ impl Manager {
             return false;
         };
         let mark = crate::routing::ids(index).mark;
-        for port in [443, 80] {
-            if crate::probe::through_tunnel(SocketAddrV4::new(addr, port), mark, PROBE_TIMEOUT / 3)
+        for port in WEB_PORTS {
+            if crate::probe::through_tunnel(SocketAddrV4::new(addr, port), mark, WEB_PROBE)
                 .await
                 .is_some()
             {

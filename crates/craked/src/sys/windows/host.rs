@@ -30,8 +30,8 @@ pub fn interfaces() -> Vec<(String, Ipv4Addr, u32)> {
             while !unicast.is_null() {
                 let u = &*unicast;
                 if let Some(addr) = ipv4(u.Address.lpSockaddr) {
-                    let prefix = u32::from(u.OnLinkPrefixLength.min(32));
-                    let mask = u32::MAX.checked_shl(32 - prefix).unwrap_or(0);
+                    let prefix = u32::from(u.OnLinkPrefixLength.min(crate::hosts::V4_BITS));
+                    let mask = u32::MAX.checked_shl(Ipv4Addr::BITS - prefix).unwrap_or(0);
                     found.push((name.to_owned(), addr, mask));
                 }
                 unicast = u.Next;
@@ -79,10 +79,12 @@ fn each_adapter(
     use windows_sys::Win32::Networking::WinSock::AF_INET;
     const ERROR_BUFFER_OVERFLOW: u32 = 111;
     let flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST;
-    let mut size: u32 = 16 * 1024;
+    // A first guess at the size; the call says if it needs more.
+    const FIRST_SIZE: u32 = 16 * 1024;
+    let mut size: u32 = FIRST_SIZE;
     let mut buf: Vec<u64>;
     loop {
-        buf = vec![0; (size as usize).div_ceil(8)];
+        buf = vec![0; (size as usize).div_ceil(size_of::<u64>())];
         // SAFETY: `buf` holds `size` bytes, 8-byte aligned.
         let err = unsafe {
             GetAdaptersAddresses(
@@ -209,13 +211,16 @@ pub fn own_group(cmd: &mut Command) {
 
 /// Stop openconnect: Ctrl+Break detaches and keeps its session (SIGHUP's
 /// counterpart), Ctrl+C logs off. Killed if it doesn't end in 10 s.
+/// openconnect gets this long to stop after the console event.
+const STOP_WAIT: Duration = Duration::from_secs(10);
+/// A console event arrives on a thread of its own, about this soon.
+const EVENT_ARRIVES: Duration = Duration::from_millis(500);
+
 pub async fn stop(child: &mut Child, keep_session: bool) {
     if let Some(pid) = child.id() {
         let event = if keep_session { "break" } else { "c" };
         if send_console_event(pid, event).await
-            && tokio::time::timeout(Duration::from_secs(10), child.wait())
-                .await
-                .is_ok()
+            && tokio::time::timeout(STOP_WAIT, child.wait()).await.is_ok()
         {
             return;
         }
@@ -257,7 +262,7 @@ pub fn deliver_console_event(pid: u32, event: &str) -> bool {
         SetConsoleCtrlHandler(Some(swallow), 1);
         let sent = GenerateConsoleCtrlEvent(event, 0) != 0;
         // The event arrives on a thread of its own: be here for it.
-        std::thread::sleep(Duration::from_millis(500));
+        std::thread::sleep(EVENT_ARRIVES);
         sent
     }
 }

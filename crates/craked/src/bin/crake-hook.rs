@@ -53,11 +53,15 @@ fn run(reason: &str) -> Result<(), String> {
     }
 }
 
-/// craked's socket, giving up on an answer after 15 s.
+/// How long the hook waits for craked's answer.
+#[cfg(unix)]
+const ANSWER_WAIT: std::time::Duration = std::time::Duration::from_secs(15);
+
+/// craked's socket, giving up on an answer after ANSWER_WAIT.
 #[cfg(unix)]
 fn open(socket: &str) -> std::io::Result<std::os::unix::net::UnixStream> {
     let stream = std::os::unix::net::UnixStream::connect(socket)?;
-    let timeout = Some(std::time::Duration::from_secs(15));
+    let timeout = Some(ANSWER_WAIT);
     stream.set_read_timeout(timeout)?;
     stream.set_write_timeout(timeout)?;
     Ok(stream)

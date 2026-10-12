@@ -3,6 +3,9 @@
 
 use super::*;
 
+/// Recent public answers kept to give log lines a name, before old ones go.
+const SEEN_NAMES_MAX: usize = 4096;
+
 impl Manager {
     /// Called with each DNS answer from a tunnel's DNS servers, before the
     /// answer is let through. Names outside the tunnel's domains are ignored.
@@ -151,9 +154,9 @@ impl Manager {
             };
             let mark = crate::routing::ids(index).mark;
             let mut answers = false;
-            for port in [443, 80] {
+            for port in WEB_PORTS {
                 let addr = SocketAddrV4::new(private[0], port);
-                if crate::probe::through_tunnel(addr, mark, PROBE_TIMEOUT / 3)
+                if crate::probe::through_tunnel(addr, mark, WEB_PROBE)
                     .await
                     .is_some()
                 {
@@ -202,7 +205,7 @@ impl Manager {
             return;
         }
         let mut seen = self.seen_names.lock().unwrap();
-        if seen.len() > 4096 {
+        if seen.len() > SEEN_NAMES_MAX {
             seen.retain(|_, (_, at)| at.elapsed() < SEEN_NAME_FOR);
         }
         for a in &answer.addrs {
@@ -354,13 +357,13 @@ pub(super) async fn ask_within(
         let id = std::collections::hash_map::RandomState::new().hash_one(Instant::now()) as u16;
         let sock = tokio::net::UdpSocket::bind("0.0.0.0:0").await.ok()?;
         crate::sys::bind_device(&sock, device).ok()?;
-        if sock.connect((*server, 53)).await.is_err() {
+        if sock.connect((*server, dns::PORT)).await.is_err() {
             continue;
         }
         if sock.send(&dns::query(id, name, qtype)).await.is_err() {
             continue;
         }
-        let mut buf = vec![0u8; 4096];
+        let mut buf = vec![0u8; dns::BUFFER];
         let wait = tokio::time::timeout(wait, async {
             loop {
                 let n = sock.recv(&mut buf).await.ok()?;

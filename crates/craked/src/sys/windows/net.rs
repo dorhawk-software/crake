@@ -57,7 +57,7 @@ impl Net {
     /// adds up front).
     pub async fn route_dns(&self, dev: &str, dns: Ipv4Addr) -> Result<()> {
         match self {
-            Self::Ip => iphelper::add_route(iphelper::luid(dev)?, dns, 32),
+            Self::Ip => iphelper::add_route(iphelper::luid(dev)?, dns, crate::hosts::V4_BITS),
             Self::Noop => Ok(()),
         }
     }

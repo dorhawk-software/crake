@@ -3,6 +3,13 @@
 
 use super::*;
 
+/// Leaving: the tunnels get 12 s to log off, looked at every POLL.
+const STOP_POLLS: u32 = 120;
+const POLL: Duration = Duration::from_millis(100);
+/// openvpn3 may still be telling resolved a device's DNS: 2 s of grace.
+const RESOLVED_POLLS: u32 = 10;
+const RESOLVED_POLL: Duration = Duration::from_millis(200);
+
 impl Manager {
     pub fn connect(self: &Arc<Self>, name: &str) -> Result<()> {
         self.connect_with(name, None)
@@ -87,12 +94,12 @@ impl Manager {
         // Leaving: log every session off, unless a package upgrade asked
         // for them to be handed to the new craked.
         self.stop_all();
-        for _ in 0..120 {
+        for _ in 0..STOP_POLLS {
             let busy = self.tunnels.lock().unwrap().values().any(|e| e.running);
             if !busy {
                 break;
             }
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            tokio::time::sleep(POLL).await;
         }
         // Leave nothing behind: Crake off is Crake gone. Its own nftables
         // table, policy rules and routing tables (OpenVPN 3 sessions, which
@@ -253,7 +260,7 @@ impl Manager {
         // is what the server pushed. A moment's grace: it may still be
         // setting it.
         if dns.is_empty() {
-            for _ in 0..10 {
+            for _ in 0..RESOLVED_POLLS {
                 if let Ok((servers, names)) = self.resolved.link(device).await
                     && !servers.is_empty()
                 {
@@ -263,7 +270,7 @@ impl Manager {
                     }
                     break;
                 }
-                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                tokio::time::sleep(RESOLVED_POLL).await;
             }
         }
         if let Some(how) = fields.get("transport").filter(|t| !t.is_empty()) {
@@ -359,7 +366,12 @@ impl Manager {
                 }
                 if let Some(addr) = info.address {
                     self.net
-                        .assign(&info.device, addr, info.prefix.unwrap_or(32), info.mtu)
+                        .assign(
+                            &info.device,
+                            addr,
+                            info.prefix.unwrap_or(crate::hosts::V4_BITS),
+                            info.mtu,
+                        )
                         .await?;
                 }
                 self.tunnel_up(name, &display, info, msg.reason == "connect")

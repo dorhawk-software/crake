@@ -53,7 +53,7 @@ fn sockaddr(addr: Ipv4Addr) -> SOCKADDR_INET {
                     S_addr: u32::from_ne_bytes(addr.octets()),
                 },
             },
-            sin_zero: [0; 8],
+            sin_zero: Default::default(),
         },
     }
 }
@@ -168,7 +168,7 @@ pub fn best_route(dest: Ipv4Addr) -> Result<(Route, u8)> {
         Route {
             luid: best.InterfaceLuid,
             dest,
-            prefix: 32,
+            prefix: crate::hosts::V4_BITS,
             via: Ipv4Addr::from(via.to_ne_bytes()),
         },
         best.DestinationPrefix.PrefixLength,

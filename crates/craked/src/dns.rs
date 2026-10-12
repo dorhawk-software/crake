@@ -7,6 +7,55 @@ use std::net::{IpAddr, Ipv4Addr};
 use hickory_proto::op::{Message, MessageType, Query, ResponseCode};
 use hickory_proto::rr::{DNSClass, RData, RecordType};
 
+use crate::packet;
+
+/// DNS's port.
+pub const PORT: u16 = 53;
+/// The fixed header every message starts with (RFC 1035 4.1.1).
+pub const HEADER: usize = 12;
+/// Big enough for any message read over UDP (EDNS asks for at most 1232).
+pub const BUFFER: usize = 4096;
+/// The header's fields after the ID (RFC 1035 4.1.1): a byte of flags (QR,
+/// opcode, AA, TC, RD), a byte of codes (RA, Z, RCODE), then how many
+/// questions, answers, authority and additional records.
+pub const FLAGS: usize = 2;
+pub const CODES: usize = 3;
+pub const QUESTIONS: usize = 4;
+pub const ANSWERS_LOW_BYTE: usize = 7;
+pub const RECORD_COUNTS: std::ops::Range<usize> = 6..12;
+/// In FLAGS: a response; what a reply keeps of a question's (opcode, RD).
+pub const QR: u8 = 0x80;
+pub const OPCODE_AND_RD: u8 = 0x79;
+/// In CODES: recursion available; the response code.
+pub const RA: u8 = 0x80;
+pub const RCODE: u8 = 0x0f;
+pub const REFUSED: u8 = 5;
+/// After a question's name (ending in a zero byte): its type and class.
+pub const QUESTION_FIELDS: usize = 4;
+/// How an answer names the question's name: a pointer to it, right after
+/// the header.
+pub const NAME_POINTER: [u8; 2] = [0xc0, HEADER as u8];
+/// Over TCP each message comes after its two-byte length (RFC 1035 4.2.2).
+const TCP_LENGTH: usize = size_of::<u16>();
+/// A name's limits (RFC 1035 2.3.4): each label, the whole name in text.
+const MAX_LABEL: usize = 63;
+const MAX_NAME: usize = 253;
+/// EDNS (RFC 6891): an OPT record (type 41, root name) offering answers up to
+/// 1232 bytes over UDP (the DNS flag day's size), no flags, no options: its
+/// TTL's four bytes and RDLENGTH's two are all zero.
+const EDNS_OPT: u16 = 41;
+const EDNS_UDP_SIZE: u16 = 1232;
+const EDNS_ZEROS: usize = 6;
+/// Room for a typical question with its OPT record.
+const QUERY_CAPACITY: usize = 64;
+/// A registrable domain is two labels ("acme.example"), three under a
+/// country's own second level ("acme.co.uk").
+const REGISTRABLE: usize = 2;
+const REGISTRABLE_UNDER_COUNTRY_SLD: usize = 3;
+/// Carrier-grade NAT's shared addresses, 100.64.0.0/10 (RFC 6598).
+const CARRIER_NAT: Ipv4Addr = Ipv4Addr::new(100, 64, 0, 0);
+const CARRIER_NAT_BITS: u32 = 10;
+
 /// One DNS answer: the name asked for and the addresses it resolved to
 /// (IPv4 from A records, IPv6 from AAAA).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,31 +77,22 @@ pub fn parse_packet(packet: &[u8]) -> Option<Answer> {
 /// spread over several segments isn't read; probing still sees the
 /// connection that follows.
 pub fn tcp_dns_payload(packet: &[u8]) -> Option<&[u8]> {
-    if packet.len() < 20 || packet[0] >> 4 != 4 || packet[9] != 6 {
+    let tcp = packet::V4::parse(packet, packet::TCP)?.payload_to_total()?;
+    if tcp.len() < packet::TCP_MIN || packet::source_port(tcp)? != PORT {
         return None;
     }
-    let ihl = usize::from(packet[0] & 0x0f) * 4;
-    let total = usize::from(u16::from_be_bytes([packet[2], packet[3]]));
-    let tcp = packet.get(ihl..total.min(packet.len()))?;
-    if tcp.len() < 20 || u16::from_be_bytes([tcp[0], tcp[1]]) != 53 {
-        return None;
-    }
-    let data = tcp.get(usize::from(tcp[12] >> 4) * 4..)?;
+    let data = packet::tcp_data(tcp)?;
     let len = usize::from(u16::from_be_bytes([*data.first()?, *data.get(1)?]));
-    (data.len() == 2 + len).then(|| &data[2..])
+    (data.len() == TCP_LENGTH + len).then(|| &data[TCP_LENGTH..])
 }
 
 /// The DNS message inside an IPv4 UDP packet from port 53.
 pub fn dns_payload(packet: &[u8]) -> Option<&[u8]> {
-    if packet.len() < 20 || packet[0] >> 4 != 4 || packet[9] != 17 {
+    let udp = packet::V4::parse(packet, packet::UDP)?.payload()?;
+    if udp.len() < packet::UDP_HEADER || packet::source_port(udp)? != PORT {
         return None;
     }
-    let ihl = usize::from(packet[0] & 0x0f) * 4;
-    let udp = packet.get(ihl..)?;
-    if udp.len() < 8 || u16::from_be_bytes([udp[0], udp[1]]) != 53 {
-        return None;
-    }
-    Some(&udp[8..])
+    Some(&udp[packet::UDP_HEADER..])
 }
 
 /// A DNS response message. Every A record in the answer section counts, so a
@@ -152,18 +192,22 @@ fn question(msg: &Message, types: &[RecordType]) -> Option<Failure> {
 
 /// A recursive question for `name`, with EDNS (1232 bytes).
 pub fn query(id: u16, name: &str, qtype: RecordType) -> Vec<u8> {
-    let mut m = Vec::with_capacity(64);
+    let mut m = Vec::with_capacity(QUERY_CAPACITY);
     m.extend_from_slice(&id.to_be_bytes());
+    // Recursion desired; one question, one additional record (the OPT).
     m.extend_from_slice(&[0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 1]);
     for label in name.split('.').filter(|l| !l.is_empty()) {
-        let label = &label.as_bytes()[..label.len().min(63)];
+        let label = &label.as_bytes()[..label.len().min(MAX_LABEL)];
         m.push(label.len() as u8);
         m.extend_from_slice(label);
     }
     m.push(0);
     m.extend_from_slice(&u16::from(qtype).to_be_bytes());
-    m.extend_from_slice(&[0, 1]);
-    m.extend_from_slice(&[0, 0, 41, 0x04, 0xd0, 0, 0, 0, 0, 0, 0]);
+    m.extend_from_slice(&u16::from(DNSClass::IN).to_be_bytes());
+    m.push(0); // the OPT record's name: the root
+    m.extend_from_slice(&EDNS_OPT.to_be_bytes());
+    m.extend_from_slice(&EDNS_UDP_SIZE.to_be_bytes());
+    m.extend_from_slice(&[0; EDNS_ZEROS]);
     m
 }
 
@@ -190,29 +234,7 @@ pub fn rewrite(failure: &Failure, mut reply: Message) -> Option<Vec<u8>> {
 /// checksum fixed, the (optional) UDP checksum cleared.
 pub fn replace_payload(packet: &[u8], dns: &[u8]) -> Option<Vec<u8>> {
     dns_payload(packet)?;
-    let ihl = usize::from(packet[0] & 0x0f) * 4;
-    let total = u16::try_from(ihl + 8 + dns.len()).ok()?;
-    let mut out = Vec::with_capacity(usize::from(total));
-    out.extend_from_slice(&packet[..ihl + 8]);
-    out.extend_from_slice(dns);
-    out[2..4].copy_from_slice(&total.to_be_bytes());
-    out[10..12].copy_from_slice(&[0, 0]);
-    let sum = ipv4_checksum(&out[..ihl]);
-    out[10..12].copy_from_slice(&sum.to_be_bytes());
-    out[ihl + 4..ihl + 6].copy_from_slice(&((8 + dns.len()) as u16).to_be_bytes());
-    out[ihl + 6..ihl + 8].copy_from_slice(&[0, 0]);
-    Some(out)
-}
-
-fn ipv4_checksum(header: &[u8]) -> u16 {
-    let mut sum: u32 = header
-        .chunks(2)
-        .map(|c| u32::from(u16::from_be_bytes([c[0], c.get(1).copied().unwrap_or(0)])))
-        .sum();
-    while sum >> 16 != 0 {
-        sum = (sum & 0xffff) + (sum >> 16);
-    }
-    !(sum as u16)
+    packet::with_udp_data(packet::V4::parse(packet, packet::UDP)?, dns)
 }
 
 /// The organisation's own domain, from its gateway's name:
@@ -229,21 +251,26 @@ pub fn organisation(gateway: &str) -> Option<String> {
         return None;
     }
     let labels: Vec<&str> = host.split('.').collect();
-    if labels.len() < 2 {
+    if labels.len() < REGISTRABLE {
         return None;
     }
     // "co.uk", "com.au", "ac.jp": a second level that belongs to the country.
-    let country_sld = labels.len() >= 3
-        && labels[labels.len() - 1].len() == 2
+    let country_sld = labels.len() >= REGISTRABLE_UNDER_COUNTRY_SLD
+        && labels[labels.len() - 1].len() == 2 // a country code
         && ["co", "com", "net", "org", "gov", "ac", "edu", "or", "ne"]
             .contains(&labels[labels.len() - 2]);
-    let keep = if country_sld { 3 } else { 2 };
+    let keep = if country_sld {
+        REGISTRABLE_UNDER_COUNTRY_SLD
+    } else {
+        REGISTRABLE
+    };
     Some(labels[labels.len() - keep..].join("."))
 }
 
 /// An address only reachable inside some network: RFC 1918 or carrier-grade NAT.
 pub fn is_private(a: Ipv4Addr) -> bool {
-    a.is_private() || (a.octets()[0] == 100 && (64..128).contains(&a.octets()[1]))
+    let shift = Ipv4Addr::BITS - CARRIER_NAT_BITS;
+    a.is_private() || u32::from(a) >> shift == u32::from(CARRIER_NAT) >> shift
 }
 
 pub fn normalize(name: &str) -> String {
@@ -262,10 +289,10 @@ pub fn in_domains(name: &str, domains: &[String]) -> bool {
 pub fn valid_domain(d: &str) -> bool {
     let d = normalize(d);
     !d.is_empty()
-        && d.len() <= 253
+        && d.len() <= MAX_NAME
         && d.split('.').all(|l| {
             !l.is_empty()
-                && l.len() <= 63
+                && l.len() <= MAX_LABEL
                 && l.bytes()
                     .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
         })
@@ -458,7 +485,7 @@ pub(crate) mod tests {
             packet.len()
         );
         assert_eq!(
-            ipv4_checksum(&packet[..20]),
+            crate::packet::checksum(&packet[..packet::IPV4_MIN]),
             0,
             "valid IPv4 header checksum"
         );

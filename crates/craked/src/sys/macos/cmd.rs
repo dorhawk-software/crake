@@ -21,7 +21,7 @@ pub async fn run(program: &str, args: &[&str]) -> Result<()> {
 
 /// `dest/prefix` as `route` takes it.
 fn destination(dest: &str, prefix: u8) -> Vec<String> {
-    if prefix == 32 {
+    if prefix == crate::hosts::V4_BITS {
         vec!["-host".into(), dest.into()]
     } else {
         vec!["-net".into(), format!("{dest}/{prefix}")]

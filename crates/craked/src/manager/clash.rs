@@ -3,6 +3,9 @@
 
 use super::*;
 
+/// "Two companies, one address" is said once in this long.
+const SAID_EVERY: Duration = Duration::from_secs(600);
+
 impl Manager {
     /// A tunnel that's up and can't be up together with `name`, and why:
     /// they share a DNS server (craked routes each server through its own
@@ -82,7 +85,7 @@ impl Manager {
             .find(|t| store.tunnels.get(t).is_some_and(|h| h.covers(addr)))
     }
 
-    /// Say (once per 10 min) that `host` on `tunnel` has an address that
+    /// Say (once per SAID_EVERY) that `host` on `tunnel` has an address that
     /// already goes through `owner`, and offer to move it.
     pub(super) fn contested(
         &self,
@@ -95,10 +98,7 @@ impl Manager {
         {
             let mut seen = self.contested.lock().unwrap();
             let key = (tunnel.to_owned(), addr);
-            if seen
-                .get(&key)
-                .is_some_and(|t| t.elapsed() < Duration::from_secs(600))
-            {
+            if seen.get(&key).is_some_and(|t| t.elapsed() < SAID_EVERY) {
                 return;
             }
             seen.insert(key, Instant::now());
@@ -142,10 +142,10 @@ impl Manager {
 /// The network a tunnel's own address is on (none for a single address).
 pub(super) fn own_net(info: &TunnelInfo) -> Option<Target> {
     let (addr, len) = (info.address?, info.prefix?);
-    if len == 0 || len >= 32 {
+    if len == 0 || len >= crate::hosts::V4_BITS {
         return None;
     }
-    let mask = u32::MAX << (32 - u32::from(len));
+    let mask = u32::MAX << (Ipv4Addr::BITS - u32::from(len));
     format!("{}/{len}", Ipv4Addr::from(u32::from(addr) & mask))
         .parse()
         .ok()

@@ -7,6 +7,9 @@
 use std::path::Path;
 use std::sync::Arc;
 
+/// A hook message is small; anything longer is refused.
+const MAX_LINE: u64 = 256 * 1024;
+
 use anyhow::{Context, Result};
 use crake_proto::{HookMessage, HookReply};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
@@ -23,7 +26,10 @@ pub fn serve(mgr: Arc<Manager>, path: &Path) -> Result<tokio::task::JoinHandle<(
     let _ = std::fs::remove_file(path);
     let listener = tokio::net::UnixListener::bind(path)
         .with_context(|| format!("binding {}", path.display()))?;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    std::fs::set_permissions(
+        path,
+        std::fs::Permissions::from_mode(crate::sys::OWNER_ONLY),
+    )?;
     Ok(tokio::spawn(async move {
         loop {
             match listener.accept().await {
@@ -79,7 +85,7 @@ async fn handle(mgr: &Manager, stream: impl AsyncRead + AsyncWrite) -> Result<()
     let (r, mut w) = tokio::io::split(stream);
     let mut line = String::new();
     // A hook message is small; refuse anything absurd.
-    BufReader::new(r).take_line(&mut line, 256 * 1024).await?;
+    BufReader::new(r).take_line(&mut line, MAX_LINE).await?;
     let msg: HookMessage = serde_json::from_str(&line).context("decoding hook message")?;
     tracing::debug!(tunnel = %msg.tunnel, reason = %msg.reason, "hook");
     let reply = match mgr.handle_hook(msg).await {

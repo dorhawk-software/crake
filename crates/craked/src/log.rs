@@ -3,6 +3,11 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+/// Entries queued for the app before a slow reader misses some.
+const APPENDED_BACKLOG: usize = 256;
+/// A timestamp to the second: "2026-10-09T21:14:00".
+const TO_THE_SECOND: usize = 19;
+
 use tokio::sync::broadcast;
 
 use anyhow::{Context, Result};
@@ -39,8 +44,8 @@ impl Log {
         Ok(Self {
             file: Mutex::new(file),
             path: path.to_owned(),
-            appended: broadcast::channel(256).0,
-            keep: Mutex::new(Some(30)),
+            appended: broadcast::channel(APPENDED_BACKLOG).0,
+            keep: Mutex::new(Some(crate::config::LOG_DAYS)),
             memory: Mutex::new(Default::default()),
         })
     }
@@ -61,7 +66,7 @@ impl Log {
         let cutoff = (OffsetDateTime::now_utc() - time::Duration::days(days as i64))
             .format(&Rfc3339)
             .unwrap_or_default();
-        let cutoff = cutoff.get(..19).unwrap_or_default().to_owned();
+        let cutoff = cutoff.get(..TO_THE_SECOND).unwrap_or_default().to_owned();
         let text = std::fs::read_to_string(&self.path).unwrap_or_default();
         let total = text.lines().count();
         let kept: Vec<&str> = text
@@ -69,7 +74,7 @@ impl Log {
             .filter(|l| {
                 serde_json::from_str::<LogEntry>(l)
                     .ok()
-                    .and_then(|e| e.ts.get(..19).map(|t| t >= cutoff.as_str()))
+                    .and_then(|e| e.ts.get(..TO_THE_SECOND).map(|t| t >= cutoff.as_str()))
                     .unwrap_or(true)
             })
             .collect();

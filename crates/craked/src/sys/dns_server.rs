@@ -43,7 +43,7 @@ pub fn spawn(mgr: Arc<Manager>, addr: SocketAddrV4) -> Result<()> {
         }
     });
     tokio::spawn(async move {
-        let mut buf = vec![0u8; 4096];
+        let mut buf = vec![0u8; crate::dns::BUFFER];
         loop {
             let Ok((n, from)) = sock.recv_from(&mut buf).await else {
                 continue;
@@ -151,11 +151,11 @@ async fn ask(query: &[u8], device: Option<&str>, servers: &[Ipv4Addr]) -> Option
         {
             continue;
         }
-        let to = SocketAddr::from((*server, 53));
+        let to = SocketAddr::from((*server, crate::dns::PORT));
         if sock.send_to(query, to).await.is_err() {
             continue;
         }
-        let mut buf = vec![0u8; 4096];
+        let mut buf = vec![0u8; crate::dns::BUFFER];
         if let Ok(Ok(n)) = tokio::time::timeout(WAIT, sock.recv(&mut buf)).await {
             buf.truncate(n);
             return Some(buf);
@@ -176,7 +176,10 @@ async fn ask_tcp(query: &[u8], device: Option<&str>, servers: &[Ipv4Addr]) -> Op
             continue;
         }
         let exchange = async {
-            let mut stream = sock.connect(SocketAddr::from((*server, 53))).await.ok()?;
+            let mut stream = sock
+                .connect(SocketAddr::from((*server, crate::dns::PORT)))
+                .await
+                .ok()?;
             write_message(&mut stream, query).await.ok()?;
             read_message(&mut stream).await
         };

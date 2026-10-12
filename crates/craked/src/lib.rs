@@ -12,12 +12,14 @@ pub mod log;
 pub mod manager;
 pub mod networks;
 pub mod own;
+pub mod packet;
 pub mod plan;
 pub mod policy;
 pub mod probe;
 pub mod settings;
 pub mod sys;
 pub mod traffic;
+pub mod units;
 
 // The system-specific modules, by their portable names.
 pub use sys::{conntrack, dns_queue, net, resolved, routing, syn_queue};

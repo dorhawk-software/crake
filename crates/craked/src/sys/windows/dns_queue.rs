@@ -13,5 +13,5 @@ use crate::manager::Manager;
 pub const ADDR: Ipv4Addr = Ipv4Addr::new(127, 53, 0, 1);
 
 pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
-    super::super::dns_server::spawn(mgr, SocketAddrV4::new(ADDR, 53))
+    super::super::dns_server::spawn(mgr, SocketAddrV4::new(ADDR, crate::dns::PORT))
 }

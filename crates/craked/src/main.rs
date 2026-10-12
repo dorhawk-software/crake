@@ -354,10 +354,11 @@ async fn command(mgr: &Manager, tunnel: &str, line: &str) {
 }
 
 fn human(secs: u64) -> String {
+    use craked::units::{SECS_PER_DAY as DAY, SECS_PER_HOUR as HOUR, SECS_PER_MINUTE as MINUTE};
     match secs {
-        s if s >= 86_400 => format!("{}d {}h", s / 86_400, s % 86_400 / 3600),
-        s if s >= 3600 => format!("{}h {}m", s / 3600, s % 3600 / 60),
-        s => format!("{}m", s.div_ceil(60)),
+        s if s >= DAY => format!("{}d {}h", s / DAY, s % DAY / HOUR),
+        s if s >= HOUR => format!("{}h {}m", s / HOUR, s % HOUR / MINUTE),
+        s => format!("{}m", s.div_ceil(MINUTE)),
     }
 }
 
@@ -381,6 +382,12 @@ mod service {
     /// The arguments, from `run` to the service's own thread.
     static ARGS: Mutex<Option<super::Args>> = Mutex::new(None);
 
+    /// ERROR_FAILED_SERVICE_CONTROLLER_CONNECT: started by hand, not by the
+    /// service controller.
+    const ERROR_FAILED_SERVICE_CONTROLLER_CONNECT: i32 = 1063;
+    /// How long Windows should wait for a start or stop to report back.
+    const WAIT_HINT: Duration = Duration::from_secs(15);
+
     define_windows_service!(ffi_service_main, service_main);
 
     /// Run under the service manager. Started any other way (a console),
@@ -389,8 +396,10 @@ mod service {
         *ARGS.lock().unwrap() = Some(args);
         match service_dispatcher::start(SERVICE_NAME, ffi_service_main) {
             Ok(()) => Ok(()),
-            // ERROR_FAILED_SERVICE_CONTROLLER_CONNECT: not a service.
-            Err(windows_service::Error::Winapi(e)) if e.raw_os_error() == Some(1063) => {
+            // Not started as a service.
+            Err(windows_service::Error::Winapi(e))
+                if e.raw_os_error() == Some(ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) =>
+            {
                 super::log_to(None);
                 let args = ARGS.lock().unwrap().take().expect("set above");
                 super::run(args, None)
@@ -437,7 +446,7 @@ mod service {
                 controls_accepted: accept,
                 exit_code: ServiceExitCode::Win32(0),
                 checkpoint: 0,
-                wait_hint: Duration::from_secs(15),
+                wait_hint: WAIT_HINT,
                 process_id: None,
             })
         };
