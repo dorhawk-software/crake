@@ -65,11 +65,15 @@ pub struct Answer {
     pub addrs: Vec<IpAddr>,
 }
 
-/// An IPv4 packet carrying a UDP DNS response, as NFQUEUE hands it over.
-/// A tunnel DNS server's answer: over UDP, or over TCP when one segment
-/// carries the whole message.
+/// An IP packet carrying a DNS response, as NFQUEUE hands it over: a
+/// tunnel DNS server's answer, over UDP, or over TCP when one segment
+/// carries the whole message; from a server reached over IPv4 or IPv6.
 pub fn parse_packet(packet: &[u8]) -> Option<Answer> {
-    parse_message(dns_payload(packet).or_else(|| tcp_dns_payload(packet))?)
+    parse_message(
+        dns_payload(packet)
+            .or_else(|| tcp_dns_payload(packet))
+            .or_else(|| dns_payload6(packet))?,
+    )
 }
 
 /// The DNS message in an IPv4 TCP segment from port 53, when the segment
@@ -77,7 +81,10 @@ pub fn parse_packet(packet: &[u8]) -> Option<Answer> {
 /// spread over several segments isn't read; probing still sees the
 /// connection that follows.
 pub fn tcp_dns_payload(packet: &[u8]) -> Option<&[u8]> {
-    let tcp = packet::V4::parse(packet, packet::TCP)?.payload_to_total()?;
+    tcp_dns(packet::V4::parse(packet, packet::TCP)?.payload_to_total()?)
+}
+
+fn tcp_dns(tcp: &[u8]) -> Option<&[u8]> {
     if tcp.len() < packet::TCP_MIN || packet::source_port(tcp)? != PORT {
         return None;
     }
@@ -88,11 +95,23 @@ pub fn tcp_dns_payload(packet: &[u8]) -> Option<&[u8]> {
 
 /// The DNS message inside an IPv4 UDP packet from port 53.
 pub fn dns_payload(packet: &[u8]) -> Option<&[u8]> {
-    let udp = packet::V4::parse(packet, packet::UDP)?.payload()?;
+    udp_dns(packet::V4::parse(packet, packet::UDP)?.payload()?)
+}
+
+fn udp_dns(udp: &[u8]) -> Option<&[u8]> {
     if udp.len() < packet::UDP_HEADER || packet::source_port(udp)? != PORT {
         return None;
     }
     Some(&udp[packet::UDP_HEADER..])
+}
+
+/// The DNS message in an IPv6 packet from port 53, over UDP or in one TCP
+/// segment.
+fn dns_payload6(packet: &[u8]) -> Option<&[u8]> {
+    match packet::V6::parse(packet, packet::UDP) {
+        Some(ip) => udp_dns(ip.payload()?),
+        None => tcp_dns(packet::V6::parse(packet, packet::TCP)?.payload()?),
+    }
 }
 
 /// A DNS response message. Every A record in the answer section counts, so a
@@ -434,6 +453,34 @@ pub(crate) mod tests {
         assert!(parse_packet(&tcp_packet(53, &[])).is_none());
         // Never taken for UDP, which the public-DNS rescue rewrites.
         assert!(dns_payload(&tcp_packet(53, &whole)).is_none());
+    }
+
+    /// The same segment from a DNS server reached over IPv6.
+    fn ipv6(protocol: u8, segment: &[u8]) -> Vec<u8> {
+        let mut p = vec![0x60, 0, 0, 0];
+        p.extend_from_slice(&u16::try_from(segment.len()).unwrap().to_be_bytes());
+        p.extend_from_slice(&[protocol, 64]);
+        p.extend_from_slice(&"fd40::53".parse::<std::net::Ipv6Addr>().unwrap().octets());
+        p.extend_from_slice(&"fd40:ff::7".parse::<std::net::Ipv6Addr>().unwrap().octets());
+        p.extend_from_slice(segment);
+        p
+    }
+
+    #[test]
+    fn reads_answers_from_a_server_reached_over_ipv6() {
+        let ip: Ipv4Addr = "10.33.7.7".parse().unwrap();
+        let msg = response("git.acme.internal", &[ip]);
+        let udp = &udp_packet(53, &msg)[packet::IPV4_MIN..];
+        let a = parse_packet(&ipv6(packet::UDP, udp)).unwrap();
+        assert_eq!(a.addrs, vec![IpAddr::V4(ip)]);
+        let mut whole = (msg.len() as u16).to_be_bytes().to_vec();
+        whole.extend_from_slice(&msg);
+        let tcp = &tcp_packet(53, &whole)[packet::IPV4_MIN..];
+        assert!(parse_packet(&ipv6(packet::TCP, tcp)).is_some());
+        let other = &udp_packet(5353, &msg)[packet::IPV4_MIN..];
+        assert!(parse_packet(&ipv6(packet::UDP, other)).is_none());
+        // The public-DNS rescue rewrites IPv4 packets only.
+        assert!(dns_payload(&ipv6(packet::UDP, udp)).is_none());
     }
 
     #[test]

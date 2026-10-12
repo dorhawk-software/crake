@@ -40,14 +40,22 @@ impl Resolved {
     pub async fn set_link(
         &self,
         device: &str,
-        servers: &[Ipv4Addr],
+        servers: &[std::net::IpAddr],
         domains: &[String],
         everything: bool,
     ) -> Result<()> {
         if let Self::Noop = self {
             return Ok(());
         }
-        super::super::dns_links::set(device, servers, domains, everything);
+        // craked's own server asks IPv4 servers only, for now.
+        let servers: Vec<Ipv4Addr> = servers
+            .iter()
+            .filter_map(|a| match a {
+                std::net::IpAddr::V4(a) => Some(*a),
+                std::net::IpAddr::V6(_) => None,
+            })
+            .collect();
+        super::super::dns_links::set(device, &servers, domains, everything);
         std::fs::create_dir_all(DIR)?;
         // Domains it no longer has go.
         for (path, owner) in ours() {

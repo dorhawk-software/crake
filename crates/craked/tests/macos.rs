@@ -132,6 +132,7 @@ async fn a_tunnel_on_a_utun_device() {
             device: &dev,
             timeout: 600,
             dns: &[Ipv4Addr::new(10, 40, 0, 2)],
+            dns6: &[],
             pinned: &pinned,
             learned: &learned,
             full_except: None,
@@ -203,7 +204,7 @@ async fn a_tunnel_on_a_utun_device() {
     resolved
         .set_link(
             &dev,
-            &[Ipv4Addr::new(10, 40, 0, 2)],
+            &[Ipv4Addr::new(10, 40, 0, 2).into()],
             &["acme.internal".into()],
             false,
         )

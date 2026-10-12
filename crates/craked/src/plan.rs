@@ -53,6 +53,8 @@ pub struct Plan<'a> {
     pub timeout: u64,
     /// The tunnel's DNS servers; their answers are queued for learning.
     pub dns: &'a [Ipv4Addr],
+    /// Its IPv6 DNS servers, likewise.
+    pub dns6: &'a [std::net::Ipv6Addr],
     pub pinned: &'a [Target],
     /// Learned hosts with seconds left.
     pub learned: &'a [(IpAddr, u64)],

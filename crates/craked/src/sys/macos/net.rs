@@ -68,6 +68,11 @@ impl Net {
         Ok(())
     }
 
+    /// IPv6 DNS servers aren't asked here yet: nothing to route.
+    pub async fn route_dns6(&self, _dev: &str, _dns: std::net::Ipv6Addr) -> Result<()> {
+        Ok(())
+    }
+
     /// The tunnel's DNS server, through the tunnel (the one route Crake
     /// adds up front).
     pub async fn route_dns(&self, dev: &str, dns: Ipv4Addr) -> Result<()> {

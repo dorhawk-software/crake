@@ -62,7 +62,7 @@ impl Resolved {
     pub async fn set_link(
         &self,
         device: &str,
-        servers: &[Ipv4Addr],
+        servers: &[std::net::IpAddr],
         domains: &[String],
         // A full tunnel: every name goes to its DNS.
         everything: bool,
@@ -73,7 +73,10 @@ impl Resolved {
         let index = ifindex(device)?;
         let servers: Vec<(i32, Vec<u8>)> = servers
             .iter()
-            .map(|a| (libc::AF_INET, a.octets().to_vec()))
+            .map(|a| match a {
+                std::net::IpAddr::V4(a) => (libc::AF_INET, a.octets().to_vec()),
+                std::net::IpAddr::V6(a) => (libc::AF_INET6, a.octets().to_vec()),
+            })
             .collect();
         let mut domains: Vec<(&str, bool)> = domains.iter().map(|d| (d.as_str(), true)).collect();
         if everything {

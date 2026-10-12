@@ -20,8 +20,8 @@ pub struct TunnelInfo {
     /// The tunnel's IPv6 address and prefix length, if it has one.
     pub address6: Option<(Ipv6Addr, u8)>,
     /// IPv6 DNS servers. openconnect lists them with the IPv4 ones in
-    /// `INTERNAL_IP4_DNS`; craked asks only IPv4 ones for now, so these are
-    /// shown, not used.
+    /// `INTERNAL_IP4_DNS`. Registered and their answers held on Linux;
+    /// macOS' and Windows' own DNS server asks IPv4 ones only.
     pub dns6: Vec<Ipv6Addr>,
     pub domains: Vec<String>,
     /// `a.b.c.d/len` or `v6::/len`

@@ -229,10 +229,11 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    IPv6 addresses in answers (AAAA, from a tunnel DNS reached over IPv4)
    are routed before the first packet too, on Linux (netns-tested; the
    tunnel gets the IPv6 address openconnect hands over,
-   `INTERNAL_IP6_ADDRESS`). Still open: DNS over TCP across segments, DNS
-   servers reached over IPv6 (openconnect lists them in
-   `INTERNAL_IP4_DNS`; craked shows them but asks only IPv4 ones),
-   DNS-over-TLS upstreams (Crake can't see those failures), IPv6 in the
+   `INTERNAL_IP6_ADDRESS`). A tunnel's DNS servers reached over IPv6
+   (openconnect lists them in `INTERNAL_IP4_DNS`) are registered with
+   resolved, get a /128 through the tunnel, and their answers are held
+   like IPv4 ones (Linux; netns-tested). Still open: DNS over TCP across
+   segments, IPv6 DNS servers on macOS and Windows, DNS-over-TLS upstreams (Crake can't see those failures), IPv6 in the
    public-NXDOMAIN rescue and split-horizon.
 4. Connection probing and automatic learning; undo. **Built**, proven in a
    throwaway namespace (the fake gateway drops packets not from the tunnel

@@ -22,7 +22,7 @@ use craked::manager::Manager;
 
 const FAKE: &str = r#"#!/bin/sh
 export TUNDEV=crake-acme VPNGATEWAY=192.0.2.10 INTERNAL_IP4_ADDRESS=10.40.255.7 \
-  INTERNAL_IP4_NETMASK=255.255.255.255 INTERNAL_IP4_DNS=10.40.0.2 \
+  INTERNAL_IP4_NETMASK=255.255.255.255 INTERNAL_IP4_DNS='10.40.0.2 fd40::53' \
   INTERNAL_IP6_ADDRESS=fd40:ff::7 INTERNAL_IP6_NETMASK=fd40:ff::7/64 \
   CISCO_DEF_DOMAIN=acme.internal
 reason=connect "$CRAKE_TEST_HOOK" || exit 1
@@ -264,6 +264,60 @@ fn read_query(tun: &mut File) -> Vec<u8> {
         }
     }
     panic!("no DNS query left through the tunnel");
+}
+
+/// Ask the tunnel's DNS server reached over IPv6 (fd40::53) for `name`;
+/// the test answers `addr`. Returns whether the app's first packet to
+/// `addr` left through the tunnel.
+fn ask_over_ipv6(tun: &mut File, name: &str, addr: Ipv4Addr) -> bool {
+    let sock = UdpSocket::bind("[::]:0").unwrap();
+    sock.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    sock.send_to(&query(name), "[fd40::53]:53").unwrap();
+    let start = Instant::now();
+    let mut buf = [0u8; 2048];
+    let q = loop {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "no IPv6 DNS query left through the tunnel"
+        );
+        match tun.read(&mut buf) {
+            Ok(n) if n > 48 && buf[0] >> 4 == 6 && buf[6] == 17 && buf[42..44] == [0, 53] => {
+                break buf[..n].to_vec();
+            }
+            _ => std::thread::sleep(Duration::from_millis(2)),
+        }
+    };
+    let dns = answer_message(&q[48..], 0, &[addr.into()]);
+    let mut udp = Vec::new();
+    udp.extend_from_slice(&q[42..44]);
+    udp.extend_from_slice(&q[40..42]);
+    udp.extend_from_slice(&((8 + dns.len()) as u16).to_be_bytes());
+    udp.extend_from_slice(&[0, 0]);
+    udp.extend_from_slice(&dns);
+    // UDP over IPv6 must carry its checksum (pseudo-header included).
+    let mut pseudo = Vec::new();
+    pseudo.extend_from_slice(&q[24..40]);
+    pseudo.extend_from_slice(&q[8..24]);
+    pseudo.extend_from_slice(&(udp.len() as u32).to_be_bytes());
+    pseudo.extend_from_slice(&[0, 0, 0, 17]);
+    pseudo.extend_from_slice(&udp);
+    if pseudo.len() % 2 == 1 {
+        pseudo.push(0);
+    }
+    let c = checksum(&pseudo);
+    udp[6..8].copy_from_slice(&c.to_be_bytes());
+    let mut ip = vec![0x60, 0, 0, 0];
+    ip.extend_from_slice(&(udp.len() as u16).to_be_bytes());
+    ip.extend_from_slice(&[17, 64]);
+    ip.extend_from_slice(&q[24..40]);
+    ip.extend_from_slice(&q[8..24]);
+    ip.extend_from_slice(&udp);
+    tun.write_all(&ip).unwrap();
+    let mut answer = [0u8; 512];
+    sock.recv_from(&mut answer)
+        .expect("the answer reached the app");
+    let _ = sock.send_to(b"first", (addr, 443));
+    first_packet_through_tunnel(tun, IpAddr::V4(addr))
 }
 
 fn checksum(header: &[u8]) -> u16 {
@@ -585,6 +639,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     let public: Ipv4Addr = "93.184.215.14".parse().unwrap();
     let gw: Ipv4Addr = "192.0.2.10".parse().unwrap();
     let git6: Ipv6Addr = "fd40:1::7".parse().unwrap();
+    let over6: Ipv4Addr = "10.33.6.6".parse().unwrap();
 
     // Run the blocking socket work off the runtime; the queue thread needs it.
     let db: Ipv4Addr = "10.58.70.119".parse().unwrap();
@@ -643,6 +698,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
             ask(&mut tun, "vpn.acme.internal", gw),
             ask_tcp(&mut tun, "big.acme.internal", big),
             ask_aaaa(&mut tun, "v6.acme.internal", git6),
+            ask_over_ipv6(&mut tun, "dns6.acme.internal", over6),
         );
         (tun, r, publics, splits)
     })
@@ -690,7 +746,13 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     assert_eq!(www.addrs, vec![IpAddr::V4(www_public)], "{www:?}");
     assert!(!www.first_through_tunnel, "{www:?}");
 
-    let (git_first, wiki_first, public_routed, gw_routed, tcp_first, v6_first) = results;
+    let (git_first, wiki_first, public_routed, gw_routed, tcp_first, v6_first, over6_first) =
+        results;
+    assert!(
+        over6_first,
+        "an answer from the tunnel's DNS reached over IPv6: routed first\n{}",
+        sh("nft list chain inet crake dns_acme; ip -6 route")
+    );
     assert!(
         v6_first,
         "an AAAA answer: the first IPv6 packet went through the tunnel\n{}",

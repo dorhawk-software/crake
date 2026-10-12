@@ -94,7 +94,12 @@ impl Manager {
         }
         if let Err(e) = self
             .resolved
-            .set_link(crate::hush::DEVICE, &[crate::hush::ADDR], &domains, false)
+            .set_link(
+                crate::hush::DEVICE,
+                &[crate::hush::ADDR.into()],
+                &domains,
+                false,
+            )
             .await
         {
             tracing::error!("keeping internal names private: {e:#}");

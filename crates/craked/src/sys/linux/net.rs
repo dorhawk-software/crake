@@ -91,6 +91,12 @@ impl Net {
             .with_context(|| format!("loose reverse-path filtering on {dev}"))
     }
 
+    /// The same for an IPv6 DNS server.
+    pub async fn route_dns6(&self, dev: &str, dns: std::net::Ipv6Addr) -> Result<()> {
+        let Self::Ip = self else { return Ok(()) };
+        ip(&["-6", "route", "replace", &format!("{dns}/128"), "dev", dev]).await
+    }
+
     /// The only route Crake installs up front.
     pub async fn route_dns(&self, dev: &str, dns: Ipv4Addr) -> Result<()> {
         let Self::Ip = self else { return Ok(()) };

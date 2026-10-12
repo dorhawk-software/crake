@@ -125,7 +125,12 @@ impl Manager {
         }
         if let Err(e) = self
             .resolved
-            .set_link(crate::keep::DEVICE, &[crate::keep::ADDR], &domains, false)
+            .set_link(
+                crate::keep::DEVICE,
+                &[crate::keep::ADDR.into()],
+                &domains,
+                false,
+            )
             .await
         {
             tracing::error!("answering from memory: {e:#}");

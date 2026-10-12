@@ -58,6 +58,7 @@ impl Manager {
                 device: &info.device,
                 timeout: self.timeout_for(name),
                 dns: &info.dns,
+                dns6: &info.dns6,
                 pinned: &pinned,
                 learned: &learned,
                 full_except: full_except.as_deref(),
@@ -82,12 +83,18 @@ impl Manager {
         domains: &[String],
     ) {
         let everything = self.learning(name) == crate::policy::Learning::FullTunnel;
-        if info.dns.is_empty() || (domains.is_empty() && !everything) {
+        let servers: Vec<IpAddr> = info
+            .dns
+            .iter()
+            .map(|a| IpAddr::V4(*a))
+            .chain(info.dns6.iter().map(|a| IpAddr::V6(*a)))
+            .collect();
+        if servers.is_empty() || (domains.is_empty() && !everything) {
             return;
         }
         let res = self
             .resolved
-            .set_link(&info.device, &info.dns, domains, everything)
+            .set_link(&info.device, &servers, domains, everything)
             .await;
         // Forget answers cached while the tunnel was off (failures included).
         self.resolved.flush().await;

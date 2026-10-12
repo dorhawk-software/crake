@@ -81,6 +81,7 @@ pub fn up_script(plan: &Plan) -> String {
         device,
         timeout,
         dns,
+        dns6,
         pinned,
         learned,
         full_except,
@@ -154,6 +155,13 @@ pub fn up_script(plan: &Plan) -> String {
         let servers: Vec<String> = dns.iter().map(Ipv4Addr::to_string).collect();
         s += &format!(
             "add rule inet {TABLE} dns_{name} iifname \"{device}\" ip saddr {{ {} }} meta l4proto {{ udp, tcp }} th sport 53 queue num {QUEUE_NUM} bypass\n",
+            servers.join(", ")
+        );
+    }
+    if !dns6.is_empty() {
+        let servers: Vec<String> = dns6.iter().map(ToString::to_string).collect();
+        s += &format!(
+            "add rule inet {TABLE} dns_{name} iifname \"{device}\" ip6 saddr {{ {} }} meta l4proto {{ udp, tcp }} th sport 53 queue num {QUEUE_NUM} bypass\n",
             servers.join(", ")
         );
     }
@@ -621,6 +629,7 @@ mod tests {
             device: "crake-acme",
             timeout: 604800,
             dns: &["10.40.0.53".parse().unwrap()],
+            dns6: &["fd40::53".parse().unwrap()],
             pinned: &[
                 "10.40.0.0/16".parse().unwrap(),
                 "fd40::/32".parse().unwrap(),
@@ -646,6 +655,9 @@ mod tests {
         assert!(s.contains(
             "iifname \"crake-acme\" ip saddr { 10.40.0.53 } meta l4proto { udp, tcp } th sport 53 queue num 7300 bypass"
         ));
+        assert!(s.contains(
+            "iifname \"crake-acme\" ip6 saddr { fd40::53 } meta l4proto { udp, tcp } th sport 53 queue num 7300 bypass"
+        ));
         assert!(
             !s.contains("meta mark 0 ip daddr !="),
             "only a full tunnel takes everything"
@@ -656,6 +668,7 @@ mod tests {
             device: "crake-globex",
             timeout: 60,
             dns: &[],
+            dns6: &[],
             pinned: &[],
             learned: &[],
             full_except: Some(&[
@@ -680,6 +693,7 @@ mod tests {
             device: "crake-globex",
             timeout: 60,
             dns: &[],
+            dns6: &[],
             pinned: &[],
             learned: &[],
             full_except: Some(&[]),

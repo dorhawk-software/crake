@@ -168,6 +168,9 @@ impl Manager {
         for dns in &info.dns {
             self.net.route_dns(&info.device, *dns).await?;
         }
+        for dns in &info.dns6 {
+            self.net.route_dns6(&info.device, *dns).await?;
+        }
         let routed = self.apply_routing(name, &display, &info).await?;
         let mut first = first;
         if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
