@@ -79,18 +79,38 @@ fn ask_public(
     public_knows: Option<Ipv4Addr>,
     tunnel_knows: Option<Ipv4Addr>,
 ) -> Public {
+    ask_public_for(
+        uplink,
+        tun,
+        name,
+        1,
+        public_knows.map(Into::into),
+        tunnel_knows.map(Into::into),
+    )
+}
+
+/// The same for a question of type `kind` (1: A, 28: AAAA).
+fn ask_public_for(
+    uplink: &mut File,
+    tun: &mut File,
+    name: &str,
+    kind: u8,
+    public_knows: Option<IpAddr>,
+    tunnel_knows: Option<IpAddr>,
+) -> Public {
     let sock = UdpSocket::bind("0.0.0.0:0").unwrap();
     sock.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
-    sock.send_to(&query(name), "192.168.0.1:53").unwrap();
+    sock.send_to(&query_for(name, kind), "192.168.0.1:53")
+        .unwrap();
     let q = read_query(uplink);
     match public_knows {
-        Some(a) => uplink.write_all(&answer(&q, a)).unwrap(),
+        Some(a) => uplink.write_all(&reply(&q, 0, &[a])).unwrap(),
         None => uplink.write_all(&nxdomain(&q)).unwrap(),
     }
     let tunnel_asked = match try_read_query(tun, Duration::from_millis(1500)) {
         Some(tq) => {
             match tunnel_knows {
-                Some(a) => tun.write_all(&answer(&tq, a)).unwrap(),
+                Some(a) => tun.write_all(&reply(&tq, 0, &[a])).unwrap(),
                 None => tun.write_all(&nxdomain(&tq)).unwrap(),
             }
             true
@@ -105,7 +125,8 @@ fn ask_public(
         .unwrap_or_default();
     let first_through_tunnel = match addrs.first() {
         Some(a) => {
-            let _ = sock.send_to(b"first", (*a, 5432));
+            let app = UdpSocket::bind(if a.is_ipv6() { "[::]:0" } else { "0.0.0.0:0" }).unwrap();
+            let _ = app.send_to(b"first", (*a, 5432));
             first_packet_through_tunnel(tun, *a)
         }
         None => false,
@@ -639,6 +660,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     let public: Ipv4Addr = "93.184.215.14".parse().unwrap();
     let gw: Ipv4Addr = "192.0.2.10".parse().unwrap();
     let git6: Ipv6Addr = "fd40:1::7".parse().unwrap();
+    let db6: Ipv6Addr = "fd40:1::5".parse().unwrap();
     let over6: Ipv4Addr = "10.33.6.6".parse().unwrap();
 
     // Run the blocking socket work off the runtime; the queue thread needs it.
@@ -659,6 +681,15 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
             ask_public(&mut uplink, &mut tun, "typo.example.cloud", None, None),
             // Public DNS knows it: untouched, the tunnel is never asked.
             ask_public(&mut uplink, &mut tun, "www.example.org", Some(site), None),
+            // Asked for its IPv6 address: the tunnel's, routed.
+            ask_public_for(
+                &mut uplink,
+                &mut tun,
+                "db6.example.cloud",
+                28,
+                None,
+                Some(db6.into()),
+            ),
         );
         // Under the organisation's own domain (gateway vpn.acme.example):
         // public DNS knows it, and the tunnel's DNS knows better.
@@ -704,32 +735,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     })
     .await
     .unwrap();
-    let (rescued, unknown, unknown_again, known) = publics;
-    assert_eq!(rescued.rcode, 0, "{rescued:?}");
-    assert_eq!(
-        rescued.addrs,
-        vec![IpAddr::V4(db)],
-        "the tunnel's answer replaced the failure"
-    );
-    assert!(
-        rescued.tunnel_asked && rescued.first_through_tunnel,
-        "{rescued:?}"
-    );
-    assert_eq!(unknown.rcode, 3, "unknown everywhere: still NXDOMAIN");
-    assert!(
-        unknown.tunnel_asked && !unknown_again.tunnel_asked,
-        "{unknown_again:?}"
-    );
-    assert_eq!(unknown_again.rcode, 3);
-    assert_eq!(
-        (known.rcode, known.addrs.clone()),
-        (0, vec![IpAddr::V4(site)])
-    );
-    assert!(
-        !known.tunnel_asked,
-        "public successes never go to the tunnel"
-    );
-    assert!(!known.first_through_tunnel, "and stay direct");
+    publics_handled(publics, db, db6, site);
 
     let (fe, office, www) = splits;
     assert_eq!(
@@ -787,6 +793,47 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     mgr.shutdown().await;
     drop(tun_back);
     logged_what_it_did(dir.path());
+}
+
+/// What the app got from public DNS: rescued by the tunnel when public
+/// DNS didn't know the name (A and AAAA), unchanged otherwise.
+fn publics_handled(
+    publics: (Public, Public, Public, Public, Public),
+    db: Ipv4Addr,
+    db6: Ipv6Addr,
+    site: Ipv4Addr,
+) {
+    let (rescued, unknown, unknown_again, known, rescued6) = publics;
+    assert_eq!(rescued6.addrs, vec![IpAddr::V6(db6)], "{rescued6:?}");
+    assert!(
+        rescued6.tunnel_asked && rescued6.first_through_tunnel,
+        "an AAAA rescued from the tunnel is routed: {rescued6:?}"
+    );
+    assert_eq!(rescued.rcode, 0, "{rescued:?}");
+    assert_eq!(
+        rescued.addrs,
+        vec![IpAddr::V4(db)],
+        "the tunnel's answer replaced the failure"
+    );
+    assert!(
+        rescued.tunnel_asked && rescued.first_through_tunnel,
+        "{rescued:?}"
+    );
+    assert_eq!(unknown.rcode, 3, "unknown everywhere: still NXDOMAIN");
+    assert!(
+        unknown.tunnel_asked && !unknown_again.tunnel_asked,
+        "{unknown_again:?}"
+    );
+    assert_eq!(unknown_again.rcode, 3);
+    assert_eq!(
+        (known.rcode, known.addrs.clone()),
+        (0, vec![IpAddr::V4(site)])
+    );
+    assert!(
+        !known.tunnel_asked,
+        "public successes never go to the tunnel"
+    );
+    assert!(!known.first_through_tunnel, "and stay direct");
 }
 
 /// What the log says about the test's names.

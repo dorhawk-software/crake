@@ -80,7 +80,7 @@ impl Manager {
             if reply.metadata.response_code != ResponseCode::NoError {
                 continue;
             }
-            let addrs: Vec<IpAddr> = dns::a_records(&reply).into_iter().map(IpAddr::V4).collect();
+            let addrs = dns::records(&reply);
             // A managed tunnel answers only for what its policy allows.
             if !addrs.is_empty()
                 && !addrs
