@@ -1135,6 +1135,37 @@ its own devices, so craked maps them back with `tunnel_of_device`) goes
 away: on Windows OpenVPN lets the starter name its Wintun adapter
 (`--dev-node crake-<name>`).
 
+**A WFP callout driver for Windows (someday; decided with the user,
+2026-10-12: "not now, but write it down").** Two things Windows can't do
+from user mode, and Linux does: the first connection to a host only a
+tunnel reaches fails there (its retry works), and a stuck IPv6
+connection can't be reset (SetTcpEntry is IPv4's; raw sockets can't send
+TCP), so it runs out (~21 s) before the app's next one takes the route.
+A kernel driver of Crake's own would fix both:
+- At the ALE connect-redirect layer (FWPM_LAYER_ALE_CONNECT_REDIRECT_V4/
+  V6) pend a new connection to an address worth racing (the same
+  syn_watch/syn_skip ranges as Linux's first-SYN race), hand it to
+  craked (an IOCTL or a shared queue, like NFQUEUE), and when a tunnel
+  takes the host, rewrite the connection's local address to the
+  tunnel's (FWPS_CONNECT_REQUEST0) before its first packet: the route
+  lookup then goes through the tunnel. Direct or down: let it go as is.
+- An IOCTL to abort a flow craked names (FwpsFlowAbort0 with a flow
+  context, or a RST injected with FwpsInjectTransportReceiveAsync0),
+  IPv4 and IPv6, replacing SetTcpEntry.
+In C with the WDK (or windows-drivers-rs), built on GitHub's Windows
+runner; tested in the Windows VM with test signing
+(`bcdedit /set testsigning on`, a self-signed driver; the VM has no
+Secure Boot). **Shipping it** needs Microsoft's signature: an EV
+code-signing certificate for dorhawk.software (~$300–400/yr, on a
+hardware token or cloud HSM; a sole-proprietor EV tier exists), a free
+Microsoft Partner Center account, and attestation signing for each
+driver build (check Microsoft Learn's current rules before buying).
+Considered and not chosen: WinDivert (an existing signed packet driver,
+LGPL-3.0/GPL-2.0): no signing cost, but antivirus engines often flag
+WinDivert64.sys as a hacker tool, a problem on the company laptops
+Crake is for, and Crake would have to NAT those connections in user
+mode.
+
 **Also noted (user):** the panel has no shadow on
 Windows (Linux draws one in its transparent margin), and a few white
 pixels show outside the rounded top corners; both look like GPUI's
