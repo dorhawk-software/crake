@@ -340,7 +340,13 @@ impl Manager {
             })
             .filter(|e| {
                 let gw = e.info.as_ref().and_then(|i| i.gateway);
-                guard(e.config.display(), Target::host(dst), gw).is_ok()
+                guard(
+                    e.config.display(),
+                    Target::host(dst),
+                    gw,
+                    self.routing.routes_ipv6(),
+                )
+                .is_ok()
             })
             .filter(|e| e.config.learning().allows(name.as_deref(), dst))
             .map(|e| {

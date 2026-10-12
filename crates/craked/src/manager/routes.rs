@@ -24,7 +24,7 @@ impl Manager {
             let t = store.tunnel(name);
             t.gateway = info.gateway.or(t.gateway);
             t.expire(now);
-            let ok = |x: Target| guard(label, x, t.gateway).is_ok();
+            let ok = |x: Target| guard(label, x, t.gateway, self.routing.routes_ipv6()).is_ok();
             let pinned: Vec<Target> = t.pinned.iter().copied().filter(|x| ok(*x)).collect();
             let learned: Vec<(IpAddr, u64)> = t
                 .learned_remaining(now)

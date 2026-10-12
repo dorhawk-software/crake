@@ -32,15 +32,42 @@ fn learned_set(name: &str) -> String {
 fn pinned_set(name: &str) -> String {
     format!("pinned_{name}")
 }
+// IPv6 has its own sets (nftables sets hold one address family each).
+fn learned6_set(name: &str) -> String {
+    format!("learned6_{name}")
+}
+fn pinned6_set(name: &str) -> String {
+    format!("pinned6_{name}")
+}
+
+/// The learned/pinned set for `addr`'s family.
+fn learned_set_for(name: &str, addr: IpAddr) -> String {
+    if addr.is_ipv6() {
+        learned6_set(name)
+    } else {
+        learned_set(name)
+    }
+}
+fn pinned_set_for(name: &str, t: Target) -> String {
+    if t.is_ipv6() {
+        pinned6_set(name)
+    } else {
+        pinned_set(name)
+    }
+}
 
 fn set_defs(name: &str, timeout: u64) -> String {
     // `dynamic` is what nft adds anyway for a set updated from the packet path;
     // spelling it out keeps `add set` idempotent.
     format!(
         "add set inet {TABLE} {} {{ type ipv4_addr; flags dynamic, timeout; timeout {timeout}s; }}\n\
-         add set inet {TABLE} {} {{ type ipv4_addr; flags interval; }}\n",
+         add set inet {TABLE} {} {{ type ipv4_addr; flags interval; }}\n\
+         add set inet {TABLE} {} {{ type ipv6_addr; flags dynamic, timeout; timeout {timeout}s; }}\n\
+         add set inet {TABLE} {} {{ type ipv6_addr; flags interval; }}\n",
         learned_set(name),
-        pinned_set(name)
+        pinned_set(name),
+        learned6_set(name),
+        pinned6_set(name)
     )
 }
 
@@ -66,6 +93,7 @@ pub fn up_script(plan: &Plan) -> String {
     } = *plan;
     let mark = ids(index).mark;
     let (ls, ps) = (learned_set(name), pinned_set(name));
+    let (ls6, ps6) = (learned6_set(name), pinned6_set(name));
     let mut s = format!("add table inet {TABLE}\n");
     s += &set_defs(name, timeout);
     s += &chain_defs(name);
@@ -75,8 +103,12 @@ pub fn up_script(plan: &Plan) -> String {
          flush chain inet {TABLE} dns_{name}\n\
          flush set inet {TABLE} {ls}\n\
          flush set inet {TABLE} {ps}\n\
+         flush set inet {TABLE} {ls6}\n\
+         flush set inet {TABLE} {ps6}\n\
          add rule inet {TABLE} out_{name} ip daddr @{ps} meta mark set {mark:#x}\n\
          add rule inet {TABLE} out_{name} ip daddr @{ls} update @{ls} {{ ip daddr timeout {timeout}s }} meta mark set {mark:#x}\n\
+         add rule inet {TABLE} out_{name} ip6 daddr @{ps6} meta mark set {mark:#x}\n\
+         add rule inet {TABLE} out_{name} ip6 daddr @{ls6} update @{ls6} {{ ip6 daddr timeout {timeout}s }} meta mark set {mark:#x}\n\
          add rule inet {TABLE} nat_{name} oifname \"{device}\" masquerade\n"
     );
     if let Some(except) = full_except {
@@ -104,21 +136,33 @@ pub fn up_script(plan: &Plan) -> String {
             servers.join(", ")
         );
     }
-    if !pinned.is_empty() {
-        let list: Vec<String> = pinned.iter().map(Target::to_string).collect();
-        s += &format!("add element inet {TABLE} {ps} {{ {} }}\n", list.join(", "));
-    }
-    let learned: Vec<String> = learned
-        .iter()
-        .filter(|(_, t)| *t > 0)
-        .map(|(a, t)| format!("{a} timeout {t}s"))
-        .collect();
-    if !learned.is_empty() {
-        s += &format!(
-            "add element inet {TABLE} {ls} {{ {} }}\n",
-            learned.join(", ")
-        );
-    }
+    let elems = |set: &str, items: Vec<String>, out: &mut String| {
+        if !items.is_empty() {
+            *out += &format!(
+                "add element inet {TABLE} {set} {{ {} }}\n",
+                items.join(", ")
+            );
+        }
+    };
+    // Each family goes in its own set (nftables sets hold one family each).
+    let pins = |v6: bool| -> Vec<String> {
+        pinned
+            .iter()
+            .filter(|t| t.is_ipv6() == v6)
+            .map(Target::to_string)
+            .collect()
+    };
+    elems(&ps, pins(false), &mut s);
+    elems(&ps6, pins(true), &mut s);
+    let learns = |v6: bool| -> Vec<String> {
+        learned
+            .iter()
+            .filter(|(a, t)| *t > 0 && a.is_ipv6() == v6)
+            .map(|(a, t)| format!("{a} timeout {t}s"))
+            .collect()
+    };
+    elems(&ls, learns(false), &mut s);
+    elems(&ls6, learns(true), &mut s);
     s
 }
 
@@ -148,9 +192,12 @@ pub fn down_script(name: &str) -> String {
     );
     s += &set_defs(name, 1);
     s += &format!(
-        "delete set inet {TABLE} {}\ndelete set inet {TABLE} {}\n",
+        "delete set inet {TABLE} {}\ndelete set inet {TABLE} {}\n\
+         delete set inet {TABLE} {}\ndelete set inet {TABLE} {}\n",
         learned_set(name),
-        pinned_set(name)
+        pinned_set(name),
+        learned6_set(name),
+        pinned6_set(name)
     );
     s
 }
@@ -170,6 +217,11 @@ impl Routing {
     /// Changes the system (not development's no-op).
     pub fn is_real(&self) -> bool {
         matches!(self, Self::Real)
+    }
+
+    /// Linux routes IPv6 through a tunnel (v6 nft sets, `ip -6` rules/routes).
+    pub fn routes_ipv6(&self) -> bool {
+        true
     }
 
     /// At startup and at shutdown: clear everything Crake sets up (its
@@ -196,11 +248,13 @@ impl Routing {
                 ip(&["rule", "del", "priority", &p.to_string()]).await.ok();
             }
         }
-        // And the routing tables those rules pointed at.
+        // And the routing tables those rules pointed at (v4 and v6; the v6
+        // rules share the same priority/table numbers).
         for table in range {
-            ip(&["route", "flush", "table", &table.to_string()])
-                .await
-                .ok();
+            let t = table.to_string();
+            ip(&["route", "flush", "table", &t]).await.ok();
+            ip(&["-6", "rule", "del", "priority", &t]).await.ok();
+            ip(&["-6", "route", "flush", "table", &t]).await.ok();
         }
         Ok(())
     }
@@ -230,6 +284,20 @@ impl Routing {
             "rule", "add", "fwmark", &mark, "lookup", &table, "priority", &prio,
         ])
         .await?;
+        // The same for IPv6: best-effort, so a v4-only tunnel (or a kernel
+        // with IPv6 off) isn't held up. v6 hosts only reach these when the
+        // tunnel actually carries IPv6.
+        ip(&["-6", "rule", "del", "priority", &prio]).await.ok();
+        ip(&[
+            "-6", "rule", "add", "fwmark", &mark, "lookup", &table, "priority", &prio,
+        ])
+        .await
+        .ok();
+        ip(&[
+            "-6", "route", "replace", "default", "dev", device, "table", &table,
+        ])
+        .await
+        .ok();
         nft(&up_script(plan)).await?;
         if !plan.device.starts_with("crake-") {
             nft(&tunnel_device_script(plan.device, true)).await?;
@@ -340,12 +408,18 @@ impl Routing {
         ip(&["route", "flush", "table", &id.table.to_string()])
             .await
             .ok();
+        ip(&["-6", "rule", "del", "priority", &id.priority.to_string()])
+            .await
+            .ok();
+        ip(&["-6", "route", "flush", "table", &id.table.to_string()])
+            .await
+            .ok();
         nft(&down_script(name)).await
     }
 
     pub async fn add_learned(&self, name: &str, addr: IpAddr, timeout: u64) -> Result<()> {
         let Self::Real = self else { return Ok(()) };
-        let ls = learned_set(name);
+        let ls = learned_set_for(name, addr);
         // Delete first so a fresh timeout replaces the old one.
         nft(&format!(
             "add element inet {TABLE} {ls} {{ {addr} }}\ndelete element inet {TABLE} {ls} {{ {addr} }}\n\
@@ -356,7 +430,7 @@ impl Routing {
 
     pub async fn remove_learned(&self, name: &str, addr: IpAddr) -> Result<()> {
         let Self::Real = self else { return Ok(()) };
-        let ls = learned_set(name);
+        let ls = learned_set_for(name, addr);
         nft(&format!("add element inet {TABLE} {ls} {{ {addr} }}\ndelete element inet {TABLE} {ls} {{ {addr} }}\n")).await
     }
 
@@ -364,14 +438,14 @@ impl Routing {
         let Self::Real = self else { return Ok(()) };
         nft(&format!(
             "add element inet {TABLE} {} {{ {t} }}\n",
-            pinned_set(name)
+            pinned_set_for(name, t)
         ))
         .await
     }
 
     pub async fn remove_pinned(&self, name: &str, t: Target) -> Result<()> {
         let Self::Real = self else { return Ok(()) };
-        let ps = pinned_set(name);
+        let ps = pinned_set_for(name, t);
         nft(&format!(
             "add element inet {TABLE} {ps} {{ {t} }}\ndelete element inet {TABLE} {ps} {{ {t} }}\n"
         ))
@@ -382,18 +456,22 @@ impl Routing {
     /// `None` when nothing is applied (Noop).
     pub async fn read_learned(&self, name: &str) -> Result<Option<Vec<(IpAddr, u64)>>> {
         let Self::Real = self else { return Ok(None) };
-        let out = Command::new("nft")
-            .args(["-j", "list", "set", "inet", TABLE, &learned_set(name)])
-            .output()
-            .await
-            .context("running nft")?;
-        if !out.status.success() {
-            bail!(
-                "nft list set failed: {}",
-                String::from_utf8_lossy(&out.stderr).trim()
-            );
+        let mut found = Vec::new();
+        for set in [learned_set(name), learned6_set(name)] {
+            let out = Command::new("nft")
+                .args(["-j", "list", "set", "inet", TABLE, &set])
+                .output()
+                .await
+                .context("running nft")?;
+            if !out.status.success() {
+                bail!(
+                    "nft list set failed: {}",
+                    String::from_utf8_lossy(&out.stderr).trim()
+                );
+            }
+            found.extend(parse_learned(&out.stdout)?);
         }
-        Ok(Some(parse_learned(&out.stdout)?))
+        Ok(Some(found))
     }
 }
 
@@ -480,16 +558,25 @@ mod tests {
             device: "crake-acme",
             timeout: 604800,
             dns: &["10.40.0.53".parse().unwrap()],
-            pinned: &["10.40.0.0/16".parse().unwrap()],
+            pinned: &[
+                "10.40.0.0/16".parse().unwrap(),
+                "fd40::/32".parse().unwrap(),
+            ],
             learned: &[
                 ("10.33.1.1".parse().unwrap(), 60),
                 ("10.33.1.2".parse().unwrap(), 0),
+                ("fd40::1".parse().unwrap(), 60),
             ],
             full_except: None,
         });
         assert!(s.contains("add element inet crake pinned_acme { 10.40.0.0/16 }"));
         assert!(s.contains("add element inet crake learned_acme { 10.33.1.1 timeout 60s }"));
         assert!(!s.contains("10.33.1.2"), "expired hosts are not loaded");
+        // IPv6 goes in its own sets, with its own ip6 marking rules.
+        assert!(s.contains("add element inet crake pinned6_acme { fd40::/32 }"));
+        assert!(s.contains("add element inet crake learned6_acme { fd40::1 timeout 60s }"));
+        assert!(s.contains("ip6 daddr @pinned6_acme meta mark set 0x43520001"));
+        assert!(s.contains("ip6 daddr @learned6_acme update @learned6_acme"));
         assert!(s.contains("meta mark set 0x43520001"));
         assert!(s.contains("oifname \"crake-acme\" masquerade"));
         assert!(s.contains(

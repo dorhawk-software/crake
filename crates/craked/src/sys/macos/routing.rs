@@ -56,6 +56,11 @@ impl Routing {
         self.real
     }
 
+    /// IPv6 routing on macOS isn't built yet (a later slice).
+    pub fn routes_ipv6(&self) -> bool {
+        false
+    }
+
     /// Nothing to clear at startup: Crake's routes go with their devices.
     pub async fn reset_all(&self) -> Result<()> {
         Ok(())

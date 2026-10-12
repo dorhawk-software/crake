@@ -61,7 +61,7 @@ impl Manager {
         let _ops = self.ops.lock().await;
         let (label, gw) = self.prepare(name)?;
         for a in &addrs {
-            guard(&label, Target::host(*a), gw)?;
+            guard(&label, Target::host(*a), gw, self.routing.routes_ipv6())?;
             self.check_scope(name, &label, Target::host(*a), Some(host))?;
             if let Some(owner) = self.owner_of(*a, name) {
                 let owner = self.label(&owner);
@@ -104,7 +104,7 @@ impl Manager {
         if !t.is_host() {
             bail!("Only single hosts are learned. To send {t} through {label}, pin it.");
         }
-        guard(&label, t, gw)?;
+        guard(&label, t, gw, self.routing.routes_ipv6())?;
         self.check_scope(name, &label, t, None)?;
         if let Some(owner) = self.owner_of(t.addr(), name) {
             let owner = self.label(&owner);
@@ -222,7 +222,7 @@ impl Manager {
         let (to_label, gw) = self.prepare(to)?;
         let addrs = hosts_of(inputs, &to_label)?;
         for a in &addrs {
-            guard(&to_label, Target::host(*a), gw)?;
+            guard(&to_label, Target::host(*a), gw, self.routing.routes_ipv6())?;
             let known = th_name(&self.hosts.lock().unwrap(), from, *a);
             self.check_scope(to, &to_label, Target::host(*a), known.as_deref())?;
         }
@@ -273,7 +273,7 @@ impl Manager {
         let (label, gw) = self.prepare(name)?;
         let addrs = hosts_of(inputs, &label)?;
         for a in &addrs {
-            guard(&label, Target::host(*a), gw)?;
+            guard(&label, Target::host(*a), gw, self.routing.routes_ipv6())?;
             let known = th_name(&self.hosts.lock().unwrap(), name, *a);
             self.check_scope(name, &label, Target::host(*a), known.as_deref())?;
         }
@@ -311,7 +311,7 @@ impl Manager {
         let _ops = self.ops.lock().await;
         let (label, gw) = self.prepare(name)?;
         let t: Target = input.parse()?;
-        guard(&label, t, gw)?;
+        guard(&label, t, gw, self.routing.routes_ipv6())?;
         self.check_scope(name, &label, t, None)?;
         let was_learned = {
             let mut store = self.hosts.lock().unwrap();
@@ -492,12 +492,19 @@ pub(super) fn hosts_of(inputs: &[&str], label: &str) -> Result<Vec<IpAddr>> {
 
 /// Nothing that would break the machine, and nothing that covers the tunnel's
 /// own gateway (that would cut the tunnel off).
-pub(super) fn guard(label: &str, t: Target, gateway: Option<Ipv4Addr>) -> Result<()> {
-    // IPv6 host/network routing isn't wired through the kernel yet (the sets
-    // and routes are IPv4); the address model already carries it. Until then,
-    // say so plainly rather than half-route it.
-    if t.is_ipv6() {
-        bail!("Crake routes IPv6 through a tunnel soon, not yet. For now {t} stays direct.");
+pub(super) fn guard(
+    label: &str,
+    t: Target,
+    gateway: Option<Ipv4Addr>,
+    ipv6_ok: bool,
+) -> Result<()> {
+    // IPv6 routing is built on Linux; on platforms where it isn't yet, say so
+    // plainly rather than half-route it (the address model carries v6 either
+    // way).
+    if t.is_ipv6() && !ipv6_ok {
+        bail!(
+            "Crake doesn't route IPv6 through a tunnel on this platform yet. For now {t} stays direct."
+        );
     }
     t.check_routable()?;
     if let Some(gw) = gateway.filter(|gw| t.contains(*gw)) {

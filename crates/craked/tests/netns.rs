@@ -23,6 +23,19 @@ trap 'ip link del crake-acme; exit 0' TERM
 while :; do sleep 0.1; done
 "#;
 
+// Like FAKE, but the tunnel device also gets an IPv6 address, so IPv6
+// destinations routed to it have a source to leave with.
+const FAKE6: &str = r#"#!/bin/sh
+ip link add crake-acme type dummy 2>/dev/null
+ip link set crake-acme up
+ip -6 addr add fd00:ac::7/64 dev crake-acme nodad
+export TUNDEV=crake-acme VPNGATEWAY=192.0.2.10 INTERNAL_IP4_ADDRESS=10.40.255.7 \
+  INTERNAL_IP4_NETMASK=255.255.255.255 INTERNAL_IP4_DNS=10.40.0.2
+reason=connect "$CRAKE_TEST_HOOK" || exit 1
+trap 'ip link del crake-acme; exit 0' TERM
+while :; do sleep 0.1; done
+"#;
+
 fn enabled() -> bool {
     std::env::var("CRAKE_NETNS_TEST").as_deref() == Ok("1")
 }
@@ -44,6 +57,17 @@ fn goes_through_tunnel(ip: &str) -> bool {
     let before = tx();
     let sock = std::net::UdpSocket::bind("0.0.0.0:0").unwrap();
     let _ = sock.send_to(b"crex", format!("{ip}:9"));
+    std::thread::sleep(Duration::from_millis(50));
+    tx() > before
+}
+
+/// The same for an IPv6 destination.
+fn goes_through_tunnel6(ip: &str) -> bool {
+    let before = tx();
+    let Ok(sock) = std::net::UdpSocket::bind("[::]:0") else {
+        return false;
+    };
+    let _ = sock.send_to(b"crex", format!("[{ip}]:9"));
     std::thread::sleep(Duration::from_millis(50));
     tx() > before
 }
@@ -195,6 +219,97 @@ async fn routes_only_what_it_is_told() {
     ] {
         assert!(log.contains(want), "missing {want:?} in\n{log}");
     }
+}
+
+/// A pinned or learned IPv6 host is routed through the tunnel, the same way
+/// as IPv4: its own nftables sets, its own `ip -6` rule and route.
+#[tokio::test]
+async fn routes_an_ipv6_host() {
+    if !enabled() {
+        eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
+        return;
+    }
+    strict_rp_filter();
+    let dir = tempfile::tempdir().unwrap();
+    let fake = dir.path().join("openconnect");
+    std::fs::write(&fake, FAKE6).unwrap();
+    std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+    unsafe { std::env::set_var("CRAKE_TEST_HOOK", env!("CARGO_BIN_EXE_crake-hook")) };
+    let cfg = Config {
+        hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
+        hook_socket: dir.path().join("hook.sock"),
+        openconnect: fake,
+        log_path: dir.path().join("log"),
+        state_path: dir.path().join("hosts.json"),
+        learned_expiry_days: 7,
+        probing: false,
+        race_first_syn: false,
+        probe_wait_secs: 3,
+        never: vec![],
+        use_resolved: false,
+        apply_network: true,
+        managed_dir: dir.path().join("managed.d"),
+        tunnels: vec![TunnelConfig {
+            name: "acme".into(),
+            display_name: Some("ACME".into()),
+            gateway: "vpn.acme.example".into(),
+            protocol: Protocol::Anyconnect,
+            user: None,
+            passwd_file: None,
+            dns_domains: vec![],
+            auth_args: vec![],
+            extra_args: vec![],
+            managed: None,
+            own: None,
+        }],
+    };
+    let socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    // A dual-stack "LAN": a v4 and a v6 default, so an unrouted destination
+    // has somewhere to go first (and is then re-routed to the tunnel by its
+    // mark, as on a real machine).
+    sh("ip link add uplink type dummy; ip link set uplink up; \
+        ip addr add 192.168.0.242/24 dev uplink; ip route add default via 192.168.0.1 dev uplink; \
+        ip -6 addr add fd00:1a::242/64 dev uplink nodad; ip -6 route add default via fd00:1a::1 dev uplink");
+    mgr.init().await.unwrap();
+    let _srv = hook_server::serve(mgr.clone(), &socket).unwrap();
+
+    // Pin a v6 network, connect, and it routes.
+    mgr.pin("acme", "fd40::/32").await.unwrap();
+    mgr.connect("acme").unwrap();
+    wait_for(&mgr, TunnelState::Connected).await;
+    assert!(
+        sh("ip -6 rule").contains("lookup 7301"),
+        "{}",
+        sh("ip -6 rule")
+    );
+    assert!(
+        sh("nft list set inet crake pinned6_acme").contains("fd40::/32"),
+        "{}",
+        sh("nft list set inet crake pinned6_acme")
+    );
+    assert!(goes_through_tunnel6("fd40::1:1"), "pinned v6 network");
+    assert!(!goes_through_tunnel6("fd99::1"), "nothing else");
+
+    // A single learned v6 host, then forgotten.
+    mgr.add_host("acme", "fd50::9").await.unwrap();
+    assert!(
+        sh("nft list set inet crake learned6_acme").contains("fd50::9"),
+        "{}",
+        sh("nft list set inet crake learned6_acme")
+    );
+    assert!(goes_through_tunnel6("fd50::9"), "added v6 host");
+    mgr.forget("acme", "fd50::9").await.unwrap();
+    assert!(!goes_through_tunnel6("fd50::9"), "forgotten v6 host");
+
+    // Off: the v6 rule and sets leave with everything else.
+    mgr.shutdown().await;
+    assert!(!sh("ip -6 rule").contains("7301"), "{}", sh("ip -6 rule"));
+    assert!(
+        !sh("nft list ruleset").contains("pinned6_acme"),
+        "{}",
+        sh("nft list ruleset")
+    );
 }
 
 /// IT requires a full tunnel: everything goes through, except the tunnel's

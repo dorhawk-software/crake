@@ -259,7 +259,7 @@ impl Manager {
             if self.never(Some(&answer.name), *addr) {
                 continue;
             }
-            if let Err(e) = guard(&label, Target::host(*addr), gw) {
+            if let Err(e) = guard(&label, Target::host(*addr), gw, self.routing.routes_ipv6()) {
                 self.record(
                     LogKind::LeftAlone,
                     name,
