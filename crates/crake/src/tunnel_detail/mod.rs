@@ -8,8 +8,8 @@ use std::time::Duration;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyElement, Context, Div, Entity, FocusHandle, FontWeight, PathBuilder, Stateful, Subscription,
-    TestSupportExt, Window, canvas, div, point, px, svg,
+    AnyElement, Context, Div, Entity, FocusHandle, FontWeight, Stateful, Subscription,
+    TestSupportExt, Window, canvas, div, px, svg,
 };
 
 use crate::Request;
@@ -24,19 +24,13 @@ mod hosts;
 #[cfg(test)]
 mod tests;
 
-use self::chart::{chart, learned_today, today};
+use self::chart::{now_minutes, today};
 use self::facts::{facts, policy, title_row};
 
 pub const WIDTH: f32 = 900.;
 
 /// How often the hosts and the chart are asked for again while open.
 const REFRESH: Duration = Duration::from_secs(5);
-
-/// The chart, as in the design's 840 × 60 drawing: the baseline, and the
-/// time labels under it.
-const CHART_H: f32 = 60.;
-
-const BASELINE: f32 = 44.;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Tab {
@@ -56,6 +50,8 @@ pub struct TunnelDetail {
     /// The tallest the window may be (the screen's height, less a margin).
     max_height: f32,
     focus: FocusHandle,
+    /// Where the pointer is on the chart (`crate::timeline`).
+    chart_hover: crate::timeline::Hover,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -83,7 +79,10 @@ impl Render for TunnelDetail {
             .cloned()
             .unwrap_or_default();
         let traffic = today(model.tunnel_traffic.get(&self.tunnel));
-        let ticks = learned_today(model, &self.tunnel);
+        // Decisions about 12 px apart or closer share a tick (the design's
+        // 836 px for the day so far).
+        let span = now_minutes();
+        let marks = model.marks_within(span, Some(&self.tunnel), span * 12. / 836.);
         let failed = model
             .failed
             .as_ref()
@@ -182,7 +181,7 @@ impl Render for TunnelDetail {
             .child(title_row(&tunnel, &t))
             .child(facts(&tunnel, &t))
             .child(policy(&tunnel, &t))
-            .child(chart(&tunnel, &traffic, &ticks, &t));
+            .child(self.chart(&tunnel, marks, &traffic, &t, cx));
 
         let body = div()
             .id("body")
@@ -295,6 +294,7 @@ impl TunnelDetail {
             hint: String::new(),
             max_height,
             focus: cx.focus_handle(),
+            chart_hover: crate::timeline::Hover::default(),
             _subscriptions: subscriptions,
         }
     }

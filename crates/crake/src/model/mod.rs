@@ -493,15 +493,22 @@ impl Model {
     /// decisions as two-stroke ticks, left-alone ones as circles; marks less
     /// than a minute and a half apart merge into one, with a count.
     pub fn marks(&self) -> Vec<Mark> {
+        self.marks_within(60., None, MERGE_MINUTES)
+    }
+
+    /// The marks of the last `span` minutes (of one tunnel's decisions, or
+    /// all), decisions at most `merge` minutes apart sharing one.
+    pub fn marks_within(&self, span: f32, tunnel: Option<&str>, merge: f32) -> Vec<Mark> {
         let now = jiff::Timestamp::now();
         let mut events: Vec<(f32, &LogEntry)> = self
             .log
             .iter()
             .filter(|e| matches!(e.kind, LogKind::Routed | LogKind::LeftAlone))
+            .filter(|e| tunnel.is_none_or(|t| e.tunnel.as_deref() == Some(t)))
             .filter_map(|e| {
                 let t: jiff::Timestamp = e.ts.parse().ok()?;
                 let ago = (now.as_second() - t.as_second()) as f32 / 60.;
-                (0. ..=60.).contains(&ago).then_some((ago, e))
+                (0. ..=span).contains(&ago).then_some((ago, e))
             })
             .collect();
         // Oldest first.
@@ -510,7 +517,7 @@ impl Model {
         for (ago, e) in events {
             let routed = e.kind == LogKind::Routed;
             match groups.iter_mut().rev().find(|g| g.1 == routed) {
-                Some(g) if g.0 - ago <= MERGE_MINUTES => {
+                Some(g) if g.0 - ago <= merge => {
                     g.0 = ago; // the mark stands where the latest of them is
                     g.2.push(e);
                 }

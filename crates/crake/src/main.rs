@@ -53,6 +53,7 @@ use sys::single;
 
 mod theme;
 
+mod timeline;
 mod tray;
 
 // With craked over its socket, openconnect and nftables: Linux.
@@ -340,8 +341,9 @@ fn main() {
             if std::env::var("CRAKE_SHOW").is_ok_and(|v| v.starts_with("newtunnel")) {
                 open_new_tunnel(None, cx);
             }
-            // CRAKE_SHOW=panel (development): open the panel at start.
-            if std::env::var("CRAKE_SHOW").as_deref() == Ok("panel") {
+            // CRAKE_SHOW=panel (development): open the panel at start;
+            // hover:<minutes ago> opens it pointing at its chart.
+            if std::env::var("CRAKE_SHOW").is_ok_and(|v| v == "panel" || v.starts_with("hover:")) {
                 toggle_panel(None, cx);
             }
             // CRAKE_DEMO=arrive (development): a decision every 8 s, to watch

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: reading Today through ACME</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+    --ink: #ECEDEE; --muted: #A9AEB4; --bars: #3E4246; --accent: #2DD4BF;
+  }
+  body.light {
+    --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8;
+    --ink: #1A1C1E; --muted: #5A5F64; --bars: #D8D9D5; --accent: #0F766E;
+  }
+  body { margin: 0; background: var(--desk); color: var(--ink);
+    font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  .page { padding: 32px 40px 40px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 900px; }
+  .intro b { color: var(--ink); }
+  .case { width: 900px; margin-top: 22px; }
+  .label { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 10px; }
+  .window { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 28px 16px; }
+  .head { display: flex; justify-content: space-between; align-items: baseline; }
+  .head h2 { margin: 0; font-size: 16px; font-weight: 700; }
+  .head .sum { font-size: 12px; color: var(--muted); }
+  .chart { margin-top: 8px; }
+  /* Under the chart: the time row, or (while pointing) one line about that moment. */
+  .under { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 4px; height: 18px; align-items: baseline; }
+  .readout { display: flex; gap: 8px; align-items: baseline; font-size: 13px; color: var(--ink); min-width: 0; }
+  .readout .time { font-size: 11px; color: var(--muted); flex: none; }
+  .readout .text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="page" id="page"></div>
+<script>
+const dark = !location.search.includes('dark=false');
+if (!dark) document.body.classList.add('light');
+
+// tunnel-detail.html's chart: 840 x 44 to the baseline, midnight to now
+// (13:24), a bar per 7 px of traffic through ACME.
+const NOW = 13.4, X = h => 2 + h / NOW * 836;
+const bar = (x, top, base, w) => `M${(x - w / 2).toFixed(2)} ${base}V${(top + w / 2).toFixed(2)}a${w / 2} ${w / 2} 0 0 1 ${w} 0V${base}Z`;
+let s = 9; const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+const bars = [];
+for (let i = 0; i <= 120; i++) {
+  const h = i * NOW / 120;
+  bars.push({ h, ht: h > 8.5 ? 2 + rnd() * 16 : 0 });
+}
+const css = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+// Decisions today, as tunnel-detail.html has them; 9.20 and 9.23 are
+// minutes apart: one tick, "2" above it.
+const ticks = [{ h: 8.67, n: 1 }, { h: 9.21, n: 2 }, { h: 10.78, n: 1 }, { h: 13.35, n: 1 }];
+const clock = h => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
+
+function chart(opts) {
+  let svg = `<svg viewBox="0 -10 840 70" style="display:block;width:100%;height:auto">`;
+  for (const b of bars) {
+    if (!b.ht) continue;
+    const on = opts.hover != null && opts.kind === 'bar' && Math.abs(b.h - opts.hover) < 0.06;
+    svg += `<path d="M${X(b.h).toFixed(1)} 44V${(44 - b.ht).toFixed(1)}" stroke="${on ? css('--muted') : css('--bars')}" stroke-width="3"/>`;
+  }
+  if (opts.hover != null) {
+    svg += `<line x1="${X(opts.hover)}" y1="2" x2="${X(opts.hover)}" y2="44" stroke="${css('--lineStrong')}" stroke-width="1" stroke-dasharray="2 3"/>`;
+  }
+  svg += `<line x1="0" y1="44.5" x2="840" y2="44.5" stroke="${css('--lineStrong')}" stroke-width="1"/>`;
+  for (const t of ticks) {
+    svg += `<path d="${bar(X(t.h), 10, 44, 3)}${bar(X(t.h) + 4.5, 18, 44, 3)}" fill="${css('--accent')}"/>`;
+    if (t.n > 1) {
+      svg += `<text x="${X(t.h) + 2.2}" y="7" text-anchor="middle" font-family="Atkinson Hyperlegible Mono" font-size="11" fill="${css('--accent')}">${t.n}</text>`;
+    }
+  }
+  return svg + `</svg>`;
+}
+
+const axis = `<span class="mono">00:00</span><span class="mono">06:00</span><span class="mono">now</span>`;
+const readout = (h, text) => `<span class="readout"><span class="mono time">${clock(h)}</span><span class="text">${text}</span></span>`;
+
+const cases = [
+  { label: 'Not pointing (as tunnel-detail.html, but the two ticks at 09:12 and 09:14 are one, with 2 above it)',
+    opts: { hover: null }, under: axis },
+  { label: 'Pointing at a bar', opts: { hover: 11.92, kind: 'bar' },
+    under: readout(11.92, '18 MB through ACME') },
+  { label: 'Pointing at a tick', opts: { hover: 10.78 },
+    under: readout(10.78, 'Sent wiki.acme.internal through ACME.') },
+  { label: 'Pointing at the tick with 2', opts: { hover: 9.21 },
+    under: readout(9.2, 'Sent git and jira.acme.internal through ACME.') },
+];
+
+let html = `<div class="intro"><b>Proposal, not in DESIGN.md yet.</b> Tunnel detail's “Today through ACME” reads as
+  the panel’s Last hour does (chart-hover.html): while you point at it, a dotted hairline marks the moment and the time row
+  says what happened then, in the log’s words: the traffic through ACME, or the hosts sent through it. Decisions close
+  together share one two-stroke tick, with how many above it. The same chart in both, at their own spans: the panel’s
+  last hour, the detail’s day so far.</div>`;
+for (const c of cases) {
+  html += `
+  <div class="case">
+    <div class="label">${c.label}</div>
+    <div class="window">
+      <div class="head"><h2>Today through ACME</h2><span class="mono sum">6 hosts · 212 MB</span></div>
+      <div class="chart">${chart(c.opts)}</div>
+      <div class="under">${c.under}</div>
+    </div>
+  </div>`;
+}
+document.getElementById('page').innerHTML = html;
+</script>
+</body>
+</html>

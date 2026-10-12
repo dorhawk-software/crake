@@ -46,3 +46,17 @@ pub fn rounded_bar(x: f32, top: f32, base: f32, w: f32) -> Option<gpui_kit::Path
     p.close();
     p.build().ok()
 }
+
+/// A circle, filled or (with a width) stroked.
+pub fn circle(cx: f32, cy: f32, r: f32, stroke: Option<f32>) -> Option<gpui_kit::Path<Pixels>> {
+    let mut p = match stroke {
+        Some(w) => PathBuilder::stroke(px(w)),
+        None => PathBuilder::fill(),
+    };
+    let radii = point(px(r), px(r));
+    p.move_to(point(px(cx - r), px(cy)));
+    p.arc_to(radii, px(0.), false, true, point(px(cx + r), px(cy)));
+    p.arc_to(radii, px(0.), false, true, point(px(cx - r), px(cy)));
+    p.close();
+    p.build().ok()
+}

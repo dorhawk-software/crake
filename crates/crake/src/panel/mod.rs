@@ -9,8 +9,8 @@ use std::time::{Duration, Instant};
 
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyElement, ClipboardItem, Context, Div, Entity, FontWeight, MouseButton, PathBuilder, Pixels,
-    Stateful, Subscription, TestSupportExt, Window, canvas, div, point, px, svg,
+    AnyElement, ClipboardItem, Context, Div, Entity, FontWeight, MouseButton, Stateful,
+    Subscription, TestSupportExt, Window, canvas, div, px, svg,
 };
 
 use crate::Request;
@@ -25,9 +25,6 @@ mod tunnels;
 mod tests;
 
 pub const WIDTH: f32 = 452.;
-
-/// The chart's width inside the panel (its border and 18 px sides off).
-const CHART_WIDTH: f32 = WIDTH - 2. - 36.;
 
 /// Transparent room around the panel (only its rounded corners need any).
 pub const MARGIN: f32 = 0.;
@@ -95,10 +92,8 @@ pub struct Panel {
     been_active: bool,
     /// It opened upward from a bottom panel: its bottom edge stays put.
     upward: bool,
-    /// Where the pointer is on the chart, in minutes ago.
-    hover: Option<f32>,
-    /// The chart's left edge and width (window pixels), from its last paint.
-    chart_geometry: std::rc::Rc<std::cell::Cell<(f32, f32)>>,
+    /// Where the pointer is on the chart (`crate::timeline`).
+    chart_hover: crate::timeline::Hover,
     /// The "?" card after "What Crake did" is open.
     help_open: bool,
     _subscriptions: Vec<Subscription>,
@@ -325,10 +320,12 @@ impl Panel {
             been_active: window.is_window_active(),
             upward,
             // CRAKE_SHOW=hover:<minutes ago> (development): as if pointing there.
-            hover: std::env::var("CRAKE_SHOW")
-                .ok()
-                .and_then(|v| v.strip_prefix("hover:")?.parse().ok()),
-            chart_geometry: Default::default(),
+            chart_hover: crate::timeline::Hover {
+                at: std::env::var("CRAKE_SHOW")
+                    .ok()
+                    .and_then(|v| v.strip_prefix("hover:")?.parse().ok()),
+                ..Default::default()
+            },
             help_open: false,
             _subscriptions: subscriptions,
         }
