@@ -100,8 +100,9 @@ impl Settings {
             })
     }
 
-    /// One tunnel: grip and number (when it's tried in order), name, gateway
-    /// and protocol, and who may change it.
+    /// One tunnel: grip and number (when it's tried in order), name, state,
+    /// gateway and protocol, who may change it, and its switch
+    /// (design/proposals/settings-tunnels-switch.html).
     pub(super) fn tunnel_row(
         &self,
         tunnel: &crate::client::Tunnel,
@@ -126,59 +127,8 @@ impl Settings {
         } else {
             format!("{} \u{b7} {protocol}", tunnel.gateway)
         };
-        let right: AnyElement = match tunnel.source.as_str() {
-            "app" => {
-                let (edit, remove) = (tunnel.name.clone(), tunnel.name.clone());
-                div()
-                    .flex()
-                    .gap(px(8.))
-                    .flex_none()
-                    .child(
-                        small_button(
-                            ("edit", position.unwrap_or(99)),
-                            "Edit",
-                            None,
-                            t.line,
-                            t.ink,
-                            t,
-                        )
-                        .on_click(cx.listener(move |this, _, _, _| {
-                            this.requests
-                                .send_blocking(Request::NewTunnel(Some(edit.clone())))
-                                .ok();
-                        }))
-                        .test_support(),
-                    )
-                    .child(
-                        small_button(
-                            ("remove", position.unwrap_or(99)),
-                            "Remove\u{2026}",
-                            Some("crake/trash.svg"),
-                            t.danger,
-                            t.danger,
-                            t,
-                        )
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.removing = Some(remove.clone());
-                            cx.notify();
-                        }))
-                        .test_support(),
-                    )
-                    .into_any_element()
-            }
-            "managed" => div()
-                .flex_none()
-                .text_size(px(13.))
-                .text_color(t.muted)
-                .child(format!("Set up by {}", tunnel.organisation))
-                .into_any_element(),
-            _ => div()
-                .flex_none()
-                .text_size(px(13.))
-                .text_color(t.muted)
-                .child("From the config file")
-                .into_any_element(),
-        };
+        let on = matches!(tunnel.state.as_str(), "connected" | "connecting");
+        let right = self.row_actions(tunnel, position, t, cx);
         div()
             .id(gpui_kit::ElementId::Name(format!("tunnel-{}", tunnel.name).into()))
             .flex()
@@ -246,7 +196,15 @@ impl Settings {
                             })
                             .when(crate::new_tunnel::beta(&tunnel.protocol), |d| {
                                 d.child(crate::new_tunnel::beta_tag(t))
-                            }),
+                            })
+                            // Its state, in the panel's words.
+                            .child(
+                                div()
+                                    .text_size(px(13.))
+                                    .text_color(t.muted)
+                                    .whitespace_nowrap()
+                                    .child(crate::model::tunnel_state(tunnel)),
+                            ),
                     )
                     .child(
                         div()
@@ -262,9 +220,34 @@ impl Settings {
                             "A full tunnel: while it\u{2019}s on, whatever the tunnels above don\u{2019}t take goes through it.",
                             t,
                         ))
+                    })
+                    // Why it can't be switched on now (it clashes with one
+                    // that's up).
+                    .when(!on && !tunnel.clash.is_empty(), |d| {
+                        d.child(sub(&tunnel.clash, t))
                     }),
             )
             .child(right)
+            // On or off, as in the panel (sign-in when it needs one).
+            .child(
+                crate::panel::switch(
+                    gpui_kit::ElementId::Name(format!("switch-{}", tunnel.name).into()),
+                    on,
+                    t,
+                )
+                .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
+                    cx.stop_propagation()
+                })
+                .on_click({
+                    let name = tunnel.name.clone();
+                    cx.listener(move |this, _, _, _| {
+                        this.requests
+                            .send_blocking(Request::Switch(name.clone(), !on))
+                            .ok();
+                    })
+                })
+                .test_support(),
+            )
             // Opens tunnel detail too: says the row leads somewhere.
             .child(
                 div()
@@ -295,6 +278,70 @@ impl Settings {
                         })
                     }).test_support(),
             )
+    }
+
+    /// Who may change a tunnel: Edit and Remove… for one added here, who
+    /// set it up for the rest.
+    fn row_actions(
+        &self,
+        tunnel: &crate::client::Tunnel,
+        position: Option<usize>,
+        t: &Theme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        match tunnel.source.as_str() {
+            "app" => {
+                let (edit, remove) = (tunnel.name.clone(), tunnel.name.clone());
+                div()
+                    .flex()
+                    .gap(px(8.))
+                    .flex_none()
+                    .child(
+                        small_button(
+                            ("edit", position.unwrap_or(99)),
+                            "Edit",
+                            None,
+                            t.line,
+                            t.ink,
+                            t,
+                        )
+                        .on_click(cx.listener(move |this, _, _, _| {
+                            this.requests
+                                .send_blocking(Request::NewTunnel(Some(edit.clone())))
+                                .ok();
+                        }))
+                        .test_support(),
+                    )
+                    .child(
+                        small_button(
+                            ("remove", position.unwrap_or(99)),
+                            "Remove\u{2026}",
+                            Some("crake/trash.svg"),
+                            t.danger,
+                            t.danger,
+                            t,
+                        )
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.removing = Some(remove.clone());
+                            cx.notify();
+                        }))
+                        .test_support(),
+                    )
+                    .into_any_element()
+            }
+            "managed" => div()
+                .flex_none()
+                .text_size(px(13.))
+                .text_color(t.muted)
+                .child(format!("Set up by {}", tunnel.organisation))
+                .into_any_element(),
+            _ => div()
+                .flex_none()
+                .text_size(px(13.))
+                .text_color(t.muted)
+                .child("From the config file")
+                .into_any_element(),
+        }
     }
 
     /// "Remove Home lab?" under its row, after Remove… was pressed.

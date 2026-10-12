@@ -204,4 +204,25 @@ fn tunnels(cx: &mut TestAppContext) {
 
     w.click("new-tunnel", cx);
     assert!(matches!(w.request(), Request::NewTunnel(None)));
+
+    // Each tunnel's switch, as in the panel: on asks to switch it off, off
+    // to switch it on.
+    let states: Vec<(String, bool)> = w.model.read_with(cx, |m, _| {
+        m.tunnels
+            .iter()
+            .map(|t| {
+                (
+                    t.name.clone(),
+                    matches!(t.state.as_str(), "connected" | "connecting"),
+                )
+            })
+            .collect()
+    });
+    for (name, on) in states {
+        w.click(ElementId::Name(format!("switch-{name}").into()), cx);
+        assert!(
+            matches!(w.request(), Request::Switch(n, to) if n == name && to == !on),
+            "{name}'s switch"
+        );
+    }
 }

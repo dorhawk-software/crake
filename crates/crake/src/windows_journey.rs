@@ -246,10 +246,12 @@ fn a_day_with_crake_on_windows(cx: &mut TestAppContext) {
         window::<signin_view::SignIn>(cx).is_none()
     });
 
-    // 7. Switched off from the panel: its adapter and routes go.
-    let p = panel(cx);
-    let acme = index(cx, "acme");
-    click(cx, p, ("switch", acme));
+    // 7. Switched off from Settings → Tunnels (switched on from the panel
+    //    in step 1): its adapter and routes go.
+    request(cx, Request::Settings);
+    let (s, _) = wait_window::<settings_view::Settings>(cx, "Settings opens");
+    click(cx, s, ("section", 0usize));
+    click(cx, s, gpui_kit::ElementId::Name("switch-acme".into()));
     until(cx, "ACME off", Duration::from_secs(15), |cx| {
         state(cx, "acme") == "off"
     });
