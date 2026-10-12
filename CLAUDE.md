@@ -729,7 +729,12 @@ The user doesn't want development builds installed on their machine.
   it builds and substitutes from it next time; Cachix has no 10 GB cap, so
   GitHub's budget now holds only the five Rust caches (~9 GB). Setup (done
   with the user): a Cachix account, a public cache named `crake`, an auth
-  token as the repo secret `CACHIX_AUTH_TOKEN`. The NixOS VM-boot (~6-8
+  token as the repo secret `CACHIX_AUTH_TOKEN`. Cachix's free plan holds
+  5 GB and then evicts the least recently used paths (a warning email at
+  85%); it had reached ~3.5 GB by 2026-10-12 because every path a run built
+  was pushed, Crake's own per-commit outputs included. Now `pushFilter`
+  keeps those out: only the dependency derivations (crane's `crake-deps`,
+  `crake-journey-deps`) go up, which is what the next run reuses. The NixOS VM-boot (~6-8
   min) is uncacheable, so nixos stays the slowest job even cached.
 - Daily use, nothing installed: `sudo ./target/debug/craked --config dev/<yours>.toml --dev`
   (serves the app on `/run/user/<uid>/crake-dev.sock`), then `./target/debug/crake`.
