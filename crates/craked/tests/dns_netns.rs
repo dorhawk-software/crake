@@ -320,7 +320,8 @@ fn read_tcp(tun: &mut File, want: impl Fn(&[u8]) -> bool) -> Vec<u8> {
 /// Ask the tunnel's DNS for `name` over TCP (as resolved does when an answer
 /// is too big for UDP); the test answers `addr` in one segment. Returns
 /// whether the app's first packet to `addr` left through the tunnel.
-fn ask_tcp(tun: &mut File, name: &str, addr: Ipv4Addr) -> bool {
+/// `split`: the answer comes in two segments (a long one would).
+fn ask_tcp(tun: &mut File, name: &str, addr: Ipv4Addr, split: bool) -> bool {
     let msg = query(name);
     let app = std::thread::spawn(move || {
         let mut s = std::net::TcpStream::connect_timeout(
@@ -355,7 +356,15 @@ fn ask_tcp(tun: &mut File, name: &str, addr: Ipv4Addr) -> bool {
     let reply = answer_message(&data[2..], 0, &[addr.into()]);
     let mut framed = (reply.len() as u16).to_be_bytes().to_vec();
     framed.extend_from_slice(&reply);
-    tun.write_all(&tcp_reply(&seg, 777_001, &framed)).unwrap();
+    if split {
+        let (a, b) = framed.split_at(framed.len() / 2);
+        tun.write_all(&tcp_reply(&seg, 777_001, a)).unwrap();
+        std::thread::sleep(Duration::from_millis(50));
+        tun.write_all(&tcp_reply(&seg, 777_001 + a.len() as u32, b))
+            .unwrap();
+    } else {
+        tun.write_all(&tcp_reply(&seg, 777_001, &framed)).unwrap();
+    }
     let got = app.join().unwrap();
     assert!(
         got.windows(4).any(|w| w == addr.octets()),
@@ -490,6 +499,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     let git: Ipv4Addr = "10.33.7.7".parse().unwrap();
     let wiki: Ipv4Addr = "10.33.8.8".parse().unwrap();
     let big: Ipv4Addr = "10.33.9.9".parse().unwrap();
+    let split: Ipv4Addr = "10.33.9.10".parse().unwrap();
     let public: Ipv4Addr = "93.184.215.14".parse().unwrap();
     let gw: Ipv4Addr = "192.0.2.10".parse().unwrap();
     let git6: Ipv6Addr = "fd40:1::7".parse().unwrap();
@@ -574,7 +584,8 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
             ask(&mut tun, "wiki.corp.example", wiki),
             ask(&mut tun, "www.example.com", public),
             ask(&mut tun, "vpn.acme.internal", gw),
-            ask_tcp(&mut tun, "big.acme.internal", big),
+            ask_tcp(&mut tun, "big.acme.internal", big, false),
+            ask_tcp(&mut tun, "split.acme.internal", split, true),
             ask_aaaa(&mut tun, "v6.acme.internal", git6),
             ask_over_ipv6(&mut tun, "dns6.acme.internal", over6),
         );
@@ -593,8 +604,20 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
 
     splits_handled(splits, fe_private, office_public, www_public, fe6_private);
 
-    let (git_first, wiki_first, public_routed, gw_routed, tcp_first, v6_first, over6_first) =
-        results;
+    let (
+        git_first,
+        wiki_first,
+        public_routed,
+        gw_routed,
+        tcp_first,
+        split_first,
+        v6_first,
+        over6_first,
+    ) = results;
+    assert!(
+        split_first,
+        "an answer over TCP in two segments: the first packet went through the tunnel"
+    );
     assert!(
         over6_first,
         "an answer from the tunnel's DNS reached over IPv6: routed first\n{}",

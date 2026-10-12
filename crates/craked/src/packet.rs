@@ -49,6 +49,10 @@ const DATA_OFFSET: usize = 12;
 const FLAGS: usize = 13;
 const SYN: u8 = 0x02;
 const ACK: u8 = 0x10;
+const FIN: u8 = 0x01;
+const RST: u8 = 0x04;
+/// A TCP segment's sequence number.
+const SEQUENCE: Range<usize> = 4..8;
 
 /// ICMP "destination unreachable": type, code, four unused bytes, then the
 /// start of the packet that couldn't be delivered.
@@ -150,6 +154,20 @@ pub fn destination_port(segment: &[u8]) -> Option<u16> {
 pub fn tcp_data(segment: &[u8]) -> Option<&[u8]> {
     let words = *segment.get(DATA_OFFSET)? >> VERSION_SHIFT;
     segment.get(usize::from(words) * WORD..)
+}
+
+/// A TCP segment's sequence number.
+pub fn tcp_seq(segment: &[u8]) -> Option<u32> {
+    segment
+        .get(SEQUENCE)?
+        .try_into()
+        .ok()
+        .map(u32::from_be_bytes)
+}
+
+/// The segment ends its connection's stream (FIN or RST).
+pub fn tcp_ends(segment: &[u8]) -> bool {
+    segment.get(FLAGS).is_some_and(|f| f & (FIN | RST) != 0)
 }
 
 /// A connection's first SYN: SYN set, ACK clear (not a SYN-ACK).

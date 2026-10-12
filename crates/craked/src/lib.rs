@@ -2,6 +2,7 @@ pub mod auth;
 pub mod config;
 pub mod dbus;
 pub mod dns;
+pub mod dns_tcp;
 pub mod flows;
 pub mod hook_server;
 pub mod hosts;

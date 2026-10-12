@@ -224,8 +224,11 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    user's systemd-resolved: looking up an internal name with its tunnel
    off fails at once); removed on shutdown.
    Over TCP too: a tunnel DNS answer that fits one segment (almost every A
-   answer) is held like a UDP one (netns-tested); one spread over several
-   segments isn't read, and probing catches its connection.
+   answer) is held like a UDP one; one spread over several segments is put
+   together from them in the order they come (`dns_tcp.rs`, in the queue's
+   receive loop): the earlier ones pass at once, the one that completes it
+   is held until its addresses are routed, so the app still can't have it
+   before then (netns-tested, fails without the reassembly).
    IPv6 addresses in answers (AAAA, from a tunnel DNS reached over IPv4)
    are routed before the first packet too, on Linux (netns-tested; the
    tunnel gets the IPv6 address openconnect hands over,
@@ -236,9 +239,8 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    routes the AAAA records a tunnel knows too, and watches public DNS
    reached over IPv6 as well (a dual-stack network's router often hands
    one out; the rewritten answer gets the UDP checksum IPv6 requires;
-   netns-tested). Still open:
-   DNS over TCP across segments, IPv6 DNS servers on macOS and Windows,
-   DNS-over-TLS upstreams (Crake can't see those failures).
+   netns-tested). Still open: DNS-over-TLS upstreams (Crake can't see
+   those failures).
    Split-horizon takes AAAA questions too (a unique local fc00::/7
    address counts as private), the memory answerer (7h) remembers and
    serves IPv6 addresses (an A and an AAAA answer each keep the other's),

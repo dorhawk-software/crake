@@ -6,7 +6,9 @@
 //!   tunnels; if one knows the name, its answer replaces the failure.
 //!
 //! The queue rules use `bypass`: if craked isn't listening, answers pass untouched.
-//! Each answer is handled on its own task, so a slow tunnel never holds up the rest.
+//! Each answer is handled on its own task, so a slow tunnel never holds up the rest;
+//! an answer over TCP spread over segments is put together first, in the order
+//! they came (`dns_tcp`), and only the segment that completes it is held.
 
 use std::ffi::CStr;
 use std::io::ErrorKind;
@@ -33,6 +35,7 @@ pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
     let (done_tx, mut done) = mpsc::unbounded_channel::<Message>();
 
     tokio::spawn(async move {
+        let mut tcp_answers = crate::dns_tcp::Reassembly::default();
         loop {
             tokio::select! {
                 ready = fd.readable_mut() => {
@@ -46,9 +49,10 @@ pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
                     loop {
                         match guard.get_inner_mut().recv() {
                             Ok(msg) => {
+                                let whole = tcp_answers.segment(msg.get_payload());
                                 let (mgr, done_tx) = (Arc::clone(&mgr), done_tx.clone());
                                 tokio::spawn(async move {
-                                    let _ = done_tx.send(handle(&mgr, msg).await);
+                                    let _ = done_tx.send(handle(&mgr, msg, whole).await);
                                 });
                             }
                             Err(e) if e.kind() == ErrorKind::WouldBlock => {
@@ -73,10 +77,16 @@ pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
     Ok(())
 }
 
-async fn handle(mgr: &Arc<Manager>, mut msg: Message) -> Message {
+/// `whole`: the TCP answers this segment completes (`dns_tcp`).
+async fn handle(mgr: &Arc<Manager>, mut msg: Message, whole: Vec<Vec<u8>>) -> Message {
     match device_of(msg.get_indev()).and_then(|d| mgr.tunnel_of_device(&d)) {
         Some(tunnel) => {
-            if let Some(answer) = dns::parse_packet(msg.get_payload()) {
+            let answers: Vec<dns::Answer> = if whole.is_empty() {
+                dns::parse_packet(msg.get_payload()).into_iter().collect()
+            } else {
+                whole.iter().filter_map(|m| dns::parse_message(m)).collect()
+            };
+            for answer in answers {
                 mgr.learn_from_dns(&tunnel, answer).await;
             }
         }
