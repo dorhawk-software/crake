@@ -72,7 +72,9 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          # Not saved: the fastest job, and the caches overflow GitHub's
+          # 10 GB (which evicts the Nix store, the slowest to rebuild).
+          save-if: false
       - name: Crake compiles for Windows, lint-clean
         run: scripts/windows-check.sh
 
@@ -167,7 +169,7 @@ jobs:
         with:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock', '**/*.nix') }}
           restore-prefixes-first-match: nix-${{ runner.os }}-
-          gc-max-store-size-linux: 8G
+          gc-max-store-size-linux: 6G
           purge: true
           purge-prefixes: nix-${{ runner.os }}-
           purge-created: 0
