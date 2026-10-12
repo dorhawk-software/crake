@@ -613,13 +613,18 @@ The user doesn't want development builds installed on their machine.
   (cache-nix-action), where crane keeps the crates.io dependencies a
   derivation of their own (packaging/nix/package.nix; the vendored GPUI
   backend stays whole in it).
-  **To do (noted for the user):** GitHub keeps 10 GB of caches per
-  repository, and rust-cache (check 2.4 GB, Windows build 3.2 GB, the
-  Windows check 1 GB), Nix (2.4 GB) and the packages (~3 GB) don't fit
-  together: GitHub evicts the least used, and that run is slow again.
-  Once `windows` is merged, save caches from `main` only (rust-cache's
-  `save-if`, actions/cache's restore/save split) and let branches restore
-  them; if still too big, drop rustup from the package cache.
+  **Caches (asked by the user, 2026-10-12: runs took 35 min with
+  "No cache found"):** GitHub keeps 10 GB of caches per repository and
+  evicts the least used; Nix (3.3 GB), the packages (2.6 GB, a new one
+  each week), check (2.5 GB), the Windows build (1.5 GB) and the rest,
+  with copies per branch, didn't fit, so each run evicted what the next
+  needed. Now caches are saved by `main`'s runs only (rust-cache
+  `save-if`, actions/cache's restore/save split, cache-nix-action's
+  `save`) and restored on every branch; CI builds carry line tables only
+  (`CARGO_PROFILE_DEV_DEBUG`), not full debug info; and `check` runs the
+  tests once, under coverage (the separate `cargo test` was the same
+  suite again). A branch run is fast once `main` has run with the same
+  Cargo.lock. If still too big: drop rustup from the package cache.
 - Daily use, nothing installed: `sudo ./target/debug/craked --config dev/<yours>.toml --dev`
   (serves the app on `/run/user/<uid>/crake-dev.sock`), then `./target/debug/crake`.
   The app signs in as the user (`openconnect --authenticate`, questions in

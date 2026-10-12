@@ -15,13 +15,19 @@ permissions:
   contents: read
 
 # One run per branch: a new push cancels the one still going (only the
-# newest commit matters; CI minutes aren't free for anyone).
+# newest commit matters; CI minutes aren't free for anyone). Caches are
+# saved by main's runs only and restored everywhere: GitHub keeps 10 GB
+# per repository, and copies per branch pushed out the ones jobs needed.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
+  # Line numbers are all CI needs from debug info; full debug info is most
+  # of a target directory, so most of each cache (release builds keep
+  # their own profile).
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
   # What GPUI links (X11, keyboard, fonts) and what the tests drive.
   APT: >-
     build-essential pkg-config cmake clang
@@ -39,14 +45,16 @@ jobs:
         with:
           components: clippy, rustfmt, llvm-tools-preview
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny,cargo-machete,cargo-llvm-cov
       - name: Lint gate
         run: scripts/lint.sh
-      - name: Tests
-        run: cargo test --workspace
-      - name: Coverage floors
+      # cargo llvm-cov runs every test (and fails when one does): the tests
+      # and their coverage in one build.
+      - name: Tests, and the coverage floors
         run: scripts/check-coverage.sh
 
   windows:
@@ -59,6 +67,8 @@ jobs:
           targets: x86_64-pc-windows-gnu
           components: clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Crake compiles for Windows, lint-clean
         run: scripts/windows-check.sh
 
@@ -74,6 +84,8 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Crake compiles for macOS, lint-clean
         run: cargo clippy --workspace --all-targets --locked
       - name: The tests that aren't Linux's own, on macOS
@@ -90,6 +102,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: The tests that aren't Linux's own, on Windows
         run: cargo test --workspace --locked
       - name: crake.exe, craked.exe and crake-hook.exe (unsigned)
@@ -117,6 +131,8 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $APT
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: nftables and policy routing in a namespace
         run: scripts/netns-test.sh
       - name: End to end against ocserv
@@ -150,6 +166,7 @@ jobs:
           purge-created: 0
           purge-last-accessed: P2D
           purge-primary-key: never
+          save: ${{ github.ref == 'refs/heads/main' }}
       - name: Build Crake with Nix
         run: nix build --print-build-logs .#default
       - name: The NixOS module, end to end (a gateway and a client VM)
@@ -166,7 +183,7 @@ jobs:
         run: echo "week=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
       # rustup, Cargo's downloads and both builds (the .deb's on 22.04 and
       # Arch's with Arch's Rust), as the Windows and check jobs keep theirs.
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         with:
           path: ~/crake-cache
           key: packages-${{ steps.week.outputs.week }}-${{ hashFiles('Cargo.lock') }}
@@ -180,8 +197,13 @@ jobs:
       # The containers write as root, and Cargo unpacks some crates' files
       # readable by their owner only: the cache has to be readable to be saved.
       - name: Let the cache be saved
-        if: always()
+        if: github.ref == 'refs/heads/main'
         run: sudo chmod -R a+rX ~/crake-cache
+      - uses: actions/cache/save@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: ~/crake-cache
+          key: packages-${{ steps.week.outputs.week }}-${{ hashFiles('Cargo.lock') }}
       - uses: actions/upload-artifact@v4
         with:
           name: crake-packages
