@@ -632,7 +632,11 @@ The user doesn't want development builds installed on their machine.
   (`CARGO_PROFILE_DEV_DEBUG`), not full debug info; and `check` runs the
   tests once, under coverage (the separate `cargo test` was the same
   suite again). A branch run is fast once `main` has run with the same
-  Cargo.lock. If still too big: drop rustup from the package cache.
+  Cargo.lock. Measured on main: packages 2.6 GB, the Windows build 1.4,
+  check 1.3, macOS 1.1, network 1.1 and Nix 3.3 still came to ~10.8 GB
+  and Nix's was evicted, so the network job restores but never saves (it
+  runs in parallel; uncached it takes about as long as the packages do
+  cached). If still too big: drop rustup from the package cache.
 - Daily use, nothing installed: `sudo ./target/debug/craked --config dev/<yours>.toml --dev`
   (serves the app on `/run/user/<uid>/crake-dev.sock`), then `./target/debug/crake`.
   The app signs in as the user (`openconnect --authenticate`, questions in

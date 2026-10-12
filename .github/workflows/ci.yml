@@ -134,7 +134,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          # Never saved: 10 GB per repository fits Nix, the packages, check,
+          # the Windows build and macOS, not this too (it evicted Nix's).
+          # Uncached it takes about as long as the packages do cached.
+          save-if: false
       - name: nftables and policy routing in a namespace
         run: scripts/netns-test.sh
       - name: End to end against ocserv
