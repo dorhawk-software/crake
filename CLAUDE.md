@@ -1182,14 +1182,17 @@ Windows (Linux draws one in its transparent margin), and a few white
 pixels show outside the rounded top corners; both look like GPUI's
 DirectX drawing of transparent windows (the renderer anti-aliases the
 card's `rounded(px(10.))` corners against the transparent backdrop and
-leaves a white fringe). **Planned fix (not done; needs a CI Windows
-build + VM check, agreed to defer 2026-10-12 to keep on IPv6):** on
-Windows only, make the panel window opaque and card-sized (drop the
-transparent shadow margin) and let the OS round it — `plain_frame`
-(`sys/windows/host.rs`) uses `DWMWCP_ROUND` instead of
-`DWMWCP_DONOTROUND`, and the card stops self-rounding on Windows. DWM
-then gives anti-aliased rounded corners **and** a native drop shadow, so
-both complaints go at once. All `cfg(windows)`, Linux untouched.
+leaves a white fringe). **Done (2026-10-12, `76d8d29`):** on Windows the
+panel window is opaque and the size of its card, Windows rounds it
+(`sys::rounded_frame`, DWMWCP_ROUND) and draws its hairline in the
+theme's line colour; the card doesn't round itself or draw a border
+there. Checked in the user's Windows 11 VM (CI's build, demo panel,
+`virsh screenshot`): no fringe, a clean hairline; but that VM has the
+Microsoft Basic Display Adapter (no GPU), where Windows draws every
+window square and without effects, so the rounding and whether Windows
+adds a shadow to the borderless pop-up still need a Windows with a GPU.
+If it has no shadow there: DwmExtendFrameIntoClientArea with 1 px
+margins is the usual fix.
 The installer now uses NSIS Modern UI 2 (`packaging/windows/crake.nsi`,
 done 2026-10-12): welcome page, Crake's icon, a finish page that can open
 Crake; it was the classic 90s wizard before.
