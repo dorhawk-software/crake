@@ -514,10 +514,9 @@ impl X11WindowState {
             // https://stackoverflow.com/questions/43218127/x11-xlib-xcb-creating-a-window-requires-border-pixel-if-specifying-colormap-wh
             .border_pixel(visual_set.black_pixel)
             .colormap(colormap)
-            // CRAKE PATCH: pop-ups stay managed (not override-redirect), so the
-            // window manager gives them focus and focus-out tells the app that
-            // the user clicked elsewhere.
-            .override_redirect(0)
+            // A pop-up that wants focus is managed: an override-redirect window
+            // never gets focus from the window manager, nor focus-out events.
+            .override_redirect((params.kind == WindowKind::PopUp && !params.focus) as u32)
             .event_mask(
                 xproto::EventMask::EXPOSURE
                     | xproto::EventMask::STRUCTURE_NOTIFY
@@ -619,9 +618,9 @@ impl X11WindowState {
                 )?;
             }
 
-            if params.kind == WindowKind::PopUp {
-                // CRAKE PATCH: a pop-up (Crake's tray panel) floats above other
-                // windows and stays out of the taskbar and pager.
+            if params.kind == WindowKind::PopUp && params.focus {
+                // A focusable pop-up (e.g. a tray panel): above other windows,
+                // out of the taskbar and pager.
                 check_reply(
                     || "X11 ChangeProperty32 setting state for pop-up failed.",
                     xcb.change_property32(
@@ -634,6 +633,17 @@ impl X11WindowState {
                             atoms._NET_WM_STATE_SKIP_PAGER,
                             atoms._NET_WM_STATE_ABOVE,
                         ],
+                    ),
+                )?;
+            } else if params.kind == WindowKind::PopUp {
+                check_reply(
+                    || "X11 ChangeProperty32 setting window type for pop-up failed.",
+                    xcb.change_property32(
+                        xproto::PropMode::REPLACE,
+                        x_window,
+                        atoms._NET_WM_WINDOW_TYPE,
+                        xproto::AtomEnum::ATOM,
+                        &[atoms._NET_WM_WINDOW_TYPE_NOTIFICATION],
                     ),
                 )?;
             }
@@ -802,8 +812,8 @@ impl X11WindowState {
                     Some((f32::from(size.width) as i32, f32::from(size.height) as i32));
             }
             size_hints.max_size = Some((max_texture_size as i32, max_texture_size as i32));
-            // CRAKE PATCH: the app chose this position (e.g. next to a tray
-            // icon); without this hint the window manager places it itself.
+            // The position the app asked for, as user-specified: without it
+            // window managers place the window themselves (ICCCM 4.1.2.3).
             size_hints.position = Some((
                 WmSizeHintsSpecification::UserSpecified,
                 bounds.origin.x.0,

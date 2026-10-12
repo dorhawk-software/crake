@@ -12,9 +12,11 @@ Changes, all in `src/linux/x11/window.rs`, marked `CRAKE PATCH`:
 
 1. `WM_NORMAL_HINTS` carries the window's position as user-specified, so the
    window manager honours the position the app asked for.
-2. `WindowKind::PopUp` windows are managed (not override-redirect), get
-   `_NET_WM_STATE_SKIP_TASKBAR`, `_SKIP_PAGER` and `_ABOVE` instead of the
-   notification window type.
+2. A `WindowKind::PopUp` that asks for focus (`focus: true`, GPUI's
+   default, as Crake's panel and sign-in do) is managed (not
+   override-redirect) and gets `_NET_WM_STATE_SKIP_TASKBAR`, `_SKIP_PAGER`
+   and `_ABOVE` instead of the notification window type. Pop-ups with
+   `focus: false` stay as upstream has them.
 
 Keeping it current: the change itself is `vendor/gpui-pre-linux.patch` (a
 diff against crates.io's pristine source). `scripts/update-gpui.sh` takes the
@@ -25,6 +27,7 @@ taken the change (the patch applies backwards), the script drops this copy
 and the `[patch]`. `scripts/check-gpui-patch.sh` (in the lint gate) fails
 the build if Cargo quietly stopped using this copy.
 
-Upstream (GPUI is Zed's, zed-industries/zed): change 1 is a plain fix
-anyone could take; change 2 alters every PopUp window, so upstream it would
-have to be opt-in (a focusable pop-up).
+Upstream (GPUI is Zed's): reported as
+https://github.com/zed-industries/zed/issues/65493, with both changes as
+proposed there (this patch is exactly that, so once upstream has it the
+weekly update notices and drops this copy).
