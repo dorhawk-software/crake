@@ -64,6 +64,7 @@ impl Manager {
             .await?;
         self.set_routed(name, true);
         self.routing.public_up(self.cfg.probing).await?;
+        self.sync_syn_race().await;
         // A tunnel that just came up may know names that failed before.
         self.unknown.lock().unwrap().clear();
         Ok(pinned.len() + learned.len())
@@ -122,6 +123,7 @@ impl Manager {
             tracing::error!("removing routing for {name}: {e:#}");
         }
         self.set_routed(name, false);
+        self.sync_syn_race().await;
         let any_left = self.tunnels.lock().unwrap().values().any(|e| e.routed);
         if !any_left && let Err(e) = self.routing.public_down().await {
             tracing::error!("removing the public DNS watch: {e:#}");

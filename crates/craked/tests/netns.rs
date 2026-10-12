@@ -80,6 +80,7 @@ async fn routes_only_what_it_is_told() {
         state_path: state_path.clone(),
         learned_expiry_days: 7,
         probing: false,
+        race_first_syn: false,
         probe_wait_secs: 3,
         never: vec![],
         use_resolved: false,
@@ -226,6 +227,7 @@ async fn a_full_tunnel_takes_everything_but_the_gateway_and_the_lan() {
         state_path: dir.path().join("hosts.json"),
         learned_expiry_days: 7,
         probing: false,
+        race_first_syn: false,
         probe_wait_secs: 3,
         never: vec![],
         use_resolved: false,
@@ -291,6 +293,7 @@ async fn internal_names_stay_private_while_the_tunnel_is_off() {
         state_path: dir.path().join("hosts.json"),
         learned_expiry_days: 7,
         probing: false,
+        race_first_syn: false,
         probe_wait_secs: 3,
         never: vec![],
         // No systemd-resolved in the namespace: its calls just fail; the

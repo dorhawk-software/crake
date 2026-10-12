@@ -335,6 +335,14 @@ impl Manager {
         {
             tracing::error!("connection probing is off: {e:#}");
         }
+        // The first SYN of a new connection, held so even the first one is
+        // routed (Linux NFQUEUE; a no-op elsewhere).
+        if self.routing.is_real()
+            && self.cfg.probing
+            && let Err(e) = crate::syn_queue::spawn(Arc::clone(self))
+        {
+            tracing::error!("the first-SYN race is off: {e:#}");
+        }
         // Each tunnel's DNS, asked now and then whether it still answers.
         if self.routing.is_real() && self.cfg.use_resolved {
             let this = Arc::clone(self);

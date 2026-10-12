@@ -102,6 +102,19 @@ impl Routing {
         Ok(())
     }
 
+    /// The first-SYN race is Linux-only (NFQUEUE); nothing to set up here.
+    pub async fn race_up(
+        &self,
+        _watch: &[crate::hosts::Target],
+        _skip: &[crate::hosts::Target],
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub async fn race_down(&self) -> Result<()> {
+        Ok(())
+    }
+
     /// Take away every route craked added through the tunnel.
     pub async fn down(&self, name: &str, index: usize, _device: Option<&str>) -> Result<()> {
         super::set_path(ids(index).mark, None);

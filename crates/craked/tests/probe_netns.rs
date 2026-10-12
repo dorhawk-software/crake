@@ -189,12 +189,20 @@ fn connect(ip: &str, port: u16, within: Duration) -> (std::io::Result<TcpStream>
     (TcpStream::connect_timeout(&addr, within), start.elapsed())
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
-    if std::env::var("CRAKE_NETNS_TEST").as_deref() != Ok("1") {
-        eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
-        return;
-    }
+/// A started craked in the namespace: ACME up (fake openconnect), a
+/// responder playing the hosts behind the tunnel and the internet. `race`
+/// turns the first-SYN race on. The returned handles are kept alive by the
+/// caller for the test's duration.
+struct Probe {
+    mgr: std::sync::Arc<Manager>,
+    world: Arc<Mutex<World>>,
+    stop: Arc<AtomicBool>,
+    responder: std::thread::JoinHandle<()>,
+    _dir: tempfile::TempDir,
+    _srv: tokio::task::JoinHandle<()>,
+}
+
+async fn start_probe(race: bool) -> Probe {
     // Strict reverse-path filtering, as Fedora has it.
     strict_rp_filter();
     let uplink = open_tun("uplink");
@@ -233,6 +241,7 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
         state_path: dir.path().join("hosts.json"),
         learned_expiry_days: 7,
         probing: true,
+        race_first_syn: race,
         probe_wait_secs: 1,
         never: vec!["10.70.9.0/24".parse().unwrap()],
         use_resolved: false,
@@ -264,6 +273,30 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
 
+    Probe {
+        mgr,
+        world,
+        stop,
+        responder,
+        _dir: dir,
+        _srv,
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
+    if std::env::var("CRAKE_NETNS_TEST").as_deref() != Ok("1") {
+        eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
+        return;
+    }
+    let Probe {
+        mgr,
+        world,
+        stop,
+        responder,
+        _dir: dir,
+        _srv,
+    } = start_probe(false).await;
     let (silent, refused, unreachable, down, lan, never) = tokio::task::spawn_blocking(|| {
         // 1. No answer directly: the app's own attempt ends up connected.
         let silent = connect("10.70.0.5", 5432, Duration::from_secs(12));
@@ -448,4 +481,70 @@ async fn forget_is_not_forbid(mgr: &Manager) {
 fn strict_rp_filter() {
     let all = std::fs::read_to_string("/proc/sys/net/ipv4/conf/all/rp_filter").unwrap();
     assert_eq!(all.trim(), "1", "the namespace filters strictly");
+}
+
+/// With the first-SYN race on, the very first connection to a host that
+/// only a tunnel reaches succeeds on that first attempt, with no probe
+/// wait and no retry (CLAUDE.md milestone 4). Without it (the passive test
+/// above), the first attempt fails and only a later one gets through.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_first_connection_is_routed_when_the_syn_is_held() {
+    if std::env::var("CRAKE_NETNS_TEST").as_deref() != Ok("1") {
+        eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
+        return;
+    }
+    let Probe {
+        mgr,
+        world,
+        stop,
+        responder,
+        _dir: dir,
+        _srv,
+    } = start_probe(true).await;
+
+    // 10.70.0.5 answers only through the tunnel, and was never probed. One
+    // connection, held and raced: it succeeds, fast.
+    let (first, down) = tokio::task::spawn_blocking(|| {
+        let first = connect("10.70.0.5", 5432, Duration::from_secs(4));
+        // 10.70.0.7 answers nowhere: held, raced, let through, fails.
+        let down = connect("10.70.0.7", 22, Duration::from_secs(4));
+        (first, down)
+    })
+    .await
+    .unwrap();
+
+    assert!(
+        first.0.is_ok(),
+        "the first connection was routed through the tunnel: {:?}\nsyns: {:?}\nlog:\n{}",
+        first.0,
+        world.lock().unwrap().tunnel_syns,
+        std::fs::read_to_string(dir.path().join("log")).unwrap_or_default()
+    );
+    assert!(
+        first.1 < Duration::from_secs(2),
+        "on the first attempt, no probe wait or retry ({:?})",
+        first.1
+    );
+    assert!(down.0.is_err(), "a host nothing answers for still fails");
+
+    // The SYN that got through went out the tunnel, and the host is learned.
+    assert!(
+        world
+            .lock()
+            .unwrap()
+            .tunnel_syns
+            .iter()
+            .any(|(d, _)| *d == "10.70.0.5".parse::<Ipv4Addr>().unwrap())
+    );
+    assert!(sh("nft list set inet crake learned_acme").contains("10.70.0.5"));
+
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(
+        log.contains("Sent 10.70.0.5 through ACME."),
+        "the decision is logged:\n{log}"
+    );
+
+    mgr.shutdown().await;
+    stop.store(true, Ordering::Relaxed);
+    responder.join().unwrap();
 }

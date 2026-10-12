@@ -66,36 +66,141 @@ impl Manager {
     /// answers. The stuck connection is forgotten by conntrack, so the app's
     /// next retry already goes through the tunnel.
     pub async fn probe(&self, flow: crate::conntrack::Flow, why: crate::probe::Direct) {
-        use crate::probe::{Direct, Local};
-        let dst = flow.dst;
-        let target = Target::host(dst);
-        if target.check_routable().is_err() || self.never(self.name_for(dst).as_deref(), dst) {
+        let Some(candidates) = self.probe_candidacy(flow.dst, flow.src) else {
             return;
-        }
-        let local = Local::load();
-        // Only this machine's own connections, and never the local network.
-        if !local.is_own(flow.src) || local.on_link(dst) {
-            return;
-        }
+        };
+        self.try_tunnels(flow.dst, flow.dport, candidates, why, Some(flow))
+            .await;
+    }
+
+    /// Whether `dst` (reached from `src`) may be probed, and through which
+    /// tunnels: routable, not on the never list, this machine's own and not
+    /// the local network, not already routed, not probed in the last 10 min,
+    /// and in reach of at least one routed tunnel. Marks it probed.
+    fn probe_candidacy(&self, dst: Ipv4Addr, src: Ipv4Addr) -> Option<Vec<(String, String, u32)>> {
+        if Target::host(dst).check_routable().is_err()
+            || self.never(self.name_for(dst).as_deref(), dst)
         {
-            let store = self.hosts.lock().unwrap();
-            if store.tunnels.values().any(|t| t.covers(dst)) {
-                return;
-            }
+            return None;
+        }
+        let local = crate::probe::Local::load();
+        // Only this machine's own connections, and never the local network.
+        if !local.is_own(src) || local.on_link(dst) {
+            return None;
+        }
+        if self
+            .hosts
+            .lock()
+            .unwrap()
+            .tunnels
+            .values()
+            .any(|t| t.covers(dst))
+        {
+            return None;
         }
         {
             let mut probed = self.probed.lock().unwrap();
             probed.retain(|_, at| at.elapsed() < PROBED_FOR);
             if probed.insert(dst, Instant::now()).is_some() {
-                return;
+                return None;
             }
         }
         let candidates = self.probe_candidates(dst);
-        if candidates.is_empty() {
+        (!candidates.is_empty()).then_some(candidates)
+    }
+
+    /// Keep the first-SYN race's nftables rule in step with the tunnels
+    /// that are up: which addresses are worth holding a SYN for (`watch`)
+    /// and which never (`skip`). Called when a tunnel comes up or goes down.
+    pub(super) async fn sync_syn_race(&self) {
+        use std::collections::BTreeSet;
+        if !self.routing.is_real() || !self.cfg.probing || !self.cfg.race_first_syn {
             return;
         }
+        // (name, gateway, pushed networks) of each routed tunnel.
+        let routed: Vec<(String, Option<Ipv4Addr>, Vec<String>)> = {
+            let map = self.tunnels.lock().unwrap();
+            map.values()
+                .filter(|e| e.routed)
+                .map(|e| {
+                    let gw = e.info.as_ref().and_then(|i| i.gateway);
+                    let splits = e.info.as_ref().map(|i| i.split_include.clone());
+                    (e.config.name.clone(), gw, splits.unwrap_or_default())
+                })
+                .collect()
+        };
+        let mut watch: BTreeSet<Target> = BTreeSet::new();
+        let mut skip: BTreeSet<Target> = BTreeSet::new();
+        let mut anything = false;
+        for (name, gw, splits) in &routed {
+            if let Some(gw) = gw {
+                skip.insert(Target::host(*gw));
+            }
+            match self.learning(name) {
+                crate::policy::Learning::Anything => anything = true,
+                crate::policy::Learning::Only { nets, .. } => watch.extend(nets),
+                // A full tunnel marks everything; nothing to race.
+                crate::policy::Learning::FullTunnel => {}
+            }
+            // The networks the gateway said are behind it.
+            watch.extend(splits.iter().filter_map(|n| n.parse::<Target>().ok()));
+        }
+        // A learn-anything tunnel reaches internal hosts by their private
+        // address: race those (the local networks and gateways are skipped).
+        if anything {
+            watch.extend(
+                ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+                    .iter()
+                    .filter_map(|n| n.parse::<Target>().ok()),
+            );
+        }
+        skip.extend(crate::probe::Local::load().networks());
+        let (watch, skip): (Vec<Target>, Vec<Target>) =
+            (watch.into_iter().collect(), skip.into_iter().collect());
+        if let Err(e) = self.routing.race_up(&watch, &skip).await {
+            tracing::error!("the first-SYN race rule: {e:#}");
+        }
+    }
+
+    /// The first SYN to `flow.dst` was held in NFQUEUE (`syn_queue`): race a
+    /// direct attempt against the tunnels and route it before the SYN is
+    /// ever sent, so even the first connection succeeds. Direct is preferred
+    /// when it works; it gets a short window (a slow but reachable host
+    /// answers within it), then the tunnels are raced. Returns true when a
+    /// tunnel took it (the held SYN is then let through and routes); false
+    /// for a direct or down host (let through direct).
+    pub async fn race_held(&self, flow: crate::conntrack::Flow) -> bool {
+        let Some(candidates) = self.probe_candidacy(flow.dst, flow.src) else {
+            return false;
+        };
+        let addr = SocketAddrV4::new(flow.dst, flow.dport);
+        // A reachable host answers directly within a round trip; past this it
+        // is treated as silently dropped (only a tunnel might reach it), so
+        // the first connection isn't held for the whole probe wait.
+        const DIRECT_WAIT: Duration = Duration::from_millis(400);
+        let why = match crate::probe::direct(addr, DIRECT_WAIT).await {
+            crate::probe::DirectTry::Answered(_) => return false,
+            crate::probe::DirectTry::Failed(why) => why,
+        };
+        self.try_tunnels(flow.dst, flow.dport, candidates, why, None)
+            .await
+    }
+
+    /// Race the routed tunnels for `dst:dport` and route it through the one
+    /// that answers (the `both` setting decides between several). `why` is how
+    /// the direct attempt went, for the log. `forget`: a stuck conntrack entry
+    /// to delete so the app's retry is routed (passive probing); None when the
+    /// held SYN itself routes (the first-SYN race).
+    async fn try_tunnels(
+        &self,
+        dst: Ipv4Addr,
+        dport: u16,
+        candidates: Vec<(String, String, u32)>,
+        why: crate::probe::Direct,
+        forget: Option<crate::conntrack::Flow>,
+    ) -> bool {
         let shown = self.name_for(dst).unwrap_or_else(|| dst.to_string());
-        let addr = SocketAddrV4::new(dst, flow.dport);
+        let addr = SocketAddrV4::new(dst, dport);
         let both = self.settings.lock().unwrap().both;
         // Every eligible tunnel is tried at once; the setting decides which
         // answer counts (CLAUDE.md, "When two tunnels answer").
@@ -127,7 +232,7 @@ impl Manager {
                 let ms = took.as_millis().max(1);
                 let why = format!("{} Through {label} it answered in {ms} ms.", why.said());
                 self.ask_first(name, label, &shown, why, &[dst]);
-                return;
+                return false;
             }
             let _ops = self.ops.lock().await;
             let dns_name = self.name_for(dst);
@@ -136,11 +241,15 @@ impl Manager {
                 .await
             {
                 tracing::error!("learning {dst} for {name}: {e:#}");
-                return;
+                return false;
             }
             drop(_ops);
-            // The app's stuck attempt: forget it, so its next retry is routed afresh.
-            let _ = tokio::task::spawn_blocking(move || crate::conntrack::delete(flow)).await;
+            // Passive probing: forget the app's stuck attempt so its retry is
+            // routed afresh. The first-SYN race has no stuck entry (`forget`
+            // is None): the held SYN itself routes once the host is learned.
+            if let Some(flow) = forget {
+                let _ = tokio::task::spawn_blocking(move || crate::conntrack::delete(flow)).await;
+            }
             let ms = took.as_millis().max(1);
             let mut reason = format!("{} Through {label} it answered in {ms} ms.", why.said());
             if both == crate::settings::Both::Faster
@@ -190,16 +299,18 @@ impl Manager {
                     });
                 }
             }
-            return;
+            return true;
         }
         let labels: Vec<&str> = candidates.iter().map(|(_, l, _)| l.as_str()).collect();
         let through = labels.join(" or ");
         let reason = match why {
-            Direct::NoAnswer => {
+            crate::probe::Direct::NoAnswer => {
                 format!("It didn't answer directly or through {through}. Probably down.")
             }
-            Direct::Refused => format!("Refused directly, and no answer through {through}."),
-            Direct::Unreachable => {
+            crate::probe::Direct::Refused => {
+                format!("Refused directly, and no answer through {through}.")
+            }
+            crate::probe::Direct::Unreachable => {
                 format!("Unreachable directly, and no answer through {through}.")
             }
         };
@@ -211,6 +322,7 @@ impl Manager {
             reason,
             vec![dst.to_string()],
         );
+        false
     }
 
     /// Tunnels a host may be probed through, in order: routed, not sent direct

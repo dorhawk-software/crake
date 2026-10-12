@@ -26,6 +26,7 @@ fn config(dir: &std::path::Path) -> Config {
         state_path: dir.join("hosts.json"),
         learned_expiry_days: 7,
         probing: false,
+        race_first_syn: false,
         probe_wait_secs: 3,
         never: vec![],
         use_resolved: false,

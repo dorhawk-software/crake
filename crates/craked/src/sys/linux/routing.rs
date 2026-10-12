@@ -276,6 +276,57 @@ impl Routing {
         .await
     }
 
+    /// Hold the first SYN of a new connection to a `watch` address that
+    /// isn't in `skip` (NFQUEUE, `syn_queue`), so craked can route it before
+    /// it is sent (the first-SYN race). `watch` = the tunnels' scopes and
+    /// pushed networks, plus private ranges for a learn-anything tunnel;
+    /// `skip` = the local networks and the gateways, never raced. Empty
+    /// `watch` removes the rule. Idempotent.
+    pub async fn race_up(&self, watch: &[Target], skip: &[Target]) -> Result<()> {
+        let Self::Real = self else { return Ok(()) };
+        if watch.is_empty() {
+            return self.race_down().await;
+        }
+        let queue = crate::syn_queue::QUEUE_NUM;
+        let elems = |ts: &[Target]| {
+            ts.iter()
+                .map(Target::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let watch_add = format!(
+            "add element inet {TABLE} syn_watch {{ {} }}\n",
+            elems(watch)
+        );
+        let skip_add = if skip.is_empty() {
+            String::new()
+        } else {
+            format!("add element inet {TABLE} syn_skip {{ {} }}\n", elems(skip))
+        };
+        nft(&format!(
+            "add table inet {TABLE}\n\
+             add set inet {TABLE} syn_watch {{ type ipv4_addr; flags interval; }}\n\
+             add set inet {TABLE} syn_skip {{ type ipv4_addr; flags interval; }}\n\
+             add chain inet {TABLE} syn_race {{ type route hook output priority mangle - 10; policy accept; }}\n\
+             flush set inet {TABLE} syn_watch\n\
+             flush set inet {TABLE} syn_skip\n\
+             flush chain inet {TABLE} syn_race\n\
+             {watch_add}{skip_add}\
+             add rule inet {TABLE} syn_race ct state new meta l4proto tcp tcp flags & (fin | syn | rst | ack) == syn ip daddr @syn_watch ip daddr != @syn_skip queue num {queue} bypass\n"
+        ))
+        .await
+    }
+
+    pub async fn race_down(&self) -> Result<()> {
+        let Self::Real = self else { return Ok(()) };
+        nft(&format!(
+            "add table inet {TABLE}\n\
+             add chain inet {TABLE} syn_race {{ type route hook output priority mangle - 10; policy accept; }}\n\
+             delete chain inet {TABLE} syn_race\n"
+        ))
+        .await
+    }
+
     /// `device`: the tunnel's device, when Crake didn't name it.
     pub async fn down(&self, name: &str, index: usize, device: Option<&str>) -> Result<()> {
         let Self::Real = self else { return Ok(()) };

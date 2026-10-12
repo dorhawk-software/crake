@@ -112,8 +112,22 @@ When two tunnels answer: ask the user (default), use the faster, or use the
 first in order. Never route hosts on the user's "never send through a tunnel"
 list.
 
-Later improvement: race the direct and tunnel attempts while holding the first
-SYN in NFQUEUE, so even the first connection succeeds.
+**First-SYN race (built, Linux).** Even the first connection to a host that
+needs a tunnel succeeds: craked holds the first SYN in NFQUEUE (an `syn_race`
+`type route hook output` chain, queue 7301, `bypass`), races a direct attempt
+against the tunnels (`race_held`), learns the host if a tunnel takes it, then
+lets the SYN through — the output chain marks it and re-routes it through the
+tunnel (the re-injected SYN really does re-route; netns-proven, and a mutation
+makes the first connection take the probe wait again). Direct is preferred when
+it answers within a round trip (`DIRECT_WAIT` 400 ms); past that only a tunnel
+might reach it. Only SYNs worth racing are held: a tunnel's `Only` scope, its
+pushed split-include networks, or the private ranges for a learn-anything
+tunnel, minus the local networks and the gateways (`sync_syn_race` keeps the
+`syn_watch`/`syn_skip` sets in step as tunnels come and go). Off with
+`race_first_syn = false` (default on); passive conntrack probing still handles
+anything not held. Windows' equivalent is a WFP callout driver (not built; the
+first probed connection there is still reset). The tunnel race and learn/log
+are shared with passive probing (`try_tunnels`).
 
 ### Managed (IT) profiles
 

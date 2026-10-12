@@ -504,6 +504,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
         state_path: dir.path().join("hosts.json"),
         learned_expiry_days: 7,
         probing: false,
+        race_first_syn: false,
         probe_wait_secs: 3,
         never: vec![],
         use_resolved: false, // no systemd in the namespace

@@ -7,6 +7,7 @@ pub mod dns_queue;
 pub mod net;
 pub mod resolved;
 pub mod routing;
+pub mod syn_queue;
 
 mod host;
 pub use host::*;

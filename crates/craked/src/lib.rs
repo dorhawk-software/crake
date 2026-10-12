@@ -20,4 +20,4 @@ pub mod sys;
 pub mod traffic;
 
 // The system-specific modules, by their portable names.
-pub use sys::{conntrack, dns_queue, net, resolved, routing};
+pub use sys::{conntrack, dns_queue, net, resolved, routing, syn_queue};

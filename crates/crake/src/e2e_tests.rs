@@ -34,6 +34,7 @@ pub(crate) fn config(dir: &std::path::Path) -> Config {
         state_path: dir.join("hosts.json"),
         learned_expiry_days: 7,
         probing: true,
+        race_first_syn: false,
         probe_wait_secs: 1,
         never: vec![],
         use_resolved: false, // no systemd in the container

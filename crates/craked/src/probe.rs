@@ -37,6 +37,51 @@ impl Direct {
     }
 }
 
+/// The flow of a first SYN held in NFQUEUE (an IPv4 TCP packet with SYN set
+/// and ACK clear): (source, destination, ports).
+pub fn syn_flow(packet: &[u8]) -> Option<Flow> {
+    if packet.len() < 40 || packet[0] >> 4 != 4 || packet[9] != 6 {
+        return None;
+    }
+    let ihl = usize::from(packet[0] & 0x0f) * 4;
+    let t = packet.get(ihl..)?;
+    // SYN set, ACK clear: the first SYN, not a SYN-ACK.
+    if t.len() < 20 || t[13] & 0x12 != 0x02 {
+        return None;
+    }
+    Some(Flow {
+        src: Ipv4Addr::new(packet[12], packet[13], packet[14], packet[15]),
+        dst: Ipv4Addr::new(packet[16], packet[17], packet[18], packet[19]),
+        sport: u16::from_be_bytes([t[0], t[1]]),
+        dport: u16::from_be_bytes([t[2], t[3]]),
+    })
+}
+
+/// The direct attempt's outcome in the first-SYN race (`race_held`).
+pub enum DirectTry {
+    /// Direct works: the host is reachable without a tunnel.
+    Answered(Duration),
+    /// Direct doesn't work (yet): why, for the log if a tunnel takes it.
+    Failed(Direct),
+}
+
+/// Try `addr` by the default route (no tunnel mark), up to `timeout`. A RST
+/// is "refused", an ICMP unreachable is "unreachable", a timeout is "no
+/// answer" (the host is silently dropped: only a tunnel might reach it).
+pub async fn direct(addr: SocketAddrV4, timeout: Duration) -> DirectTry {
+    use std::io::ErrorKind;
+    let start = Instant::now();
+    match tokio::time::timeout(timeout, tokio::net::TcpStream::connect(addr)).await {
+        Ok(Ok(_)) => DirectTry::Answered(start.elapsed()),
+        Ok(Err(e)) => DirectTry::Failed(match e.kind() {
+            ErrorKind::ConnectionRefused => Direct::Refused,
+            ErrorKind::HostUnreachable | ErrorKind::NetworkUnreachable => Direct::Unreachable,
+            _ => Direct::NoAnswer,
+        }),
+        Err(_) => DirectTry::Failed(Direct::NoAnswer),
+    }
+}
+
 /// The connection an ICMP "unreachable" is about, when it is about one of
 /// this machine's TCP connections: network or host unreachable, or
 /// prohibited (never "fragmentation needed", which path MTU discovery uses).

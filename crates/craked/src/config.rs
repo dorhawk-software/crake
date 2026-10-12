@@ -47,6 +47,10 @@ pub struct Config {
     /// Seconds to wait for an answer before probing: 1, 2, 3 or 5.
     #[serde(default = "default_probe_wait")]
     pub probe_wait_secs: u64,
+    /// Hold the first SYN of a new connection to race direct against the
+    /// tunnels, so even the first connection is routed (Linux only).
+    #[serde(default = "yes")]
+    pub race_first_syn: bool,
     /// Never send these through any tunnel (hosts or networks).
     #[serde(default)]
     pub never: Vec<crate::hosts::Target>,
@@ -244,6 +248,7 @@ impl Default for Config {
             state_path: default_state_path(),
             learned_expiry_days: default_expiry_days(),
             probing: true,
+            race_first_syn: true,
             probe_wait_secs: default_probe_wait(),
             never: Vec::new(),
             use_resolved: true,
