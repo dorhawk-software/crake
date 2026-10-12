@@ -50,8 +50,6 @@ jobs:
           components: clippy, rustfmt, llvm-tools-preview
       - uses: Swatinem/rust-cache@v2
         with:
-          # Shared with the network job: both build the whole Linux
-          # workspace, so network reuses these compiled deps (gpui).
           shared-key: linux
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@v2
@@ -59,10 +57,13 @@ jobs:
           tool: cargo-deny,cargo-machete,cargo-llvm-cov
       - name: Lint gate
         run: scripts/lint.sh
-      # cargo llvm-cov runs every test (and fails when one does): the tests
-      # and their coverage in one build.
-      - name: Tests, and the coverage floors
-        run: scripts/check-coverage.sh
+      # Every test, measured (and failing when one does), then in the very
+      # same build the namespace and e2e tests (nftables, policy routing, a
+      # real ocserv; containers without a network). They had a job of their
+      # own, which spent ~11 of its 15 minutes building what this one had
+      # just built (a -p build unifies dependencies' features differently).
+      - name: Tests, the coverage floors, the namespace and e2e tests
+        run: scripts/check-coverage.sh scripts/netns-test.sh scripts/e2e-test.sh
 
   windows:
     runs-on: ubuntu-24.04
@@ -130,24 +131,6 @@ jobs:
             target/release/crake.exe
             target/release/craked.exe
             target/release/crake-hook.exe
-
-  network:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $APT
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          # Reuse the check job's cache (same Linux workspace): the e2e step
-          # builds the crake test binary, so the compiled deps come from
-          # there instead of a from-scratch gpui build. Restore only.
-          shared-key: linux
-          save-if: false
-      - name: nftables and policy routing in a namespace
-        run: scripts/netns-test.sh
-      - name: End to end against ocserv
-        run: scripts/e2e-test.sh
 
   nixos:
     runs-on: ubuntu-24.04

@@ -7,8 +7,13 @@ cd "$(dirname "$0")/.."
 # These tests exercise craked's routing logic, not interactive GPUI, so the dev
 # profile's opt-level 1 only slows the build. Unoptimised workspace crates build
 # far faster; dependencies keep their opt-level and stay cached.
-export CARGO_PROFILE_DEV_OPT_LEVEL=0
-BINS=$(cargo test -p craked --test netns --test dns_netns --test probe_netns --no-run --message-format=json 2>/dev/null \
+# (CI's check job builds the whole workspace once, measured, and hands its
+# own settings here: CRAKE_CARGO_SCOPE=--workspace reuses that build, as a
+# `-p craked` build would unify dependencies' features differently.)
+: "${CARGO_PROFILE_DEV_OPT_LEVEL:=0}"
+export CARGO_PROFILE_DEV_OPT_LEVEL
+# shellcheck disable=SC2086
+BINS=$(cargo test ${CRAKE_CARGO_SCOPE:--p craked} --test netns --test dns_netns --test probe_netns --no-run --message-format=json 2>/dev/null \
   | sed -n 's/.*"executable":"\([^"]*netns-[^"]*\)".*/\1/p')
 [ -n "$BINS" ] || { echo "could not build the tests" >&2; exit 1; }
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/crake-netns.XXXXXX")
@@ -20,6 +25,6 @@ for BIN in $BINS; do
   docker run --rm --network none --cap-add NET_ADMIN --device /dev/net/tun \
     --sysctl net.ipv4.conf.all.rp_filter=1 --sysctl net.ipv4.conf.default.rp_filter=1 \
     -v /:/host:ro -v "$WORK:/host/mnt" \
-    -e CRAKE_NETNS_TEST=1 -e TMPDIR=/mnt \
+    -e CRAKE_NETNS_TEST=1 -e TMPDIR=/mnt -e LLVM_PROFILE_FILE=/dev/null \
     alpine:3 chroot /host "$BIN" --test-threads=1 "$@"
 done

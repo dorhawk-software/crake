@@ -12,10 +12,14 @@ cd "$(dirname "$0")/.."
 # the dev profile's opt-level 1, which is there for interactive GPUI stutter.
 # Building the workspace crates unoptimised cuts the crake crate's compile from
 # minutes to seconds; dependencies keep their own opt-level and stay cached.
-export CARGO_PROFILE_DEV_OPT_LEVEL=0
-cargo build -q -p craked --bin crake-hook
-HOOK=$PWD/target/debug/crake-hook
-BIN=$(cargo test -p crake --no-run --message-format=json 2>/dev/null \
+# (CI's check job hands its own settings here, as to scripts/netns-test.sh.)
+: "${CARGO_PROFILE_DEV_OPT_LEVEL:=0}"
+export CARGO_PROFILE_DEV_OPT_LEVEL
+# shellcheck disable=SC2086
+cargo build -q ${CRAKE_CARGO_SCOPE:--p craked} --bin crake-hook
+HOOK=${CARGO_TARGET_DIR:-$PWD/target}/debug/crake-hook
+# shellcheck disable=SC2086
+BIN=$(cargo test ${CRAKE_CARGO_SCOPE:--p crake} --no-run --message-format=json 2>/dev/null \
   | sed -n 's/.*"executable":"\([^"]*\/deps\/crake-[^"]*\)".*/\1/p' | head -n1)
 [ -n "$BIN" ] || { echo "could not build the tests" >&2; exit 1; }
 docker build -q -t crake-e2e-gateway scripts/e2e >/dev/null
@@ -27,5 +31,5 @@ docker run -d --rm --name "$GW" --network none --cap-add NET_ADMIN --device /dev
   -v "$WORK/link:/link" crake-e2e-gateway >/dev/null
 docker run --rm --network none --cap-add NET_ADMIN --device /dev/net/tun \
   -v /:/host:ro -v "$WORK/tmp:/host/mnt" -v "$WORK/link:/link" \
-  crake-e2e-gateway sh /client.sh env CRAKE_E2E_HOOK="$HOOK" \
+  crake-e2e-gateway sh /client.sh env CRAKE_E2E_HOOK="$HOOK" LLVM_PROFILE_FILE=/dev/null \
   env ${CRAKE_JOURNEY_DEBUG:+CRAKE_JOURNEY_DEBUG=$CRAKE_JOURNEY_DEBUG} ${CRAKE_DEBUG:+CRAKE_DEBUG=$CRAKE_DEBUG} "$BIN" e2e_tests journey_tests --test-threads=1 --nocapture "$@"

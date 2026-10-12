@@ -752,10 +752,17 @@ The user doesn't want development builds installed on their machine.
   suite again). A branch run is fast once `main` has run with the same
   Cargo.lock. Measured on main: packages 2.6 GB, the Windows build 1.4,
   check 1.3, macOS 1.1, network 1.1 and Nix 3.3 still came to ~10.8 GB
-  and Nix's was evicted. The `network` job (whose e2e step builds the crake
-  test binary) shares the `check` job's cache (`shared-key: linux`, restore
-  only), so it reuses the compiled gpui deps instead of a from-scratch
-  build (its e2e step was ~12 min of mostly compiling). **GitHub's 10 GB can't be raised** (asked 2026-10-12: same for
+  and Nix's was evicted. **The namespace and e2e tests run in `check`
+  (2026-10-12, asked for: faster CI):** they had a `network` job of their
+  own, the slowest (~15 min, ~11 of them compiling: `check`'s coverage
+  build is instrumented, in another folder, and a `-p crake` build unifies
+  dependencies' features differently, so nothing was reused).
+  `scripts/check-coverage.sh` now measures the cargo-llvm-cov "show-env"
+  way (plain `cargo test --workspace`, instrumented, in
+  target/llvm-cov-target, opt-level 0) and then runs the scripts it's given
+  in that very build (`CRAKE_CARGO_SCOPE=--workspace`): they build nothing.
+  Their binaries in containers write no coverage (`LLVM_PROFILE_FILE=
+  /dev/null`). Locally the scripts work as before. **GitHub's 10 GB can't be raised** (asked 2026-10-12: same for
   public/OSS and private, no paid tier), so the Nix store (the 3.3 GB
   whale it kept evicting) moved to **Cachix** (free for open source,
   cache `crake`): the nixos job's `cachix/cachix-action` pushes every path

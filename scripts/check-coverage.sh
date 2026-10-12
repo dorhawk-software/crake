@@ -19,13 +19,21 @@ declare -A floor=(
     [lint-literals]=82
 )
 
-# Every test runs here (cargo llvm-cov is cargo test, measured): a failing
-# test fails this. Each test binary's result, for the log.
-if ! summary=$(cargo llvm-cov --workspace --summary-only 2>&1); then
-    printf 'cargo llvm-cov failed:\n%s\n' "$summary"
+# Every test runs here, measured: cargo-llvm-cov's "show-env" way (cargo
+# test itself, instrumented), in a folder of its own, so the build stays
+# there for any tests given as arguments (CI: the namespace and e2e tests,
+# which then build nothing). A failing test fails this.
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$PWD/target/llvm-cov-target}"
+: "${CARGO_PROFILE_DEV_OPT_LEVEL:=0}"
+export CARGO_PROFILE_DEV_OPT_LEVEL
+eval "$(cargo llvm-cov show-env --export-prefix 2>/dev/null)"
+cargo llvm-cov clean --workspace 2>/dev/null
+if ! tests=$(cargo test --workspace 2>&1); then
+    printf 'cargo test failed:\n%s\n' "$tests"
     exit 1
 fi
-printf '%s\n' "$summary" | grep -E '^(     Running|test result:)'
+printf '%s\n' "$tests" | grep -E '^(     Running|test result:)'
+summary=$(cargo llvm-cov report --summary-only 2>&1)
 
 fail=0
 for crate in "${!floor[@]}"; do
@@ -45,5 +53,11 @@ for crate in "${!floor[@]}"; do
         cargo llvm-cov report --show-missing-lines 2>/dev/null | grep "/$crate/src/" | sed 's/^/  /'
         fail=1
     fi
+done
+# Then, in the same build, the tests the caller gave (their binaries run in
+# containers that can't write coverage data: measured above, not here).
+for extra in "$@"; do
+    echo "== $extra"
+    CRAKE_CARGO_SCOPE=--workspace "$extra" || fail=1
 done
 exit $fail
