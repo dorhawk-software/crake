@@ -176,9 +176,12 @@ mod tests {
             inline("ca ca.crt\n", dir.path()),
             Err(Problem::Missing("ca.crt".into(), true))
         );
+        // An absolute path, on every system (a drive on Windows).
+        let gone = dir.path().join("gone").join("ca.crt");
+        let gone = gone.to_string_lossy().into_owned();
         assert_eq!(
-            inline("ca /nowhere/ca.crt\n", dir.path()),
-            Err(Problem::Missing("/nowhere/ca.crt".into(), false))
+            inline(&format!("ca \"{gone}\"\n"), dir.path()),
+            Err(Problem::Missing(gone, false))
         );
         assert_eq!(
             Problem::Missing("ca.crt".into(), true).said(),
