@@ -2,7 +2,7 @@
 //! openconnect's process (its own group, stopped with signals) and private
 //! files.
 
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::path::Path;
 use std::time::Duration;
 
@@ -31,6 +31,40 @@ pub fn interfaces() -> Vec<(String, Ipv4Addr, u32)> {
                         name,
                         Ipv4Addr::from(u32::from_be(a.sin_addr.s_addr)),
                         u32::from_be(m.sin_addr.s_addr),
+                    ));
+                }
+                p = ifa.ifa_next;
+            }
+            libc::freeifaddrs(head);
+        }
+    }
+    found
+}
+
+/// Every IPv6 address on the machine: interface, address, prefix length.
+pub fn interfaces6() -> Vec<(String, Ipv6Addr, u8)> {
+    let mut found = Vec::new();
+    // SAFETY: getifaddrs/freeifaddrs pair; we only read the list.
+    unsafe {
+        let mut head: *mut libc::ifaddrs = std::ptr::null_mut();
+        if libc::getifaddrs(&mut head) == 0 {
+            let mut p = head;
+            while !p.is_null() {
+                let ifa = &*p;
+                if !ifa.ifa_addr.is_null()
+                    && i32::from((*ifa.ifa_addr).sa_family) == libc::AF_INET6
+                    && !ifa.ifa_netmask.is_null()
+                {
+                    let name = std::ffi::CStr::from_ptr(ifa.ifa_name)
+                        .to_string_lossy()
+                        .into_owned();
+                    let a = &*(ifa.ifa_addr as *const libc::sockaddr_in6);
+                    let m = &*(ifa.ifa_netmask as *const libc::sockaddr_in6);
+                    let prefix = u128::from_be_bytes(m.sin6_addr.s6_addr).leading_ones();
+                    found.push((
+                        name,
+                        Ipv6Addr::from(a.sin6_addr.s6_addr),
+                        u8::try_from(prefix).unwrap_or(u8::MAX),
                     ));
                 }
                 p = ifa.ifa_next;

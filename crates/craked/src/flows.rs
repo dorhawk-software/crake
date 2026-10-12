@@ -2,7 +2,7 @@
 //! of it. Linux reports these from conntrack (`conntrack`); other systems
 //! from their own connection tables. Portable.
 
-use std::net::Ipv4Addr;
+use std::net::IpAddr;
 
 /// The parts of a TCP state we care about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,8 +17,8 @@ pub enum TcpState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Flow {
-    pub src: Ipv4Addr,
-    pub dst: Ipv4Addr,
+    pub src: IpAddr,
+    pub dst: IpAddr,
     pub sport: u16,
     pub dport: u16,
 }
@@ -80,8 +80,8 @@ mod tests {
     #[test]
     fn a_table_looked_at_twice_says_what_happened() {
         let flow = |port| Flow {
-            src: Ipv4Addr::new(192, 168, 0, 242),
-            dst: Ipv4Addr::new(10, 40, 1, 10),
+            src: [192, 168, 0, 242].into(),
+            dst: [10, 40, 1, 10].into(),
             sport: port,
             dport: 443,
         };

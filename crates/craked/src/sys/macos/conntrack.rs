@@ -177,8 +177,8 @@ pub fn parse(buf: &[u8]) -> HashMap<Flow, TcpState> {
                     && !dst.is_unspecified()
                 {
                     current = Some(Flow {
-                        src,
-                        dst,
+                        src: src.into(),
+                        dst: dst.into(),
                         sport,
                         dport,
                     });
@@ -262,8 +262,8 @@ mod tests {
             let found = parse(&buf);
             assert_eq!(found.len(), 2, "packed: {packed}");
             let stuck = Flow {
-                src: Ipv4Addr::new(192, 0, 2, 5),
-                dst: Ipv4Addr::new(10, 40, 1, 10),
+                src: Ipv4Addr::new(192, 0, 2, 5).into(),
+                dst: Ipv4Addr::new(10, 40, 1, 10).into(),
                 sport: 50000,
                 dport: 443,
             };

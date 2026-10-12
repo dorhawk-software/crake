@@ -3,7 +3,7 @@
 //! the next packet of a flow is routed afresh.
 
 use std::io;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 
 use anyhow::{Context, Result};
@@ -25,6 +25,8 @@ const CTA_TUPLE_IP: u16 = 1;
 const CTA_TUPLE_PROTO: u16 = 2;
 const CTA_IP_V4_SRC: u16 = 1;
 const CTA_IP_V4_DST: u16 = 2;
+const CTA_IP_V6_SRC: u16 = 3;
+const CTA_IP_V6_DST: u16 = 4;
 const CTA_PROTO_NUM: u16 = 1;
 const CTA_PROTO_SRC_PORT: u16 = 2;
 const CTA_PROTO_DST_PORT: u16 = 3;
@@ -160,8 +162,19 @@ pub async fn close_to(target: crate::hosts::Target) {
 pub fn delete(flow: Flow) -> io::Result<()> {
     let fd = netlink_socket(0, false)?;
     let mut ip = Vec::new();
-    netlink::put_attr(&mut ip, CTA_IP_V4_SRC, &flow.src.octets());
-    netlink::put_attr(&mut ip, CTA_IP_V4_DST, &flow.dst.octets());
+    let family = match (flow.src, flow.dst) {
+        (IpAddr::V4(src), IpAddr::V4(dst)) => {
+            netlink::put_attr(&mut ip, CTA_IP_V4_SRC, &src.octets());
+            netlink::put_attr(&mut ip, CTA_IP_V4_DST, &dst.octets());
+            libc::AF_INET
+        }
+        (IpAddr::V6(src), IpAddr::V6(dst)) => {
+            netlink::put_attr(&mut ip, CTA_IP_V6_SRC, &src.octets());
+            netlink::put_attr(&mut ip, CTA_IP_V6_DST, &dst.octets());
+            libc::AF_INET6
+        }
+        _ => return Err(io::Error::from(io::ErrorKind::InvalidInput)),
+    };
     let mut proto = Vec::new();
     netlink::put_attr(&mut proto, CTA_PROTO_NUM, &[libc::IPPROTO_TCP as u8]);
     netlink::put_attr(&mut proto, CTA_PROTO_SRC_PORT, &flow.sport.to_be_bytes());
@@ -169,7 +182,7 @@ pub fn delete(flow: Flow) -> io::Result<()> {
     let mut tuple = Vec::new();
     netlink::put_attr(&mut tuple, CTA_TUPLE_IP | NLA_F_NESTED, &ip);
     netlink::put_attr(&mut tuple, CTA_TUPLE_PROTO | NLA_F_NESTED, &proto);
-    let mut body = vec![libc::AF_INET as u8, 0, 0, 0]; // nfgenmsg
+    let mut body = vec![family as u8, 0, 0, 0]; // nfgenmsg
     netlink::put_attr(&mut body, CTA_TUPLE_ORIG | NLA_F_NESTED, &tuple);
 
     let msg = netlink::request(
@@ -206,8 +219,9 @@ pub fn parse_messages(b: &[u8]) -> Vec<Event> {
     netlink::messages(b)
         .into_iter()
         .filter_map(|(kind, flags, body)| {
+            let family = body.first().map(|f| i32::from(*f));
             if kind >> SUBSYS_SHIFT != NFNL_SUBSYS_CTNETLINK
-                || body.first() != Some(&(libc::AF_INET as u8))
+                || !matches!(family, Some(libc::AF_INET | libc::AF_INET6))
             {
                 return None;
             }
@@ -230,11 +244,17 @@ fn parse_event(kind: Kind, body: &[u8]) -> Option<Event> {
     if child(&proto, CTA_PROTO_NUM)?.first() != Some(&(libc::IPPROTO_TCP as u8)) {
         return None;
     }
-    let v4 = |k| -> Option<Ipv4Addr> {
-        let v = child(&ip, k)?;
-        let octets: [u8; size_of::<Ipv4Addr>()] =
-            v.get(..size_of::<Ipv4Addr>())?.try_into().ok()?;
-        Some(Ipv4Addr::from(octets))
+    // An IPv4 tuple carries the V4 attributes, an IPv6 one the V6.
+    let addr = |v4: u16, v6: u16| -> Option<IpAddr> {
+        if let Some(v) = child(&ip, v4) {
+            let octets: [u8; size_of::<Ipv4Addr>()] =
+                v.get(..size_of::<Ipv4Addr>())?.try_into().ok()?;
+            return Some(Ipv4Addr::from(octets).into());
+        }
+        let v = child(&ip, v6)?;
+        let octets: [u8; size_of::<Ipv6Addr>()] =
+            v.get(..size_of::<Ipv6Addr>())?.try_into().ok()?;
+        Some(Ipv6Addr::from(octets).into())
     };
     let port = |k| -> Option<u16> {
         let v = child(&proto, k)?;
@@ -248,8 +268,8 @@ fn parse_event(kind: Kind, body: &[u8]) -> Option<Event> {
     Some(Event {
         kind,
         flow: Flow {
-            src: v4(CTA_IP_V4_SRC)?,
-            dst: v4(CTA_IP_V4_DST)?,
+            src: addr(CTA_IP_V4_SRC, CTA_IP_V6_SRC)?,
+            dst: addr(CTA_IP_V4_DST, CTA_IP_V6_DST)?,
             sport: port(CTA_PROTO_SRC_PORT)?,
             dport: port(CTA_PROTO_DST_PORT)?,
         },
@@ -266,18 +286,32 @@ mod tests {
         let mut ip = Vec::new();
         netlink::put_attr(&mut ip, CTA_IP_V4_SRC, &[192, 168, 0, 242]);
         netlink::put_attr(&mut ip, CTA_IP_V4_DST, &[10, 58, 70, 119]);
+        framed(libc::AF_INET, &ip, msg, flags, state)
+    }
+
+    /// The same for an IPv6 connection.
+    fn message6(msg: u16, flags: u16, state: u8) -> Vec<u8> {
+        let src: Ipv6Addr = "2001:db8:1::42".parse().unwrap();
+        let dst: Ipv6Addr = "2001:db8:40::10".parse().unwrap();
+        let mut ip = Vec::new();
+        netlink::put_attr(&mut ip, CTA_IP_V6_SRC, &src.octets());
+        netlink::put_attr(&mut ip, CTA_IP_V6_DST, &dst.octets());
+        framed(libc::AF_INET6, &ip, msg, flags, state)
+    }
+
+    fn framed(family: i32, ip: &[u8], msg: u16, flags: u16, state: u8) -> Vec<u8> {
         let mut proto = Vec::new();
         netlink::put_attr(&mut proto, CTA_PROTO_NUM, &[6]);
         netlink::put_attr(&mut proto, CTA_PROTO_SRC_PORT, &40000u16.to_be_bytes());
         netlink::put_attr(&mut proto, CTA_PROTO_DST_PORT, &5432u16.to_be_bytes());
         let mut tuple = Vec::new();
-        netlink::put_attr(&mut tuple, CTA_TUPLE_IP | NLA_F_NESTED, &ip);
+        netlink::put_attr(&mut tuple, CTA_TUPLE_IP | NLA_F_NESTED, ip);
         netlink::put_attr(&mut tuple, CTA_TUPLE_PROTO | NLA_F_NESTED, &proto);
         let mut tcp = Vec::new();
         netlink::put_attr(&mut tcp, CTA_PROTOINFO_TCP_STATE, &[state]);
         let mut info = Vec::new();
         netlink::put_attr(&mut info, CTA_PROTOINFO_TCP | NLA_F_NESTED, &tcp);
-        let mut body = vec![libc::AF_INET as u8, 0, 0, 0];
+        let mut body = vec![family as u8, 0, 0, 0];
         netlink::put_attr(&mut body, CTA_TUPLE_ORIG | NLA_F_NESTED, &tuple);
         netlink::put_attr(&mut body, 3, &2u32.to_be_bytes()); // CTA_STATUS, skipped
         netlink::put_attr(&mut body, CTA_PROTOINFO | NLA_F_NESTED, &info);
@@ -318,5 +352,23 @@ mod tests {
             (Kind::Destroy, Some(TcpState::Answered))
         );
         assert!(parse_messages(b"short").is_empty());
+    }
+
+    #[test]
+    fn parses_ipv6_events() {
+        let ev = parse_messages(&message6(IPCTNL_MSG_CT_NEW, NLM_F_CREATE, 1));
+        assert_eq!(
+            (ev[0].kind, ev[0].state, ev[0].flow),
+            (
+                Kind::New,
+                Some(TcpState::SynSent),
+                Flow {
+                    src: "2001:db8:1::42".parse().unwrap(),
+                    dst: "2001:db8:40::10".parse().unwrap(),
+                    sport: 40000,
+                    dport: 5432
+                }
+            )
+        );
     }
 }

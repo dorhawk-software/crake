@@ -213,12 +213,12 @@ impl Manager {
         }
     }
 
-    pub(super) fn name_for(&self, addr: Ipv4Addr) -> Option<String> {
+    pub(super) fn name_for(&self, addr: IpAddr) -> Option<String> {
         let seen = self
             .seen_names
             .lock()
             .unwrap()
-            .get(&IpAddr::V4(addr))
+            .get(&addr)
             .filter(|(_, at)| at.elapsed() < SEEN_NAME_FOR)
             .map(|(n, _)| n.clone());
         // Failing that, the name a tunnel's DNS gave this address last (an
@@ -230,7 +230,7 @@ impl Manager {
                 .tunnels
                 .values()
                 .flat_map(|t| &t.answers)
-                .filter(|(_, (addrs, _))| addrs.contains(&addr))
+                .filter(|(_, (addrs, _))| matches!(addr, IpAddr::V4(a) if addrs.contains(&a)))
                 .max_by_key(|(_, (_, at))| *at)
                 .map(|(name, _)| name.clone())
         })
@@ -296,7 +296,7 @@ impl Manager {
             }
         }
         if asks {
-            let addrs: Vec<Ipv4Addr> = sent.iter().filter_map(|a| a.parse().ok()).collect();
+            let addrs: Vec<IpAddr> = sent.iter().filter_map(|a| a.parse().ok()).collect();
             let why = match why {
                 Why::TunnelDomain => format!("Only {label}'s DNS knows it."),
                 Why::PublicFailed => format!("Public DNS didn't know it; {label}'s DNS did."),

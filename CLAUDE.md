@@ -243,7 +243,10 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    "fragmentation needed") from outside the tunnels goes to the same queue
    as DNS answers and starts the probe at once: "Unreachable directly.
    Through ACME it answered in 31 ms." (netns-tested).
-   Still open: UDP, IPv6.
+   IPv6 on Linux: conntrack's IPv6 connections are probed the same way
+   (passively; the probe's socket by family; the stuck entry deleted;
+   netns-tested with a host only the tunnel answers over IPv6).
+   Still open: UDP; for IPv6, the first-SYN race and ICMPv6 unreachable.
 5. Multiple simultaneous tunnels, try order, conflict handling.
    **Requested:** detect tunnels that can't be up together. When switching a
    tunnel on, compare what it pushes with the tunnels already up: its own

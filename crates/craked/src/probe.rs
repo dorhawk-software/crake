@@ -5,7 +5,7 @@
 //! Watching is passive (conntrack events); no packet is held.
 
 use std::collections::HashMap;
-use std::net::{Ipv4Addr, SocketAddrV4};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -47,8 +47,8 @@ pub fn syn_flow(packet: &[u8]) -> Option<Flow> {
         return None;
     }
     Some(Flow {
-        src: ip.src(),
-        dst: ip.dst(),
+        src: ip.src().into(),
+        dst: ip.dst().into(),
         sport: packet::source_port(tcp)?,
         dport: packet::destination_port(tcp)?,
     })
@@ -65,7 +65,7 @@ pub enum DirectTry {
 /// Try `addr` by the default route (no tunnel mark), up to `timeout`. A RST
 /// is "refused", an ICMP unreachable is "unreachable", a timeout is "no
 /// answer" (the host is silently dropped: only a tunnel might reach it).
-pub async fn direct(addr: SocketAddrV4, timeout: Duration) -> DirectTry {
+pub async fn direct(addr: SocketAddr, timeout: Duration) -> DirectTry {
     use std::io::ErrorKind;
     let start = Instant::now();
     match tokio::time::timeout(timeout, tokio::net::TcpStream::connect(addr)).await {
@@ -91,8 +91,8 @@ pub fn unreachable(packet: &[u8]) -> Option<Flow> {
     let inner = packet::V4::parse(packet::unreachable_about(icmp, &CODES)?, packet::TCP)?;
     let tcp = inner.payload()?;
     Some(Flow {
-        src: inner.src(),
-        dst: inner.dst(),
+        src: inner.src().into(),
+        dst: inner.dst().into(),
         sport: packet::source_port(tcp)?,
         dport: packet::destination_port(tcp)?,
     })
@@ -175,11 +175,21 @@ pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
 
 /// Try `addr` with the tunnel's mark, the same path its traffic would take.
 /// Returns how long the handshake took.
-pub async fn through_tunnel(addr: SocketAddrV4, mark: u32, timeout: Duration) -> Option<Duration> {
-    let sock = TcpSocket::new_v4().ok()?;
+pub async fn through_tunnel(
+    addr: impl Into<SocketAddr>,
+    mark: u32,
+    timeout: Duration,
+) -> Option<Duration> {
+    let addr = addr.into();
+    let sock = if addr.is_ipv4() {
+        TcpSocket::new_v4()
+    } else {
+        TcpSocket::new_v6()
+    }
+    .ok()?;
     crate::sys::mark(&sock, mark).ok()?;
     let start = Instant::now();
-    match tokio::time::timeout(timeout, sock.connect(addr.into())).await {
+    match tokio::time::timeout(timeout, sock.connect(addr)).await {
         Ok(Ok(_stream)) => Some(start.elapsed()),
         _ => None,
     }
@@ -194,10 +204,12 @@ pub fn ipv4_of(device: &str) -> Option<(Ipv4Addr, u8)> {
         .map(|(_, a, m)| (a, m.leading_ones() as u8))
 }
 
-/// The machine's own IPv4 addresses and the networks they're on, excluding
+/// The machine's own addresses and the networks they're on, excluding
 /// Crake's tunnels.
 pub struct Local {
     nets: Vec<(Ipv4Addr, u32)>,
+    /// IPv6: address and prefix length.
+    nets6: Vec<(Ipv6Addr, u8)>,
 }
 
 impl Local {
@@ -207,10 +219,15 @@ impl Local {
             .filter(|(name, _, _)| !crate::sys::is_tunnel_device(name))
             .map(|(_, a, m)| (a, m))
             .collect();
-        Self { nets }
+        let nets6 = crate::sys::interfaces6()
+            .into_iter()
+            .filter(|(name, _, _)| !crate::sys::is_tunnel_device(name))
+            .map(|(_, a, p)| (a, p))
+            .collect();
+        Self { nets, nets6 }
     }
 
-    /// The networks the machine is directly attached to (not tunnels).
+    /// The IPv4 networks the machine is directly attached to (not tunnels).
     pub fn networks(&self) -> Vec<Target> {
         self.nets
             .iter()
@@ -224,16 +241,31 @@ impl Local {
     }
 
     /// One of the machine's own (non-tunnel) addresses.
-    pub fn is_own(&self, ip: Ipv4Addr) -> bool {
-        self.nets.iter().any(|(a, _)| *a == ip)
+    pub fn is_own(&self, ip: IpAddr) -> bool {
+        match ip {
+            IpAddr::V4(ip) => self.nets.iter().any(|(a, _)| *a == ip),
+            IpAddr::V6(ip) => self.nets6.iter().any(|(a, _)| *a == ip),
+        }
     }
 
     /// On a network the machine is directly attached to (the LAN, a bridge).
     /// Those are never a tunnel's business.
-    pub fn on_link(&self, ip: Ipv4Addr) -> bool {
-        self.nets
-            .iter()
-            .any(|(a, m)| *m != u32::MAX && u32::from(*a) & m == u32::from(ip) & m)
+    pub fn on_link(&self, ip: IpAddr) -> bool {
+        match ip {
+            IpAddr::V4(ip) => self
+                .nets
+                .iter()
+                .any(|(a, m)| *m != u32::MAX && u32::from(*a) & m == u32::from(ip) & m),
+            // Link-local (fe80::/10) is on every link; the rest by prefix.
+            IpAddr::V6(ip) => {
+                ip.is_unicast_link_local()
+                    || self.nets6.iter().any(|(a, p)| {
+                        let p = u32::from(*p);
+                        let m = u128::MAX.checked_shl(Ipv6Addr::BITS - p).unwrap_or(0);
+                        p < Ipv6Addr::BITS && u128::from(*a) & m == u128::from(ip) & m
+                    })
+            }
+        }
     }
 }
 
@@ -280,8 +312,8 @@ mod tests {
         assert_eq!(
             (flow.src, flow.dst, flow.sport, flow.dport),
             (
-                Ipv4Addr::new(192, 168, 0, 242),
-                Ipv4Addr::new(10, 70, 0, 8),
+                Ipv4Addr::new(192, 168, 0, 242).into(),
+                Ipv4Addr::new(10, 70, 0, 8).into(),
                 40000,
                 443
             )
@@ -306,6 +338,10 @@ mod tests {
                 ("192.168.0.242".parse().unwrap(), 0xffff_ff00),
                 ("10.40.255.7".parse().unwrap(), u32::MAX),
             ],
+            nets6: vec![
+                ("2001:db8:1::42".parse().unwrap(), 64),
+                ("2001:db8:9::7".parse().unwrap(), 128),
+            ],
         };
         assert!(l.is_own("192.168.0.242".parse().unwrap()));
         assert!(l.on_link("192.168.0.50".parse().unwrap()));
@@ -314,5 +350,13 @@ mod tests {
             "a /32 is no network"
         );
         assert!(!l.on_link("10.58.70.119".parse().unwrap()));
+        assert!(l.is_own("2001:db8:1::42".parse().unwrap()));
+        assert!(l.on_link("2001:db8:1::99".parse().unwrap()));
+        assert!(l.on_link("fe80::1".parse().unwrap()), "link-local");
+        assert!(
+            !l.on_link("2001:db8:9::8".parse().unwrap()),
+            "a /128 is no network"
+        );
+        assert!(!l.on_link("2001:db8:2::1".parse().unwrap()));
     }
 }

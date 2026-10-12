@@ -11,7 +11,7 @@
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
-use std::net::{Ipv4Addr, SocketAddr, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
@@ -76,9 +76,19 @@ fn fold(mut sum: u32) -> u16 {
     !(sum as u16)
 }
 
-/// A TCP segment answering `syn` with the given flags (SYN-ACK or RST-ACK).
+/// The tunnel's own IPv6 address (the test gives it; craked takes a
+/// tunnel's IPv6 address from openconnect in a later slice).
+const TUNNEL_V6: &str = "fd40:ff::7";
+
+/// A TCP segment answering `syn` (IPv4 or IPv6) with the given flags
+/// (SYN-ACK or RST-ACK).
 fn tcp_reply(syn: &[u8], flags: u8) -> Vec<u8> {
-    let ihl = usize::from(syn[0] & 0x0f) * 4;
+    let v6 = syn[0] >> 4 == 6;
+    let ihl = if v6 {
+        40
+    } else {
+        usize::from(syn[0] & 0x0f) * 4
+    };
     let t = &syn[ihl..];
     let seq = u32::from_be_bytes([t[4], t[5], t[6], t[7]]);
     let mut tcp = vec![0u8; 20];
@@ -89,6 +99,20 @@ fn tcp_reply(syn: &[u8], flags: u8) -> Vec<u8> {
     tcp[12] = 5 << 4;
     tcp[13] = flags;
     tcp[14..16].copy_from_slice(&65535u16.to_be_bytes());
+    if v6 {
+        let (src, dst) = (&syn[24..40], &syn[8..24]);
+        let mut pseudo = Vec::new();
+        pseudo.extend_from_slice(src);
+        pseudo.extend_from_slice(dst);
+        pseudo.extend_from_slice(&[0, 0, 0, 20, 0, 0, 0, 6]);
+        let c = fold(sum16(&pseudo) + sum16(&tcp));
+        tcp[16..18].copy_from_slice(&c.to_be_bytes());
+        let mut ip = vec![0x60, 0, 0, 0, 0, 20, 6, 64];
+        ip.extend_from_slice(src);
+        ip.extend_from_slice(dst);
+        ip.extend_from_slice(&tcp);
+        return ip;
+    }
     let (src, dst) = (&syn[16..20], &syn[12..16]);
     let mut pseudo = Vec::new();
     pseudo.extend_from_slice(src);
@@ -121,31 +145,36 @@ fn host_unreachable(syn: &[u8]) -> Vec<u8> {
     ip
 }
 
-/// A SYN (no ACK) in this packet: (destination, port).
-fn syn_of(p: &[u8]) -> Option<(Ipv4Addr, u16)> {
-    if p.len() < 40 || p[0] >> 4 != 4 || p[9] != 6 {
-        return None;
-    }
-    let ihl = usize::from(p[0] & 0x0f) * 4;
-    let t = p.get(ihl..)?;
-    (t.len() >= 20 && t[13] & 0x12 == 0x02).then(|| {
-        (
-            Ipv4Addr::new(p[16], p[17], p[18], p[19]),
-            u16::from_be_bytes([t[2], t[3]]),
-        )
-    })
+/// A SYN (no ACK) in this packet, IPv4 or IPv6: (source, destination,
+/// port).
+fn syn_of(p: &[u8]) -> Option<(IpAddr, IpAddr, u16)> {
+    let (src, dst, t): (IpAddr, IpAddr, &[u8]) = match p.first()? >> 4 {
+        4 if p.len() >= 40 && p[9] == 6 => {
+            let ihl = usize::from(p[0] & 0x0f) * 4;
+            let src: [u8; 4] = p[12..16].try_into().ok()?;
+            let dst: [u8; 4] = p[16..20].try_into().ok()?;
+            (src.into(), dst.into(), p.get(ihl..)?)
+        }
+        6 if p.len() >= 60 && p[6] == 6 => {
+            let src: [u8; 16] = p[8..24].try_into().ok()?;
+            let dst: [u8; 16] = p[24..40].try_into().ok()?;
+            (src.into(), dst.into(), &p[40..])
+        }
+        _ => return None,
+    };
+    (t.len() >= 20 && t[13] & 0x12 == 0x02).then(|| (src, dst, u16::from_be_bytes([t[2], t[3]])))
 }
 
 #[derive(Default)]
 struct World {
     /// Refused on the internet (RST); everything else there is dropped.
-    refuse_direct: HashSet<Ipv4Addr>,
+    refuse_direct: HashSet<IpAddr>,
     /// The router says it can't reach these (ICMP host unreachable).
-    unreachable_direct: HashSet<Ipv4Addr>,
+    unreachable_direct: HashSet<IpAddr>,
     /// Answered behind the tunnel; everything else there is dropped.
-    behind_tunnel: HashSet<Ipv4Addr>,
+    behind_tunnel: HashSet<IpAddr>,
     /// Every SYN seen leaving through the tunnel.
-    tunnel_syns: Vec<(Ipv4Addr, u16)>,
+    tunnel_syns: Vec<(IpAddr, u16)>,
 }
 
 fn responder(mut uplink: File, mut tun: File, world: Arc<Mutex<World>>, stop: Arc<AtomicBool>) {
@@ -154,7 +183,7 @@ fn responder(mut uplink: File, mut tun: File, world: Arc<Mutex<World>>, stop: Ar
         let mut idle = true;
         if let Ok(n) = uplink.read(&mut buf) {
             idle = false;
-            if let Some((dst, _)) = syn_of(&buf[..n]) {
+            if let Some((_, dst, _)) = syn_of(&buf[..n]) {
                 let w = world.lock().unwrap();
                 if w.refuse_direct.contains(&dst) {
                     uplink.write_all(&tcp_reply(&buf[..n], 0x14)).unwrap();
@@ -165,13 +194,14 @@ fn responder(mut uplink: File, mut tun: File, world: Arc<Mutex<World>>, stop: Ar
         }
         if let Ok(n) = tun.read(&mut buf) {
             idle = false;
-            if let Some((dst, port)) = syn_of(&buf[..n]) {
+            if let Some((src, dst, port)) = syn_of(&buf[..n]) {
                 let mut w = world.lock().unwrap();
                 w.tunnel_syns.push((dst, port));
                 // Like a real VPN gateway: only packets from the tunnel's own
                 // address get anywhere; anything else (e.g. still carrying the
                 // Wi-Fi address) is dropped.
-                let from_tunnel = buf[12..16] == [10, 40, 255, 7];
+                let from_tunnel = src == IpAddr::V4(Ipv4Addr::new(10, 40, 255, 7))
+                    || src == TUNNEL_V6.parse::<IpAddr>().unwrap();
                 if from_tunnel && w.behind_tunnel.contains(&dst) {
                     tun.write_all(&tcp_reply(&buf[..n], 0x12)).unwrap();
                 }
@@ -206,9 +236,11 @@ async fn start_probe(race: bool) -> Probe {
     // Strict reverse-path filtering, as Fedora has it.
     strict_rp_filter();
     let uplink = open_tun("uplink");
+    // Dual-stack, so an IPv6 connection has somewhere to go directly.
     sh(
         "ip link set uplink up; ip addr add 192.168.0.242/24 dev uplink; \
-        ip route add default via 192.168.0.1 dev uplink",
+        ip route add default via 192.168.0.1 dev uplink; \
+        ip -6 addr add fd00:1a::242/64 dev uplink nodad; ip -6 route add default dev uplink",
     );
     let tun = open_tun("crake-acme");
     sh("ip link set crake-acme up");
@@ -217,7 +249,8 @@ async fn start_probe(race: bool) -> Probe {
     {
         let mut w = world.lock().unwrap();
         w.behind_tunnel.extend(
-            ["10.70.0.5", "10.70.0.6", "10.70.0.8"].map(|a| a.parse::<Ipv4Addr>().unwrap()),
+            ["10.70.0.5", "10.70.0.6", "10.70.0.8", "fd70::5"]
+                .map(|a| a.parse::<IpAddr>().unwrap()),
         );
         w.refuse_direct.insert("10.70.0.6".parse().unwrap());
         w.unreachable_direct.insert("10.70.0.8".parse().unwrap());
@@ -272,6 +305,9 @@ async fn start_probe(race: bool) -> Probe {
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
+    sh(&format!(
+        "ip -6 addr add {TUNNEL_V6}/128 dev crake-acme nodad"
+    ));
 
     Probe {
         mgr,
@@ -297,34 +333,38 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
         _dir: dir,
         _srv,
     } = start_probe(false).await;
-    let (silent, refused, unreachable, down, lan, never) = tokio::task::spawn_blocking(|| {
-        // 1. No answer directly: the app's own attempt ends up connected.
-        let silent = connect("10.70.0.5", 5432, Duration::from_secs(12));
-        // 2. Refused directly: that attempt fails, the next goes through.
-        let refused_first = connect("10.70.0.6", 443, Duration::from_secs(5));
-        std::thread::sleep(Duration::from_millis(1500));
-        let refused_again = connect("10.70.0.6", 443, Duration::from_secs(5));
-        // 2b. The router says unreachable: tried through the tunnel at once,
-        //     sooner than the wait (1 s), so the next attempt goes through.
-        let unreachable_first = connect("10.70.0.8", 443, Duration::from_secs(2));
-        std::thread::sleep(Duration::from_millis(400));
-        let unreachable_again = connect("10.70.0.8", 443, Duration::from_millis(500));
-        // 3. Down everywhere. 4. The local network. 5. The never list.
-        let down = connect("10.70.0.7", 22, Duration::from_secs(1));
-        let lan = connect("192.168.0.50", 80, Duration::from_secs(1));
-        let never = connect("10.70.9.9", 80, Duration::from_secs(1));
-        std::thread::sleep(Duration::from_secs(5)); // probe wait + probe timeout
-        (
-            silent,
-            (refused_first, refused_again),
-            (unreachable_first, unreachable_again),
-            down,
-            lan,
-            never,
-        )
-    })
-    .await
-    .unwrap();
+    let (silent, silent6, refused, unreachable, down, lan, never) =
+        tokio::task::spawn_blocking(|| {
+            // 1. No answer directly: the app's own attempt ends up connected.
+            let silent = connect("10.70.0.5", 5432, Duration::from_secs(12));
+            // 1b. The same over IPv6.
+            let silent6 = connect("[fd70::5]", 5432, Duration::from_secs(12));
+            // 2. Refused directly: that attempt fails, the next goes through.
+            let refused_first = connect("10.70.0.6", 443, Duration::from_secs(5));
+            std::thread::sleep(Duration::from_millis(1500));
+            let refused_again = connect("10.70.0.6", 443, Duration::from_secs(5));
+            // 2b. The router says unreachable: tried through the tunnel at once,
+            //     sooner than the wait (1 s), so the next attempt goes through.
+            let unreachable_first = connect("10.70.0.8", 443, Duration::from_secs(2));
+            std::thread::sleep(Duration::from_millis(400));
+            let unreachable_again = connect("10.70.0.8", 443, Duration::from_millis(500));
+            // 3. Down everywhere. 4. The local network. 5. The never list.
+            let down = connect("10.70.0.7", 22, Duration::from_secs(1));
+            let lan = connect("192.168.0.50", 80, Duration::from_secs(1));
+            let never = connect("10.70.9.9", 80, Duration::from_secs(1));
+            std::thread::sleep(Duration::from_secs(5)); // probe wait + probe timeout
+            (
+                silent,
+                silent6,
+                (refused_first, refused_again),
+                (unreachable_first, unreachable_again),
+                down,
+                lan,
+                never,
+            )
+        })
+        .await
+        .unwrap();
 
     let (ok, took) = silent;
     assert!(
@@ -334,6 +374,18 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
     assert!(
         took < Duration::from_secs(8),
         "it recovered on a SYN retry ({took:?})"
+    );
+    assert!(
+        silent6.0.is_ok(),
+        "the stuck IPv6 connection succeeded through the tunnel: {:?}\nsyns: {:?}\nlog:\n{}",
+        silent6.0,
+        world.lock().unwrap().tunnel_syns,
+        std::fs::read_to_string(dir.path().join("log")).unwrap_or_default()
+    );
+    assert!(
+        sh("nft list set inet crake learned6_acme").contains("fd70::5"),
+        "{}",
+        sh("nft list set inet crake learned6_acme")
     );
     let (first, again) = refused;
     assert_eq!(
@@ -363,7 +415,7 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
     let syns = world.lock().unwrap().tunnel_syns.clone();
     let tried = |ip: &str| {
         syns.iter()
-            .any(|(d, _)| *d == ip.parse::<Ipv4Addr>().unwrap())
+            .any(|(d, _)| *d == ip.parse::<IpAddr>().unwrap())
     };
     assert!(tried("10.70.0.7"), "down host was tried through the tunnel");
     assert!(!tried("192.168.0.50"), "the local network is never probed");
@@ -397,6 +449,7 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
     for want in [
         "Sent 10.70.0.5 through ACME.",
         "It didn't answer directly. Through ACME it answered in",
+        "Sent fd70::5 through ACME.",
         "Sent 10.70.0.6 through ACME.",
         "Refused directly. Through ACME it answered in",
         "Sent 10.70.0.8 through ACME.",
@@ -534,7 +587,7 @@ async fn the_first_connection_is_routed_when_the_syn_is_held() {
             .unwrap()
             .tunnel_syns
             .iter()
-            .any(|(d, _)| *d == "10.70.0.5".parse::<Ipv4Addr>().unwrap())
+            .any(|(d, _)| *d == "10.70.0.5".parse::<IpAddr>().unwrap())
     );
     assert!(sh("nft list set inet crake learned_acme").contains("10.70.0.5"));
 

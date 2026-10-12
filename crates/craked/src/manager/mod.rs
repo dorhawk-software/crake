@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
-use std::net::{IpAddr, Ipv4Addr, SocketAddrV4};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -153,12 +153,12 @@ pub struct Manager {
     /// last said: once per 10 min, not on every lookup.
     contested: Mutex<HashMap<(String, Ipv4Addr), Instant>>,
     /// "Ask me first" questions lately (tunnel, host): not asked again soon.
-    asked: Mutex<HashMap<(String, Ipv4Addr), Instant>>,
+    asked: Mutex<HashMap<(String, IpAddr), Instant>>,
     /// Names under an organisation's domain whose tunnel DNS had no private
     /// address lately; not asked again for a while.
     no_split: Mutex<HashMap<String, Instant>>,
     /// Hosts probed lately (or being probed): not probed again for a while.
-    probed: Mutex<HashMap<Ipv4Addr, Instant>>,
+    probed: Mutex<HashMap<IpAddr, Instant>>,
     /// Names from recent public DNS answers, so decisions can say a name.
     seen_names: Mutex<HashMap<IpAddr, (String, Instant)>>,
     changes: broadcast::Sender<String>,

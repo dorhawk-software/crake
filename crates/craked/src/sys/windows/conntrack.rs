@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 use std::io;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 
 use anyhow::Result;
@@ -110,8 +110,8 @@ fn table() -> io::Result<HashMap<Flow, TcpState>> {
         .iter()
         .map(|r| {
             let flow = Flow {
-                src: Ipv4Addr::from(r.dwLocalAddr.to_ne_bytes()),
-                dst: Ipv4Addr::from(r.dwRemoteAddr.to_ne_bytes()),
+                src: Ipv4Addr::from(r.dwLocalAddr.to_ne_bytes()).into(),
+                dst: Ipv4Addr::from(r.dwRemoteAddr.to_ne_bytes()).into(),
                 sport: port(r.dwLocalPort),
                 dport: port(r.dwRemotePort),
             };
@@ -133,14 +133,18 @@ pub async fn close_to(target: crate::hosts::Target) {
 /// Reset a connection stuck without an answer, so the app's next attempt
 /// takes the route Crake just added (Linux deletes its conntrack entry).
 pub fn delete(flow: Flow) -> io::Result<()> {
+    // The table read here is IPv4's only.
+    let (IpAddr::V4(src), IpAddr::V4(dst)) = (flow.src, flow.dst) else {
+        return Err(io::Error::from(io::ErrorKind::InvalidInput));
+    };
     let net = |port: u16| u32::from(port.to_be());
     let row = MIB_TCPROW_LH {
         Anonymous: MIB_TCPROW_LH_0 {
             dwState: MIB_TCP_STATE_DELETE_TCB as u32,
         },
-        dwLocalAddr: u32::from_ne_bytes(flow.src.octets()),
+        dwLocalAddr: u32::from_ne_bytes(src.octets()),
         dwLocalPort: net(flow.sport),
-        dwRemoteAddr: u32::from_ne_bytes(flow.dst.octets()),
+        dwRemoteAddr: u32::from_ne_bytes(dst.octets()),
         dwRemotePort: net(flow.dport),
     };
     // SAFETY: a filled row, only read.

@@ -12,9 +12,9 @@ impl Manager {
         label: &str,
         shown: &str,
         why: String,
-        addrs: &[Ipv4Addr],
+        addrs: &[IpAddr],
     ) {
-        let fresh: Vec<Ipv4Addr> = {
+        let fresh: Vec<IpAddr> = {
             let mut asked = self.asked.lock().unwrap();
             asked.retain(|_, at| at.elapsed() < PROBED_FOR);
             addrs
@@ -35,13 +35,17 @@ impl Manager {
             name,
             &format!("{shown} needs {label}."),
             format!("{why} You asked to decide these yourself."),
-            fresh.iter().map(Ipv4Addr::to_string).collect(),
+            fresh.iter().map(IpAddr::to_string).collect(),
         );
     }
 
     /// A private address a tunnel's DNS gave for a name: inside one of
     /// the tunnels, almost surely (`probe::KNOWN_INSIDE_WAIT`).
-    pub fn known_inside(&self, addr: Ipv4Addr) -> bool {
+    pub fn known_inside(&self, addr: IpAddr) -> bool {
+        // Remembered answers are IPv4 (`TunnelHosts::answers`).
+        let IpAddr::V4(addr) = addr else {
+            return false;
+        };
         if !crate::dns::is_private(addr) {
             return false;
         }
@@ -77,7 +81,7 @@ impl Manager {
     /// tunnels: routable, not on the never list, this machine's own and not
     /// the local network, not already routed, not probed in the last 10 min,
     /// and in reach of at least one routed tunnel. Marks it probed.
-    fn probe_candidacy(&self, dst: Ipv4Addr, src: Ipv4Addr) -> Option<Vec<(String, String, u32)>> {
+    fn probe_candidacy(&self, dst: IpAddr, src: IpAddr) -> Option<Vec<(String, String, u32)>> {
         if Target::host(dst).check_routable().is_err()
             || self.never(self.name_for(dst).as_deref(), dst)
         {
@@ -155,8 +159,9 @@ impl Manager {
             );
         }
         skip.extend(crate::probe::Local::load().networks());
-        let (watch, skip): (Vec<Target>, Vec<Target>) =
-            (watch.into_iter().collect(), skip.into_iter().collect());
+        // The race holds IPv4 SYNs only, for now; IPv6 is probed passively.
+        let v4 = |ts: BTreeSet<Target>| ts.into_iter().filter(|t| !t.is_ipv6()).collect();
+        let (watch, skip): (Vec<Target>, Vec<Target>) = (v4(watch), v4(skip));
         if let Err(e) = self.routing.race_up(&watch, &skip).await {
             tracing::error!("the first-SYN race rule: {e:#}");
         }
@@ -173,7 +178,7 @@ impl Manager {
         let Some(candidates) = self.probe_candidacy(flow.dst, flow.src) else {
             return false;
         };
-        let addr = SocketAddrV4::new(flow.dst, flow.dport);
+        let addr = SocketAddr::new(flow.dst, flow.dport);
         // A reachable host answers directly within a round trip; past this it
         // is treated as silently dropped (only a tunnel might reach it), so
         // the first connection isn't held for the whole probe wait.
@@ -193,14 +198,14 @@ impl Manager {
     /// held SYN itself routes (the first-SYN race).
     async fn try_tunnels(
         &self,
-        dst: Ipv4Addr,
+        dst: IpAddr,
         dport: u16,
         candidates: Vec<(String, String, u32)>,
         why: crate::probe::Direct,
         forget: Option<crate::conntrack::Flow>,
     ) -> bool {
         let shown = self.name_for(dst).unwrap_or_else(|| dst.to_string());
-        let addr = SocketAddrV4::new(dst, dport);
+        let addr = SocketAddr::new(dst, dport);
         let both = self.settings.lock().unwrap().both;
         // Every eligible tunnel is tried at once; the setting decides which
         // answer counts (CLAUDE.md, "When two tunnels answer").
@@ -327,7 +332,7 @@ impl Manager {
 
     /// Tunnels a host may be probed through, in order: routed, not sent direct
     /// by you for that tunnel, and not covering the tunnel's gateway.
-    pub(super) fn probe_candidates(&self, dst: Ipv4Addr) -> Vec<(String, String, u32)> {
+    pub(super) fn probe_candidates(&self, dst: IpAddr) -> Vec<(String, String, u32)> {
         let name = self.name_for(dst);
         let map = self.tunnels.lock().unwrap();
         let store = self.hosts.lock().unwrap();
@@ -336,7 +341,7 @@ impl Manager {
             .filter(|e| e.routed)
             .filter(|e| {
                 let t = store.tunnels.get(&e.config.name);
-                !t.is_some_and(|t| t.direct.contains(&IpAddr::V4(dst)))
+                !t.is_some_and(|t| t.direct.contains(&dst))
             })
             .filter(|e| {
                 let gw = e.info.as_ref().and_then(|i| i.gateway);

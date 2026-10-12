@@ -41,6 +41,12 @@ pub fn interfaces() -> Vec<(String, Ipv4Addr, u32)> {
     found
 }
 
+/// Every IPv6 address on the machine. None yet: craked routes no IPv6 on
+/// Windows (`Routing::routes_ipv6`), so nothing asks.
+pub fn interfaces6() -> Vec<(String, std::net::Ipv6Addr, u8)> {
+    Vec::new()
+}
+
 /// The DNS servers Windows was given (DHCP, or by hand) on the adapters
 /// that are up, Crake's own tunnels left out: where public names go.
 pub fn system_dns() -> Vec<Ipv4Addr> {
