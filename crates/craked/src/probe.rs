@@ -63,13 +63,21 @@ pub fn unreachable(packet: &[u8]) -> Option<Flow> {
     })
 }
 
+/// How long an address a tunnel's DNS gave (for a name, private) gets to
+/// answer directly before it's tried through the tunnel: a round trip,
+/// not the probe wait. An app that kept the address from an earlier
+/// lookup (its own DNS cache) reaches it without asking DNS, so Crake can't
+/// route it before the first packet; this gets it routed before the
+/// system's first SYN retry (1 s on Linux).
+pub const KNOWN_INSIDE_WAIT: Duration = Duration::from_millis(300);
+
 /// Watch for the daemon's lifetime.
 pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
     let mut events = Events::open()?;
-    let wait = mgr.probe_wait();
     tokio::spawn(async move {
-        let mut pending: HashMap<Flow, Instant> = HashMap::new();
-        let mut tick = tokio::time::interval(Duration::from_millis(200));
+        // Each stuck connection: since when, and how long it may take.
+        let mut pending: HashMap<Flow, (Instant, Duration)> = HashMap::new();
+        let mut tick = tokio::time::interval(Duration::from_millis(100));
         loop {
             tokio::select! {
                 batch = events.next() => match batch {
@@ -78,7 +86,13 @@ pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
                             match (ev.kind, ev.state) {
                                 (Kind::New, Some(TcpState::SynSent)) => {
                                     if mgr.any_routed() {
-                                        pending.insert(ev.flow, Instant::now());
+                                        // Read each time: Settings can change it.
+                                        let wait = if mgr.known_inside(ev.flow.dst) {
+                                            KNOWN_INSIDE_WAIT
+                                        } else {
+                                            mgr.probe_wait()
+                                        };
+                                        pending.insert(ev.flow, (Instant::now(), wait));
                                     }
                                 }
                                 // A reset before it was ever answered: refused. The
@@ -106,7 +120,7 @@ pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
                 _ = tick.tick() => {
                     let due: Vec<Flow> = pending
                         .iter()
-                        .filter(|(_, at)| at.elapsed() >= wait)
+                        .filter(|(_, (at, wait))| at.elapsed() >= *wait)
                         .map(|(f, _)| *f)
                         .collect();
                     for flow in due {

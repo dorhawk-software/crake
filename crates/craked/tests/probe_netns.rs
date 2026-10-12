@@ -245,7 +245,7 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
             protocol: Protocol::Anyconnect,
             user: None,
             passwd_file: None,
-            dns_domains: vec![],
+            dns_domains: vec!["acme.internal".into()],
             auth_args: vec![],
             extra_args: vec![],
             managed: None,
@@ -416,6 +416,29 @@ async fn forget_is_not_forbid(mgr: &Manager) {
         again.1.0
     );
     assert!(sh("nft list set inet crake learned_acme").contains("10.70.0.6"));
+
+    // An address ACME's DNS gave for a name, reached again from an app's
+    // own DNS cache after Forget (no lookup to route it before the first
+    // packet): tried through ACME after a round trip, not the probe wait,
+    // so the app's first SYN retry gets through.
+    mgr.learn_from_dns(
+        "acme",
+        craked::dns::Answer {
+            name: "db.acme.internal".into(),
+            addrs: vec!["10.70.0.5".parse().unwrap()],
+        },
+    )
+    .await;
+    mgr.forget("acme", "10.70.0.5").await.unwrap();
+    let (back, took) =
+        tokio::task::spawn_blocking(|| connect("10.70.0.5", 5432, Duration::from_secs(5)))
+            .await
+            .unwrap();
+    assert!(back.is_ok(), "routed again: {back:?}");
+    assert!(
+        took < Duration::from_millis(1600),
+        "on the first SYN retry, not after the probe wait ({took:?})"
+    );
 }
 
 /// rp_filter=1 everywhere, as Fedora has it (scripts/netns-test.sh starts

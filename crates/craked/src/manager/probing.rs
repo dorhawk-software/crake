@@ -39,6 +39,19 @@ impl Manager {
         );
     }
 
+    /// A private address a tunnel's DNS gave for a name: inside one of
+    /// the tunnels, almost surely (`probe::KNOWN_INSIDE_WAIT`).
+    pub fn known_inside(&self, addr: Ipv4Addr) -> bool {
+        if !crate::dns::is_private(addr) {
+            return false;
+        }
+        let store = self.hosts.lock().unwrap();
+        store
+            .tunnels
+            .values()
+            .any(|t| t.answers.values().any(|(addrs, _)| addrs.contains(&addr)))
+    }
+
     pub fn probe_wait(&self) -> Duration {
         Duration::from_secs(self.settings.lock().unwrap().probe_wait_secs)
     }
