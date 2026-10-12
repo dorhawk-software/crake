@@ -323,90 +323,98 @@ pub(crate) mod tests {
 
     use super::*;
 
-    /// A minimal response: one question, A records for it.
-    pub fn response(name: &str, addrs: &[Ipv4Addr]) -> Vec<u8> {
-        let mut m = vec![
-            0x12,
-            0x34,
-            0x81,
-            0x80,
-            0,
-            1,
-            0,
-            addrs.len() as u8,
-            0,
-            0,
-            0,
-            0,
-        ];
-        for label in name.split('.') {
-            m.push(label.len() as u8);
-            m.extend_from_slice(label.as_bytes());
+    use hickory_proto::op::OpCode;
+    use hickory_proto::rr::{Name, Record};
+
+    /// The test's answers come from DNS on 10.40.0.2 to an app on
+    /// 10.40.255.7, with this ID and TTL.
+    const ID: u16 = 0x1234;
+    const TTL: u32 = 60;
+    const SERVER: Ipv4Addr = Ipv4Addr::new(10, 40, 0, 2);
+    const APP: Ipv4Addr = Ipv4Addr::new(10, 40, 255, 7);
+    const APP_PORT: u16 = 54321;
+
+    /// A response to a `qtype` question for `name`: `code`, these records.
+    fn message(name: &str, qtype: RecordType, code: ResponseCode, records: Vec<RData>) -> Vec<u8> {
+        let name = Name::from_ascii(name).unwrap();
+        let mut m = Message::response(ID, OpCode::Query);
+        m.metadata.recursion_desired = true;
+        m.metadata.recursion_available = true;
+        m.metadata.response_code = code;
+        m.add_query(Query::query(name.clone(), qtype));
+        for rdata in records {
+            m.add_answer(Record::from_rdata(name.clone(), TTL, rdata));
         }
-        m.extend_from_slice(&[0, 0, 1, 0, 1]);
-        for a in addrs {
-            m.extend_from_slice(&[0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4]);
-            m.extend_from_slice(&a.octets());
-        }
-        m
+        m.to_vec().unwrap()
     }
 
-    /// A minimal response with AAAA records (type 28, 16-byte addresses).
+    /// A response with A records.
+    pub fn response(name: &str, addrs: &[Ipv4Addr]) -> Vec<u8> {
+        let records = addrs.iter().map(|a| RData::A((*a).into())).collect();
+        message(name, RecordType::A, ResponseCode::NoError, records)
+    }
+
+    /// A response with AAAA records.
     pub fn response_aaaa(name: &str, addrs: &[std::net::Ipv6Addr]) -> Vec<u8> {
-        let mut m = vec![
-            0x12,
-            0x34,
-            0x81,
-            0x80,
+        let records = addrs.iter().map(|a| RData::AAAA((*a).into())).collect();
+        message(name, RecordType::AAAA, ResponseCode::NoError, records)
+    }
+
+    /// "No such name", for an A question.
+    fn nxdomain(name: &str) -> Vec<u8> {
+        message(name, RecordType::A, ResponseCode::NXDomain, Vec::new())
+    }
+
+    /// An IPv4 packet from the DNS server to the app carrying `segment`.
+    fn ipv4(protocol: u8, segment: &[u8]) -> Vec<u8> {
+        const VERSION_AND_LENGTH: u8 = 0x45; // IPv4, a 20-byte header
+        const HOPS: u8 = 64;
+        let mut p = vec![
+            VERSION_AND_LENGTH,
             0,
-            1,
-            0,
-            addrs.len() as u8,
             0,
             0,
+            0,
+            0,
+            0,
+            0,
+            HOPS,
+            protocol,
             0,
             0,
         ];
-        for label in name.split('.') {
-            m.push(label.len() as u8);
-            m.extend_from_slice(label.as_bytes());
-        }
-        m.extend_from_slice(&[0, 0, 0x1c, 0, 1]); // qtype AAAA, class IN
-        for a in addrs {
-            m.extend_from_slice(&[0xc0, 0x0c, 0, 0x1c, 0, 1, 0, 0, 0, 60, 0, 16]);
-            m.extend_from_slice(&a.octets());
-        }
-        m
+        p.extend_from_slice(&SERVER.octets());
+        p.extend_from_slice(&APP.octets());
+        p.extend_from_slice(segment);
+        let total = u16::try_from(p.len()).unwrap();
+        p[2..4].copy_from_slice(&total.to_be_bytes());
+        p
     }
 
     pub fn udp_packet(sport: u16, payload: &[u8]) -> Vec<u8> {
-        let mut p = vec![
-            0x45, 0, 0, 0, 0, 0, 0, 0, 64, 17, 0, 0, 10, 40, 0, 2, 10, 40, 255, 7,
-        ];
-        p.extend_from_slice(&sport.to_be_bytes());
-        p.extend_from_slice(&[0xd4, 0x31, 0, 0, 0, 0]);
-        p.extend_from_slice(payload);
-        p
-    }
-
-    fn nxdomain(name: &str) -> Vec<u8> {
-        let mut m = response(name, &[]);
-        m[3] = 0x83;
-        m
+        let mut udp = Vec::new();
+        udp.extend_from_slice(&sport.to_be_bytes());
+        udp.extend_from_slice(&APP_PORT.to_be_bytes());
+        udp.extend_from_slice(&[0; 4]); // length and checksum: not read
+        udp.extend_from_slice(payload);
+        ipv4(packet::UDP, &udp)
     }
 
     fn tcp_packet(sport: u16, data: &[u8]) -> Vec<u8> {
-        let mut p = vec![
-            0x45, 0, 0, 0, 0, 0, 0, 0, 64, 6, 0, 0, 10, 40, 0, 2, 10, 40, 255, 7,
-        ];
-        p.extend_from_slice(&sport.to_be_bytes());
-        p.extend_from_slice(&[
-            0xd4, 0x31, 0, 0, 0, 1, 0, 0, 0, 1, 0x50, 0x18, 0xff, 0xff, 0, 0, 0, 0,
-        ]);
-        p.extend_from_slice(data);
-        let total = p.len() as u16;
-        p[2..4].copy_from_slice(&total.to_be_bytes());
-        p
+        const SEQUENCE: u32 = 1;
+        const ACKNOWLEDGED: u32 = 1;
+        const FIVE_WORDS: u8 = 0x50; // the header's length: no options
+        const PSH_ACK: u8 = 0x18;
+        let mut tcp = Vec::new();
+        tcp.extend_from_slice(&sport.to_be_bytes());
+        tcp.extend_from_slice(&APP_PORT.to_be_bytes());
+        tcp.extend_from_slice(&SEQUENCE.to_be_bytes());
+        tcp.extend_from_slice(&ACKNOWLEDGED.to_be_bytes());
+        tcp.extend_from_slice(&[FIVE_WORDS, PSH_ACK]);
+        tcp.extend_from_slice(&u16::MAX.to_be_bytes()); // window
+        tcp.extend_from_slice(&[0; 4]); // checksum and urgent pointer
+        tcp.extend_from_slice(data);
+        ipv4(packet::TCP, &tcp)
     }
 
     #[test]
@@ -456,7 +464,7 @@ pub(crate) mod tests {
         let f = public_failure(&nxdomain("db.example.cloud")).unwrap();
         assert_eq!(
             (f.id, f.name.as_str(), f.qtype),
-            (0x1234, "db.example.cloud", RecordType::A)
+            (ID, "db.example.cloud", RecordType::A)
         );
         // Successes, local and single-label names are not failures to rescue.
         assert!(public_failure(&response("db.example.cloud", &[])).is_none());
@@ -475,9 +483,10 @@ pub(crate) mod tests {
         let dns = rewrite(&f, reply).unwrap();
         let packet = replace_payload(&udp_packet(53, &nxdomain("db.example.cloud")), &dns).unwrap();
         assert_eq!(parse_packet(&packet).unwrap().addrs, vec![IpAddr::V4(ip)]);
+        let dns_at = packet::IPV4_MIN + packet::UDP_HEADER;
         assert_eq!(
-            &packet[28..30],
-            &[0x12, 0x34],
+            &packet[dns_at..dns_at + 2],
+            &ID.to_be_bytes(),
             "keeps the public question's ID"
         );
         assert_eq!(
