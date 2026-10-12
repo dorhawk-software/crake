@@ -20,6 +20,8 @@ use crate::theme::{Theme, fonts};
 
 mod view;
 
+mod import;
+
 mod routing;
 
 mod server;
@@ -182,6 +184,8 @@ pub struct NewTunnel {
     /// Which VPN engines are installed (None until looked; all in demo).
     engines: Option<crate::engines::Engines>,
     profile: Option<String>,
+    /// How importing a .ovpn file went, under the Profile field.
+    profile_note: Option<import::ProfileNote>,
     focus: FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
@@ -220,6 +224,18 @@ impl NewTunnel {
         &self,
     ) -> (Entity<InputState>, Entity<InputState>, Entity<InputState>) {
         (self.name.clone(), self.gateway.clone(), self.user.clone())
+    }
+
+    /// Import a .ovpn file as the file picker would give it, and the
+    /// profile chosen then (the Linux journey: the picker is the platform's).
+    #[cfg(all(test, target_os = "linux"))]
+    pub(crate) fn import_for_tests(&mut self, path: std::path::PathBuf, cx: &mut Context<Self>) {
+        self.import_ovpn(path, cx);
+    }
+
+    #[cfg(all(test, target_os = "linux"))]
+    pub(crate) fn profile_for_tests(&self) -> Option<String> {
+        self.profile.clone()
     }
 
     pub fn new(
@@ -388,6 +404,7 @@ impl NewTunnel {
             profile: (field("protocol") == "openvpn3")
                 .then(|| field("gateway"))
                 .filter(|g| !g.is_empty()),
+            profile_note: None,
             focus,
             _subscriptions: subscriptions,
         }

@@ -258,3 +258,110 @@ fn on_a_small_screen_continue_stays_in_view(cx: &mut TestAppContext) {
     assert!(visible(cx, last), "scrolled to the last protocol");
     assert!(visible(cx, "next".into()), "and Continue still in view");
 }
+
+/// A .ovpn file a test imports, in a folder of its own: `body`, with a
+/// `ca.crt` beside it unless `alone`.
+fn ovpn(name: &str, body: &str, alone: bool) -> (tempfile::TempDir, std::path::PathBuf) {
+    let dir = tempfile::tempdir().unwrap();
+    if !alone {
+        std::fs::write(dir.path().join("ca.crt"), "-----BEGIN CERTIFICATE-----\n").unwrap();
+    }
+    let path = dir.path().join(name);
+    std::fs::write(&path, body).unwrap();
+    (dir, path)
+}
+
+/// What the Profile field says under it after an import.
+fn note(w: &Opened, cx: &mut TestAppContext) -> Option<String> {
+    w.read(cx, |t| match &t.profile_note {
+        Some(import::ProfileNote::Imported(s) | import::ProfileNote::Failed(s)) => Some(s.clone()),
+        None => None,
+    })
+}
+
+/// design/proposals/ovpn-import.html, option A: "Import .ovpn…" in the
+/// Profile label's row; the imported file becomes the chosen profile and
+/// the tunnel's.
+#[gpui_kit::test]
+fn a_ovpn_file_becomes_the_profile(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
+    let w = open(cx);
+    w.type_into(|t| t.name.clone(), "Initech", cx);
+    w.click(("protocol", OPENVPN3), cx);
+    assert!(w.shown("import-ovpn", cx), "the import, in the label's row");
+    assert!(w.shown("profile", cx), "next to the list");
+    // The picker is the platform's; the file it gives is imported.
+    w.click("import-ovpn", cx);
+    let (_dir, path) = ovpn("initech-office.ovpn", "client\nca ca.crt\n", false);
+    w.view.update(cx, |t, cx| t.import_ovpn(path, cx));
+    cx.run_until_parked();
+    assert_eq!(
+        w.read(cx, |t| t.profile.clone()).as_deref(),
+        Some("initech-office")
+    );
+    assert!(w.read(cx, |t| t.profiles.contains(&"initech-office".to_owned())));
+    assert_eq!(
+        note(&w, cx).as_deref(),
+        Some("Imported initech-office.ovpn as your profile.")
+    );
+    w.click("next", cx);
+    w.click("next", cx);
+    w.click("next", cx);
+    assert_eq!(w.added()["gateway"], "initech-office");
+}
+
+/// A name a profile has already gets a number; a file that points to one
+/// that isn't there, or that openvpn3 refuses, says why and chooses
+/// nothing.
+#[gpui_kit::test]
+fn an_import_says_what_went_wrong(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
+    let w = open(cx);
+    w.click(("protocol", OPENVPN3), cx);
+    let (_a, taken) = ovpn("initech.ovpn", "client\n", true);
+    w.view.update(cx, |t, cx| t.import_ovpn(taken, cx));
+    cx.run_until_parked();
+    assert_eq!(
+        w.read(cx, |t| t.profile.clone()).as_deref(),
+        Some("initech 2")
+    );
+    assert_eq!(
+        note(&w, cx).as_deref(),
+        Some("Imported initech.ovpn as your profile \u{201c}initech 2\u{201d}.")
+    );
+
+    w.view.update(cx, |t, _| t.profile = None);
+    let (_b, missing) = ovpn("globex.ovpn", "client\nca ca.crt\n", true);
+    w.view.update(cx, |t, cx| t.import_ovpn(missing, cx));
+    cx.run_until_parked();
+    assert_eq!(
+        note(&w, cx).as_deref(),
+        Some(
+            "Couldn\u{2019}t import globex.ovpn: it points to ca.crt, which isn\u{2019}t next to it. Keep the files your IT team sent together and try again."
+        )
+    );
+    assert_eq!(w.read(cx, |t| t.profile.clone()), None);
+
+    let (_c, refused) = ovpn("bad.ovpn", "# openvpn3 refuses\n", true);
+    w.view.update(cx, |t, cx| t.import_ovpn(refused, cx));
+    cx.run_until_parked();
+    assert_eq!(
+        note(&w, cx).as_deref(),
+        Some(
+            "Couldn\u{2019}t import bad.ovpn: openvpn3 didn\u{2019}t take it (Configuration file contains errors)."
+        )
+    );
+}
+
+/// No profiles on this computer: the list is the import button.
+#[gpui_kit::test]
+fn with_no_profiles_the_list_is_the_import(cx: &mut TestAppContext) {
+    let w = open(cx);
+    w.click(("protocol", OPENVPN3), cx);
+    w.view.update(cx, |t, cx| {
+        t.profiles.clear();
+        cx.notify();
+    });
+    assert!(w.shown("import-ovpn", cx));
+    assert!(!w.shown("profile", cx), "no list to choose from");
+}

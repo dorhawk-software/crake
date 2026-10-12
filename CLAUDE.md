@@ -541,7 +541,18 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    "Pending web authentication" (already connecting: Crake just waits),
    Connect may say it's already done, and Crake opens the sign-in URL from
    the status or the OPEN_URL input queue itself, once per URL.
-   Not yet: importing a .ovpn file. Original note: Next protocol after openconnect's. openvpn3 runs its sessions through
+   Importing a .ovpn file (requested; design/proposals/ovpn-import.html,
+   option A chosen by the user over a link under the field, which "read as
+   thrown there"): New tunnel's Profile label row has "Import .ovpn…"
+   (with no profiles at all, the list is an "Import a .ovpn file…"
+   button); the file's referenced files (ca, cert, key, tls-auth with its
+   direction, tls-crypt, pkcs12 as base64, ...) are put inline
+   (`ovpn_file.rs`, as `openvpn3 config-import` does), openvpn3's
+   configuration service takes it (`ovpn3::import`, D-Bus Import(ssbb),
+   persistent, the user's), under a name no profile has yet ("initech 2"),
+   and it's the chosen profile; a missing file or openvpn3's refusal is
+   said under the field. Window tests and a journey step (the picker is
+   the platform's; tests import the file it would give). Original note: Next protocol after openconnect's. openvpn3 runs its sessions through
    its own D-Bus services (net.openvpn.v3.*), with profiles imported from
    .ovpn files; Crake would drive those, keep its own routing (no
    redirect-gateway, routes pushed as hints), and read the session's tun

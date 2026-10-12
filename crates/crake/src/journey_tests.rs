@@ -202,6 +202,23 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
     cx.simulate_window_resize(n, gpui_kit::size(gpui_kit::px(720.), gpui_kit::px(1000.)));
     let (name, gateway, user) = view.read_with(cx, |v, _| v.fields_for_tests());
     type_into(cx, n, name, "Globex");
+    // OpenVPN 3: a .ovpn file imported from the Profile label's row (the
+    // picker is the platform's; the file it gives) becomes the profile.
+    click(cx, n, ("protocol", 8usize));
+    click(cx, n, "import-ovpn");
+    let ovpn = tempfile::tempdir().unwrap();
+    std::fs::write(ovpn.path().join("ca.crt"), "-----BEGIN CERTIFICATE-----\n").unwrap();
+    std::fs::write(ovpn.path().join("globex-lab.ovpn"), "client\nca ca.crt\n").unwrap();
+    view.update(cx, |v, cx| {
+        v.import_for_tests(ovpn.path().join("globex-lab.ovpn"), cx)
+    });
+    until(
+        cx,
+        "the .ovpn file is the profile",
+        Duration::from_secs(10),
+        |cx| view.read_with(cx, |v, _| v.profile_for_tests()).as_deref() == Some("globex-lab"),
+    );
+    // On with AnyConnect instead.
     click(cx, n, ("protocol", 1usize));
     type_into(cx, n, gateway, &crate::test_app::gateway());
     click(cx, n, "next");

@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: importing a .ovpn file</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --line-strong: #4A4E53; --ink: #ECEDEE;
+    --muted: #A9AEB4; --accent: #2DD4BF; --accent-soft: rgba(45, 212, 191, 0.14); }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --line-strong: #BDBDB8; --ink: #1A1C1E;
+    --muted: #5A5F64; --accent: #0F766E; --accent-soft: rgba(15, 118, 110, 0.10); }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 40px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 900px; margin-bottom: 22px; }
+  .intro b { color: var(--ink); }
+  .grid { display: grid; grid-template-columns: repeat(3, 420px); gap: 24px; align-items: start; }
+  .opt { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .why { font-size: 13px; color: var(--muted); margin-bottom: 10px; min-height: 38px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px 24px; margin-bottom: 18px; }
+  .state { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 6px; }
+  h2 { margin: 0 0 16px; font-size: 22px; font-weight: 700; }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; }
+  .lab { display: flex; align-items: baseline; justify-content: space-between; font-weight: 600; margin-bottom: 6px; }
+  .lab .act { font-size: 13px; color: var(--accent); font-weight: 600; }
+  .field, .select { box-sizing: border-box; height: 42px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 6px;
+    background: var(--panel); color: var(--ink); display: flex; align-items: center; font-size: 15px; min-width: 0; }
+  .select { justify-content: space-between; font-size: 14px; padding-right: 10px; flex: 1; }
+  .group { display: flex; }
+  .group .select { border-radius: 6px 0 0 6px; }
+  .group .btn { border-radius: 0 6px 6px 0; border-left: none; }
+  .btn { box-sizing: border-box; height: 42px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 6px;
+    background: var(--surface); color: var(--ink); display: flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+  .btn.wide { width: 100%; background: var(--panel); }
+  .hint { margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .hint a { color: var(--accent); font-weight: 600; text-decoration: none; }
+  .line { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .line.ink { color: var(--ink); line-height: 19px; }
+  .rec { color: var(--accent); font-size: 12px; font-weight: 700; margin-left: 6px; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>Proposal: importing a .ovpn file, three ways to place it. Chosen with the user (2026-10-12): A</b>,
+    the action in the Profile label's row (an earlier version, a link under the field, read as thrown there).</div>
+  <div class="intro"> Today an OpenVPN 3 tunnel needs a
+    profile imported with <span class="mono">openvpn3 config-import</span> first. Each way opens the file picker; Crake
+    gives the file to openvpn3 as your profile (the files it points to, such as <span class="mono">ca.crt</span>, taken in
+    from beside it) and chooses it. With no profiles at all, the list is the import button itself (bottom row, the same in
+    all three).</div>
+  <div class="grid">
+
+    <div>
+      <div class="opt">A · In the label’s row</div>
+      <div class="why">The field’s own action, where its name is: the list and a way to add to it read as one thing.</div>
+      <div class="state">Profiles to choose from</div>
+      <div class="card">
+        <h2>Where does it connect?</h2>
+        <div class="row">
+          <div><div class="lab">Name</div><div class="field">Initech</div></div>
+          <div><div class="lab"><span>Profile</span><span class="act">Import .ovpn…</span></div>
+            <div class="select"><span>Choose…</span><span>⌄</span></div></div>
+        </div>
+      </div>
+      <div class="state">After an import</div>
+      <div class="card">
+        <h2>Where does it connect?</h2>
+        <div class="row">
+          <div><div class="lab">Name</div><div class="field">Initech</div></div>
+          <div><div class="lab"><span>Profile</span><span class="act">Import .ovpn…</span></div>
+            <div class="select"><span>initech-office</span><span>⌄</span></div></div>
+        </div>
+        <div class="line"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><path d="M6 15V4M12 15V8" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"></path></svg>
+          <span>Imported initech-office.ovpn as your profile.</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="opt">B · A button joined to the list<span class="rec">Recommended</span></div>
+      <div class="why">One control: pick one you have, or bring a new one. As big as the list, so nobody misses it.</div>
+      <div class="state">Profiles to choose from</div>
+      <div class="card">
+        <h2>Where does it connect?</h2>
+        <div class="row">
+          <div><div class="lab">Name</div><div class="field">Initech</div></div>
+          <div><div class="lab">Profile</div>
+            <div class="group"><div class="select"><span>Choose…</span><span>⌄</span></div><div class="btn">Import…</div></div></div>
+        </div>
+      </div>
+      <div class="state">After an import</div>
+      <div class="card">
+        <h2>Where does it connect?</h2>
+        <div class="row">
+          <div><div class="lab">Name</div><div class="field">Initech</div></div>
+          <div><div class="lab">Profile</div>
+            <div class="group"><div class="select"><span>initech-office</span><span>⌄</span></div><div class="btn">Import…</div></div></div>
+        </div>
+        <div class="line"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><path d="M6 15V4M12 15V8" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"></path></svg>
+          <span>Imported initech-office.ovpn as your profile.</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="opt">C · A sentence with its reason</div>
+      <div class="why">Says when you’d want it, in the place a field’s hint goes, so it reads as help rather than a stray link.</div>
+      <div class="state">Profiles to choose from</div>
+      <div class="card">
+        <h2>Where does it connect?</h2>
+        <div class="row">
+          <div><div class="lab">Name</div><div class="field">Initech</div></div>
+          <div><div class="lab">Profile</div><div class="select"><span>Choose…</span><span>⌄</span></div>
+            <div class="hint">Got a .ovpn file from your IT team? <a>Import it</a></div></div>
+        </div>
+      </div>
+      <div class="state">After an import</div>
+      <div class="card">
+        <h2>Where does it connect?</h2>
+        <div class="row">
+          <div><div class="lab">Name</div><div class="field">Initech</div></div>
+          <div><div class="lab">Profile</div><div class="select"><span>initech-office</span><span>⌄</span></div>
+            <div class="hint">Got a .ovpn file from your IT team? <a>Import it</a></div></div>
+        </div>
+        <div class="line"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><path d="M6 15V4M12 15V8" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"></path></svg>
+          <span>Imported initech-office.ovpn as your profile.</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="state">No profiles yet (all three)</div>
+      <div class="card">
+        <h2>Where does it connect?</h2>
+        <div class="row">
+          <div><div class="lab">Name</div><div class="field">Initech</div></div>
+          <div><div class="lab">Profile</div><div class="btn wide"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Import a .ovpn file…</div></div>
+        </div>
+        <div class="line"><span>No OpenVPN 3 profiles on this computer yet. Import the .ovpn file your IT team gave you.</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="state">A file that can’t be used (shown with B)</div>
+      <div class="card">
+        <h2>Where does it connect?</h2>
+        <div class="row">
+          <div><div class="lab">Name</div><div class="field">Initech</div></div>
+          <div><div class="lab">Profile</div>
+            <div class="group"><div class="select"><span>Choose…</span><span>⌄</span></div><div class="btn">Import…</div></div></div>
+        </div>
+        <div class="line ink"><span>Couldn’t import initech-office.ovpn: it points to ca.crt, which isn’t next to it. Keep the
+          files your IT team sent together and try again.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>if (location.search.includes('dark=false')) document.body.classList.add('light');</script>
+</body>
+</html>

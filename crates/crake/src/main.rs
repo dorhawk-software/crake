@@ -36,6 +36,8 @@ mod notify;
 
 mod ovpn3;
 
+mod ovpn_file;
+
 mod panel;
 
 mod place;
@@ -255,6 +257,7 @@ impl gpui_kit::AssetSource for Assets {
             "section-about.svg",
             "help.svg",
             "trash.svg",
+            "plus.svg",
             "section-tunnels.svg",
             "disclose-right.svg",
             "disclose-down.svg",

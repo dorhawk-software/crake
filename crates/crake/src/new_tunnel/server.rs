@@ -7,6 +7,103 @@ use super::*;
 const WIDE_COLUMN: f32 = 1.4;
 
 impl NewTunnel {
+    /// OpenVPN 3's Profile: the list, with "Import .ovpn…" in its label's
+    /// row; with no profiles at all, the import button in its place.
+    fn profile_field(&self, t: &Theme, cx: &mut Context<Self>) -> Div {
+        if self.profiles.is_empty() {
+            return div().child(label("Profile")).child(
+                div()
+                    .id("import-ovpn")
+                    .h(px(42.))
+                    .px(px(14.))
+                    .flex()
+                    .items_center()
+                    .gap(px(8.))
+                    .border_1()
+                    .border_color(t.line_strong)
+                    .rounded(px(6.))
+                    .bg(t.panel)
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .cursor_pointer()
+                    .child(svg().path("crake/plus.svg").size(px(16.)).text_color(t.ink))
+                    .child("Import a .ovpn file\u{2026}")
+                    .on_click(cx.listener(|this, _, _, cx| this.choose_ovpn(cx)))
+                    .test_support(),
+            );
+        }
+        let options: Vec<(String, String)> = self
+            .profiles
+            .iter()
+            .map(|p| (p.clone(), p.clone()))
+            .collect();
+        div()
+            .child(
+                div()
+                    .flex()
+                    .items_baseline()
+                    .justify_between()
+                    .child(label("Profile"))
+                    .child(
+                        div()
+                            .id("import-ovpn")
+                            .text_size(px(13.))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(t.accent)
+                            .cursor_pointer()
+                            .child("Import .ovpn\u{2026}")
+                            .on_click(cx.listener(|this, _, _, cx| this.choose_ovpn(cx)))
+                            .test_support(),
+                    ),
+            )
+            .child(
+                self.dropdown(
+                    "profile",
+                    options,
+                    self.profile
+                        .clone()
+                        .unwrap_or_else(|| "Choose\u{2026}".into()),
+                    None,
+                    t,
+                    cx,
+                    |this, v| this.profile = Some(v),
+                ),
+            )
+    }
+
+    /// Under OpenVPN 3's fields: how an import went, or, with no profiles
+    /// yet, where to start.
+    fn profile_line(&self, t: &Theme) -> Option<Div> {
+        let line = || {
+            div()
+                .flex()
+                .items_center()
+                .gap(px(8.))
+                .mt(px(10.))
+                .text_size(px(13.))
+                .line_height(px(19.))
+        };
+        match &self.profile_note {
+            Some(import::ProfileNote::Imported(said)) => Some(
+                line()
+                    .text_color(t.muted)
+                    .child(
+                        svg()
+                            .path("crake/mark-routed.svg")
+                            .size(px(16.))
+                            .text_color(t.accent),
+                    )
+                    .child(said.clone()),
+            ),
+            Some(import::ProfileNote::Failed(said)) => {
+                Some(line().text_color(t.ink).child(said.clone()))
+            }
+            None if self.profiles.is_empty() => Some(line().text_color(t.muted).child(
+                "No OpenVPN 3 profiles on this computer yet. Import the .ovpn file your IT team gave you.",
+            )),
+            None => None,
+        }
+    }
+
     pub(super) fn server(&self, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {
         // The detection line under the fields.
         let (found, line): (bool, Option<String>) = match &self.detect {
@@ -48,29 +145,7 @@ impl NewTunnel {
                         // 1 : 1.4, as the design's grid.
                         div().flex_basis(px(0.)).flex_grow(WIDE_COLUMN).min_w_0().child(
                             if self.protocol == "openvpn3" {
-                                let options: Vec<(String, String)> = self
-                                    .profiles
-                                    .iter()
-                                    .map(|p| (p.clone(), p.clone()))
-                                    .collect();
-                                div()
-                                    .child(label("Profile"))
-                                    .child(self.dropdown(
-                                        "profile",
-                                        options,
-                                        self.profile.clone().unwrap_or_else(|| {
-                                            if self.profiles.is_empty() {
-                                                "No profiles yet".into()
-                                            } else {
-                                                "Choose\u{2026}".into()
-                                            }
-                                        }),
-                                        None,
-                                        t,
-                                        cx,
-                                        |this, v| this.profile = Some(v),
-                                    ))
-                                    .into_any_element()
+                                self.profile_field(t, cx).into_any_element()
                             } else {
                                 div()
                                     .child(label("Gateway"))
@@ -80,6 +155,7 @@ impl NewTunnel {
                         ),
                     ),
             )
+            .when(self.protocol == "openvpn3", |d| d.children(self.profile_line(t)))
             .when_some(line.filter(|_| self.protocol != "openvpn3"), |d, line| {
                 d.child(
                     div()

@@ -76,6 +76,34 @@ pub fn profiles() -> Vec<String> {
     })
 }
 
+/// Give openvpn3 a profile: `config` (self-contained, `ovpn_file::inline`)
+/// under `name`, kept (not single use), owned by the user. Blocking: call
+/// it off the UI thread. The error is openvpn3's, as it said it.
+pub fn import(name: &str, config: &str) -> Result<(), String> {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| e.to_string())?;
+    rt.block_on(async {
+        let conn = Connection::system().await.map_err(|e| e.to_string())?;
+        let _profile: OwnedObjectPath = call(
+            &conn,
+            CONFIGURATION,
+            "/net/openvpn/v3/configuration",
+            CONFIGURATION,
+            "Import",
+            // Not single use; persistent (kept across reboots).
+            &(name, config, false, true),
+        )
+        .await
+        .map_err(|e| match e {
+            zbus::Error::MethodError(_, Some(said), _) => said,
+            other => other.to_string(),
+        })?;
+        Ok(())
+    })
+}
+
 async fn call<B, R>(
     conn: &Connection,
     dest: &str,
