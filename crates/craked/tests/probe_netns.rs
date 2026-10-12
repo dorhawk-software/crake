@@ -354,6 +354,24 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
     mgr.redo("acme", &["10.70.0.5"]).await.unwrap();
     assert!(sh("nft list set inet crake learned_acme").contains("10.70.0.5"));
 
+    // Forget: gone, and the next visit is a first one again (probed and
+    // routed afresh, although it was probed moments ago), not blocked.
+    mgr.forget("acme", "10.70.0.6").await.unwrap();
+    assert!(!sh("nft list set inet crake learned_acme").contains("10.70.0.6"));
+    let again = tokio::task::spawn_blocking(|| {
+        let first = connect("10.70.0.6", 443, Duration::from_secs(5));
+        std::thread::sleep(Duration::from_millis(1500));
+        (first, connect("10.70.0.6", 443, Duration::from_secs(5)))
+    })
+    .await
+    .unwrap();
+    assert!(
+        again.1.0.is_ok(),
+        "forgotten, then routed again on the next visit: {:?}",
+        again.1.0
+    );
+    assert!(sh("nft list set inet crake learned_acme").contains("10.70.0.6"));
+
     mgr.shutdown().await;
     stop.store(true, Ordering::Relaxed);
     responder.join().unwrap();

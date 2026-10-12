@@ -399,12 +399,18 @@ impl Manager {
                 self.routing.remove_learned(name, t.addr()).await?;
             }
         }
+        // Forgotten, not forbidden (that's Undo): the next visit is a first
+        // one. Probed again even if it was probed moments ago, and its name
+        // asked of DNS again rather than taken from a cache, so it's routed
+        // before the first packet again, under its name.
+        self.probed.lock().unwrap().retain(|a, _| !t.contains(*a));
+        self.resolved.flush().await;
         let msg = format!("Stopped sending {t} through {label}.");
         self.record(
             LogKind::Undone,
             name,
             &msg,
-            "You forgot it. It goes direct again.".into(),
+            "You forgot it. Next time it's needed, Crake finds out again.".into(),
         );
         Ok(msg)
     }
