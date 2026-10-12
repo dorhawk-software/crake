@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -12,20 +12,25 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
-/// A host (`/32`) or a network, always stored with host bits cleared.
+/// A host (a full-length prefix: `/32` for IPv4, `/128` for IPv6) or a
+/// network, always stored with host bits cleared. Either address family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub struct Target {
-    addr: Ipv4Addr,
+    addr: IpAddr,
     len: u8,
 }
 
 impl Target {
-    pub fn host(addr: Ipv4Addr) -> Self {
-        Self { addr, len: 32 }
+    pub fn host(addr: impl Into<IpAddr>) -> Self {
+        let addr = addr.into();
+        Self {
+            len: full_len(addr),
+            addr,
+        }
     }
 
-    pub fn addr(self) -> Ipv4Addr {
+    pub fn addr(self) -> IpAddr {
         self.addr
     }
 
@@ -34,34 +39,81 @@ impl Target {
     }
 
     pub fn is_host(self) -> bool {
-        self.len == 32
+        self.len == full_len(self.addr)
     }
 
-    fn mask(self) -> u32 {
-        u32::MAX.checked_shl(32 - u32::from(self.len)).unwrap_or(0)
+    pub fn is_ipv6(self) -> bool {
+        self.addr.is_ipv6()
     }
 
-    pub fn contains(self, ip: Ipv4Addr) -> bool {
-        u32::from(ip) & self.mask() == u32::from(self.addr)
+    fn mask(self) -> u128 {
+        mask_bits(self.len, full_len(self.addr))
+    }
+
+    pub fn contains(self, ip: impl Into<IpAddr>) -> bool {
+        let ip = ip.into();
+        if ip.is_ipv6() != self.addr.is_ipv6() {
+            return false;
+        }
+        host_bits(ip) & self.mask() == host_bits(self.addr)
     }
 
     /// Refuse what would break the machine or can't be meant: loopback,
-    /// multicast, link-local, and anything wider than a /8.
+    /// multicast, link-local, and anything far too wide (wider than a /8 for
+    /// IPv4, /16 for IPv6).
     pub fn check_routable(self) -> Result<()> {
-        let a = self.addr;
-        if self.len < 8 {
-            bail!("{self} is too wide; the widest network Crake will route is a /8");
+        let min = if self.addr.is_ipv6() { 16 } else { 8 };
+        if self.len < min {
+            bail!("{self} is too wide; the widest network Crake will route is a /{min}");
         }
-        if a.is_unspecified()
-            || a.is_loopback()
-            || a.is_multicast()
-            || a.is_broadcast()
-            || a.is_link_local()
-        {
+        let bad = match self.addr {
+            IpAddr::V4(a) => {
+                a.is_unspecified()
+                    || a.is_loopback()
+                    || a.is_multicast()
+                    || a.is_broadcast()
+                    || a.is_link_local()
+            }
+            IpAddr::V6(a) => {
+                a.is_unspecified()
+                    || a.is_loopback()
+                    || a.is_multicast()
+                    // Link-local unicast fe80::/10.
+                    || a.segments()[0] & 0xffc0 == 0xfe80
+            }
+        };
+        if bad {
             bail!("{self} can't go through a tunnel");
         }
         Ok(())
     }
+}
+
+/// How many bits a full-length prefix has for this address's family.
+fn full_len(addr: IpAddr) -> u8 {
+    if addr.is_ipv6() { 128 } else { 32 }
+}
+
+/// The address as its bits in the low end of a u128 (IPv4 in the low 32).
+fn host_bits(addr: IpAddr) -> u128 {
+    match addr {
+        IpAddr::V4(a) => u128::from(u32::from(a)),
+        IpAddr::V6(a) => u128::from(a),
+    }
+}
+
+/// The top `len` bits set within a `full`-bit (32 or 128) address space.
+fn mask_bits(len: u8, full: u8) -> u128 {
+    if len == 0 {
+        return 0;
+    }
+    let full = u32::from(full);
+    let base = if full >= 128 {
+        u128::MAX
+    } else {
+        (1u128 << full) - 1
+    };
+    (base << (full - u32::from(len))) & base
 }
 
 impl FromStr for Target {
@@ -69,28 +121,41 @@ impl FromStr for Target {
 
     fn from_str(s: &str) -> Result<Self> {
         let s = s.trim();
-        let (addr, len) = match s.split_once('/') {
-            Some((a, l)) => (
-                a,
-                l.parse::<u8>()
-                    .ok()
-                    .filter(|l| *l <= 32)
-                    .with_context(|| format!("{s:?} has a bad prefix length"))?,
-            ),
-            None => (s, 32),
+        let (a_part, l_part) = match s.split_once('/') {
+            Some((a, l)) => (a, Some(l)),
+            None => (s, None),
         };
-        let addr: Ipv4Addr = addr
+        let addr: IpAddr = a_part
             .parse()
-            .with_context(|| format!("{s:?} is not an IPv4 address or network"))?;
-        let t = Self { addr, len };
-        let normalized = Self {
-            addr: Ipv4Addr::from(u32::from(addr) & t.mask()),
-            len,
+            .with_context(|| format!("{s:?} is not an IP address or network"))?;
+        let max = full_len(addr);
+        let len = match l_part {
+            Some(l) => l
+                .parse::<u8>()
+                .ok()
+                .filter(|l| *l <= max)
+                .with_context(|| format!("{s:?} has a bad prefix length"))?,
+            None => max,
         };
-        if normalized.addr != addr {
-            bail!("{s} has host bits set; did you mean {normalized}?");
+        let t = Self { addr, len };
+        let bits = host_bits(addr) & t.mask();
+        let normalized = match addr {
+            IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::from(bits as u32)),
+            IpAddr::V6(_) => IpAddr::V6(Ipv6Addr::from(bits)),
+        };
+        if normalized != addr {
+            bail!(
+                "{s} has host bits set; did you mean {}?",
+                Self {
+                    addr: normalized,
+                    len
+                }
+            );
         }
-        Ok(normalized)
+        Ok(Self {
+            addr: normalized,
+            len,
+        })
     }
 }
 
@@ -123,17 +188,17 @@ pub struct TunnelHosts {
     pub pinned: BTreeSet<Target>,
     /// Host -> expiry, seconds since the epoch.
     #[serde(default)]
-    pub learned: BTreeMap<Ipv4Addr, u64>,
+    pub learned: BTreeMap<IpAddr, u64>,
     /// Hosts you sent direct (undid): never learned again until you redo.
     #[serde(default)]
-    pub direct: BTreeSet<Ipv4Addr>,
+    pub direct: BTreeSet<IpAddr>,
     /// The name a learned host was learned under, when it came from DNS.
     #[serde(default)]
-    pub names: BTreeMap<Ipv4Addr, String>,
+    pub names: BTreeMap<IpAddr, String>,
     /// When and how a learned host was learned: (seconds since the epoch,
     /// "probe" | "dns" | "inside" | "split" | "you").
     #[serde(default)]
-    pub learned_how: BTreeMap<Ipv4Addr, (u64, String)>,
+    pub learned_how: BTreeMap<IpAddr, (u64, String)>,
     /// Last gateway address seen; nothing that covers it may be routed.
     #[serde(default)]
     pub gateway: Option<Ipv4Addr>,
@@ -166,12 +231,13 @@ impl TunnelHosts {
     }
 
     /// Already sent through the tunnel, learned or pinned (directly or by network).
-    pub fn covers(&self, addr: Ipv4Addr) -> bool {
+    pub fn covers(&self, addr: impl Into<IpAddr>) -> bool {
+        let addr = addr.into();
         self.learned.contains_key(&addr) || self.pinned.iter().any(|p| p.contains(addr))
     }
 
     /// Seconds left for each learned host.
-    pub fn learned_remaining(&self, now: u64) -> Vec<(Ipv4Addr, u64)> {
+    pub fn learned_remaining(&self, now: u64) -> Vec<(IpAddr, u64)> {
         self.learned
             .iter()
             .filter(|(_, e)| **e > now)
@@ -277,47 +343,50 @@ mod tests {
         let h: Target = "10.33.1.1".parse().unwrap();
         assert!(h.is_host());
         assert_eq!(h.to_string(), "10.33.1.1");
+        let v4 = |s: &str| s.parse::<IpAddr>().unwrap();
         let n: Target = "10.40.0.0/16".parse().unwrap();
-        assert!(n.contains("10.40.9.9".parse().unwrap()));
-        assert!(!n.contains("10.41.0.1".parse().unwrap()));
+        assert!(n.contains(v4("10.40.9.9")));
+        assert!(!n.contains(v4("10.41.0.1")));
         assert!("10.40.0.1/16".parse::<Target>().is_err());
         assert!("10.40.0.0/33".parse::<Target>().is_err());
         assert!("intranet".parse::<Target>().is_err());
-        assert!(
-            "0.0.0.0/0"
-                .parse::<Target>()
-                .unwrap()
-                .check_routable()
-                .is_err()
-        );
-        assert!(
-            "10.0.0.0/7"
-                .parse::<Target>()
-                .unwrap()
-                .check_routable()
-                .is_err()
-        );
-        assert!(
-            "127.0.0.1"
-                .parse::<Target>()
-                .unwrap()
-                .check_routable()
-                .is_err()
-        );
-        assert!(
-            "169.254.1.1"
-                .parse::<Target>()
-                .unwrap()
-                .check_routable()
-                .is_err()
-        );
-        assert!(
-            "10.0.0.0/8"
-                .parse::<Target>()
-                .unwrap()
-                .check_routable()
-                .is_ok()
-        );
+        let bad = |s: &str| s.parse::<Target>().unwrap().check_routable().is_err();
+        let ok = |s: &str| s.parse::<Target>().unwrap().check_routable().is_ok();
+        assert!(bad("0.0.0.0/0"));
+        assert!(bad("10.0.0.0/7"));
+        assert!(bad("127.0.0.1"));
+        assert!(bad("169.254.1.1"));
+        assert!(ok("10.0.0.0/8"));
+    }
+
+    #[test]
+    fn ipv6_targets() {
+        let v6 = |s: &str| s.parse::<IpAddr>().unwrap();
+        let h: Target = "fd00:dead:beef::1".parse().unwrap();
+        assert!(h.is_host());
+        assert!(h.is_ipv6());
+        assert_eq!(h.prefix_len(), 128);
+        assert_eq!(h.to_string(), "fd00:dead:beef::1");
+
+        let n: Target = "fd00:dead:beef::/48".parse().unwrap();
+        assert!(!n.is_host());
+        assert!(n.contains(v6("fd00:dead:beef:1234::9")));
+        assert!(!n.contains(v6("fd00:dead:beff::1")));
+        // Families don't mix: a v6 network never contains a v4 address.
+        assert!(!n.contains("10.0.0.1".parse::<IpAddr>().unwrap()));
+        assert_eq!(n.to_string(), "fd00:dead:beef::/48");
+
+        assert!("fd00::1/48".parse::<Target>().is_err()); // host bits set
+        assert!("fd00::/129".parse::<Target>().is_err()); // bad prefix
+        let bad = |s: &str| s.parse::<Target>().unwrap().check_routable().is_err();
+        let ok = |s: &str| s.parse::<Target>().unwrap().check_routable().is_ok();
+        assert!(bad("::/0")); // too wide
+        assert!(bad("fd00::/8")); // wider than /16
+        assert!(bad("::1")); // loopback
+        assert!(bad("fe80::1")); // link-local
+        assert!(bad("ff02::1")); // multicast
+        assert!(ok("fd00:dead:beef::/48"));
+        assert!(ok("2001:db8::1")); // documentation host
     }
 
     #[test]

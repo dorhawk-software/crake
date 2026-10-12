@@ -16,7 +16,6 @@
 //! widen its scope: hosts outside `learn` are never sent through it, by
 //! learning or by hand.
 
-use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
@@ -43,7 +42,8 @@ pub enum Learning {
 
 impl Learning {
     /// May `addr` (known as `name`, if a name is known) go through?
-    pub fn allows(&self, name: Option<&str>, addr: Ipv4Addr) -> bool {
+    pub fn allows(&self, name: Option<&str>, addr: impl Into<std::net::IpAddr>) -> bool {
+        let addr = addr.into();
         match self {
             Self::Anything => true,
             Self::FullTunnel => false,
@@ -318,7 +318,7 @@ mod tests {
             names: vec!["*.acme.internal".into(), "git.acme.com".into()],
             nets: vec!["10.40.0.0/16".parse().unwrap()],
         };
-        let ip = |s: &str| s.parse::<Ipv4Addr>().unwrap();
+        let ip = |s: &str| s.parse::<std::net::Ipv4Addr>().unwrap();
         assert!(l.allows(Some("jira.acme.internal"), ip("172.16.0.9")));
         assert!(l.allows(Some("GIT.acme.com."), ip("172.16.0.9")));
         assert!(!l.allows(Some("acme.internal"), ip("172.16.0.9")));

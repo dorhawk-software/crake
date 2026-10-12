@@ -12,7 +12,7 @@
 //! DNS answers aren't watched (not yet on macOS).
 
 use std::collections::{BTreeSet, HashMap};
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Mutex;
 
 use anyhow::Result;
@@ -160,11 +160,11 @@ impl Routing {
         Ok(())
     }
 
-    pub async fn add_learned(&self, name: &str, addr: Ipv4Addr, _timeout: u64) -> Result<()> {
+    pub async fn add_learned(&self, name: &str, addr: IpAddr, _timeout: u64) -> Result<()> {
         self.add(name, Target::host(addr)).await
     }
 
-    pub async fn remove_learned(&self, name: &str, addr: Ipv4Addr) -> Result<()> {
+    pub async fn remove_learned(&self, name: &str, addr: IpAddr) -> Result<()> {
         self.remove(name, Target::host(addr)).await
     }
 
@@ -177,7 +177,7 @@ impl Routing {
     }
 
     /// macOS keeps no expiry of its own: craked's store is the record.
-    pub async fn read_learned(&self, _name: &str) -> Result<Option<Vec<(Ipv4Addr, u64)>>> {
+    pub async fn read_learned(&self, _name: &str) -> Result<Option<Vec<(IpAddr, u64)>>> {
         Ok(None)
     }
 

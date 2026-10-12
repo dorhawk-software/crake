@@ -63,7 +63,12 @@ impl Manager {
 
     /// The tunnel that's up and already sends `addr` through itself
     /// (learned or pinned), other than `except`.
-    pub(super) fn owner_of(&self, addr: Ipv4Addr, except: &str) -> Option<String> {
+    pub(super) fn owner_of(
+        &self,
+        addr: impl Into<std::net::IpAddr>,
+        except: &str,
+    ) -> Option<String> {
+        let addr = addr.into();
         let up: Vec<String> = self
             .tunnels
             .lock()
@@ -99,7 +104,7 @@ impl Manager {
             seen.insert(key, Instant::now());
         }
         let owner_label = self.label(owner);
-        let theirs = th_name(&self.hosts.lock().unwrap(), owner, addr)
+        let theirs = th_name(&self.hosts.lock().unwrap(), owner, IpAddr::V4(addr))
             .map(|n| format!(" ({n})"))
             .unwrap_or_default();
         self.log.append(LogEntry {

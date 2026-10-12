@@ -155,11 +155,15 @@ impl Manager {
             .get(&tunnel)
             .and_then(|t| {
                 t.answers.get(&qname).map(|(a, _)| a.clone()).or_else(|| {
+                    // Only IPv4 answers are kept for now (AAAA learning is a
+                    // later slice), matching `answers` above.
                     let named: Vec<Ipv4Addr> = t
                         .names
                         .iter()
-                        .filter(|(a, n)| **n == qname && t.covers(**a))
-                        .map(|(a, _)| *a)
+                        .filter_map(|(a, n)| match *a {
+                            IpAddr::V4(v) if *n == qname && t.covers(*a) => Some(v),
+                            _ => None,
+                        })
                         .collect();
                     (!named.is_empty()).then_some(named)
                 })

@@ -26,7 +26,7 @@ impl Manager {
             t.expire(now);
             let ok = |x: Target| guard(label, x, t.gateway).is_ok();
             let pinned: Vec<Target> = t.pinned.iter().copied().filter(|x| ok(*x)).collect();
-            let learned: Vec<(Ipv4Addr, u64)> = t
+            let learned: Vec<(IpAddr, u64)> = t
                 .learned_remaining(now)
                 .into_iter()
                 .filter(|(a, _)| ok(Target::host(*a)))

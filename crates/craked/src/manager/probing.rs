@@ -336,7 +336,7 @@ impl Manager {
             .filter(|e| e.routed)
             .filter(|e| {
                 let t = store.tunnels.get(&e.config.name);
-                !t.is_some_and(|t| t.direct.contains(&dst))
+                !t.is_some_and(|t| t.direct.contains(&IpAddr::V4(dst)))
             })
             .filter(|e| {
                 let gw = e.info.as_ref().and_then(|i| i.gateway);

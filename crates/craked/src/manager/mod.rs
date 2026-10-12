@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
-use std::net::{Ipv4Addr, SocketAddrV4};
+use std::net::{IpAddr, Ipv4Addr, SocketAddrV4};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -208,15 +208,15 @@ fn and_list(items: &[&str]) -> String {
     }
 }
 
-fn join(addrs: &[Ipv4Addr]) -> String {
+fn join(addrs: &[IpAddr]) -> String {
     addrs
         .iter()
-        .map(Ipv4Addr::to_string)
+        .map(IpAddr::to_string)
         .collect::<Vec<_>>()
         .join(", ")
 }
 
-fn th_name(store: &HostStore, tunnel: &str, addr: Ipv4Addr) -> Option<String> {
+fn th_name(store: &HostStore, tunnel: &str, addr: IpAddr) -> Option<String> {
     store.tunnels.get(tunnel)?.names.get(&addr).cloned()
 }
 

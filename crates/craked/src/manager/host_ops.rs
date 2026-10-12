@@ -71,7 +71,12 @@ impl Manager {
             }
         }
         for a in &addrs {
-            self.hosts.lock().unwrap().tunnel(name).direct.remove(a);
+            self.hosts
+                .lock()
+                .unwrap()
+                .tunnel(name)
+                .direct
+                .remove(&IpAddr::V4(*a));
             self.learn_one(name, *a, Some(host), "you").await?;
         }
         let expiry = self.expiry_sentence(name);
@@ -135,10 +140,11 @@ impl Manager {
     pub(super) async fn learn_one(
         &self,
         name: &str,
-        addr: Ipv4Addr,
+        addr: impl Into<std::net::IpAddr>,
         dns_name: Option<&str>,
         how: &str,
     ) -> Result<()> {
+        let addr = addr.into();
         {
             let mut store = self.hosts.lock().unwrap();
             let th = store.tunnel(name);
@@ -203,7 +209,7 @@ impl Manager {
             name,
             &msg,
             "You undid the route. Crake won\u{2019}t learn this host again on its own.".into(),
-            addrs.iter().map(Ipv4Addr::to_string).collect(),
+            addrs.iter().map(IpAddr::to_string).collect(),
         );
         Ok(msg)
     }
@@ -256,7 +262,7 @@ impl Manager {
             to,
             &msg,
             format!("You chose {to_label}. {}", self.expiry_sentence(to)),
-            addrs.iter().map(Ipv4Addr::to_string).collect(),
+            addrs.iter().map(IpAddr::to_string).collect(),
         );
         Ok(msg)
     }
@@ -295,7 +301,7 @@ impl Manager {
             name,
             &msg,
             "You redid it.".into(),
-            addrs.iter().map(Ipv4Addr::to_string).collect(),
+            addrs.iter().map(IpAddr::to_string).collect(),
         );
         Ok(msg)
     }
@@ -428,8 +434,8 @@ impl Manager {
         let Some(t) = store.tunnels.get(name) else {
             return Ok(Vec::new());
         };
-        let named = |a: Ipv4Addr| t.names.get(&a).cloned();
-        let how = |a: Ipv4Addr| t.learned_how.get(&a).cloned();
+        let named = |a: IpAddr| t.names.get(&a).cloned();
+        let how = |a: IpAddr| t.learned_how.get(&a).cloned();
         let forgets = self.forget_after(name).is_some();
         let timeout = self.timeout_for(name);
         let pinned = t.pinned.iter().map(|p| HostRow {
@@ -467,7 +473,7 @@ impl Manager {
 }
 
 /// Single hosts from user input.
-pub(super) fn hosts_of(inputs: &[&str], label: &str) -> Result<Vec<Ipv4Addr>> {
+pub(super) fn hosts_of(inputs: &[&str], label: &str) -> Result<Vec<IpAddr>> {
     let mut out = Vec::new();
     for i in inputs {
         let t: Target = i.parse()?;
@@ -487,6 +493,12 @@ pub(super) fn hosts_of(inputs: &[&str], label: &str) -> Result<Vec<Ipv4Addr>> {
 /// Nothing that would break the machine, and nothing that covers the tunnel's
 /// own gateway (that would cut the tunnel off).
 pub(super) fn guard(label: &str, t: Target, gateway: Option<Ipv4Addr>) -> Result<()> {
+    // IPv6 host/network routing isn't wired through the kernel yet (the sets
+    // and routes are IPv4); the address model already carries it. Until then,
+    // say so plainly rather than half-route it.
+    if t.is_ipv6() {
+        bail!("Crake routes IPv6 through a tunnel soon, not yet. For now {t} stays direct.");
+    }
     t.check_routable()?;
     if let Some(gw) = gateway.filter(|gw| t.contains(*gw)) {
         bail!(

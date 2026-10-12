@@ -245,7 +245,7 @@ impl Manager {
                 let mut store = self.hosts.lock().unwrap();
                 let th = store.tunnel(name);
                 // Already sent, or sent direct by you.
-                if th.covers(*addr) || th.direct.contains(addr) {
+                if th.covers(*addr) || th.direct.contains(&IpAddr::V4(*addr)) {
                     continue;
                 }
             }

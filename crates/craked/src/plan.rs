@@ -2,7 +2,7 @@
 //! tunnel gets by its position (mark, routing table, rule priority). What
 //! the operating system's routing (`routing`) puts in place. Portable.
 
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 
 use crate::hosts::Target;
 
@@ -38,7 +38,7 @@ pub struct Plan<'a> {
     pub dns: &'a [Ipv4Addr],
     pub pinned: &'a [Target],
     /// Learned hosts with seconds left.
-    pub learned: &'a [(Ipv4Addr, u64)],
+    pub learned: &'a [(IpAddr, u64)],
     /// Full tunnel (a managed policy): everything goes through except these
     /// (the gateway, the local networks). Other tunnels' hosts still go
     /// their own way.

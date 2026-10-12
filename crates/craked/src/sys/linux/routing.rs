@@ -14,7 +14,7 @@
 //! Base chains are per tunnel so a tunnel can be torn down without touching
 //! the others. Only locally generated traffic is marked.
 
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::process::Stdio;
 
 use anyhow::{Context, Result, bail};
@@ -343,7 +343,7 @@ impl Routing {
         nft(&down_script(name)).await
     }
 
-    pub async fn add_learned(&self, name: &str, addr: Ipv4Addr, timeout: u64) -> Result<()> {
+    pub async fn add_learned(&self, name: &str, addr: IpAddr, timeout: u64) -> Result<()> {
         let Self::Real = self else { return Ok(()) };
         let ls = learned_set(name);
         // Delete first so a fresh timeout replaces the old one.
@@ -354,7 +354,7 @@ impl Routing {
         .await
     }
 
-    pub async fn remove_learned(&self, name: &str, addr: Ipv4Addr) -> Result<()> {
+    pub async fn remove_learned(&self, name: &str, addr: IpAddr) -> Result<()> {
         let Self::Real = self else { return Ok(()) };
         let ls = learned_set(name);
         nft(&format!("add element inet {TABLE} {ls} {{ {addr} }}\ndelete element inet {TABLE} {ls} {{ {addr} }}\n")).await
@@ -380,7 +380,7 @@ impl Routing {
 
     /// Learned hosts as the kernel sees them: address and seconds until expiry.
     /// `None` when nothing is applied (Noop).
-    pub async fn read_learned(&self, name: &str) -> Result<Option<Vec<(Ipv4Addr, u64)>>> {
+    pub async fn read_learned(&self, name: &str) -> Result<Option<Vec<(IpAddr, u64)>>> {
         let Self::Real = self else { return Ok(None) };
         let out = Command::new("nft")
             .args(["-j", "list", "set", "inet", TABLE, &learned_set(name)])
@@ -397,7 +397,7 @@ impl Routing {
     }
 }
 
-pub fn parse_learned(json: &[u8]) -> Result<Vec<(Ipv4Addr, u64)>> {
+pub fn parse_learned(json: &[u8]) -> Result<Vec<(IpAddr, u64)>> {
     let v: serde_json::Value = serde_json::from_slice(json).context("nft json")?;
     let mut found = Vec::new();
     for item in v["nftables"].as_array().into_iter().flatten() {
