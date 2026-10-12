@@ -668,9 +668,10 @@ The user doesn't want development builds installed on their machine.
   suite again). A branch run is fast once `main` has run with the same
   Cargo.lock. Measured on main: packages 2.6 GB, the Windows build 1.4,
   check 1.3, macOS 1.1, network 1.1 and Nix 3.3 still came to ~10.8 GB
-  and Nix's was evicted, so the network job restores but never saves (it
-  runs in parallel; uncached it takes about as long as the packages do
-  cached). **GitHub's 10 GB can't be raised** (asked 2026-10-12: same for
+  and Nix's was evicted. The `network` job (whose e2e step builds the crake
+  test binary) shares the `check` job's cache (`shared-key: linux`, restore
+  only), so it reuses the compiled gpui deps instead of a from-scratch
+  build (its e2e step was ~12 min of mostly compiling). **GitHub's 10 GB can't be raised** (asked 2026-10-12: same for
   public/OSS and private, no paid tier), so the Nix store (the 3.3 GB
   whale it kept evicting) moved to **Cachix** (free for open source,
   cache `crake`): the nixos job's `cachix/cachix-action` pushes every path
