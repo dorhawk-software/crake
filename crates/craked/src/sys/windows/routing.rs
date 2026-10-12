@@ -180,7 +180,9 @@ impl Routing {
         let Some(routes) = map.get_mut(name) else {
             return Ok(());
         };
-        if self.real && let IpAddr::V4(a) = t.addr() {
+        if self.real
+            && let IpAddr::V4(a) = t.addr()
+        {
             iphelper::add_route(iphelper::luid(&routes.device)?, a, t.prefix_len())?;
         }
         routes.targets.insert(t);
@@ -192,7 +194,10 @@ impl Routing {
         let Some(routes) = map.get_mut(name) else {
             return Ok(());
         };
-        if routes.targets.remove(&t) && self.real && let IpAddr::V4(a) = t.addr() {
+        if routes.targets.remove(&t)
+            && self.real
+            && let IpAddr::V4(a) = t.addr()
+        {
             iphelper::delete_route(iphelper::luid(&routes.device)?, a, t.prefix_len())?;
         }
         Ok(())
