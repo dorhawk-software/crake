@@ -62,6 +62,20 @@ pub async fn route_add_scoped(dest: &str, prefix: u8, dev: &str) -> Result<()> {
     route(&args, true).await
 }
 
+/// `dest/prefix` refused at once (EHOSTUNREACH): IPv6 for a full tunnel
+/// that has no IPv6 address.
+pub async fn route_add_reject(dest: &str, prefix: u8) -> Result<()> {
+    route(&reject_args(dest, prefix), true).await
+}
+
+/// `route`'s arguments for a reject route (to loopback, refused).
+fn reject_args(dest: &str, prefix: u8) -> Vec<String> {
+    let mut args = vec!["-n".to_owned(), "add".into()];
+    args.extend(destination(dest, prefix));
+    args.extend(["::1".into(), "-reject".into()]);
+    args
+}
+
 /// `dest/prefix` to a next hop (a full tunnel's gateway kept on its way;
 /// an IPv6 one may carry its scope, `fe80::1%en0`).
 pub async fn route_add_via(dest: &str, prefix: u8, via: &str) -> Result<()> {
@@ -197,6 +211,11 @@ mod tests {
         assert_eq!(
             super::destination("fd40::", 48),
             ["-inet6", "-net", "fd40::/48"]
+        );
+        // tests/macos.rs gives the kernel this very command.
+        assert_eq!(
+            super::reject_args("::", 1),
+            ["-n", "add", "-inet6", "-net", "::/1", "::1", "-reject"]
         );
         let lan = "   route to: 192.0.2.7\ndestination: 192.0.2.0\n  interface: en0\n";
         assert_eq!(super::parse_route_get(lan), (false, None));

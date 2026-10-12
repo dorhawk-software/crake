@@ -65,10 +65,14 @@ impl Net {
         Ok(())
     }
 
-    /// IPv6 DNS servers aren't asked here yet (craked's own DNS server
-    /// asks IPv4 ones): nothing to route.
-    pub async fn route_dns6(&self, _dev: &str, _dns: std::net::Ipv6Addr) -> Result<()> {
-        Ok(())
+    /// The same for an IPv6 DNS server.
+    pub async fn route_dns6(&self, dev: &str, dns: std::net::Ipv6Addr) -> Result<()> {
+        match self {
+            Self::Ip => {
+                iphelper::add_route(iphelper::luid(dev)?, dns.into(), crate::hosts::V6_BITS)
+            }
+            Self::Noop => Ok(()),
+        }
     }
 
     /// The tunnel's DNS server, through the tunnel (the one route Crake

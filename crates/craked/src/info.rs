@@ -20,9 +20,11 @@ pub struct TunnelInfo {
     /// The tunnel's IPv6 address and prefix length, if it has one.
     pub address6: Option<(Ipv6Addr, u8)>,
     /// IPv6 DNS servers. openconnect lists them with the IPv4 ones in
-    /// `INTERNAL_IP4_DNS`. Registered and their answers held on Linux;
-    /// macOS' and Windows' own DNS server asks IPv4 ones only.
+    /// `INTERNAL_IP4_DNS`.
     pub dns6: Vec<Ipv6Addr>,
+    /// Every DNS server, in the gateway's order (`dns` and `dns6` split
+    /// them by family): the order they're asked in.
+    pub servers: Vec<IpAddr>,
     pub domains: Vec<String>,
     /// `a.b.c.d/len` or `v6::/len`
     pub split_include: Vec<String>,
@@ -107,6 +109,7 @@ impl TunnelInfo {
             dns,
             address6,
             dns6,
+            servers,
             domains,
             split_include: split_list(env, "CISCO_SPLIT_INC", false)
                 .into_iter()
@@ -225,6 +228,8 @@ mod tests {
         .unwrap();
         assert_eq!(info.dns, ["10.40.0.2".parse::<Ipv4Addr>().unwrap()]);
         assert_eq!(info.dns6, ["fd40::53".parse::<Ipv6Addr>().unwrap()]);
+        let order: Vec<IpAddr> = vec!["10.40.0.2".parse().unwrap(), "fd40::53".parse().unwrap()];
+        assert_eq!(info.servers, order, "the gateway's order");
         assert_eq!(info.address6, Some(("fd40:ff::7".parse().unwrap(), 64)));
         assert_eq!(info.split_include, ["fd40::/48"]);
         let bare = TunnelInfo::from_env(&env(&[

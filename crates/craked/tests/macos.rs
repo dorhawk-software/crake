@@ -245,6 +245,37 @@ async fn a_tunnel_on_a_utun_device() {
         "macOS asked craked's server: {found}"
     );
 
+    // A full tunnel without an IPv6 address refuses IPv6 with reject
+    // routes (sys::macos::cmd::reject_args, here for a test prefix): a
+    // connection fails at once instead of going around the tunnel.
+    sh(
+        "route",
+        &[
+            "-n",
+            "add",
+            "-inet6",
+            "-net",
+            "2001:db8:dead::/48",
+            "::1",
+            "-reject",
+        ],
+    );
+    let start = std::time::Instant::now();
+    let refused = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        tokio::net::TcpStream::connect("[2001:db8:dead::1]:80"),
+    )
+    .await;
+    sh(
+        "route",
+        &["-n", "delete", "-inet6", "-net", "2001:db8:dead::/48"],
+    );
+    assert!(
+        matches!(refused, Ok(Err(_))) && start.elapsed() < std::time::Duration::from_secs(2),
+        "refused at once: {refused:?} after {:?}",
+        start.elapsed()
+    );
+
     // Switched off: its files and routes go.
     resolved.revert(&dev).await;
     assert!(!std::path::Path::new("/etc/resolver/acme.internal").exists());

@@ -5,13 +5,13 @@
 //! the names there its own way (`resolved`: NRPT rules, /etc/resolver).
 
 use std::collections::BTreeMap;
-use std::net::Ipv4Addr;
+use std::net::IpAddr;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// A link's DNS servers and domains, and whether every other name goes
 /// to it too (a full tunnel's DNS).
-type Link = (Vec<Ipv4Addr>, Vec<String>, bool);
+type Link = (Vec<IpAddr>, Vec<String>, bool);
 
 /// Each link craked registered, by device.
 static LINKS: Mutex<BTreeMap<String, Link>> = Mutex::new(BTreeMap::new());
@@ -26,7 +26,7 @@ fn links() -> std::sync::MutexGuard<'static, BTreeMap<String, Link>> {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
-pub fn set(device: &str, servers: &[Ipv4Addr], domains: &[String], everything: bool) {
+pub fn set(device: &str, servers: &[IpAddr], domains: &[String], everything: bool) {
     links().insert(
         device.to_owned(),
         (servers.to_vec(), domains.to_vec(), everything),
@@ -53,7 +53,7 @@ pub fn set_public(on: bool) {
 /// that, a full tunnel's), with that link's servers. On a tie a tunnel
 /// that's up wins over craked's own links: a domain kept private for a
 /// tunnel that's off may be one a tunnel that's up has too.
-pub fn owner(name: &str) -> Option<(String, Vec<Ipv4Addr>)> {
+pub fn owner(name: &str) -> Option<(String, Vec<IpAddr>)> {
     links()
         .iter()
         .filter_map(|(device, (servers, domains, everything))| {
@@ -78,8 +78,8 @@ mod tests {
         super::owner(name).map(|(d, _)| d)
     }
 
-    fn dns(n: u8) -> Vec<Ipv4Addr> {
-        vec![Ipv4Addr::new(10, 0, 0, n)]
+    fn dns(n: u8) -> Vec<std::net::IpAddr> {
+        vec![Ipv4Addr::new(10, 0, 0, n).into()]
     }
 
     // One test: the links are one table for the whole process.

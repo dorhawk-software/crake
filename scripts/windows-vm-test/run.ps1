@@ -27,6 +27,13 @@ Check "the LAN (198.51.100.20)" {
     Set-DnsClientServerAddress -InterfaceIndex $nic.ifIndex -ServerAddresses 198.51.100.10 -ErrorAction Stop
     $true
 }
+# IPv6 on the LAN too, with the gateway as its router: IPv6 that goes
+# around a full tunnel would get somewhere.
+Check "the LAN's IPv6 (fd00:1a::20)" {
+    New-NetIPAddress -InterfaceIndex $nic.ifIndex -IPAddress fd00:1a::20 -PrefixLength 64 `
+        -DefaultGateway fd00:1a::10 -ErrorAction Stop | Out-Null
+    $true
+}
 
 # Crake, installed: with its installer when the disc has one (as a person
 # would), otherwise its files copied and the service made by hand.

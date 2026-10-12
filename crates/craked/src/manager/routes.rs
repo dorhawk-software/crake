@@ -83,18 +83,13 @@ impl Manager {
         domains: &[String],
     ) {
         let everything = self.learning(name) == crate::policy::Learning::FullTunnel;
-        let servers: Vec<IpAddr> = info
-            .dns
-            .iter()
-            .map(|a| IpAddr::V4(*a))
-            .chain(info.dns6.iter().map(|a| IpAddr::V6(*a)))
-            .collect();
+        let servers = &info.servers;
         if servers.is_empty() || (domains.is_empty() && !everything) {
             return;
         }
         let res = self
             .resolved
-            .set_link(&info.device, &servers, domains, everything)
+            .set_link(&info.device, servers, domains, everything)
             .await;
         // Forget answers cached while the tunnel was off (failures included).
         self.resolved.flush().await;

@@ -9,7 +9,7 @@
 //! and TCP (the system asks again over TCP when an answer was truncated);
 //! a question that came over TCP is asked of the tunnel's DNS over TCP.
 
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -128,7 +128,7 @@ async fn answer(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> 
 /// manager may rescue (a name only a tunnel knows, a public name with a
 /// private address).
 async fn public(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> {
-    let servers = super::system_dns();
+    let servers: Vec<IpAddr> = super::system_dns().into_iter().map(IpAddr::V4).collect();
     let reply = if tcp {
         ask_tcp(query, None, &servers).await
     } else {
@@ -140,10 +140,16 @@ async fn public(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> 
     Some(mgr.rescue_answer(&reply).await.unwrap_or(reply))
 }
 
-/// Ask DNS servers in turn: a tunnel's through the tunnel (`device`).
-async fn ask(query: &[u8], device: Option<&str>, servers: &[Ipv4Addr]) -> Option<Vec<u8>> {
+/// Ask DNS servers in turn (IPv4 or IPv6): a tunnel's through the tunnel
+/// (`device`).
+async fn ask(query: &[u8], device: Option<&str>, servers: &[IpAddr]) -> Option<Vec<u8>> {
     for server in servers {
-        let Ok(sock) = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).await else {
+        let any: IpAddr = if server.is_ipv6() {
+            Ipv6Addr::UNSPECIFIED.into()
+        } else {
+            Ipv4Addr::UNSPECIFIED.into()
+        };
+        let Ok(sock) = UdpSocket::bind((any, 0)).await else {
             continue;
         };
         if let Some(device) = device
@@ -165,9 +171,14 @@ async fn ask(query: &[u8], device: Option<&str>, servers: &[Ipv4Addr]) -> Option
 }
 
 /// The same over TCP.
-async fn ask_tcp(query: &[u8], device: Option<&str>, servers: &[Ipv4Addr]) -> Option<Vec<u8>> {
+async fn ask_tcp(query: &[u8], device: Option<&str>, servers: &[IpAddr]) -> Option<Vec<u8>> {
     for server in servers {
-        let Ok(sock) = TcpSocket::new_v4() else {
+        let sock = if server.is_ipv6() {
+            TcpSocket::new_v6()
+        } else {
+            TcpSocket::new_v4()
+        };
+        let Ok(sock) = sock else {
             continue;
         };
         if let Some(device) = device

@@ -1029,13 +1029,27 @@ Helper, SOCKADDR_IN6), the tunnel gets the IPv6 address openconnect
 hands over and its own IPv6 default route for probes (metric 9000),
 sockets bind with IPV6_UNICAST_IF (host byte order, unlike IPv4's),
 probing reads the IPv6 TCP table, a full tunnel adds ::/1 and 8000::/1
-when the tunnel has an IPv6 address. Windows can't reset another
-program's IPv6 connection (SetTcpEntry is IPv4's), so a stuck one runs
-out and the app's next goes through; without an IPv6 address a full
-tunnel leaves IPv6 alone (Linux refuses it). The VM test proves it: its
-gateway hands out fd40:ff::/64 addresses and ACME's fd40:1::10, and a
-name ACME's DNS knows only by that address is routed before the first
-packet and answers over IPv6.
+when the tunnel has an IPv6 address. Without one, IPv6 is refused by a
+Windows Firewall rule (`firewall.rs`, group "Crake", via PowerShell):
+outbound on the machine's own adapters, to everything but loopback,
+link-local, multicast, the LAN and the gateway (`plan::uncovered6`
+ranges); a connection fails at once. Routing the halves to the tunnel
+didn't work: Windows skips a route whose interface has no address to
+send from. A marker file (ProgramData\Crake\firewall-rules) is there
+while a rule may exist; only then does a start clean up (PowerShell's
+firewall module takes ~10 s to load the first time, too long for a
+service starting). IPv6 DNS servers are asked by craked's DNS server
+(through the tunnel, a /128 to each), in the gateway's order. Windows
+can't reset another program's IPv6 connection (SetTcpEntry is IPv4's;
+raw sockets can't send TCP): a stuck one runs out and the app's next
+goes through; only a WFP callout driver could do better. The VM test
+proves it: its gateway hands out fd40:ff::/64 addresses, ACME's
+fd40:1::10 and a DNS server at fd40::2 (listed first, knowing a name
+the IPv4 one doesn't), the LAN has IPv6 with an "internet" host
+2001:db8:77::1, and a second ocserv on 8443 gives no IPv6: a name known
+only by its IPv6 address is routed before the first packet, the IPv6
+DNS server is asked, a full tunnel with IPv6 takes IPv6, and one without
+refuses it at once (and IPv6 goes direct again when it's off).
 
 **Phase 4: done** (`scripts/windows-vm-test.sh`; passes: about 2½
 minutes a run, the image's unattended install about 25 minutes once). A Windows 11 VM with
@@ -1087,7 +1101,10 @@ a launchd daemon. IPv6 (2026-10-12, as on Windows): `route`/`ifconfig`
 with `-inet6` (the tunnel's address as an alias), a scoped IPv6 default
 route, IPV6_BOUND_IF, the kernel list's IPv6 rows (the address unions
 start 4 and 20 bytes after inp_vflag), pf NAT for inet6, a full
-tunnel's IPv6 halves; tests/macos.rs checks the routes as root on CI.
+tunnel's IPv6 halves (without an IPv6 address: reject routes to ::1,
+refused at once), IPv6 DNS servers asked by craked's DNS server;
+tests/macos.rs checks the routes and that a reject route refuses at once,
+as root on CI.
 Not yet: public names (no root resolver in
 /etc/resolver: no rescue, no full tunnel's DNS for every name), the
 panel's placement under the menu bar, an installer (.pkg, signed and

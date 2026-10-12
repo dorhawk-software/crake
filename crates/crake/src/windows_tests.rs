@@ -166,6 +166,21 @@ async fn the_installed_service_end_to_end() {
         addr6.contains("fd40:ff::"),
         "crake-acme's IPv6 address: {addr6}"
     );
+    // ACME's DNS reached over IPv6, the gateway's first: routed through
+    //     the tunnel and asked (only it knows dns6.acme.internal).
+    let routes6 = ps(
+        "Get-NetRoute -InterfaceAlias crake-acme -AddressFamily IPv6 | ForEach-Object { $_.DestinationPrefix }",
+    );
+    assert!(routes6.contains("fd40::2/128"), "IPv6 routes: {routes6}");
+    let by_dns6 = tokio::task::spawn_blocking(|| resolve("dns6.acme.internal"))
+        .await
+        .unwrap();
+    assert!(
+        by_dns6
+            .as_ref()
+            .is_ok_and(|a| a.contains(&IpAddr::from([10, 40, 1, 10]))),
+        "dns6.acme.internal, from ACME's IPv6 DNS: {by_dns6:?}"
+    );
     let named6 = tokio::task::spawn_blocking(|| {
         let addrs = resolve("v6.acme.internal")?;
         let want: IpAddr = "fd40:1::10".parse().unwrap();
@@ -332,6 +347,26 @@ async fn a_full_tunnel() {
         named.is_ok_and(|a| a.contains(&IpAddr::from([10, 40, 1, 11]))),
         "wiki.acme.internal through Globex's DNS"
     );
+    // IPv6 too (the gateway gave the tunnel an IPv6 address): its halves
+    // through the tunnel, and the internet's IPv6 host reached that way.
+    let through6 = ps(
+        "Get-NetRoute -InterfaceAlias crake-globex -AddressFamily IPv6 | ForEach-Object { $_.DestinationPrefix }",
+    );
+    assert!(
+        through6.contains("::/1") && through6.contains("8000::/1"),
+        "IPv6 routes: {through6}"
+    );
+    let way6 = ps(
+        "(Find-NetRoute -RemoteIPAddress 2001:db8:77::1 | Select-Object -First 1).InterfaceAlias",
+    );
+    assert!(
+        way6.contains("crake-globex"),
+        "2001:db8:77::1 goes by {way6}"
+    );
+    let v6 = tokio::task::spawn_blocking(|| get("[2001:db8:77::1]", Duration::from_secs(3)))
+        .await
+        .unwrap();
+    assert!(v6.is_ok_and(|b| b.contains("crex")), "IPv6 through Globex");
     // Still up a while later: its own packets didn't loop into it.
     app.settle(Duration::from_secs(5)).await;
     assert_eq!(app.state("globex").as_deref(), Some("connected"));
@@ -348,6 +383,71 @@ async fn a_full_tunnel() {
     app.send(Command::RemoveTunnel("globex".into()));
     app.until("Globex removed", |m| {
         !m.tunnels.iter().any(|t| t.name == "globex")
+    })
+    .await;
+    drop(app);
+    a_full_tunnel_without_ipv6().await;
+}
+
+/// A full tunnel whose gateway gives no IPv6 address (the second gateway,
+/// on 8443): IPv6 is refused at once, never sent around the tunnel.
+async fn a_full_tunnel_without_ipv6() {
+    let gateway = format!("{}:8443", crate::test_app::gateway());
+    let direct = tokio::task::spawn_blocking(|| get("[2001:db8:77::1]", Duration::from_secs(3)))
+        .await
+        .unwrap();
+    assert!(direct.is_ok(), "IPv6 direct before: {direct:?}");
+    let mut app = added(
+        "initech",
+        "Initech",
+        &[("mode", "full"), ("gateway", &gateway)],
+    )
+    .await;
+    let session = crate::test_app::sign_in_to(&gateway).await;
+    app.send(Command::ConnectWithSession("initech".into(), session));
+    let state = |want: &'static str| {
+        move |m: &crate::model::Model| {
+            m.tunnels
+                .iter()
+                .any(|t| t.name == "initech" && t.state == want)
+        }
+    };
+    app.within(
+        Duration::from_secs(30),
+        "Initech connected",
+        state("connected"),
+    )
+    .await;
+    let (refused, took) = tokio::task::spawn_blocking(|| {
+        let start = Instant::now();
+        (
+            get("[2001:db8:77::1]", Duration::from_secs(5)),
+            start.elapsed(),
+        )
+    })
+    .await
+    .unwrap();
+    assert!(refused.is_err(), "IPv6 went around Initech: {refused:?}");
+    assert!(
+        took < Duration::from_secs(2),
+        "refused at once ({took:?}): {refused:?}; routes: {}",
+        ps("Get-NetRoute -AddressFamily IPv6 | Format-Table -AutoSize | Out-String")
+    );
+    // IPv4 still goes through.
+    let v4 = tokio::task::spawn_blocking(|| get("10.40.1.10", Duration::from_secs(3)))
+        .await
+        .unwrap();
+    assert!(v4.is_ok_and(|b| b.contains("crex")), "IPv4 through Initech");
+    app.send(Command::Disconnect("initech".into()));
+    app.within(Duration::from_secs(15), "Initech off", state("off"))
+        .await;
+    let back = tokio::task::spawn_blocking(|| get("[2001:db8:77::1]", Duration::from_secs(3)))
+        .await
+        .unwrap();
+    assert!(back.is_ok(), "IPv6 direct again: {back:?}");
+    app.send(Command::RemoveTunnel("initech".into()));
+    app.until("Initech removed", |m| {
+        !m.tunnels.iter().any(|t| t.name == "initech")
     })
     .await;
 }

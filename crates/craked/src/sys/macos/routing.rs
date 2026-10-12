@@ -6,7 +6,9 @@
 //! comes up). A full tunnel is two halves of the address space through
 //! the tunnel (0/1 and 128/1, more specific than the default route), with
 //! the gateway kept on the way it went before; ::/1 and 8000::/1 likewise
-//! when the tunnel has an IPv6 address. What leaves through a
+//! when the tunnel has an IPv6 address, and as reject routes when it has
+//! none (IPv6 fails at once, apps fall back to IPv4, nothing goes around
+//! the tunnel; more specific routes still win). What leaves through a
 //! tunnel with another source address (a connection that started before
 //! its host was routed, on its next SYN) is NATed to the tunnel's address
 //! by pf, in an anchor of Crake's (`nat`), as Linux masquerades. Public
@@ -38,6 +40,8 @@ struct Routes {
     /// A full tunnel's exceptions, routed the way they went before it:
     /// (destination, next hop).
     kept: Vec<(Target, String)>,
+    /// A full tunnel without an IPv6 address: IPv6's halves, refused.
+    rejected: Vec<Target>,
 }
 
 /// A full tunnel's two halves.
@@ -100,6 +104,7 @@ impl Routing {
                 ipv6: plan.ipv6,
                 targets: BTreeSet::new(),
                 kept,
+                rejected: Vec::new(),
             },
         );
         // A default route through the tunnel for sockets bound to it only
@@ -111,8 +116,16 @@ impl Routing {
             self.nat().await?;
         }
         let learned = plan.learned.iter().map(|(a, _)| Target::host(*a));
-        // IPv6 only with an address of the tunnel's to leave with; without
-        // one, a full tunnel leaves IPv6 alone here (Linux refuses it).
+        // IPv6 through the tunnel only with an address of its to leave
+        // with; without one, refused (Linux refuses it too).
+        if plan.full_except.is_some() && !plan.ipv6 && self.real {
+            for t in halves6() {
+                cmd::route_add_reject(&t.addr().to_string(), t.prefix_len()).await?;
+            }
+            if let Some(r) = self.tunnels.lock().unwrap().get_mut(plan.name) {
+                r.rejected = halves6().to_vec();
+            }
+        }
         let full = plan
             .full_except
             .map(|_| {
@@ -168,6 +181,9 @@ impl Routing {
             cmd::route_delete(any, 0, Some(&routes.device)).await?;
         }
         for (t, _) in routes.kept {
+            cmd::route_delete(&t.addr().to_string(), t.prefix_len(), None).await?;
+        }
+        for t in routes.rejected {
             cmd::route_delete(&t.addr().to_string(), t.prefix_len(), None).await?;
         }
         self.nat().await

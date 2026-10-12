@@ -25,6 +25,7 @@ use hickory_proto::op::{Message, ResponseCode};
 use hickory_proto::rr::RecordType;
 
 mod app_tunnels;
+mod attached;
 mod clash;
 mod handover;
 mod host_ops;

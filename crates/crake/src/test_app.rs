@@ -98,10 +98,15 @@ pub(crate) fn enabled() -> bool {
 /// The sign-in window's part: trust the gateway's certificate, give the
 /// password. Returns the session openconnect got.
 pub(crate) async fn sign_in() -> crake_proto::Session {
+    sign_in_to(&gateway()).await
+}
+
+/// The same at another gateway (the Windows test's second, on 8443).
+pub(crate) async fn sign_in_to(gateway: &str) -> crake_proto::Session {
     let spec = Spec {
         tunnel: "acme".into(),
         display: "ACME".into(),
-        gateway: gateway(),
+        gateway: gateway.to_owned(),
         protocol: "anyconnect".into(),
         user: "alice".into(),
         auth_args: vec![],

@@ -7,7 +7,9 @@
 //! through the tunnel (0/1 and 128/1: more specific than the LAN's default
 //! route, whatever its metric), with its exceptions (the gateway, the LAN)
 //! kept on the way they went before; ::/1 and 8000::/1 likewise for IPv6
-//! when the tunnel has an IPv6 address. Public DNS answers aren't watched
+//! when the tunnel has an IPv6 address. Without one, a firewall rule
+//! refuses IPv6 out of the machine's own adapters (`firewall`), so it never
+//! goes around the tunnel. Public DNS answers aren't watched
 //! here: craked's own DNS server gets public names (`resolved::set_public`).
 
 use std::collections::{BTreeSet, HashMap};
@@ -33,6 +35,8 @@ struct Routes {
     device: String,
     /// The tunnel has an IPv6 address (and so its own IPv6 default route).
     ipv6: bool,
+    /// A full tunnel without one: IPv6 blocked by the firewall.
+    blocked6: bool,
     targets: BTreeSet<Target>,
     /// A full tunnel's exceptions, routed the way they went before it.
     kept: Vec<iphelper::Route>,
@@ -75,8 +79,15 @@ impl Routing {
         true
     }
 
-    /// Nothing to clear at startup: Crake's routes go with their adapters.
+    /// At startup: Crake's routes went with their adapters; a firewall
+    /// rule a crash left goes now.
     pub async fn reset_all(&self) -> Result<()> {
+        // Not worth stopping for: a leftover rule only blocks IPv6.
+        if self.real
+            && let Err(e) = super::firewall::clear().await
+        {
+            tracing::error!("clearing Crake's firewall rules: {e:#}");
+        }
         Ok(())
     }
 
@@ -88,6 +99,13 @@ impl Routing {
             Some(except) if self.real => keep_ways(except)?,
             _ => Vec::new(),
         };
+        let blocked6 = match plan.full_except {
+            Some(except) if self.real && !plan.ipv6 => {
+                super::firewall::block6(plan.name, except).await?;
+                true
+            }
+            _ => false,
+        };
         // Probes name the tunnel by its mark: which interface that is.
         super::set_path(ids(plan.index).mark, Some(plan.device));
         self.tunnels.lock().unwrap().insert(
@@ -95,6 +113,7 @@ impl Routing {
             Routes {
                 device: plan.device.to_owned(),
                 ipv6: plan.ipv6,
+                blocked6,
                 targets: BTreeSet::new(),
                 kept,
             },
@@ -110,8 +129,6 @@ impl Routing {
             }
         }
         let learned = plan.learned.iter().map(|(a, _)| Target::host(*a));
-        // IPv6 only with an address of the tunnel's to leave with; without
-        // one, a full tunnel leaves IPv6 alone here (Linux refuses it).
         let full = plan
             .full_except
             .map(|_| {
@@ -166,6 +183,12 @@ impl Routing {
         };
         if !self.real {
             return Ok(());
+        }
+        if routes.blocked6 {
+            super::firewall::unblock6(name).await?;
+            if !self.tunnels.lock().unwrap().values().any(|r| r.blocked6) {
+                super::firewall::none_left();
+            }
         }
         // The adapter may be gone already, and its routes with it.
         let Ok(luid) = iphelper::luid(&routes.device) else {

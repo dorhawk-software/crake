@@ -10,6 +10,7 @@ pub mod resolved;
 pub mod routing;
 pub mod syn_queue;
 
+mod firewall;
 mod host;
 mod iphelper;
 pub use host::*;

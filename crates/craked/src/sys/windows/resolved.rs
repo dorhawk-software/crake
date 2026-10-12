@@ -73,15 +73,7 @@ impl Resolved {
         if let Self::Noop = self {
             return Ok(());
         }
-        // craked's own server asks IPv4 servers only, for now.
-        let servers: Vec<Ipv4Addr> = servers
-            .iter()
-            .filter_map(|a| match a {
-                std::net::IpAddr::V4(a) => Some(*a),
-                std::net::IpAddr::V6(_) => None,
-            })
-            .collect();
-        super::super::dns_links::set(device, &servers, domains, everything);
+        super::super::dns_links::set(device, servers, domains, everything);
         write_rule(device, domains, everything)
     }
 
