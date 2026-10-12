@@ -2,17 +2,18 @@
 //! public answers that say a name doesn't exist, and deciding which names
 //! belong to a tunnel.
 
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 
 use hickory_proto::op::{Message, MessageType, Query, ResponseCode};
 use hickory_proto::rr::{DNSClass, RData, RecordType};
 
-/// One DNS answer: the name asked for and the IPv4 addresses it resolved to.
+/// One DNS answer: the name asked for and the addresses it resolved to
+/// (IPv4 from A records, IPv6 from AAAA).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Answer {
     /// Lower case, no trailing dot.
     pub name: String,
-    pub addrs: Vec<Ipv4Addr>,
+    pub addrs: Vec<IpAddr>,
 }
 
 /// An IPv4 packet carrying a UDP DNS response, as NFQUEUE hands it over.
@@ -66,10 +67,25 @@ pub fn parse_message(payload: &[u8]) -> Option<Answer> {
     let name = normalize(&msg.queries.first()?.name.to_ascii());
     Some(Answer {
         name,
-        addrs: a_records(&msg),
+        addrs: records(&msg),
     })
 }
 
+/// Every A and AAAA record in the answer, so a CNAME chain ends at the right
+/// addresses whatever their family.
+pub fn records(msg: &Message) -> Vec<IpAddr> {
+    msg.answers
+        .iter()
+        .filter_map(|r| match &r.data {
+            RData::A(a) => Some(IpAddr::V4(a.0)),
+            RData::AAAA(a) => Some(IpAddr::V6(a.0)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Only the IPv4 (A) records: the split-horizon and public-failure rescue work
+/// on private IPv4 addresses.
 pub fn a_records(msg: &Message) -> Vec<Ipv4Addr> {
     msg.answers
         .iter()
@@ -308,6 +324,34 @@ pub(crate) mod tests {
         m
     }
 
+    /// A minimal response with AAAA records (type 28, 16-byte addresses).
+    pub fn response_aaaa(name: &str, addrs: &[std::net::Ipv6Addr]) -> Vec<u8> {
+        let mut m = vec![
+            0x12,
+            0x34,
+            0x81,
+            0x80,
+            0,
+            1,
+            0,
+            addrs.len() as u8,
+            0,
+            0,
+            0,
+            0,
+        ];
+        for label in name.split('.') {
+            m.push(label.len() as u8);
+            m.extend_from_slice(label.as_bytes());
+        }
+        m.extend_from_slice(&[0, 0, 0x1c, 0, 1]); // qtype AAAA, class IN
+        for a in addrs {
+            m.extend_from_slice(&[0xc0, 0x0c, 0, 0x1c, 0, 1, 0, 0, 0, 60, 0, 16]);
+            m.extend_from_slice(&a.octets());
+        }
+        m
+    }
+
     pub fn udp_packet(sport: u16, payload: &[u8]) -> Vec<u8> {
         let mut p = vec![
             0x45, 0, 0, 0, 0, 0, 0, 0, 64, 17, 0, 0, 10, 40, 0, 2, 10, 40, 255, 7,
@@ -345,7 +389,10 @@ pub(crate) mod tests {
         let mut whole = (msg.len() as u16).to_be_bytes().to_vec();
         whole.extend_from_slice(&msg);
         let a = parse_packet(&tcp_packet(53, &whole)).unwrap();
-        assert_eq!((a.name.as_str(), a.addrs), ("git.acme.internal", vec![ip]));
+        assert_eq!(
+            (a.name.as_str(), a.addrs),
+            ("git.acme.internal", vec![IpAddr::V4(ip)])
+        );
         // Half a message (the rest in the next segment), another port, no data.
         assert!(parse_packet(&tcp_packet(53, &whole[..whole.len() - 4])).is_none());
         assert!(parse_packet(&tcp_packet(5353, &whole)).is_none());
@@ -359,10 +406,22 @@ pub(crate) mod tests {
         let ip: Ipv4Addr = "10.33.7.7".parse().unwrap();
         let a = parse_packet(&udp_packet(53, &response("Git.Acme.Internal", &[ip]))).unwrap();
         assert_eq!(a.name, "git.acme.internal");
-        assert_eq!(a.addrs, vec![ip]);
+        assert_eq!(a.addrs, vec![IpAddr::V4(ip)]);
         assert!(parse_packet(&udp_packet(5353, &response("x.y", &[ip]))).is_none());
         assert!(parse_packet(b"garbage").is_none());
         assert!(parse_message(&nxdomain("nope.acme.internal")).is_none());
+    }
+
+    #[test]
+    fn reads_aaaa_records() {
+        let v6: std::net::Ipv6Addr = "fd00:dead:beef::7".parse().unwrap();
+        let a = parse_packet(&udp_packet(53, &response_aaaa("git.acme.internal", &[v6]))).unwrap();
+        assert_eq!(a.name, "git.acme.internal");
+        assert_eq!(a.addrs, vec![IpAddr::V6(v6)]);
+        // records() takes both families; a_records() only IPv4.
+        let msg = Message::from_vec(&response_aaaa("x.acme.internal", &[v6])).unwrap();
+        assert_eq!(records(&msg), vec![IpAddr::V6(v6)]);
+        assert!(a_records(&msg).is_empty());
     }
 
     #[test]
@@ -388,7 +447,7 @@ pub(crate) mod tests {
 
         let dns = rewrite(&f, reply).unwrap();
         let packet = replace_payload(&udp_packet(53, &nxdomain("db.example.cloud")), &dns).unwrap();
-        assert_eq!(parse_packet(&packet).unwrap().addrs, vec![ip]);
+        assert_eq!(parse_packet(&packet).unwrap().addrs, vec![IpAddr::V4(ip)]);
         assert_eq!(
             &packet[28..30],
             &[0x12, 0x34],

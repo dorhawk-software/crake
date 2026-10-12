@@ -2,7 +2,6 @@
 //! settings.html), kept next to the host store in `settings.json`. The config
 //! file gives the defaults; a value set here wins.
 
-use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
@@ -209,7 +208,8 @@ impl Never {
     }
 
     /// Is this host (known as `name`, if a name is known) on the list?
-    pub fn covers(&self, name: Option<&str>, addr: Ipv4Addr) -> bool {
+    pub fn covers(&self, name: Option<&str>, addr: impl Into<std::net::IpAddr>) -> bool {
+        let addr = addr.into();
         self.targets.iter().any(|t| t.contains(addr))
             || name.is_some_and(|n| {
                 let n = crate::dns::normalize(n);
@@ -237,7 +237,7 @@ mod tests {
             .unwrap();
         assert!(s.set("never", "not a host!").is_err());
         let n = s.never();
-        let ip = |a: &str| a.parse::<Ipv4Addr>().unwrap();
+        let ip = |a: &str| a.parse::<std::net::Ipv4Addr>().unwrap();
         assert!(n.covers(Some("www.MyBank.example."), ip("20.0.0.1")));
         assert!(!n.covers(Some("mybank.example.evil"), ip("20.0.0.1")));
         assert!(n.covers(None, ip("192.168.1.9")));

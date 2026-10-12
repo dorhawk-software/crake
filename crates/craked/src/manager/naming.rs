@@ -11,12 +11,18 @@ impl Manager {
             return;
         }
         // The last good answer, for when this DNS stops answering (7h).
-        {
+        // IPv4 only for now; the outage fallback (keep.rs) serves A records.
+        let v4: Vec<std::net::Ipv4Addr> = answer
+            .addrs
+            .iter()
+            .filter_map(|a| match a {
+                IpAddr::V4(x) => Some(*x),
+                IpAddr::V6(_) => None,
+            })
+            .collect();
+        if !v4.is_empty() {
             let mut store = self.hosts.lock().unwrap();
-            if store
-                .tunnel(name)
-                .remember(&answer.name, &answer.addrs, hosts::now())
-            {
+            if store.tunnel(name).remember(&answer.name, &v4, hosts::now()) {
                 store.save();
             }
         }
@@ -71,7 +77,7 @@ impl Manager {
             if reply.metadata.response_code != ResponseCode::NoError {
                 continue;
             }
-            let addrs = dns::a_records(&reply);
+            let addrs: Vec<IpAddr> = dns::a_records(&reply).into_iter().map(IpAddr::V4).collect();
             // A managed tunnel answers only for what its policy allows.
             if !addrs.is_empty()
                 && !addrs
@@ -160,7 +166,7 @@ impl Manager {
             }
             let answer = Answer {
                 name: question.name.clone(),
-                addrs: private.clone(),
+                addrs: private.iter().copied().map(IpAddr::V4).collect(),
             };
             self.learn_answer(&tunnel, &answer, Why::PrivateAddress)
                 .await;
@@ -209,7 +215,7 @@ impl Manager {
             .seen_names
             .lock()
             .unwrap()
-            .get(&addr)
+            .get(&IpAddr::V4(addr))
             .filter(|(_, at)| at.elapsed() < SEEN_NAME_FOR)
             .map(|(n, _)| n.clone());
         // Failing that, the name a tunnel's DNS gave this address last (an
@@ -245,7 +251,7 @@ impl Manager {
                 let mut store = self.hosts.lock().unwrap();
                 let th = store.tunnel(name);
                 // Already sent, or sent direct by you.
-                if th.covers(*addr) || th.direct.contains(&IpAddr::V4(*addr)) {
+                if th.covers(*addr) || th.direct.contains(addr) {
                     continue;
                 }
             }
@@ -253,7 +259,10 @@ impl Manager {
             // private address. One address goes through one tunnel; it
             // stays where it is, and the user may move it.
             if let Some(owner) = self.owner_of(*addr, name) {
-                self.contested(name, &label, &owner, &answer.name, *addr);
+                // The "two companies, one address" notice is IPv4-only for now.
+                if let IpAddr::V4(v4) = addr {
+                    self.contested(name, &label, &owner, &answer.name, *v4);
+                }
                 continue;
             }
             if self.never(Some(&answer.name), *addr) {

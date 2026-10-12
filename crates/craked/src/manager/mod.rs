@@ -160,7 +160,7 @@ pub struct Manager {
     /// Hosts probed lately (or being probed): not probed again for a while.
     probed: Mutex<HashMap<Ipv4Addr, Instant>>,
     /// Names from recent public DNS answers, so decisions can say a name.
-    seen_names: Mutex<HashMap<Ipv4Addr, (String, Instant)>>,
+    seen_names: Mutex<HashMap<IpAddr, (String, Instant)>>,
     changes: broadcast::Sender<String>,
 }
 
@@ -412,7 +412,7 @@ impl Manager {
     }
 
     /// On the "never send through a tunnel" list?
-    fn never(&self, name: Option<&str>, addr: Ipv4Addr) -> bool {
+    fn never(&self, name: Option<&str>, addr: impl Into<IpAddr>) -> bool {
         self.settings.lock().unwrap().never().covers(name, addr)
     }
 

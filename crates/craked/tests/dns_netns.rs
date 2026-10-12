@@ -9,7 +9,7 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
-use std::net::{Ipv4Addr, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, UdpSocket};
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
@@ -64,7 +64,7 @@ fn open_tun(name: &str) -> File {
 #[derive(Debug)]
 struct Public {
     rcode: u8,
-    addrs: Vec<Ipv4Addr>,
+    addrs: Vec<IpAddr>,
     tunnel_asked: bool,
     first_through_tunnel: bool,
 }
@@ -430,7 +430,7 @@ fn ask_tcp(tun: &mut File, name: &str, addr: Ipv4Addr) -> bool {
         got.windows(4).any(|w| w == addr.octets()),
         "the app got the answer"
     );
-    first_packet_through_tunnel(tun, addr)
+    first_packet_through_tunnel(tun, IpAddr::V4(addr))
 }
 
 fn query(name: &str) -> Vec<u8> {
@@ -458,17 +458,25 @@ fn ask(tun: &mut File, name: &str, addr: Ipv4Addr) -> bool {
     assert!(n > 12);
     // The app's first packet, sent the moment it has the answer.
     let _ = sock.send_to(b"first", (addr, 443));
-    first_packet_through_tunnel(tun, addr)
+    first_packet_through_tunnel(tun, IpAddr::V4(addr))
 }
 
-fn first_packet_through_tunnel(tun: &mut File, addr: Ipv4Addr) -> bool {
+fn first_packet_through_tunnel(tun: &mut File, addr: IpAddr) -> bool {
     let start = Instant::now();
     let mut buf = [0u8; 2048];
     while start.elapsed() < Duration::from_millis(300) {
-        match tun.read(&mut buf) {
-            Ok(n) if n >= 20 && buf[0] >> 4 == 4 && buf[16..20] == addr.octets() => return true,
-            Ok(_) => {}
-            Err(_) => std::thread::sleep(Duration::from_millis(2)),
+        let hit = match tun.read(&mut buf) {
+            Ok(n) => match addr {
+                IpAddr::V4(a) => n >= 20 && buf[0] >> 4 == 4 && buf[16..20] == a.octets(),
+                IpAddr::V6(a) => n >= 40 && buf[0] >> 4 == 6 && buf[24..40] == a.octets(),
+            },
+            Err(_) => {
+                std::thread::sleep(Duration::from_millis(2));
+                false
+            }
+        };
+        if hit {
+            return true;
         }
     }
     false
@@ -608,7 +616,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     assert_eq!(rescued.rcode, 0, "{rescued:?}");
     assert_eq!(
         rescued.addrs,
-        vec![db],
+        vec![IpAddr::V4(db)],
         "the tunnel's answer replaced the failure"
     );
     assert!(
@@ -621,7 +629,10 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
         "{unknown_again:?}"
     );
     assert_eq!(unknown_again.rcode, 3);
-    assert_eq!((known.rcode, known.addrs.clone()), (0, vec![site]));
+    assert_eq!(
+        (known.rcode, known.addrs.clone()),
+        (0, vec![IpAddr::V4(site)])
+    );
     assert!(
         !known.tunnel_asked,
         "public successes never go to the tunnel"
@@ -631,16 +642,16 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     let (fe, office, www) = splits;
     assert_eq!(
         fe.addrs,
-        vec![fe_private],
+        vec![IpAddr::V4(fe_private)],
         "the private address won: {fe:?}"
     );
     assert!(fe.tunnel_asked && fe.first_through_tunnel, "{fe:?}");
-    assert_eq!(office.addrs, vec![office_public], "{office:?}");
+    assert_eq!(office.addrs, vec![IpAddr::V4(office_public)], "{office:?}");
     assert!(
         office.tunnel_asked && !office.first_through_tunnel,
         "{office:?}"
     );
-    assert_eq!(www.addrs, vec![www_public], "{www:?}");
+    assert_eq!(www.addrs, vec![IpAddr::V4(www_public)], "{www:?}");
     assert!(!www.first_through_tunnel, "{www:?}");
 
     let (git_first, wiki_first, public_routed, gw_routed, tcp_first) = results;
