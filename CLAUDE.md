@@ -1058,7 +1058,19 @@ away: on Windows OpenVPN lets the starter name its Wintun adapter
 **Also noted (user):** the panel has no shadow on
 Windows (Linux draws one in its transparent margin), and a few white
 pixels show outside the rounded top corners; both look like GPUI's
-DirectX drawing of transparent windows.
+DirectX drawing of transparent windows (the renderer anti-aliases the
+card's `rounded(px(10.))` corners against the transparent backdrop and
+leaves a white fringe). **Planned fix (not done; needs a CI Windows
+build + VM check, agreed to defer 2026-10-12 to keep on IPv6):** on
+Windows only, make the panel window opaque and card-sized (drop the
+transparent shadow margin) and let the OS round it — `plain_frame`
+(`sys/windows/host.rs`) uses `DWMWCP_ROUND` instead of
+`DWMWCP_DONOTROUND`, and the card stops self-rounding on Windows. DWM
+then gives anti-aliased rounded corners **and** a native drop shadow, so
+both complaints go at once. All `cfg(windows)`, Linux untouched.
+The installer now uses NSIS Modern UI 2 (`packaging/windows/crake.nsi`,
+done 2026-10-12): welcome page, Crake's icon, a finish page that can open
+Crake; it was the classic 90s wizard before.
 
 ## Someday: other platforms
 
