@@ -1192,7 +1192,13 @@ Microsoft Basic Display Adapter (no GPU), where Windows draws every
 window square and without effects, so the rounding and whether Windows
 adds a shadow to the borderless pop-up still need a Windows with a GPU.
 If it has no shadow there: DwmExtendFrameIntoClientArea with 1 px
-margins is the usual fix.
+margins is the usual fix. **Decided with the user (2026-10-12): Windows
+draws the panel's frame, the native way.** Where Windows rounds windows
+(Windows 11 with a GPU) the panel is rounded; where it doesn't (Windows
+10, a VM without a GPU, perhaps Remote Desktop) it's square like every
+other window there. Don't bring back Crake's own rounding on Windows
+(drawn, or clipped with SetWindowRgn): "If most of Windows is
+rectangular, I will not introduce a rounded concept."
 The installer now uses NSIS Modern UI 2 (`packaging/windows/crake.nsi`,
 done 2026-10-12): welcome page, Crake's icon, a finish page that can open
 Crake; it was the classic 90s wizard before.
