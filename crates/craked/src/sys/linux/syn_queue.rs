@@ -6,7 +6,9 @@
 //! not on the local network); craked races a direct attempt against the
 //! tunnels (`race_held`), learns the host if a tunnel takes it, then lets
 //! the SYN through — now routed. `bypass`: if craked isn't listening, SYNs
-//! pass untouched; each is handled on its own task.
+//! pass untouched; each is handled on its own task. New UDP conversations'
+//! first datagrams to the same addresses come here too: copied and let go
+//! at once, for probing a UDP host through the tunnels with them.
 
 use std::io::ErrorKind;
 use std::sync::Arc;
@@ -76,6 +78,10 @@ async fn handle(mgr: &Arc<Manager>, mut msg: Message) -> Message {
         // so the SYN we now let through is marked and routed by the output
         // chain. Direct or down: let it through unchanged.
         mgr.race_held(flow).await;
+    } else if let Some((flow, payload)) = crate::probe::udp_first(msg.get_payload()) {
+        // Copied before it goes (its conntrack entry is made after): the
+        // probe's way to try a UDP host through the tunnels.
+        mgr.first_datagram(flow, payload);
     }
     msg.set_verdict(Verdict::Accept);
     msg

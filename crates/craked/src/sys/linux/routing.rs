@@ -224,7 +224,10 @@ fn pinned_script(name: &str, pins: &[Target]) -> String {
 /// The sets merge what overlaps (a tunnel's pushed 10.40.0.0/16 inside a
 /// learn-anything tunnel's 10.0.0.0/8): nft refuses overlapping intervals
 /// otherwise, and the whole race with them.
-fn race_script(watch: &[Target], skip: &[Target]) -> String {
+/// `syn`: hold first SYNs (the first-SYN race); new UDP conversations'
+/// first datagrams to the same addresses are always copied (not held, not
+/// DNS's), for probing a UDP host through the tunnels.
+fn race_script(watch: &[Target], skip: &[Target], syn: bool) -> String {
     let queue = crate::syn_queue::QUEUE_NUM;
     let mut s = format!(
         "add table inet {TABLE}\n\
@@ -257,11 +260,19 @@ fn race_script(watch: &[Target], skip: &[Target]) -> String {
             );
         }
     }
-    let syn = "ct state new meta l4proto tcp tcp flags & (fin | syn | rst | ack) == syn";
-    s += &format!(
-        "add rule inet {TABLE} syn_race {syn} ip daddr @syn_watch ip daddr != @syn_skip queue num {queue} bypass\n\
-         add rule inet {TABLE} syn_race {syn} ip6 daddr @syn_watch6 ip6 daddr != @syn_skip6 queue num {queue} bypass\n"
-    );
+    let first_syn = "ct state new meta l4proto tcp tcp flags & (fin | syn | rst | ack) == syn";
+    let first_udp = "ct state new meta l4proto udp udp dport != 53";
+    let kinds: &[&str] = if syn {
+        &[first_syn, first_udp]
+    } else {
+        &[first_udp]
+    };
+    for kind in kinds {
+        s += &format!(
+            "add rule inet {TABLE} syn_race {kind} ip daddr @syn_watch ip daddr != @syn_skip queue num {queue} bypass\n\
+             add rule inet {TABLE} syn_race {kind} ip6 daddr @syn_watch6 ip6 daddr != @syn_skip6 queue num {queue} bypass\n"
+        );
+    }
     s
 }
 
@@ -453,12 +464,12 @@ impl Routing {
     /// pushed networks, plus private ranges for a learn-anything tunnel;
     /// `skip` = the local networks and the gateways, never raced. Empty
     /// `watch` removes the rule. Idempotent.
-    pub async fn race_up(&self, watch: &[Target], skip: &[Target]) -> Result<()> {
+    pub async fn race_up(&self, watch: &[Target], skip: &[Target], syn: bool) -> Result<()> {
         let Self::Real = self else { return Ok(()) };
         if watch.is_empty() {
             return self.race_down().await;
         }
-        nft(&race_script(watch, skip)).await
+        nft(&race_script(watch, skip, syn)).await
     }
 
     pub async fn race_down(&self) -> Result<()> {
@@ -710,12 +721,21 @@ mod tests {
         let s = race_script(
             &["10.0.0.0/8".parse().unwrap(), "fc00::/7".parse().unwrap()],
             &["192.168.0.0/24".parse().unwrap()],
+            true,
         );
         assert!(s.contains("add element inet crake syn_watch { 10.0.0.0/8 }"));
         assert!(s.contains("add element inet crake syn_watch6 { fc00::/7 }"));
         assert!(s.contains("add element inet crake syn_skip { 192.168.0.0/24 }"));
         assert!(!s.contains("add element inet crake syn_skip6"), "{s}");
         assert!(s.contains("ip6 daddr @syn_watch6 ip6 daddr != @syn_skip6 queue num"));
+        assert!(s.contains("tcp flags & (fin | syn | rst | ack) == syn ip daddr @syn_watch"));
+        assert!(s.contains("meta l4proto udp udp dport != 53 ip daddr @syn_watch"));
+        let no_race = race_script(&["10.0.0.0/8".parse().unwrap()], &[], false);
+        assert!(!no_race.contains("l4proto tcp"), "{no_race}");
+        assert!(
+            no_race.contains("l4proto udp"),
+            "UDP is copied for probing either way"
+        );
     }
 
     #[test]

@@ -201,6 +201,34 @@ struct World {
     behind_tunnel: HashSet<IpAddr>,
     /// Every SYN seen leaving through the tunnel.
     tunnel_syns: Vec<(IpAddr, u16)>,
+    /// Hosts that echo UDP datagrams behind the tunnel (dropped directly).
+    udp_behind: HashSet<IpAddr>,
+}
+
+/// An IPv4 UDP datagram in this packet: (source, destination).
+fn udp_of(p: &[u8]) -> Option<(IpAddr, IpAddr)> {
+    if p.len() < 28 || p[0] >> 4 != 4 || p[9] != 17 {
+        return None;
+    }
+    let src: [u8; 4] = p[12..16].try_into().ok()?;
+    let dst: [u8; 4] = p[16..20].try_into().ok()?;
+    Some((src.into(), dst.into()))
+}
+
+/// The same datagram sent back: addresses and ports swapped (no UDP
+/// checksum, which IPv4 allows).
+fn udp_echo(p: &[u8]) -> Vec<u8> {
+    let ihl = usize::from(p[0] & 0x0f) * 4;
+    let mut out = p.to_vec();
+    out[12..16].copy_from_slice(&p[16..20]);
+    out[16..20].copy_from_slice(&p[12..16]);
+    out[10..12].copy_from_slice(&[0, 0]);
+    let c = fold(sum16(&out[..ihl]));
+    out[10..12].copy_from_slice(&c.to_be_bytes());
+    out[ihl..ihl + 2].copy_from_slice(&p[ihl + 2..ihl + 4]);
+    out[ihl + 2..ihl + 4].copy_from_slice(&p[ihl..ihl + 2]);
+    out[ihl + 6..ihl + 8].copy_from_slice(&[0, 0]);
+    out
 }
 
 fn responder(mut uplink: File, mut tun: File, world: Arc<Mutex<World>>, stop: Arc<AtomicBool>) {
@@ -235,6 +263,12 @@ fn responder(mut uplink: File, mut tun: File, world: Arc<Mutex<World>>, stop: Ar
                     || src == TUNNEL_V6.parse::<IpAddr>().unwrap();
                 if from_tunnel && w.behind_tunnel.contains(&dst) {
                     tun.write_all(&tcp_reply(&buf[..n], 0x12)).unwrap();
+                }
+            } else if let Some((src, dst)) = udp_of(&buf[..n]) {
+                let w = world.lock().unwrap();
+                let from_tunnel = src == IpAddr::V4(Ipv4Addr::new(10, 40, 255, 7));
+                if from_tunnel && w.udp_behind.contains(&dst) {
+                    tun.write_all(&udp_echo(&buf[..n])).unwrap();
                 }
             }
         }
@@ -286,6 +320,7 @@ async fn start_probe(race: bool) -> Probe {
         w.refuse_direct.insert("10.70.0.6".parse().unwrap());
         w.unreachable_direct.insert("10.70.0.8".parse().unwrap());
         w.unreachable_direct.insert("fd70::8".parse().unwrap());
+        w.udp_behind.insert("10.70.0.12".parse().unwrap());
     }
     let stop = Arc::new(AtomicBool::new(false));
     let responder = {
@@ -656,6 +691,66 @@ async fn the_first_connection_is_routed_when_the_syn_is_held() {
         "the decision is logged:\n{log}"
     );
 
+    mgr.shutdown().await;
+    stop.store(true, Ordering::Relaxed);
+    responder.join().unwrap();
+}
+
+/// UDP: a host only the tunnel answers is tried through it with the app's
+/// own first datagram, learned, and the app's next datagram gets through.
+/// One that answers nowhere (a one-way service) is neither routed nor
+/// logged.
+#[tokio::test(flavor = "multi_thread")]
+async fn udp_that_only_the_tunnel_answers_is_learned() {
+    if std::env::var("CRAKE_NETNS_TEST").as_deref() != Ok("1") {
+        eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
+        return;
+    }
+    let Probe {
+        mgr,
+        world: _world,
+        stop,
+        responder,
+        _dir: dir,
+        _srv,
+    } = start_probe(false).await;
+    let (answered, silent) = tokio::task::spawn_blocking(|| {
+        // An app that asks again until answered (as UDP apps do).
+        let ask = |to: &str, tries: u32| {
+            let sock = std::net::UdpSocket::bind("0.0.0.0:0").unwrap();
+            sock.connect(to).unwrap();
+            sock.set_read_timeout(Some(Duration::from_millis(700)))
+                .unwrap();
+            let start = Instant::now();
+            let mut buf = [0u8; 64];
+            for _ in 0..tries {
+                sock.send(b"ping").unwrap();
+                if let Ok(n) = sock.recv(&mut buf) {
+                    return Some((buf[..n].to_vec(), start.elapsed()));
+                }
+            }
+            None
+        };
+        (ask("10.70.0.12:5000", 10), ask("10.70.0.13:5000", 4))
+    })
+    .await
+    .unwrap();
+    let set = sh("nft list set inet crake learned_acme");
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap_or_default();
+    assert!(
+        answered.as_ref().is_some_and(|(b, _)| b == b"ping"),
+        "the app's datagram answered through the tunnel: {answered:?}\n{set}\n{log}"
+    );
+    assert!(set.contains("10.70.0.12"), "{set}");
+    assert!(log.contains("Sent 10.70.0.12 through ACME."), "{log}");
+    assert!(silent.is_none());
+    std::thread::sleep(Duration::from_secs(3));
+    assert!(!sh("nft list set inet crake learned_acme").contains("10.70.0.13"));
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap_or_default();
+    assert!(
+        !log.contains("10.70.0.13"),
+        "silence isn't worth a line: {log}"
+    );
     mgr.shutdown().await;
     stop.store(true, Ordering::Relaxed);
     responder.join().unwrap();

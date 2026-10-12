@@ -118,6 +118,9 @@ struct Entry {
     attached: Option<HashMap<String, String>>,
 }
 
+/// A UDP conversation's first datagram, and when it was copied.
+type Datagram = (Arc<Vec<u8>>, Instant);
+
 pub struct Manager {
     cfg: Config,
     tunnels: Mutex<BTreeMap<String, Entry>>,
@@ -160,6 +163,9 @@ pub struct Manager {
     no_split: Mutex<HashMap<(String, RecordType), Instant>>,
     /// Hosts probed lately (or being probed): not probed again for a while.
     probed: Mutex<HashMap<IpAddr, Instant>>,
+    /// New UDP conversations' first datagrams (copied as they left), to try
+    /// their hosts through the tunnels with (`probe::udp_first`).
+    datagrams: Mutex<HashMap<crate::flows::Flow, Datagram>>,
     /// Names from recent public DNS answers, so decisions can say a name.
     seen_names: Mutex<HashMap<IpAddr, (String, Instant)>>,
     changes: broadcast::Sender<String>,
@@ -310,6 +316,7 @@ impl Manager {
             asked: Mutex::new(HashMap::new()),
             no_split: Mutex::new(HashMap::new()),
             probed: Mutex::new(HashMap::new()),
+            datagrams: Mutex::new(HashMap::new()),
             seen_names: Mutex::new(HashMap::new()),
             changes,
         }))

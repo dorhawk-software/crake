@@ -167,6 +167,7 @@ impl Routing {
         &self,
         _watch: &[crate::hosts::Target],
         _skip: &[crate::hosts::Target],
+        _syn: bool,
     ) -> Result<()> {
         Ok(())
     }

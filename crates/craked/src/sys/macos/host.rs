@@ -22,7 +22,7 @@ pub(crate) fn set_path(mark: u32, device: Option<&str>) {
 }
 
 /// A socket that takes the tunnel's path: bound to its interface.
-pub fn mark(sock: &tokio::net::TcpSocket, mark: u32) -> std::io::Result<()> {
+pub fn mark(sock: &impl AsRawFd, mark: u32) -> std::io::Result<()> {
     let device = PATHS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)

@@ -1,10 +1,11 @@
-//! A TCP connection as craked follows it: its four-tuple and what became
-//! of it. Linux reports these from conntrack (`conntrack`); other systems
+//! A connection as craked follows it (TCP, or a UDP conversation): its
+//! four-tuple and what became of it. Linux reports these from conntrack (`conntrack`); other systems
 //! from their own connection tables. Portable.
 
 use std::net::IpAddr;
 
-/// The parts of a TCP state we care about.
+/// The parts of a TCP state we care about. A UDP conversation is SynSent
+/// until a reply is seen, then Answered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TcpState {
     SynSent,
@@ -21,6 +22,8 @@ pub struct Flow {
     pub dst: IpAddr,
     pub sport: u16,
     pub dport: u16,
+    /// A UDP conversation (else TCP).
+    pub udp: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,6 +87,7 @@ mod tests {
             dst: [10, 40, 1, 10].into(),
             sport: port,
             dport: 443,
+            udp: false,
         };
         let before = HashMap::from([
             (flow(40001), TcpState::SynSent),

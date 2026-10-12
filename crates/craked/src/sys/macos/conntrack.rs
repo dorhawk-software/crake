@@ -200,6 +200,7 @@ pub fn parse(buf: &[u8]) -> HashMap<Flow, TcpState> {
                         dst,
                         sport,
                         dport,
+                        udp: false,
                     });
                 }
             }
@@ -309,6 +310,7 @@ mod tests {
                 dst: "fd40:1::10".parse().unwrap(),
                 sport: 50002,
                 dport: 443,
+                udp: false,
             };
             assert_eq!(found.get(&stuck6), Some(&TcpState::SynSent));
             let stuck = Flow {
@@ -316,6 +318,7 @@ mod tests {
                 dst: Ipv4Addr::new(10, 40, 1, 10).into(),
                 sport: 50000,
                 dport: 443,
+                udp: false,
             };
             assert_eq!(found.get(&stuck), Some(&TcpState::SynSent));
             assert!(found.values().any(|s| *s == TcpState::Answered));

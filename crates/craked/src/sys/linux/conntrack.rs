@@ -20,7 +20,10 @@ const NLM_F_CREATE: u16 = 0x400;
 const NLA_F_NESTED: u16 = 0x8000;
 
 const CTA_TUPLE_ORIG: u16 = 1;
+const CTA_STATUS: u16 = 3;
 const CTA_PROTOINFO: u16 = 4;
+/// CTA_STATUS's bit for a conntrack entry that has seen a reply.
+const IPS_SEEN_REPLY: u32 = 1 << 1;
 const CTA_TUPLE_IP: u16 = 1;
 const CTA_TUPLE_PROTO: u16 = 2;
 const CTA_IP_V4_SRC: u16 = 1;
@@ -176,7 +179,12 @@ pub fn delete(flow: Flow) -> io::Result<()> {
         _ => return Err(io::Error::from(io::ErrorKind::InvalidInput)),
     };
     let mut proto = Vec::new();
-    netlink::put_attr(&mut proto, CTA_PROTO_NUM, &[libc::IPPROTO_TCP as u8]);
+    let number = if flow.udp {
+        libc::IPPROTO_UDP
+    } else {
+        libc::IPPROTO_TCP
+    };
+    netlink::put_attr(&mut proto, CTA_PROTO_NUM, &[number as u8]);
     netlink::put_attr(&mut proto, CTA_PROTO_SRC_PORT, &flow.sport.to_be_bytes());
     netlink::put_attr(&mut proto, CTA_PROTO_DST_PORT, &flow.dport.to_be_bytes());
     let mut tuple = Vec::new();
@@ -241,9 +249,11 @@ fn parse_event(kind: Kind, body: &[u8]) -> Option<Event> {
     let tuple = netlink::attrs(child(&top, CTA_TUPLE_ORIG)?);
     let ip = netlink::attrs(child(&tuple, CTA_TUPLE_IP)?);
     let proto = netlink::attrs(child(&tuple, CTA_TUPLE_PROTO)?);
-    if child(&proto, CTA_PROTO_NUM)?.first() != Some(&(libc::IPPROTO_TCP as u8)) {
-        return None;
-    }
+    let udp = match child(&proto, CTA_PROTO_NUM)?.first().map(|p| i32::from(*p)) {
+        Some(libc::IPPROTO_TCP) => false,
+        Some(libc::IPPROTO_UDP) => true,
+        _ => return None,
+    };
     // An IPv4 tuple carries the V4 attributes, an IPv6 one the V6.
     let addr = |v4: u16, v6: u16| -> Option<IpAddr> {
         if let Some(v) = child(&ip, v4) {
@@ -260,11 +270,25 @@ fn parse_event(kind: Kind, body: &[u8]) -> Option<Event> {
         let v = child(&proto, k)?;
         Some(u16::from_be_bytes([*v.first()?, *v.get(1)?]))
     };
-    let state = child(&top, CTA_PROTOINFO)
-        .and_then(|p| child(&netlink::attrs(p), CTA_PROTOINFO_TCP))
-        .and_then(|t| child(&netlink::attrs(t), CTA_PROTOINFO_TCP_STATE))
-        .and_then(|s| s.first().copied())
-        .map(TcpState::from_raw);
+    let state = if udp {
+        // A UDP conversation: waiting until its status says a reply came.
+        child(&top, CTA_STATUS)
+            .and_then(|s| s.get(..size_of::<u32>())?.try_into().ok())
+            .map(u32::from_be_bytes)
+            .map(|status| {
+                if status & IPS_SEEN_REPLY == 0 {
+                    TcpState::SynSent
+                } else {
+                    TcpState::Answered
+                }
+            })
+    } else {
+        child(&top, CTA_PROTOINFO)
+            .and_then(|p| child(&netlink::attrs(p), CTA_PROTOINFO_TCP))
+            .and_then(|t| child(&netlink::attrs(t), CTA_PROTOINFO_TCP_STATE))
+            .and_then(|s| s.first().copied())
+            .map(TcpState::from_raw)
+    };
     Some(Event {
         kind,
         flow: Flow {
@@ -272,6 +296,7 @@ fn parse_event(kind: Kind, body: &[u8]) -> Option<Event> {
             dst: addr(CTA_IP_V4_DST, CTA_IP_V6_DST)?,
             sport: port(CTA_PROTO_SRC_PORT)?,
             dport: port(CTA_PROTO_DST_PORT)?,
+            udp,
         },
         state,
     })
@@ -340,7 +365,8 @@ mod tests {
                 src: "192.168.0.242".parse().unwrap(),
                 dst: "10.58.70.119".parse().unwrap(),
                 sport: 40000,
-                dport: 5432
+                dport: 5432,
+                udp: false
             }
         );
         assert_eq!(
@@ -352,6 +378,50 @@ mod tests {
             (Kind::Destroy, Some(TcpState::Answered))
         );
         assert!(parse_messages(b"short").is_empty());
+    }
+
+    /// A UDP conversation's event: no TCP state, its status bits instead.
+    fn udp_message(msg: u16, flags: u16, status: u32) -> Vec<u8> {
+        let mut ip = Vec::new();
+        netlink::put_attr(&mut ip, CTA_IP_V4_SRC, &[192, 168, 0, 242]);
+        netlink::put_attr(&mut ip, CTA_IP_V4_DST, &[10, 70, 0, 12]);
+        let mut proto = Vec::new();
+        netlink::put_attr(&mut proto, CTA_PROTO_NUM, &[17]);
+        netlink::put_attr(&mut proto, CTA_PROTO_SRC_PORT, &40000u16.to_be_bytes());
+        netlink::put_attr(&mut proto, CTA_PROTO_DST_PORT, &5000u16.to_be_bytes());
+        let mut tuple = Vec::new();
+        netlink::put_attr(&mut tuple, CTA_TUPLE_IP | NLA_F_NESTED, &ip);
+        netlink::put_attr(&mut tuple, CTA_TUPLE_PROTO | NLA_F_NESTED, &proto);
+        let mut body = vec![libc::AF_INET as u8, 0, 0, 0];
+        netlink::put_attr(&mut body, CTA_TUPLE_ORIG | NLA_F_NESTED, &tuple);
+        netlink::put_attr(&mut body, CTA_STATUS, &status.to_be_bytes());
+        let len = 16 + body.len();
+        let mut m = Vec::new();
+        m.extend_from_slice(&(len as u32).to_ne_bytes());
+        m.extend_from_slice(&((NFNL_SUBSYS_CTNETLINK << 8) | msg).to_ne_bytes());
+        m.extend_from_slice(&flags.to_ne_bytes());
+        m.extend_from_slice(&[0; 8]);
+        m.extend_from_slice(&body);
+        m
+    }
+
+    #[test]
+    fn parses_udp_conversations() {
+        let mut batch = udp_message(IPCTNL_MSG_CT_NEW, NLM_F_CREATE, 0);
+        batch.extend(udp_message(IPCTNL_MSG_CT_NEW, 0, IPS_SEEN_REPLY));
+        let ev = parse_messages(&batch);
+        assert_eq!(ev.len(), 2);
+        assert!(ev[0].flow.udp && ev[0].flow.dport == 5000);
+        assert_eq!(
+            (ev[0].kind, ev[0].state),
+            (Kind::New, Some(TcpState::SynSent)),
+            "no reply yet"
+        );
+        assert_eq!(
+            (ev[1].kind, ev[1].state),
+            (Kind::Update, Some(TcpState::Answered)),
+            "a reply came"
+        );
     }
 
     #[test]
@@ -366,7 +436,8 @@ mod tests {
                     src: "2001:db8:1::42".parse().unwrap(),
                     dst: "2001:db8:40::10".parse().unwrap(),
                     sport: 40000,
-                    dport: 5432
+                    dport: 5432,
+                    udp: false
                 }
             )
         );

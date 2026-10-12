@@ -66,11 +66,38 @@ impl Manager {
     /// answers. The stuck connection is forgotten by conntrack, so the app's
     /// next retry already goes through the tunnel.
     pub async fn probe(&self, flow: crate::conntrack::Flow, why: crate::probe::Direct) {
+        let attempt = if flow.udp {
+            match self.datagrams.lock().unwrap().remove(&flow) {
+                Some((payload, _)) => crate::probe::Attempt::Udp(flow.dport, payload),
+                None => return,
+            }
+        } else {
+            crate::probe::Attempt::Tcp(flow.dport)
+        };
         let Some(candidates) = self.probe_candidacy(flow.dst, flow.src) else {
             return;
         };
-        self.try_tunnels(flow.dst, flow.dport, candidates, why, Some(flow))
+        self.try_tunnels(flow.dst, attempt, candidates, why, Some(flow))
             .await;
+    }
+
+    /// A new UDP conversation's first datagram, as it left (Linux: copied
+    /// from NFQUEUE): kept a while to try its host through the tunnels with.
+    pub fn first_datagram(&self, flow: crate::conntrack::Flow, payload: Vec<u8>) {
+        /// At most this many kept; each for this long.
+        const MOST: usize = 1024;
+        const KEPT: Duration = Duration::from_secs(60);
+        let mut kept = self.datagrams.lock().unwrap();
+        kept.retain(|_, (_, at)| at.elapsed() < KEPT);
+        if kept.len() < MOST {
+            kept.insert(flow, (std::sync::Arc::new(payload), Instant::now()));
+        }
+    }
+
+    /// Whether `flow`'s first datagram was kept (a UDP host can only be
+    /// tried with it).
+    pub fn has_datagram(&self, flow: &crate::conntrack::Flow) -> bool {
+        self.datagrams.lock().unwrap().contains_key(flow)
     }
 
     /// Whether `dst` (reached from `src`) may be probed, and through which
@@ -114,7 +141,7 @@ impl Manager {
     /// and which never (`skip`). Called when a tunnel comes up or goes down.
     pub(super) async fn sync_syn_race(&self) {
         use std::collections::BTreeSet;
-        if !self.routing.is_real() || !self.cfg.probing || !self.cfg.race_first_syn {
+        if !self.routing.is_real() || !self.cfg.probing {
             return;
         }
         // (name, gateways, pushed networks) of each routed tunnel.
@@ -163,7 +190,11 @@ impl Manager {
         skip.extend(local.networks6());
         let (watch, skip): (Vec<Target>, Vec<Target>) =
             (watch.into_iter().collect(), skip.into_iter().collect());
-        if let Err(e) = self.routing.race_up(&watch, &skip).await {
+        if let Err(e) = self
+            .routing
+            .race_up(&watch, &skip, self.cfg.race_first_syn)
+            .await
+        {
             tracing::error!("the first-SYN race rule: {e:#}");
         }
     }
@@ -188,37 +219,37 @@ impl Manager {
             crate::probe::DirectTry::Answered(_) => return false,
             crate::probe::DirectTry::Failed(why) => why,
         };
-        self.try_tunnels(flow.dst, flow.dport, candidates, why, None)
-            .await
+        self.try_tunnels(
+            flow.dst,
+            crate::probe::Attempt::Tcp(flow.dport),
+            candidates,
+            why,
+            None,
+        )
+        .await
     }
 
-    /// Race the routed tunnels for `dst:dport` and route it through the one
-    /// that answers (the `both` setting decides between several). `why` is how
+    /// Race the routed tunnels for `dst` (tried as `attempt` says) and route
+    /// it through the one that answers (the `both` setting decides between several). `why` is how
     /// the direct attempt went, for the log. `forget`: a stuck conntrack entry
     /// to delete so the app's retry is routed (passive probing); None when the
     /// held SYN itself routes (the first-SYN race).
     async fn try_tunnels(
         &self,
         dst: IpAddr,
-        dport: u16,
+        attempt: crate::probe::Attempt,
         candidates: Vec<(String, String, u32)>,
         why: crate::probe::Direct,
         forget: Option<crate::conntrack::Flow>,
     ) -> bool {
         let shown = self.name_for(dst).unwrap_or_else(|| dst.to_string());
-        let addr = SocketAddr::new(dst, dport);
         let both = self.settings.lock().unwrap().both;
         // Every eligible tunnel is tried at once; the setting decides which
         // answer counts (CLAUDE.md, "When two tunnels answer").
         let mut tries = tokio::task::JoinSet::new();
         for (i, (_, _, mark)) in candidates.iter().enumerate() {
-            let mark = *mark;
-            tries.spawn(async move {
-                (
-                    i,
-                    crate::probe::through_tunnel(addr, mark, PROBE_TIMEOUT).await,
-                )
-            });
+            let (mark, attempt) = (*mark, attempt.clone());
+            tries.spawn(async move { (i, attempt.through(dst, mark, PROBE_TIMEOUT).await) });
         }
         let mut results: Vec<Option<Option<Duration>>> = vec![None; candidates.len()];
         let chosen = loop {
@@ -306,6 +337,11 @@ impl Manager {
                 }
             }
             return true;
+        }
+        // UDP that no one answers is often meant so (logs, metrics): not
+        // worth a line.
+        if matches!(attempt, crate::probe::Attempt::Udp(..)) {
+            return false;
         }
         let labels: Vec<&str> = candidates.iter().map(|(_, l, _)| l.as_str()).collect();
         let through = labels.join(" or ");

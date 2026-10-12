@@ -4,7 +4,7 @@
 use std::os::fd::AsRawFd;
 
 /// The tunnel's mark on a socket: its packets take the tunnel's route.
-pub fn mark(sock: &tokio::net::TcpSocket, mark: u32) -> std::io::Result<()> {
+pub fn mark(sock: &impl AsRawFd, mark: u32) -> std::io::Result<()> {
     // SAFETY: plain setsockopt with a u32 on a socket we own.
     let r = unsafe {
         libc::setsockopt(

@@ -59,8 +59,79 @@ fn tcp_flow(packet: &[u8]) -> Option<(Flow, &[u8])> {
         dst,
         sport: packet::source_port(tcp)?,
         dport: packet::destination_port(tcp)?,
+        udp: false,
     };
     Some((flow, tcp))
+}
+
+/// A new UDP conversation's first datagram (copied from NFQUEUE, let
+/// through at once): its flow and what it carried. Probing a UDP host
+/// through a tunnel sends this again, as there's no handshake to try.
+pub fn udp_first(packet: &[u8]) -> Option<(Flow, Vec<u8>)> {
+    let (src, dst, udp): (IpAddr, IpAddr, &[u8]) = match packet::V4::parse(packet, packet::UDP) {
+        Some(ip) => (ip.src().into(), ip.dst().into(), ip.payload_to_total()?),
+        None => {
+            let ip = packet::V6::parse(packet, packet::UDP)?;
+            (ip.src().into(), ip.dst().into(), ip.payload()?)
+        }
+    };
+    let flow = Flow {
+        src,
+        dst,
+        sport: packet::source_port(udp)?,
+        dport: packet::destination_port(udp)?,
+        udp: true,
+    };
+    Some((flow, udp.get(packet::UDP_HEADER..)?.to_vec()))
+}
+
+/// How a host is tried through a tunnel: a TCP handshake to a port, or the
+/// app's own first datagram to a UDP port, answered or not.
+#[derive(Clone)]
+pub enum Attempt {
+    Tcp(u16),
+    Udp(u16, Arc<Vec<u8>>),
+}
+
+impl Attempt {
+    pub fn port(&self) -> u16 {
+        match self {
+            Self::Tcp(p) | Self::Udp(p, _) => *p,
+        }
+    }
+
+    /// Try `dst` this way with the tunnel's mark; how long the answer took.
+    pub async fn through(&self, dst: IpAddr, mark: u32, timeout: Duration) -> Option<Duration> {
+        let addr = SocketAddr::new(dst, self.port());
+        match self {
+            Self::Tcp(_) => through_tunnel(addr, mark, timeout).await,
+            Self::Udp(_, payload) => udp_through_tunnel(addr, payload, mark, timeout).await,
+        }
+    }
+}
+
+/// Send `payload` to `addr` with the tunnel's mark and wait for any reply.
+pub async fn udp_through_tunnel(
+    addr: SocketAddr,
+    payload: &[u8],
+    mark: u32,
+    timeout: Duration,
+) -> Option<Duration> {
+    let any: SocketAddr = if addr.is_ipv4() {
+        (Ipv4Addr::UNSPECIFIED, 0).into()
+    } else {
+        (Ipv6Addr::UNSPECIFIED, 0).into()
+    };
+    let sock = tokio::net::UdpSocket::bind(any).await.ok()?;
+    crate::sys::mark(&sock, mark).ok()?;
+    sock.connect(addr).await.ok()?;
+    let start = Instant::now();
+    sock.send(payload).await.ok()?;
+    let mut buf = [0u8; 1];
+    match tokio::time::timeout(timeout, sock.recv(&mut buf)).await {
+        Ok(Ok(_)) => Some(start.elapsed()),
+        _ => None,
+    }
 }
 
 /// The direct attempt's outcome in the first-SYN race (`race_held`).
@@ -134,6 +205,10 @@ pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
                     Ok(batch) => {
                         for ev in batch {
                             match (ev.kind, ev.state) {
+                                // A UDP conversation can only be tried with its
+                                // first datagram, copied as it left (`udp_first`).
+                                (Kind::New, Some(TcpState::SynSent))
+                                    if ev.flow.udp && !mgr.has_datagram(&ev.flow) => {}
                                 (Kind::New, Some(TcpState::SynSent)) => {
                                     if mgr.any_routed() {
                                         // Read each time: Settings can change it.
@@ -149,6 +224,11 @@ pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
                                 // kernel usually drops such an entry at once (a
                                 // destroy without state); an unanswered SYN can't
                                 // time out this soon, so a destroy here means refused.
+                                // A UDP entry ends when it times out: nothing
+                                // was refused.
+                                (Kind::Destroy, _) if ev.flow.udp => {
+                                    pending.remove(&ev.flow);
+                                }
                                 (Kind::Update, Some(TcpState::Close)) | (Kind::Destroy, _) => {
                                     if pending.remove(&ev.flow).is_some() {
                                         let mgr = Arc::clone(&mgr);
@@ -389,6 +469,7 @@ mod tests {
             dst: "fd70::8".parse().unwrap(),
             sport: 40000,
             dport: 443,
+            udp: false,
         };
         assert_eq!(syn_flow(&syn6()), Some(want));
         let mut synack = syn6();

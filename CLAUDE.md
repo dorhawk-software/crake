@@ -270,7 +270,18 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    router's ICMPv6 "unreachable" (no route, prohibited, address
    unreachable, policy, reject route; never "port unreachable") starts
    the probe at once, and the first-SYN race holds IPv6 SYNs (all
-   netns-tested). Still open: UDP.
+   netns-tested).
+   UDP (Linux): with no handshake to try, a UDP host is tried with the
+   app's own first datagram. The race chain copies a new UDP
+   conversation's first datagram to the same addresses as the race
+   (`udp dport != 53`; copied in the SYN queue and let go at once, even
+   with `race_first_syn` off); conntrack reports UDP conversations
+   (waiting until IPS_SEEN_REPLY); one unanswered after the probe wait is
+   tried through the tunnels with that datagram (`probe::Attempt::Udp`),
+   learned only on a reply through one, and its conntrack entry deleted
+   so the app's next datagram is routed and NATed afresh. UDP no one
+   answers (logs, metrics) is neither routed nor logged. netns-tested
+   (fails without the copy rule, or with the entry deleted as TCP).
 5. Multiple simultaneous tunnels, try order, conflict handling.
    **Requested:** detect tunnels that can't be up together. When switching a
    tunnel on, compare what it pushes with the tunnels already up: its own

@@ -85,6 +85,7 @@ fn table() -> io::Result<HashMap<Flow, TcpState>> {
             dst: Ipv4Addr::from(r.dwRemoteAddr.to_ne_bytes()).into(),
             sport: port(r.dwLocalPort),
             dport: port(r.dwRemotePort),
+            udp: false,
         };
         found.insert(flow, state(r.dwState));
     }
@@ -103,6 +104,7 @@ fn table() -> io::Result<HashMap<Flow, TcpState>> {
             dst: Ipv6Addr::from(r.ucRemoteAddr).into(),
             sport: port(r.dwLocalPort),
             dport: port(r.dwRemotePort),
+            udp: false,
         };
         found.insert(flow, state(r.dwState));
     }
