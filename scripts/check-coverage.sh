@@ -18,10 +18,13 @@ declare -A floor=(
     [crake-proto]=98
 )
 
+# Every test runs here (cargo llvm-cov is cargo test, measured): a failing
+# test fails this. Each test binary's result, for the log.
 if ! summary=$(cargo llvm-cov --workspace --summary-only 2>&1); then
     printf 'cargo llvm-cov failed:\n%s\n' "$summary"
     exit 1
 fi
+printf '%s\n' "$summary" | grep -E '^(     Running|test result:)'
 
 fail=0
 for crate in "${!floor[@]}"; do
