@@ -470,8 +470,8 @@ impl Manager {
             .stderr(Stdio::piped())
             .kill_on_drop(true);
         crate::sys::own_group(&mut cmd);
-        let mut child = cmd
-            .spawn()
+        let mut child = spawn(&mut cmd)
+            .await
             .with_context(|| format!("starting {}", self.cfg.openconnect.display()))?;
         if let (Some(pw), Some(mut stdin)) = (stdin_line, child.stdin.take()) {
             stdin.write_all(format!("{pw}\n").as_bytes()).await.ok();
@@ -556,5 +556,23 @@ pub(super) async fn pump<R: tokio::io::AsyncRead + Unpin>(r: BufReader<R>, o: Ou
                 .insert(o.tunnel.clone(), how.to_owned());
         }
         *o.last.lock().unwrap() = line;
+    }
+}
+
+/// Start openconnect. "Text file busy" (another thread had just forked
+/// while the file was being written, as tests write fake ones) passes in a
+/// moment: tried again a few times.
+async fn spawn(cmd: &mut Command) -> std::io::Result<tokio::process::Child> {
+    const TRIES: u32 = 10;
+    const PAUSE: Duration = Duration::from_millis(20);
+    let mut tried = 1;
+    loop {
+        match cmd.spawn() {
+            Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy && tried < TRIES => {
+                tried += 1;
+                tokio::time::sleep(PAUSE).await;
+            }
+            done => return done,
+        }
     }
 }

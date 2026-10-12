@@ -89,14 +89,12 @@ fn ask(gateway: &str, servercert: Option<&str>, wait: Duration) -> String {
     if let Some(pin) = servercert {
         cmd.arg(format!("--servercert={pin}"));
     }
-    let Ok(mut child) = cmd
-        .args(["--", gateway])
+    cmd.args(["--", gateway])
         .env("LC_ALL", "C")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-    else {
+        .stderr(Stdio::piped());
+    let Ok(mut child) = crate::engines::spawn(&mut cmd) else {
         return String::new();
     };
     let start = Instant::now();

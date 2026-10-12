@@ -178,6 +178,24 @@ fn runnable(program: &Path) -> bool {
     })
 }
 
+/// Start a program. "Text file busy" (another thread had just forked while
+/// the file was being written, as tests write fake engines) passes in a
+/// moment: tried again a few times.
+pub fn spawn(cmd: &mut std::process::Command) -> std::io::Result<std::process::Child> {
+    const TRIES: u32 = 10;
+    const PAUSE: std::time::Duration = std::time::Duration::from_millis(20);
+    let mut tried = 1;
+    loop {
+        match cmd.spawn() {
+            Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy && tried < TRIES => {
+                tried += 1;
+                std::thread::sleep(PAUSE);
+            }
+            done => return done,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

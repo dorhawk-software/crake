@@ -334,9 +334,8 @@ fn attempt(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("Couldn't start openconnect: {e}"))?;
+    let mut child =
+        crate::engines::spawn(&mut cmd).map_err(|e| format!("Couldn't start openconnect: {e}"))?;
     let mut stdin = child.stdin.take().ok_or("no stdin")?;
     let mut stdout = child.stdout.take().ok_or("no stdout")?;
     let mut stderr = child.stderr.take().ok_or("no stderr")?;
