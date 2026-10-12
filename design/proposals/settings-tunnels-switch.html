@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: switching tunnels in Settings</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8;
+    --ink: #1A1C1E; --muted: #5A5F64; --accent: #0F766E; --danger: #B42318; --off: #BDBDB8;
+  }
+  body.dark {
+    --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+    --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; --danger: #F97066; --off: #4A4E53;
+  }
+  body { margin: 0; background: var(--desk); color: var(--ink);
+    font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  .page { padding: 32px 40px 40px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 700px; margin-bottom: 18px; }
+  .intro b { color: var(--ink); }
+  .card { width: 640px; background: var(--panel); border-radius: 10px; padding: 28px 36px 30px; }
+  h1 { margin: 0; font-size: 26px; }
+  .sub { color: var(--muted); margin: 6px 0 18px; }
+  .list { border: 1px solid var(--line); border-radius: 8px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: none; }
+  .grip { color: var(--muted); width: 14px; text-align: center; letter-spacing: -2px; }
+  .n { color: var(--muted); font-size: 12px; width: 12px; }
+  .who { flex: 1; min-width: 0; }
+  .name { font-weight: 700; display: flex; align-items: baseline; gap: 8px; }
+  .state { font-weight: 400; font-size: 13px; color: var(--muted); }
+  .badge { font-size: 12px; font-weight: 600; background: var(--surface); padding: 1px 7px; border-radius: 4px; color: var(--muted); }
+  .addr { font-size: 12px; color: var(--muted); }
+  .note { font-size: 13px; color: var(--muted); }
+  .btn { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; height: 32px; padding: 0 12px; font-weight: 600; font-size: 13px; color: var(--ink); font-family: inherit; }
+  .btn.danger { color: var(--danger); border-color: var(--danger); }
+  .switch { width: 46px; height: 26px; border-radius: 13px; background: var(--off); position: relative; flex: none; }
+  .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 10px; background: #fff; }
+  .switch.on { background: var(--accent); }
+  .switch.on::after { left: 23px; }
+  .chev { color: var(--muted); width: 14px; text-align: center; }
+  .section { font-size: 13px; font-weight: 600; color: var(--muted); padding: 10px 14px 0; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>Proposal, not in DESIGN.md yet.</b> Settings → Tunnels gets each tunnel's state beside its name
+    (the panel's words) and the panel's switch, before the chevron: Edit, Remove…, on or off, open. Switching on starts
+    sign-in when it needs one, as from the panel; a tunnel that can't be switched on now (it clashes with one that's up)
+    keeps the switch off and says why under its gateway.</div>
+  <div class="card">
+    <h1>Tunnels</h1>
+    <div class="sub">The VPNs Crake can use, in the order it tries them.</div>
+    <div class="list">
+      <div class="row"><span class="grip">⠿</span><span class="n mono">1</span>
+        <div class="who"><div class="name">ACME <span class="badge">Managed</span><span class="state">Connected · 5 hosts</span></div>
+          <div class="addr mono">vpn.acme.example · AnyConnect</div></div>
+        <span class="note">Set up by ACME IT</span><span class="switch on"></span><span class="chev">›</span></div>
+      <div class="row"><span class="grip">⠿</span><span class="n mono">2</span>
+        <div class="who"><div class="name">Nordbank <span class="badge">Beta</span><span class="state">Connected · 2 hosts</span></div>
+          <div class="addr mono">vpn.nordbank.example · GlobalProtect</div></div>
+        <button class="btn">Edit</button><button class="btn danger">Remove…</button><span class="switch on"></span><span class="chev">›</span></div>
+      <div class="row"><span class="grip">⠿</span><span class="n mono">3</span>
+        <div class="who"><div class="name">Home lab <span class="state">Off</span></div>
+          <div class="addr mono">203.0.113.7 · AnyConnect</div></div>
+        <button class="btn">Edit</button><button class="btn danger">Remove…</button><span class="switch"></span><span class="chev">›</span></div>
+      <div class="section">Everything else goes through:</div>
+      <div class="row" style="border-top:none"><span class="grip"></span><span class="n"></span>
+        <div class="who"><div class="name">Globex <span class="badge">Managed</span><span class="state">Off</span></div>
+          <div class="addr mono">vpn.globex.example · AnyConnect</div>
+          <div class="note">A full tunnel: while it's on, whatever the tunnels above don't take goes through it.</div></div>
+        <span class="note">Set up by Globex IT</span><span class="switch"></span><span class="chev">›</span></div>
+    </div>
+  </div>
+</div>
+<script>
+if (location.search.includes('dark=true')) document.body.classList.add('dark');
+</script>
+</body>
+</html>
