@@ -363,6 +363,8 @@ impl NewTunnel {
             detect: if demo {
                 Detect::Done(Found::AnyConnect {
                     groups: vec!["Employees".into(), "Contractors".into()],
+                    // new-tunnel.html: "valid until March 2027".
+                    expires: "2027-03-31T12:00:00Z".parse().ok(),
                 })
             } else {
                 Detect::Idle
@@ -428,7 +430,7 @@ impl NewTunnel {
                 .spawn(async move { crate::detect::gateway(&gateway, DETECT_TIMEOUT) })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                if let Found::AnyConnect { groups } = &found
+                if let Found::AnyConnect { groups, .. } = &found
                     && this.group.is_none()
                 {
                     this.group = groups.first().cloned();
@@ -455,7 +457,7 @@ impl NewTunnel {
 
     fn groups(&self) -> Vec<String> {
         match &self.detect {
-            Detect::Done(Found::AnyConnect { groups }) => groups.clone(),
+            Detect::Done(Found::AnyConnect { groups, .. }) => groups.clone(),
             _ => self.group.iter().cloned().collect(),
         }
     }

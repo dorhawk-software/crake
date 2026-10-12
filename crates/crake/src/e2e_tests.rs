@@ -132,6 +132,26 @@ async fn a_real_gateway_end_to_end() {
         .unwrap();
     assert!(before.is_err(), "10.40.1.10 answered without a tunnel");
 
+    // New tunnel's check: an AnyConnect gateway, and when its certificate
+    // runs out, read in a handshake (the image's is valid for ten years).
+    let found = tokio::task::spawn_blocking(|| {
+        crate::detect::gateway(&crate::test_app::gateway(), Duration::from_secs(15))
+    })
+    .await
+    .unwrap();
+    let crate::detect::Found::AnyConnect {
+        expires: Some(expires),
+        ..
+    } = found
+    else {
+        panic!("not an AnyConnect gateway with a certificate: {found:?}");
+    };
+    let year = jiff::SignedDuration::from_hours(365 * 24);
+    assert!(
+        expires > jiff::Timestamp::now() + year,
+        "valid for years: {expires}"
+    );
+
     // Sign in as the app does, then switch on with that session.
     let session = sign_in().await;
     assert!(

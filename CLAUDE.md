@@ -337,7 +337,12 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    New tunnel (`new_tunnel.rs`, 1:1 with new-tunnel.html, the window fits
    each step; `CRAKE_SHOW=newtunnel[:step[:protocol]]` with CRAKE_DEMO): detection
    asks the gateway with openconnect as AnyConnect (`detect.rs`: groups
-   too; no certificate expiry yet), sign-in browser
+   too) and reads its certificate's expiry in a TLS handshake that checks
+   nothing (`gateway_cert.rs`, rustls as GPUI already builds it, a small
+   DER reader for "not after"): "Its certificate is valid until March
+   2027." as in the design; within 30 days "expires on 4 November 2026";
+   past it "Found a Cisco AnyConnect gateway, but its certificate expired
+   on 3 October 2026." (e2e: against ocserv's), sign-in browser
    (`--external-browser=xdg-open`), password (kept in the keyring after a
    sign-in that worked, `keyring::Kind::Password`), certificate (smart card
    `pkcs11:`, keyring, or a file picked and imported into the keyring:

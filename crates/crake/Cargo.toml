@@ -20,6 +20,9 @@ zbus = { version = "5", default-features = false, features = ["tokio", "p2p"] }
 futures-util = { version = "0.3", default-features = false }
 # A .ovpn file's PKCS#12 bundle, put inline for openvpn3 (ovpn_file.rs).
 base64 = "0.22"
+# The gateway's certificate, for its expiry (gateway_cert.rs); already in
+# the build through GPUI's HTTP client, with the same features.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 async-channel = "2"
 jiff = "0.2"
 resvg = "0.46"

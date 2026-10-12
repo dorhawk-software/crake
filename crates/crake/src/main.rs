@@ -22,6 +22,8 @@ mod detect;
 
 mod engines;
 
+mod gateway_cert;
+
 mod keyring;
 
 mod log_view;

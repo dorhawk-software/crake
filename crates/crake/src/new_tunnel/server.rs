@@ -109,9 +109,13 @@ impl NewTunnel {
         let (found, line): (bool, Option<String>) = match &self.detect {
             Detect::Idle => (false, None),
             Detect::Asking => (false, Some("Asking the gateway\u{2026}".into())),
-            Detect::Done(Found::AnyConnect { .. }) => {
-                (true, Some("Found a Cisco AnyConnect gateway.".into()))
-            }
+            Detect::Done(Found::AnyConnect { expires, .. }) => (
+                true,
+                Some(crate::detect::certificate_said(
+                    *expires,
+                    jiff::Timestamp::now(),
+                )),
+            ),
             Detect::Done(Found::Unknown) => (
                 false,
                 Some("It answered, but not as AnyConnect. Pick its protocol below.".into()),
