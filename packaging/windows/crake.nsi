@@ -10,6 +10,7 @@
 ;   makensis -DVERSION=0.1.0 -DSRC=<staged files> -DOUT=<setup.exe> crake.nsi
 
 Unicode true
+!include "MUI2.nsh"
 !include "x64.nsh"
 
 Name "Crake"
@@ -17,8 +18,6 @@ OutFile "${OUT}"
 InstallDir "$PROGRAMFILES64\Crake"
 RequestExecutionLevel admin
 SetCompressor /SOLID lzma
-Icon "${SRC}\crake.ico"
-UninstallIcon "${SRC}\crake.ico"
 BrandingText "dorhawk.software"
 VIProductVersion "${VERSION}.0"
 VIAddVersionKey "ProductName" "Crake"
@@ -29,10 +28,27 @@ VIAddVersionKey "LegalCopyright" "GPL-3.0-or-later"
 
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Crake"
 
-Page directory
-Page instfiles
-UninstPage uninstConfirm
-UninstPage instfiles
+; Modern UI (MUI2): a welcome page, the folder page, progress, and a finish
+; page that can open Crake. Crake's own icon throughout.
+!define MUI_ICON "${SRC}\crake.ico"
+!define MUI_UNICON "${SRC}\crake.ico"
+!define MUI_ABORTWARNING
+!define MUI_WELCOMEPAGE_TITLE "Crake"
+!define MUI_WELCOMEPAGE_TEXT "Crake connects to your VPNs but routes nothing by default. It learns, per host, what needs a tunnel and sends only that through, telling you each time.$\r$\n$\r$\nThis will install Crake, with openconnect and Wintun beside it, and run it as a background service."
+!define MUI_FINISHPAGE_RUN "$INSTDIR\crake.exe"
+!define MUI_FINISHPAGE_RUN_TEXT "Open Crake"
+!define MUI_FINISHPAGE_RUN_NOTCHECKED
+!define MUI_FINISHPAGE_TEXT "Crake is installed and running in the notification area. Click the bird to open it and add a tunnel."
+
+!insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+
+!insertmacro MUI_LANGUAGE "English"
 
 Function .onInit
   ${IfNot} ${RunningX64}
