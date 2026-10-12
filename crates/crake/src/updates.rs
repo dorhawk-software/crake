@@ -133,16 +133,19 @@ pub(super) fn refresh_tray(cx: &mut App) {
     let m = shell.model.read(cx);
     let (shape, summary, tunnels) = (m.shape(), m.summary(), m.menu_tunnels());
     let before = shell.tray_shape;
-    if let Some(tray) = &shell.tray {
+    // The motion first: the new shape goes up with the motion's first frame
+    // on, not with its resting icon (going off, the tray showed the head
+    // asleep, then awake again as the motion began, then asleep).
+    if before != shape {
+        cx.global_mut::<Shell>().tray_shape = shape;
+        animate_tray(before, shape, cx);
+    }
+    if let Some(tray) = &cx.global::<Shell>().tray {
         tray.update(move |t| {
             t.shape = shape;
             t.summary = summary;
             t.tunnels = tunnels;
         });
-    }
-    if before != shape {
-        cx.global_mut::<Shell>().tray_shape = shape;
-        animate_tray(before, shape, cx);
     }
 }
 
@@ -170,6 +173,9 @@ pub(super) fn animate_tray(from: tray::Shape, to: tray::Shape, cx: &mut App) {
             .map(tray::Art::icon)
             .collect()
     };
+    // On at once, before the shape changes under it.
+    let first = frames.first().cloned();
+    handle.update(move |t| t.frame = first);
     let task = cx.spawn(async move |cx| {
         loop {
             for frame in &frames {
