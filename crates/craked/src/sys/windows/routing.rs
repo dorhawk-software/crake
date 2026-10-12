@@ -6,11 +6,12 @@
 //! tunnel comes up). A full tunnel is two halves of the address space
 //! through the tunnel (0/1 and 128/1: more specific than the LAN's default
 //! route, whatever its metric), with its exceptions (the gateway, the LAN)
-//! kept on the way they went before. Public DNS answers aren't watched
+//! kept on the way they went before; ::/1 and 8000::/1 likewise for IPv6
+//! when the tunnel has an IPv6 address. Public DNS answers aren't watched
 //! here: craked's own DNS server gets public names (`resolved::set_public`).
 
 use std::collections::{BTreeSet, HashMap};
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::Mutex;
 
 use anyhow::Result;
@@ -30,6 +31,8 @@ pub struct Routing {
 
 struct Routes {
     device: String,
+    /// The tunnel has an IPv6 address (and so its own IPv6 default route).
+    ipv6: bool,
     targets: BTreeSet<Target>,
     /// A full tunnel's exceptions, routed the way they went before it.
     kept: Vec<iphelper::Route>,
@@ -38,6 +41,20 @@ struct Routes {
 /// A full tunnel's two halves.
 fn halves() -> [Target; 2] {
     ["0.0.0.0/1", "128.0.0.0/1"].map(|s| s.parse().expect("a network"))
+}
+
+/// The same for IPv6.
+fn halves6() -> [Target; 2] {
+    ["::/1", "8000::/1"].map(|s| s.parse().expect("a network"))
+}
+
+/// The default route's destination for each family the tunnel has.
+fn defaults(ipv6: bool) -> Vec<IpAddr> {
+    let mut v = vec![IpAddr::V4(Ipv4Addr::UNSPECIFIED)];
+    if ipv6 {
+        v.push(IpAddr::V6(Ipv6Addr::UNSPECIFIED));
+    }
+    v
 }
 
 impl Routing {
@@ -53,9 +70,9 @@ impl Routing {
         self.real
     }
 
-    /// IPv6 routing on Windows isn't built yet (a later slice).
+    /// IPv6 hosts and networks are routes too.
     pub fn routes_ipv6(&self) -> bool {
-        false
+        true
     }
 
     /// Nothing to clear at startup: Crake's routes go with their adapters.
@@ -77,6 +94,7 @@ impl Routing {
             plan.name.to_owned(),
             Routes {
                 device: plan.device.to_owned(),
+                ipv6: plan.ipv6,
                 targets: BTreeSet::new(),
                 kept,
             },
@@ -86,15 +104,25 @@ impl Routing {
         // the tunnel (probes, DNS checks): Windows only looks at routes on
         // the interface they're bound to. Linux's per-tunnel table.
         if self.real {
-            iphelper::add_route_metric(
-                iphelper::luid(plan.device)?,
-                Ipv4Addr::UNSPECIFIED,
-                0,
-                PATH_METRIC,
-            )?;
+            let luid = iphelper::luid(plan.device)?;
+            for any in defaults(plan.ipv6) {
+                iphelper::add_route_metric(luid, any, 0, PATH_METRIC)?;
+            }
         }
         let learned = plan.learned.iter().map(|(a, _)| Target::host(*a));
-        let full = plan.full_except.map(|_| halves()).into_iter().flatten();
+        // IPv6 only with an address of the tunnel's to leave with; without
+        // one, a full tunnel leaves IPv6 alone here (Linux refuses it).
+        let full = plan
+            .full_except
+            .map(|_| {
+                let mut v = halves().to_vec();
+                if plan.ipv6 {
+                    v.extend(halves6());
+                }
+                v
+            })
+            .into_iter()
+            .flatten();
         for t in plan.pinned.iter().copied().chain(learned).chain(full) {
             self.add(plan.name, t)?;
         }
@@ -144,13 +172,11 @@ impl Routing {
             return Ok(());
         };
         for t in routes.targets {
-            // IPv6 routing on Windows isn't built yet (IP Helper v6 is a later
-            // slice); only IPv4 routes were ever added.
-            if let IpAddr::V4(a) = t.addr() {
-                iphelper::delete_route(luid, a, t.prefix_len())?;
-            }
+            iphelper::delete_route(luid, t.addr(), t.prefix_len())?;
         }
-        iphelper::delete_route(luid, Ipv4Addr::UNSPECIFIED, 0)?;
+        for any in defaults(routes.ipv6) {
+            iphelper::delete_route(luid, any, 0)?;
+        }
         for r in routes.kept {
             iphelper::delete(r)?;
         }
@@ -186,10 +212,8 @@ impl Routing {
         let Some(routes) = map.get_mut(name) else {
             return Ok(());
         };
-        if self.real
-            && let IpAddr::V4(a) = t.addr()
-        {
-            iphelper::add_route(iphelper::luid(&routes.device)?, a, t.prefix_len())?;
+        if self.real {
+            iphelper::add_route(iphelper::luid(&routes.device)?, t.addr(), t.prefix_len())?;
         }
         routes.targets.insert(t);
         Ok(())
@@ -200,11 +224,8 @@ impl Routing {
         let Some(routes) = map.get_mut(name) else {
             return Ok(());
         };
-        if routes.targets.remove(&t)
-            && self.real
-            && let IpAddr::V4(a) = t.addr()
-        {
-            iphelper::delete_route(iphelper::luid(&routes.device)?, a, t.prefix_len())?;
+        if routes.targets.remove(&t) && self.real {
+            iphelper::delete_route(iphelper::luid(&routes.device)?, t.addr(), t.prefix_len())?;
         }
         Ok(())
     }
@@ -217,8 +238,13 @@ impl Routing {
 fn keep_ways(except: &[Target]) -> Result<Vec<iphelper::Route>> {
     let mut kept = Vec::new();
     for t in except {
-        let IpAddr::V4(a) = t.addr() else { continue };
-        let (mut way, prefix) = iphelper::best_route(a)?;
+        let (mut way, prefix) = match iphelper::best_route(t.addr()) {
+            Ok(found) => found,
+            // An IPv6 exception without an IPv6 way (no IPv6 here): nothing
+            // to keep.
+            Err(_) if t.is_ipv6() => continue,
+            Err(e) => return Err(e),
+        };
         if prefix > 0 {
             continue;
         }

@@ -5,14 +5,15 @@
 //! macOS: expiry is craked's store's (it expires hosts when the tunnel
 //! comes up). A full tunnel is two halves of the address space through
 //! the tunnel (0/1 and 128/1, more specific than the default route), with
-//! the gateway kept on the way it went before. What leaves through a
+//! the gateway kept on the way it went before; ::/1 and 8000::/1 likewise
+//! when the tunnel has an IPv6 address. What leaves through a
 //! tunnel with another source address (a connection that started before
 //! its host was routed, on its next SYN) is NATed to the tunnel's address
 //! by pf, in an anchor of Crake's (`nat`), as Linux masquerades. Public
 //! DNS answers aren't watched (not yet on macOS).
 
 use std::collections::{BTreeSet, HashMap};
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
 use std::sync::Mutex;
 
 use anyhow::Result;
@@ -31,15 +32,31 @@ pub struct Routing {
 
 struct Routes {
     device: String,
+    /// The tunnel has an IPv6 address (a scoped IPv6 default route, NAT).
+    ipv6: bool,
     targets: BTreeSet<Target>,
     /// A full tunnel's exceptions, routed the way they went before it:
     /// (destination, next hop).
-    kept: Vec<(Target, Ipv4Addr)>,
+    kept: Vec<(Target, String)>,
 }
 
 /// A full tunnel's two halves.
 fn halves() -> [Target; 2] {
     ["0.0.0.0/1", "128.0.0.0/1"].map(|s| s.parse().expect("a network"))
+}
+
+/// The same for IPv6.
+fn halves6() -> [Target; 2] {
+    ["::/1", "8000::/1"].map(|s| s.parse().expect("a network"))
+}
+
+/// The default route's destination for each family the tunnel has.
+fn defaults(ipv6: bool) -> Vec<&'static str> {
+    if ipv6 {
+        vec!["0.0.0.0", "::"]
+    } else {
+        vec!["0.0.0.0"]
+    }
 }
 
 impl Routing {
@@ -56,9 +73,9 @@ impl Routing {
         self.real
     }
 
-    /// IPv6 routing on macOS isn't built yet (a later slice).
+    /// IPv6 hosts and networks are routes too.
     pub fn routes_ipv6(&self) -> bool {
-        false
+        true
     }
 
     /// Nothing to clear at startup: Crake's routes go with their devices.
@@ -80,6 +97,7 @@ impl Routing {
             plan.name.to_owned(),
             Routes {
                 device: plan.device.to_owned(),
+                ipv6: plan.ipv6,
                 targets: BTreeSet::new(),
                 kept,
             },
@@ -87,11 +105,25 @@ impl Routing {
         // A default route through the tunnel for sockets bound to it only
         // (probes, DNS checks): Linux's per-tunnel table.
         if self.real {
-            cmd::route_add_scoped("0.0.0.0", 0, plan.device).await?;
+            for any in defaults(plan.ipv6) {
+                cmd::route_add_scoped(any, 0, plan.device).await?;
+            }
             self.nat().await?;
         }
         let learned = plan.learned.iter().map(|(a, _)| Target::host(*a));
-        let full = plan.full_except.map(|_| halves()).into_iter().flatten();
+        // IPv6 only with an address of the tunnel's to leave with; without
+        // one, a full tunnel leaves IPv6 alone here (Linux refuses it).
+        let full = plan
+            .full_except
+            .map(|_| {
+                let mut v = halves().to_vec();
+                if plan.ipv6 {
+                    v.extend(halves6());
+                }
+                v
+            })
+            .into_iter()
+            .flatten();
         for t in plan.pinned.iter().copied().chain(learned).chain(full) {
             self.add(plan.name, t).await?;
         }
@@ -132,7 +164,9 @@ impl Routing {
         for t in routes.targets {
             cmd::route_delete(&t.addr().to_string(), t.prefix_len(), None).await?;
         }
-        cmd::route_delete("0.0.0.0", 0, Some(&routes.device)).await?;
+        for any in defaults(routes.ipv6) {
+            cmd::route_delete(any, 0, Some(&routes.device)).await?;
+        }
         for (t, _) in routes.kept {
             cmd::route_delete(&t.addr().to_string(), t.prefix_len(), None).await?;
         }
@@ -143,12 +177,12 @@ impl Routing {
     /// macOS' own `com.apple/*`, which its pf.conf evaluates); pf on while
     /// there are any, and released (its token) when there are none.
     async fn nat(&self) -> Result<()> {
-        let devices: Vec<String> = self
+        let devices: Vec<(String, bool)> = self
             .tunnels
             .lock()
             .unwrap()
             .values()
-            .map(|r| r.device.clone())
+            .map(|r| (r.device.clone(), r.ipv6))
             .collect();
         let mut pf = self.pf.lock().await;
         if devices.is_empty() {
@@ -225,29 +259,32 @@ impl Routing {
 /// Crake's pf anchor.
 const ANCHOR: &str = "com.apple/250.Crake";
 
-/// One NAT rule per tunnel device: anything leaving through it with
-/// another source takes the device's address.
-fn nat_rules(devices: &[String]) -> String {
+/// One NAT rule per tunnel device and family it has: anything leaving
+/// through it with another source takes the device's address.
+fn nat_rules(devices: &[(String, bool)]) -> String {
     devices
         .iter()
-        .map(|d| format!("nat on {d} inet from ! ({d}) to any -> ({d})\n"))
+        .map(|(d, v6)| {
+            let mut r = format!("nat on {d} inet from ! ({d}) to any -> ({d})\n");
+            if *v6 {
+                r += &format!("nat on {d} inet6 from ! ({d}) to any -> ({d})\n");
+            }
+            r
+        })
         .collect()
 }
 
 /// Each exception whose way is the default route (which the halves would
 /// take over) gets a route of its own to the same next hop: the gateway,
 /// above all. The LAN's networks have routes more specific already.
-async fn keep_ways(except: &[Target]) -> Result<Vec<(Target, Ipv4Addr)>> {
+async fn keep_ways(except: &[Target]) -> Result<Vec<(Target, String)>> {
     let mut kept = Vec::new();
     for t in except {
-        // IPv6 routing on macOS isn't built yet (a later slice); only IPv4
-        // exceptions are kept on their way.
-        let IpAddr::V4(a) = t.addr() else { continue };
-        let (default, via) = cmd::way_to(a).await?;
+        let (default, via) = cmd::way_to(t.addr()).await?;
         let (true, Some(via)) = (default, via) else {
             continue;
         };
-        cmd::route_add_via(&t.addr().to_string(), t.prefix_len(), via).await?;
+        cmd::route_add_via(&t.addr().to_string(), t.prefix_len(), &via).await?;
         kept.push((*t, via));
     }
     Ok(kept)
@@ -258,9 +295,10 @@ mod tests {
     #[test]
     fn a_nat_rule_per_tunnel() {
         assert_eq!(
-            super::nat_rules(&["utun5".into(), "utun6".into()]),
+            super::nat_rules(&[("utun5".into(), false), ("utun6".into(), true)]),
             "nat on utun5 inet from ! (utun5) to any -> (utun5)\n\
-             nat on utun6 inet from ! (utun6) to any -> (utun6)\n"
+             nat on utun6 inet from ! (utun6) to any -> (utun6)\n\
+             nat on utun6 inet6 from ! (utun6) to any -> (utun6)\n"
         );
     }
 }

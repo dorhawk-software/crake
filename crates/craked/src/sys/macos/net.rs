@@ -21,10 +21,14 @@ impl Net {
         if apply { Self::Ip } else { Self::Noop }
     }
 
-    /// The tunnel's IPv6 address: not given yet, as IPv6 isn't routed
-    /// here (`Routing::routes_ipv6`).
-    pub async fn assign6(&self, _dev: &str, _addr: std::net::Ipv6Addr, _prefix: u8) -> Result<()> {
-        Ok(())
+    /// The tunnel's IPv6 address, added to the device (an alias: utun
+    /// devices carry a link-local one already).
+    pub async fn assign6(&self, dev: &str, addr: std::net::Ipv6Addr, prefix: u8) -> Result<()> {
+        if let Self::Noop = self {
+            return Ok(());
+        }
+        let (a, p) = (addr.to_string(), prefix.to_string());
+        cmd::run("ifconfig", &[dev, "inet6", &a, "prefixlen", &p, "alias"]).await
     }
 
     /// The tunnel's address (a utun device is point to point: its own
@@ -68,7 +72,8 @@ impl Net {
         Ok(())
     }
 
-    /// IPv6 DNS servers aren't asked here yet: nothing to route.
+    /// IPv6 DNS servers aren't asked here yet (craked's own DNS server
+    /// asks IPv4 ones): nothing to route.
     pub async fn route_dns6(&self, _dev: &str, _dns: std::net::Ipv6Addr) -> Result<()> {
         Ok(())
     }

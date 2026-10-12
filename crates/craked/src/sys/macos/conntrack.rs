@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 use std::io;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
 
 use anyhow::Result;
@@ -55,7 +55,8 @@ pub fn delete(_flow: Flow) -> io::Result<()> {
     Ok(())
 }
 
-/// The machine's IPv4 TCP connections (not listeners) and their states.
+/// The machine's TCP connections, IPv4 and IPv6 (not listeners), and
+/// their states.
 fn table() -> io::Result<HashMap<Flow, TcpState>> {
     let name = c"net.inet.tcp.pcblist_n";
     let mut len = 0;
@@ -94,8 +95,9 @@ const XSO_INPCB: u32 = 0x10;
 const XSO_TCPCB: u32 = 0x20;
 /// The list starts and ends with an `xinpgen` this long.
 const XINPGEN: usize = 24;
-/// A connection's record says IPv4 (`inp_vflag & INP_IPV4`).
+/// A connection's record says IPv4 (`inp_vflag & INP_IPV4`) or IPv6.
 const INP_IPV4: u8 = 0x1;
+const INP_IPV6: u8 = 0x2;
 /// The list's size as asked, plus room for connections opened meanwhile.
 const ROOM: usize = 64 * 1024;
 /// Each record starts with its length and kind (u32 each), and is padded to
@@ -112,7 +114,11 @@ const PACKED_LEN: usize = 104;
 const PACKED_VFLAG: usize = 44;
 const ALIGNED_LEN: usize = 112;
 const ALIGNED_VFLAG: usize = 48;
-/// After inp_vflag: the foreign and local addresses, each an in_addr_4in6.
+/// After inp_vflag (and the TTL, the protocol and a pad byte): the foreign
+/// and local addresses, each a 16-byte union, an in6_addr or an
+/// in_addr_4in6 (IPv4 in its last four bytes).
+const FADDR6_AFTER_VFLAG: usize = 4;
+const LADDR6_AFTER_VFLAG: usize = 20;
 const FADDR_AFTER_VFLAG: usize = 16;
 const LADDR_AFTER_VFLAG: usize = 32;
 /// xtcpcb_n: t_state.
@@ -139,7 +145,14 @@ pub fn parse(buf: &[u8]) -> HashMap<Flow, TcpState> {
         buf.get(at..at + size_of::<Ipv4Addr>()).map(|b| {
             let mut octets = [0; size_of::<Ipv4Addr>()];
             octets.copy_from_slice(b);
-            Ipv4Addr::from(octets)
+            IpAddr::V4(Ipv4Addr::from(octets))
+        })
+    };
+    let ip6_at = |at: usize| {
+        buf.get(at..at + size_of::<Ipv6Addr>()).map(|b| {
+            let mut octets = [0; size_of::<Ipv6Addr>()];
+            octets.copy_from_slice(b);
+            IpAddr::V6(Ipv6Addr::from(octets))
         })
     };
     let mut found = HashMap::new();
@@ -166,19 +179,25 @@ pub fn parse(buf: &[u8]) -> HashMap<Flow, TcpState> {
                     ALIGNED_LEN => Some(ALIGNED_VFLAG),
                     _ => None,
                 };
-                if let Some(v) = flag
-                    && buf.get(at + v).is_some_and(|f| f & INP_IPV4 != 0)
-                    && let (Some(dport), Some(sport), Some(dst), Some(src)) = (
-                        u16_net(at + INP_FPORT),
-                        u16_net(at + INP_LPORT),
-                        ip_at(at + v + FADDR_AFTER_VFLAG),
-                        ip_at(at + v + LADDR_AFTER_VFLAG),
-                    )
+                let addrs = flag.and_then(|v| match buf.get(at + v)? {
+                    f if f & INP_IPV4 != 0 => Some((
+                        ip_at(at + v + FADDR_AFTER_VFLAG)?,
+                        ip_at(at + v + LADDR_AFTER_VFLAG)?,
+                    )),
+                    f if f & INP_IPV6 != 0 => Some((
+                        ip6_at(at + v + FADDR6_AFTER_VFLAG)?,
+                        ip6_at(at + v + LADDR6_AFTER_VFLAG)?,
+                    )),
+                    _ => None,
+                });
+                if let Some((dst, src)) = addrs
+                    && let (Some(dport), Some(sport)) =
+                        (u16_net(at + INP_FPORT), u16_net(at + INP_LPORT))
                     && !dst.is_unspecified()
                 {
                     current = Some(Flow {
-                        src: src.into(),
-                        dst: dst.into(),
+                        src,
+                        dst,
                         sport,
                         dport,
                     });
@@ -217,8 +236,8 @@ mod tests {
     /// `xinpcb_n` packed to 4 bytes or not.
     fn connection(
         packed: bool,
-        (src, sport): ([u8; 4], u16),
-        (dst, dport): ([u8; 4], u16),
+        (src, sport): (&[u8], u16),
+        (dst, dport): (&[u8], u16),
         state: u32,
     ) -> Vec<u8> {
         let (len, flag) = if packed { (104, 44) } else { (112, 48) };
@@ -227,9 +246,18 @@ mod tests {
         inpcb[4..8].copy_from_slice(&XSO_INPCB.to_ne_bytes());
         inpcb[16..18].copy_from_slice(&dport.to_be_bytes());
         inpcb[18..20].copy_from_slice(&sport.to_be_bytes());
-        inpcb[flag] = INP_IPV4;
-        inpcb[flag + 16..flag + 20].copy_from_slice(&dst);
-        inpcb[flag + 32..flag + 36].copy_from_slice(&src);
+        match (src.len(), dst.len()) {
+            (4, 4) => {
+                inpcb[flag] = INP_IPV4;
+                inpcb[flag + 16..flag + 20].copy_from_slice(dst);
+                inpcb[flag + 32..flag + 36].copy_from_slice(src);
+            }
+            _ => {
+                inpcb[flag] = INP_IPV6;
+                inpcb[flag + 4..flag + 20].copy_from_slice(dst);
+                inpcb[flag + 20..flag + 36].copy_from_slice(src);
+            }
+        }
         let mut socket = vec![0u8; 92]; // padded to 96
         socket[0..4].copy_from_slice(&92u32.to_ne_bytes());
         socket[4..8].copy_from_slice(&1u32.to_ne_bytes());
@@ -239,6 +267,10 @@ mod tests {
         tcpcb[4..8].copy_from_slice(&XSO_TCPCB.to_ne_bytes());
         tcpcb[36..40].copy_from_slice(&state.to_ne_bytes());
         [inpcb, socket, tcpcb].concat()
+    }
+
+    fn v6(a: &str) -> [u8; 16] {
+        a.parse::<Ipv6Addr>().unwrap().octets()
     }
 
     #[test]
@@ -254,13 +286,31 @@ mod tests {
         for packed in [false, true] {
             let buf = [
                 generation(32),
-                connection(packed, ([192, 0, 2, 5], 50000), ([10, 40, 1, 10], 443), 2),
-                connection(packed, ([192, 0, 2, 5], 50001), ([198, 51, 100, 7], 80), 4),
+                connection(packed, (&[192, 0, 2, 5], 50000), (&[10, 40, 1, 10], 443), 2),
+                connection(
+                    packed,
+                    (&[192, 0, 2, 5], 50001),
+                    (&[198, 51, 100, 7], 80),
+                    4,
+                ),
+                connection(
+                    packed,
+                    (&v6("2001:db8::5"), 50002),
+                    (&v6("fd40:1::10"), 443),
+                    2,
+                ),
                 generation(32),
             ]
             .concat();
             let found = parse(&buf);
-            assert_eq!(found.len(), 2, "packed: {packed}");
+            assert_eq!(found.len(), 3, "packed: {packed}");
+            let stuck6 = Flow {
+                src: "2001:db8::5".parse().unwrap(),
+                dst: "fd40:1::10".parse().unwrap(),
+                sport: 50002,
+                dport: 443,
+            };
+            assert_eq!(found.get(&stuck6), Some(&TcpState::SynSent));
             let stuck = Flow {
                 src: Ipv4Addr::new(192, 0, 2, 5).into(),
                 dst: Ipv4Addr::new(10, 40, 1, 10).into(),

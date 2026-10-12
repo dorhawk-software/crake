@@ -1,6 +1,6 @@
-//! macOS: sockets that take a tunnel's path (IP_BOUND_IF), and the
-//! interfaces' byte counters (the rest is `sys::unix`'s, shared with
-//! Linux).
+//! macOS: sockets that take a tunnel's path (IP_BOUND_IF, IPV6_BOUND_IF),
+//! and the interfaces' byte counters (the rest is `sys::unix`'s, shared
+//! with Linux).
 
 use std::collections::{BTreeMap, HashMap};
 use std::os::fd::AsRawFd;
@@ -32,7 +32,9 @@ pub fn mark(sock: &tokio::net::TcpSocket, mark: u32) -> std::io::Result<()> {
     bind_device(sock, &device)
 }
 
-/// A socket that leaves through this interface (IP_BOUND_IF).
+/// A socket that leaves through this interface: IP_BOUND_IF for an IPv4
+/// socket, IPV6_BOUND_IF for an IPv6 one. The socket's family isn't asked:
+/// each is tried, and one taking it is enough.
 pub fn bind_device(sock: &impl AsRawFd, device: &str) -> std::io::Result<()> {
     let name = std::ffi::CString::new(device).map_err(std::io::Error::other)?;
     // SAFETY: a NUL-terminated name.
@@ -40,21 +42,26 @@ pub fn bind_device(sock: &impl AsRawFd, device: &str) -> std::io::Result<()> {
     if index == 0 {
         return Err(std::io::Error::last_os_error());
     }
-    // SAFETY: plain setsockopt with a u32 on a socket we own.
-    let r = unsafe {
-        libc::setsockopt(
-            sock.as_raw_fd(),
-            libc::IPPROTO_IP,
-            libc::IP_BOUND_IF,
-            (&raw const index).cast(),
-            std::mem::size_of::<u32>() as u32,
-        )
+    let set = |level: libc::c_int, option: libc::c_int| {
+        // SAFETY: plain setsockopt with a u32 on a socket we own.
+        let r = unsafe {
+            libc::setsockopt(
+                sock.as_raw_fd(),
+                level,
+                option,
+                (&raw const index).cast(),
+                std::mem::size_of::<u32>() as u32,
+            )
+        };
+        if r == 0 {
+            Ok(())
+        } else {
+            Err(std::io::Error::last_os_error())
+        }
     };
-    if r == 0 {
-        Ok(())
-    } else {
-        Err(std::io::Error::last_os_error())
-    }
+    let v4 = set(libc::IPPROTO_IP, libc::IP_BOUND_IF);
+    let v6 = set(libc::IPPROTO_IPV6, libc::IPV6_BOUND_IF);
+    v4.or(v6)
 }
 
 /// (bytes on physical interfaces, bytes on Crake's tunnels, bytes per

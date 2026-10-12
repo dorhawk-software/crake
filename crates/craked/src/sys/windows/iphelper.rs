@@ -1,8 +1,8 @@
 //! The IP Helper API, as craked uses it: a tunnel's interface by name (its
 //! alias, `crake-<name>`, as openconnect gives Wintun's adapter), its
-//! address and MTU, and routes on it.
+//! address and MTU, and routes on it, IPv4 and IPv6.
 
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use anyhow::{Result, bail};
 use windows_sys::Win32::NetworkManagement::IpHelper::{
@@ -13,7 +13,8 @@ use windows_sys::Win32::NetworkManagement::IpHelper::{
 };
 use windows_sys::Win32::NetworkManagement::Ndis::NET_LUID_LH;
 use windows_sys::Win32::Networking::WinSock::{
-    AF_INET, IN_ADDR, IN_ADDR_0, IpDadStatePreferred, SOCKADDR_IN, SOCKADDR_INET,
+    AF_INET, AF_INET6, IN_ADDR, IN_ADDR_0, IN6_ADDR, IN6_ADDR_0, IpDadStatePreferred, SOCKADDR_IN,
+    SOCKADDR_IN6, SOCKADDR_INET,
 };
 
 const ERROR_NOT_FOUND: u32 = 1168;
@@ -43,23 +44,56 @@ pub fn index(alias: &str) -> Result<u32> {
     Ok(index)
 }
 
-fn sockaddr(addr: Ipv4Addr) -> SOCKADDR_INET {
-    SOCKADDR_INET {
-        Ipv4: SOCKADDR_IN {
-            sin_family: AF_INET,
-            sin_port: 0,
-            sin_addr: IN_ADDR {
-                S_un: IN_ADDR_0 {
-                    S_addr: u32::from_ne_bytes(addr.octets()),
+fn sockaddr(addr: IpAddr) -> SOCKADDR_INET {
+    match addr {
+        IpAddr::V4(a) => SOCKADDR_INET {
+            Ipv4: SOCKADDR_IN {
+                sin_family: AF_INET,
+                sin_port: 0,
+                sin_addr: IN_ADDR {
+                    S_un: IN_ADDR_0 {
+                        S_addr: u32::from_ne_bytes(a.octets()),
+                    },
                 },
+                sin_zero: Default::default(),
             },
-            sin_zero: Default::default(),
+        },
+        // SAFETY: a plain C struct, all zero is valid (no scope, no flow).
+        IpAddr::V6(a) => SOCKADDR_INET {
+            Ipv6: SOCKADDR_IN6 {
+                sin6_family: AF_INET6,
+                sin6_addr: IN6_ADDR {
+                    u: IN6_ADDR_0 { Byte: a.octets() },
+                },
+                ..unsafe { std::mem::zeroed() }
+            },
         },
     }
 }
 
+/// The address in a socket address Windows filled in.
+fn address_of(sa: &SOCKADDR_INET) -> IpAddr {
+    // SAFETY: the family says which member it is.
+    unsafe {
+        if sa.si_family == AF_INET6 {
+            IpAddr::V6(Ipv6Addr::from(sa.Ipv6.sin6_addr.u.Byte))
+        } else {
+            IpAddr::V4(Ipv4Addr::from(sa.Ipv4.sin_addr.S_un.S_addr.to_ne_bytes()))
+        }
+    }
+}
+
+/// The unspecified address of `addr`'s family: a default route's
+/// destination, or "on the link" as a next hop.
+fn unspecified(addr: IpAddr) -> IpAddr {
+    match addr {
+        IpAddr::V4(_) => Ipv4Addr::UNSPECIFIED.into(),
+        IpAddr::V6(_) => Ipv6Addr::UNSPECIFIED.into(),
+    }
+}
+
 /// `addr/prefix` on the interface.
-pub fn set_address(luid: NET_LUID_LH, addr: Ipv4Addr, prefix: u8) -> Result<()> {
+pub fn set_address(luid: NET_LUID_LH, addr: IpAddr, prefix: u8) -> Result<()> {
     // SAFETY: the row is initialized by Windows, then filled; the calls
     // only read it.
     let err = unsafe {
@@ -80,13 +114,13 @@ pub fn set_address(luid: NET_LUID_LH, addr: Ipv4Addr, prefix: u8) -> Result<()> 
     }
 }
 
-/// The interface's IPv4 MTU.
-pub fn set_mtu(luid: NET_LUID_LH, mtu: u32) -> Result<()> {
+/// The interface's MTU for one family (IPv6: when the interface has it).
+pub fn set_mtu(luid: NET_LUID_LH, mtu: u32, v6: bool) -> Result<()> {
     // SAFETY: as `set_address`; the row is read back first.
     let err = unsafe {
         let mut row: MIB_IPINTERFACE_ROW = std::mem::zeroed();
         InitializeIpInterfaceEntry(&raw mut row);
-        row.Family = AF_INET;
+        row.Family = if v6 { AF_INET6 } else { AF_INET };
         row.InterfaceLuid = luid;
         let got = GetIpInterfaceEntry(&raw mut row);
         if got != 0 {
@@ -94,7 +128,9 @@ pub fn set_mtu(luid: NET_LUID_LH, mtu: u32) -> Result<()> {
         } else {
             row.NlMtu = mtu;
             // Windows refuses an IPv4 row with a site prefix length.
-            row.SitePrefixLength = 0;
+            if !v6 {
+                row.SitePrefixLength = 0;
+            }
             SetIpInterfaceEntry(&raw mut row)
         }
     };
@@ -109,18 +145,18 @@ pub fn set_mtu(luid: NET_LUID_LH, mtu: u32) -> Result<()> {
 #[derive(Clone, Copy)]
 pub struct Route {
     pub luid: NET_LUID_LH,
-    pub dest: Ipv4Addr,
+    pub dest: IpAddr,
     pub prefix: u8,
-    pub via: Ipv4Addr,
+    pub via: IpAddr,
 }
 
-fn route(luid: NET_LUID_LH, dest: Ipv4Addr, prefix: u8, metric: u32) -> MIB_IPFORWARD_ROW2 {
+fn route(luid: NET_LUID_LH, dest: IpAddr, prefix: u8, metric: u32) -> MIB_IPFORWARD_ROW2 {
     row(
         Route {
             luid,
             dest,
             prefix,
-            via: Ipv4Addr::UNSPECIFIED,
+            via: unspecified(dest),
         },
         metric,
     )
@@ -142,7 +178,7 @@ fn row(r: Route, metric: u32) -> MIB_IPFORWARD_ROW2 {
 
 /// The way Windows sends to `dest` now: its route's interface, next hop
 /// and prefix length (with `dest` as the destination).
-pub fn best_route(dest: Ipv4Addr) -> Result<(Route, u8)> {
+pub fn best_route(dest: IpAddr) -> Result<(Route, u8)> {
     let to = sockaddr(dest);
     // SAFETY: zeroed out values Windows fills; `to` is only read.
     let (err, best) = unsafe {
@@ -162,14 +198,12 @@ pub fn best_route(dest: Ipv4Addr) -> Result<(Route, u8)> {
     if err != 0 {
         bail!("no route to {dest} ({})", os_error(err));
     }
-    // SAFETY: an IPv4 route: its next hop is a SOCKADDR_IN.
-    let via = unsafe { best.NextHop.Ipv4.sin_addr.S_un.S_addr };
     Ok((
         Route {
             luid: best.InterfaceLuid,
             dest,
-            prefix: crate::hosts::V4_BITS,
-            via: Ipv4Addr::from(via.to_ne_bytes()),
+            prefix: crate::hosts::Target::host(dest).prefix_len(),
+            via: address_of(&best.NextHop),
         },
         best.DestinationPrefix.PrefixLength,
     ))
@@ -201,12 +235,12 @@ pub fn delete(r: Route) -> Result<()> {
 }
 
 /// `dest/prefix` through the interface (already there: fine).
-pub fn add_route(luid: NET_LUID_LH, dest: Ipv4Addr, prefix: u8) -> Result<()> {
+pub fn add_route(luid: NET_LUID_LH, dest: IpAddr, prefix: u8) -> Result<()> {
     add_route_metric(luid, dest, prefix, 0)
 }
 
 /// The same with a route metric (higher: chosen only when nothing better).
-pub fn add_route_metric(luid: NET_LUID_LH, dest: Ipv4Addr, prefix: u8, metric: u32) -> Result<()> {
+pub fn add_route_metric(luid: NET_LUID_LH, dest: IpAddr, prefix: u8, metric: u32) -> Result<()> {
     let row = route(luid, dest, prefix, metric);
     // SAFETY: a filled row, only read.
     match unsafe { CreateIpForwardEntry2(&raw const row) } {
@@ -216,7 +250,7 @@ pub fn add_route_metric(luid: NET_LUID_LH, dest: Ipv4Addr, prefix: u8, metric: u
 }
 
 /// Remove `dest/prefix` from the interface (gone already: fine).
-pub fn delete_route(luid: NET_LUID_LH, dest: Ipv4Addr, prefix: u8) -> Result<()> {
+pub fn delete_route(luid: NET_LUID_LH, dest: IpAddr, prefix: u8) -> Result<()> {
     let row = route(luid, dest, prefix, 0);
     // SAFETY: a filled row, only read.
     match unsafe { DeleteIpForwardEntry2(&raw const row) } {

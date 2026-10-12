@@ -1020,6 +1020,18 @@ retransmitted SYN takes the new route and is NATed to the tunnel's
 address; Windows' stuck connection keeps the LAN's source address, so
 craked resets it. Making the first one work would need a WFP callout
 driver (holding the SYN), not planned.
+IPv6 (2026-10-12): learned and pinned IPv6 hosts are routes too (IP
+Helper, SOCKADDR_IN6), the tunnel gets the IPv6 address openconnect
+hands over and its own IPv6 default route for probes (metric 9000),
+sockets bind with IPV6_UNICAST_IF (host byte order, unlike IPv4's),
+probing reads the IPv6 TCP table, a full tunnel adds ::/1 and 8000::/1
+when the tunnel has an IPv6 address. Windows can't reset another
+program's IPv6 connection (SetTcpEntry is IPv4's), so a stuck one runs
+out and the app's next goes through; without an IPv6 address a full
+tunnel leaves IPv6 alone (Linux refuses it). The VM test proves it: its
+gateway hands out fd40:ff::/64 addresses and ACME's fd40:1::10, and a
+name ACME's DNS knows only by that address is routed before the first
+packet and answers over IPv6.
 
 **Phase 4: done** (`scripts/windows-vm-test.sh`; passes: about 2½
 minutes a run, the image's unattended install about 25 minutes once). A Windows 11 VM with
@@ -1067,7 +1079,12 @@ the console or root, `Guard::ConsoleUser`); paths: hook socket in
 sealed), state in /var/db/crake; openconnect from Homebrew
 (/opt/homebrew/bin, /usr/local/bin: launchd's and Finder apps' PATH
 lack it); `packaging/macos/software.dorhawk.craked.plist` runs craked as
-a launchd daemon. Not yet: public names (no root resolver in
+a launchd daemon. IPv6 (2026-10-12, as on Windows): `route`/`ifconfig`
+with `-inet6` (the tunnel's address as an alias), a scoped IPv6 default
+route, IPV6_BOUND_IF, the kernel list's IPv6 rows (the address unions
+start 4 and 20 bytes after inp_vflag), pf NAT for inet6, a full
+tunnel's IPv6 halves; tests/macos.rs checks the routes as root on CI.
+Not yet: public names (no root resolver in
 /etc/resolver: no rescue, no full tunnel's DNS for every name), the
 panel's placement under the menu bar, an installer (.pkg, signed and
 notarized with the user's Apple Developer account: ask for its details

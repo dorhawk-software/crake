@@ -1,20 +1,20 @@
-//! Windows: new TCP connections from the connection table
-//! (GetExtendedTcpTable), looked at four times a second; what changed
-//! becomes the events Linux gets from conntrack (`flows::changes`).
+//! Windows: new TCP connections from the connection tables, IPv4's and
+//! IPv6's (GetExtendedTcpTable), looked at four times a second; what
+//! changed becomes the events Linux gets from conntrack (`flows::changes`).
 
 use std::collections::HashMap;
 use std::io;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
 
 use anyhow::Result;
 use windows_sys::Win32::NetworkManagement::IpHelper::{
     GetExtendedTcpTable, MIB_TCP_STATE_CLOSED, MIB_TCP_STATE_DELETE_TCB, MIB_TCP_STATE_ESTAB,
-    MIB_TCP_STATE_LISTEN, MIB_TCP_STATE_SYN_RCVD, MIB_TCP_STATE_SYN_SENT, MIB_TCPROW_LH,
-    MIB_TCPROW_LH_0, MIB_TCPROW_OWNER_PID, MIB_TCPTABLE_OWNER_PID, SetTcpEntry,
-    TCP_TABLE_OWNER_PID_CONNECTIONS,
+    MIB_TCP_STATE_LISTEN, MIB_TCP_STATE_SYN_RCVD, MIB_TCP_STATE_SYN_SENT, MIB_TCP6ROW_OWNER_PID,
+    MIB_TCP6TABLE_OWNER_PID, MIB_TCPROW_LH, MIB_TCPROW_LH_0, MIB_TCPROW_OWNER_PID,
+    MIB_TCPTABLE_OWNER_PID, SetTcpEntry, TCP_TABLE_OWNER_PID_CONNECTIONS,
 };
-use windows_sys::Win32::Networking::WinSock::AF_INET;
+use windows_sys::Win32::Networking::WinSock::{ADDRESS_FAMILY, AF_INET, AF_INET6};
 
 pub use crate::flows::{Event, Flow, Kind, TcpState};
 
@@ -68,8 +68,50 @@ fn port(raw: u32) -> u16 {
     u16::from_be(raw as u16)
 }
 
-/// The machine's IPv4 TCP connections (not listeners) and their states.
+/// The machine's TCP connections (not listeners), IPv4 and IPv6, and their
+/// states.
 fn table() -> io::Result<HashMap<Flow, TcpState>> {
+    let mut found = HashMap::new();
+    let v4 = raw_table(AF_INET, size_of::<MIB_TCPROW_OWNER_PID>())?;
+    // SAFETY: Windows filled `v4` with a MIB_TCPTABLE_OWNER_PID, whose
+    // `dwNumEntries` rows follow its header.
+    let rows: &[MIB_TCPROW_OWNER_PID] = unsafe {
+        let table = &*v4.as_ptr().cast::<MIB_TCPTABLE_OWNER_PID>();
+        std::slice::from_raw_parts(table.table.as_ptr(), table.dwNumEntries as usize)
+    };
+    for r in rows {
+        let flow = Flow {
+            src: Ipv4Addr::from(r.dwLocalAddr.to_ne_bytes()).into(),
+            dst: Ipv4Addr::from(r.dwRemoteAddr.to_ne_bytes()).into(),
+            sport: port(r.dwLocalPort),
+            dport: port(r.dwRemotePort),
+        };
+        found.insert(flow, state(r.dwState));
+    }
+    // A machine without IPv6 has no IPv6 table: IPv4's is enough.
+    let Ok(v6) = raw_table(AF_INET6, size_of::<MIB_TCP6ROW_OWNER_PID>()) else {
+        return Ok(found);
+    };
+    // SAFETY: as above, a MIB_TCP6TABLE_OWNER_PID.
+    let rows: &[MIB_TCP6ROW_OWNER_PID] = unsafe {
+        let table = &*v6.as_ptr().cast::<MIB_TCP6TABLE_OWNER_PID>();
+        std::slice::from_raw_parts(table.table.as_ptr(), table.dwNumEntries as usize)
+    };
+    for r in rows {
+        let flow = Flow {
+            src: Ipv6Addr::from(r.ucLocalAddr).into(),
+            dst: Ipv6Addr::from(r.ucRemoteAddr).into(),
+            sport: port(r.dwLocalPort),
+            dport: port(r.dwRemotePort),
+        };
+        found.insert(flow, state(r.dwState));
+    }
+    Ok(found)
+}
+
+/// One family's connection table, as GetExtendedTcpTable writes it (its
+/// rows `row` bytes each), in an 8-byte aligned buffer.
+fn raw_table(family: ADDRESS_FAMILY, row: usize) -> io::Result<Vec<u64>> {
     let mut size = 0;
     // SAFETY: a size query (null table), then a table of that size.
     unsafe {
@@ -77,14 +119,14 @@ fn table() -> io::Result<HashMap<Flow, TcpState>> {
             std::ptr::null_mut(),
             &raw mut size,
             0,
-            u32::from(AF_INET),
+            u32::from(family),
             TCP_TABLE_OWNER_PID_CONNECTIONS,
             0,
         );
     }
     // Room for connections opened meanwhile.
     const ROOM_ROWS: u32 = 64;
-    size += ROOM_ROWS * size_of::<MIB_TCPROW_OWNER_PID>() as u32;
+    size += ROOM_ROWS * row as u32;
     let mut buf = vec![0u64; (size as usize).div_ceil(size_of::<u64>())];
     // SAFETY: `buf` holds `size` bytes, 8-byte aligned.
     let err = unsafe {
@@ -92,7 +134,7 @@ fn table() -> io::Result<HashMap<Flow, TcpState>> {
             buf.as_mut_ptr().cast(),
             &raw mut size,
             0,
-            u32::from(AF_INET),
+            u32::from(family),
             TCP_TABLE_OWNER_PID_CONNECTIONS,
             0,
         )
@@ -100,24 +142,7 @@ fn table() -> io::Result<HashMap<Flow, TcpState>> {
     if err != 0 {
         return Err(io::Error::from_raw_os_error(err as i32));
     }
-    // SAFETY: Windows filled `buf` with a MIB_TCPTABLE_OWNER_PID, whose
-    // `dwNumEntries` rows follow its header.
-    let rows: &[MIB_TCPROW_OWNER_PID] = unsafe {
-        let table = &*buf.as_ptr().cast::<MIB_TCPTABLE_OWNER_PID>();
-        std::slice::from_raw_parts(table.table.as_ptr(), table.dwNumEntries as usize)
-    };
-    Ok(rows
-        .iter()
-        .map(|r| {
-            let flow = Flow {
-                src: Ipv4Addr::from(r.dwLocalAddr.to_ne_bytes()).into(),
-                dst: Ipv4Addr::from(r.dwRemoteAddr.to_ne_bytes()).into(),
-                sport: port(r.dwLocalPort),
-                dport: port(r.dwRemotePort),
-            };
-            (flow, state(r.dwState))
-        })
-        .collect())
+    Ok(buf)
 }
 
 /// Close this machine's TCP connections to `target`, so the apps open new
@@ -132,8 +157,9 @@ pub async fn close_to(target: crate::hosts::Target) {
 
 /// Reset a connection stuck without an answer, so the app's next attempt
 /// takes the route Crake just added (Linux deletes its conntrack entry).
+/// IPv4 only: Windows can't reset another program's IPv6 connection, which
+/// runs its course; the app's next one takes the route.
 pub fn delete(flow: Flow) -> io::Result<()> {
-    // The table read here is IPv4's only.
     let (IpAddr::V4(src), IpAddr::V4(dst)) = (flow.src, flow.dst) else {
         return Err(io::Error::from(io::ErrorKind::InvalidInput));
     };

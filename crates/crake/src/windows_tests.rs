@@ -158,6 +158,30 @@ async fn the_installed_service_end_to_end() {
         "wiki.acme.internal's page at once"
     );
 
+    // 2b. IPv6: the tunnel has the IPv6 address the gateway gave, and a
+    //     name ACME's DNS knows by its IPv6 address is routed before the
+    //     first packet.
+    let addr6 = ps("(Get-NetIPAddress -InterfaceAlias crake-acme -AddressFamily IPv6).IPAddress");
+    assert!(
+        addr6.contains("fd40:ff::"),
+        "crake-acme's IPv6 address: {addr6}"
+    );
+    let named6 = tokio::task::spawn_blocking(|| {
+        let addrs = resolve("v6.acme.internal")?;
+        let want: IpAddr = "fd40:1::10".parse().unwrap();
+        assert!(addrs.contains(&want), "v6.acme.internal is {addrs:?}");
+        get("[fd40:1::10]", Duration::from_millis(800)).map_err(|e| e.to_string())
+    })
+    .await
+    .unwrap();
+    assert!(
+        named6.is_ok_and(|b| b.contains("crex")),
+        "v6.acme.internal's page over IPv6 at once; routes: {}",
+        ps(
+            "Get-NetRoute -InterfaceAlias crake-acme -AddressFamily IPv6 | Format-Table -AutoSize | Out-String"
+        )
+    );
+
     // 3. A name public DNS doesn't know but ACME's does (outside its
     //    domains): rescued, routed before the first packet.
     let rescued = tokio::task::spawn_blocking(|| {

@@ -22,17 +22,44 @@ use windows_sys::Win32::System::Threading::CREATE_NEW_CONSOLE;
 /// for a tunnel), address, netmask.
 pub fn interfaces() -> Vec<(String, Ipv4Addr, u32)> {
     let mut found = Vec::new();
-    each_adapter(|a, name| {
-        // SAFETY: Windows' list of the adapter's addresses, walked by its
-        // own links.
+    each_adapter(
+        windows_sys::Win32::Networking::WinSock::AF_INET,
+        |a, name| {
+            // SAFETY: Windows' list of the adapter's addresses, walked by its
+            // own links.
+            unsafe {
+                let mut unicast = a.FirstUnicastAddress;
+                while !unicast.is_null() {
+                    let u = &*unicast;
+                    if let Some(addr) = ipv4(u.Address.lpSockaddr) {
+                        let prefix = u32::from(u.OnLinkPrefixLength.min(crate::hosts::V4_BITS));
+                        let mask = u32::MAX.checked_shl(Ipv4Addr::BITS - prefix).unwrap_or(0);
+                        found.push((name.to_owned(), addr, mask));
+                    }
+                    unicast = u.Next;
+                }
+            }
+        },
+    );
+    found
+}
+
+/// Every IPv6 address on the machine: interface, address, prefix length.
+pub fn interfaces6() -> Vec<(String, std::net::Ipv6Addr, u8)> {
+    use windows_sys::Win32::Networking::WinSock::{AF_INET6, SOCKADDR_IN6};
+    let mut found = Vec::new();
+    each_adapter(AF_INET6, |a, name| {
+        // SAFETY: as in `interfaces`; AF_INET6 means a SOCKADDR_IN6.
         unsafe {
             let mut unicast = a.FirstUnicastAddress;
             while !unicast.is_null() {
                 let u = &*unicast;
-                if let Some(addr) = ipv4(u.Address.lpSockaddr) {
-                    let prefix = u32::from(u.OnLinkPrefixLength.min(crate::hosts::V4_BITS));
-                    let mask = u32::MAX.checked_shl(Ipv4Addr::BITS - prefix).unwrap_or(0);
-                    found.push((name.to_owned(), addr, mask));
+                let sa = u.Address.lpSockaddr;
+                if !sa.is_null() && (*sa).sa_family == AF_INET6 {
+                    let sin6 = &*sa.cast::<SOCKADDR_IN6>();
+                    let addr = std::net::Ipv6Addr::from(sin6.sin6_addr.u.Byte);
+                    let prefix = u.OnLinkPrefixLength.min(crate::hosts::V6_BITS);
+                    found.push((name.to_owned(), addr, prefix));
                 }
                 unicast = u.Next;
             }
@@ -41,48 +68,45 @@ pub fn interfaces() -> Vec<(String, Ipv4Addr, u32)> {
     found
 }
 
-/// Every IPv6 address on the machine. None yet: craked routes no IPv6 on
-/// Windows (`Routing::routes_ipv6`), so nothing asks.
-pub fn interfaces6() -> Vec<(String, std::net::Ipv6Addr, u8)> {
-    Vec::new()
-}
-
 /// The DNS servers Windows was given (DHCP, or by hand) on the adapters
 /// that are up, Crake's own tunnels left out: where public names go.
 pub fn system_dns() -> Vec<Ipv4Addr> {
     let mut found = Vec::new();
-    each_adapter(|a, name| {
-        // 1: IfOperStatusUp.
-        if a.OperStatus != 1 || name.starts_with("crake-") {
-            return;
-        }
-        // SAFETY: as in `interfaces`.
-        unsafe {
-            let mut server = a.FirstDnsServerAddress;
-            while !server.is_null() {
-                let s = &*server;
-                if let Some(addr) = ipv4(s.Address.lpSockaddr)
-                    && !addr.is_loopback()
-                    && !found.contains(&addr)
-                {
-                    found.push(addr);
-                }
-                server = s.Next;
+    each_adapter(
+        windows_sys::Win32::Networking::WinSock::AF_INET,
+        |a, name| {
+            // 1: IfOperStatusUp.
+            if a.OperStatus != 1 || name.starts_with("crake-") {
+                return;
             }
-        }
-    });
+            // SAFETY: as in `interfaces`.
+            unsafe {
+                let mut server = a.FirstDnsServerAddress;
+                while !server.is_null() {
+                    let s = &*server;
+                    if let Some(addr) = ipv4(s.Address.lpSockaddr)
+                        && !addr.is_loopback()
+                        && !found.contains(&addr)
+                    {
+                        found.push(addr);
+                    }
+                    server = s.Next;
+                }
+            }
+        },
+    );
     found
 }
 
-/// Each IPv4 adapter, with its alias.
+/// Each adapter with addresses of `family`, with its alias.
 fn each_adapter(
+    family: windows_sys::Win32::Networking::WinSock::ADDRESS_FAMILY,
     mut f: impl FnMut(&windows_sys::Win32::NetworkManagement::IpHelper::IP_ADAPTER_ADDRESSES_LH, &str),
 ) {
     use windows_sys::Win32::NetworkManagement::IpHelper::{
         GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_MULTICAST, GetAdaptersAddresses,
         IP_ADAPTER_ADDRESSES_LH,
     };
-    use windows_sys::Win32::Networking::WinSock::AF_INET;
     const ERROR_BUFFER_OVERFLOW: u32 = 111;
     let flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST;
     // A first guess at the size; the call says if it needs more.
@@ -94,7 +118,7 @@ fn each_adapter(
         // SAFETY: `buf` holds `size` bytes, 8-byte aligned.
         let err = unsafe {
             GetAdaptersAddresses(
-                u32::from(AF_INET),
+                u32::from(family),
                 flags,
                 std::ptr::null(),
                 buf.as_mut_ptr().cast(),
@@ -187,26 +211,34 @@ pub fn bind_device(
     unicast_if(sock.as_raw_socket(), device)
 }
 
-/// IP_UNICAST_IF: the interface's index, in network byte order.
+/// IP_UNICAST_IF (the interface's index in network byte order) for an
+/// IPv4 socket, IPV6_UNICAST_IF (in host byte order) for an IPv6 one. The
+/// socket's family isn't asked: each is tried, and one taking it is enough.
 fn unicast_if(raw: std::os::windows::io::RawSocket, device: &str) -> std::io::Result<()> {
-    use windows_sys::Win32::Networking::WinSock::{IP_UNICAST_IF, IPPROTO_IP, SOCKET, setsockopt};
-    let index = super::iphelper::index(device).map_err(std::io::Error::other)?;
-    let value = index.to_be();
-    // SAFETY: a live socket of ours; `value` is the u32 the option takes.
-    let err = unsafe {
-        setsockopt(
-            raw as SOCKET,
-            IPPROTO_IP,
-            IP_UNICAST_IF,
-            (&raw const value).cast(),
-            size_of::<u32>() as i32,
-        )
+    use windows_sys::Win32::Networking::WinSock::{
+        IP_UNICAST_IF, IPPROTO_IP, IPPROTO_IPV6, IPV6_UNICAST_IF, SOCKET, setsockopt,
     };
-    if err == 0 {
-        Ok(())
-    } else {
-        Err(std::io::Error::last_os_error())
-    }
+    let index = super::iphelper::index(device).map_err(std::io::Error::other)?;
+    let set = |level: i32, option: i32, value: u32| {
+        // SAFETY: a live socket of ours; `value` is the u32 the option takes.
+        let err = unsafe {
+            setsockopt(
+                raw as SOCKET,
+                level,
+                option,
+                (&raw const value).cast(),
+                size_of::<u32>() as i32,
+            )
+        };
+        if err == 0 {
+            Ok(())
+        } else {
+            Err(std::io::Error::last_os_error())
+        }
+    };
+    let v4 = set(IPPROTO_IP, IP_UNICAST_IF, index.to_be());
+    let v6 = set(IPPROTO_IPV6, IPV6_UNICAST_IF, index);
+    v4.or(v6)
 }
 
 /// openconnect gets a console of its own (in the service's session, so

@@ -1,7 +1,7 @@
 //! macOS: the command-line tools craked drives (`ifconfig`, `route`), as
 //! Linux's craked drives `ip` and `nft`.
 
-use std::net::Ipv4Addr;
+use std::net::IpAddr;
 
 use anyhow::{Result, bail};
 use tokio::process::Command;
@@ -19,13 +19,25 @@ pub async fn run(program: &str, args: &[&str]) -> Result<()> {
     Ok(())
 }
 
-/// `dest/prefix` as `route` takes it.
+/// `dest/prefix` as `route` takes it (`-inet6` first for IPv6).
 fn destination(dest: &str, prefix: u8) -> Vec<String> {
-    if prefix == crate::hosts::V4_BITS {
-        vec!["-host".into(), dest.into()]
+    let v6 = dest.contains(':');
+    let host = if v6 {
+        crate::hosts::V6_BITS
     } else {
-        vec!["-net".into(), format!("{dest}/{prefix}")]
+        crate::hosts::V4_BITS
+    };
+    let mut args: Vec<String> = if v6 {
+        vec!["-inet6".into()]
+    } else {
+        Vec::new()
+    };
+    if prefix == host {
+        args.extend(["-host".into(), dest.into()]);
+    } else {
+        args.extend(["-net".into(), format!("{dest}/{prefix}")]);
     }
+    args
 }
 
 /// `dest/prefix` through the interface (already there: fine).
@@ -50,11 +62,12 @@ pub async fn route_add_scoped(dest: &str, prefix: u8, dev: &str) -> Result<()> {
     route(&args, true).await
 }
 
-/// `dest/prefix` to a next hop (a full tunnel's gateway kept on its way).
-pub async fn route_add_via(dest: &str, prefix: u8, via: Ipv4Addr) -> Result<()> {
+/// `dest/prefix` to a next hop (a full tunnel's gateway kept on its way;
+/// an IPv6 one may carry its scope, `fe80::1%en0`).
+pub async fn route_add_via(dest: &str, prefix: u8, via: &str) -> Result<()> {
     let mut args = vec!["-n".to_owned(), "add".into()];
     args.extend(destination(dest, prefix));
-    args.push(via.to_string());
+    args.push(via.to_owned());
     route(&args, true).await
 }
 
@@ -132,17 +145,20 @@ fn pf_token(said: &str) -> Option<String> {
 
 /// How macOS sends to `dest` now: (whether by the default route, its next
 /// hop if any), from `route -n get`.
-pub async fn way_to(dest: Ipv4Addr) -> Result<(bool, Option<Ipv4Addr>)> {
-    let out = Command::new("route")
-        .args(["-n", "get", &dest.to_string()])
-        .output()
-        .await?;
+pub async fn way_to(dest: IpAddr) -> Result<(bool, Option<String>)> {
+    let dest = dest.to_string();
+    let mut args = vec!["-n", "get"];
+    if dest.contains(':') {
+        args.push("-inet6");
+    }
+    args.push(&dest);
+    let out = Command::new("route").args(&args).output().await?;
     Ok(parse_route_get(&String::from_utf8_lossy(&out.stdout)))
 }
 
 /// `route -n get`'s answer: whether its destination is the default route,
-/// and its gateway.
-pub fn parse_route_get(text: &str) -> (bool, Option<Ipv4Addr>) {
+/// and its gateway (an address, with its scope for a link-local IPv6 one).
+pub fn parse_route_get(text: &str) -> (bool, Option<String>) {
     let field = |name: &str| {
         text.lines()
             .filter_map(|l| l.trim().strip_prefix(name))
@@ -150,7 +166,13 @@ pub fn parse_route_get(text: &str) -> (bool, Option<Ipv4Addr>) {
             .next()
     };
     let default = field("destination:") == Some("default");
-    let gateway = field("gateway:").and_then(|g| g.parse().ok());
+    let gateway = field("gateway:")
+        .filter(|g| {
+            g.split('%')
+                .next()
+                .is_some_and(|a| a.parse::<IpAddr>().is_ok())
+        })
+        .map(str::to_owned);
     (default, gateway)
 }
 
@@ -161,7 +183,20 @@ mod tests {
         let text = "   route to: 198.51.100.10\ndestination: default\n       mask: default\n    gateway: 192.0.2.1\n  interface: en0\n";
         assert_eq!(
             super::parse_route_get(text),
-            (true, Some("192.0.2.1".parse().unwrap()))
+            (true, Some("192.0.2.1".to_owned()))
+        );
+        let v6 = "   route to: 2001:db8::10\ndestination: default\n    gateway: fe80::1%en0\n  interface: en0\n";
+        assert_eq!(
+            super::parse_route_get(v6),
+            (true, Some("fe80::1%en0".to_owned()))
+        );
+        assert_eq!(
+            super::destination("fd40::1", 128),
+            ["-inet6", "-host", "fd40::1"]
+        );
+        assert_eq!(
+            super::destination("fd40::", 48),
+            ["-inet6", "-net", "fd40::/48"]
         );
         let lan = "   route to: 192.0.2.7\ndestination: 192.0.2.0\n  interface: en0\n";
         assert_eq!(super::parse_route_get(lan), (false, None));

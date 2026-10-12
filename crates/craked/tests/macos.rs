@@ -90,7 +90,12 @@ fn sh(program: &str, args: &[&str]) -> String {
 
 /// The interface `route -n get` sends `addr` out of.
 fn way(addr: &str) -> String {
-    sh("route", &["-n", "get", addr])
+    let mut args = vec!["-n", "get"];
+    if addr.contains(':') {
+        args.push("-inet6");
+    }
+    args.push(addr);
+    sh("route", &args)
         .lines()
         .find_map(|l| {
             l.trim()
@@ -120,11 +125,23 @@ async fn a_tunnel_on_a_utun_device() {
         .await
         .unwrap();
     assert_eq!(way("10.40.0.2"), dev);
+    // The IPv6 address the gateway gave, as well.
+    net.assign6(&dev, "fd40:ff::5".parse().unwrap(), 128)
+        .await
+        .unwrap();
+    let shown = sh("ifconfig", &[&dev]);
+    assert!(shown.contains("inet6 fd40:ff::5"), "{shown}");
 
     // Pinned and learned hosts: routes through it; nothing else.
     let routing = Routing::new(true);
-    let pinned: Vec<Target> = vec!["10.40.2.0/24".parse().unwrap()];
-    let learned = [(IpAddr::V4(Ipv4Addr::new(10, 40, 1, 10)), 600)];
+    let pinned: Vec<Target> = vec![
+        "10.40.2.0/24".parse().unwrap(),
+        "fd40:2::/64".parse().unwrap(),
+    ];
+    let learned = [
+        (IpAddr::V4(Ipv4Addr::new(10, 40, 1, 10)), 600),
+        ("fd40:1::10".parse().unwrap(), 600),
+    ];
     routing
         .up(&Plan {
             name: "acme",
@@ -136,13 +153,17 @@ async fn a_tunnel_on_a_utun_device() {
             pinned: &pinned,
             learned: &learned,
             full_except: None,
-            ipv6: false,
+            ipv6: true,
         })
         .await
         .unwrap();
     assert_eq!(way("10.40.1.10"), dev);
     assert_eq!(way("10.40.2.7"), dev);
     assert_ne!(way("10.40.1.11"), dev, "not learned: not routed");
+    // IPv6 hosts and networks likewise.
+    assert_eq!(way("fd40:1::10"), dev);
+    assert_eq!(way("fd40:2::7"), dev);
+    assert_ne!(way("fd40:1::11"), dev, "not learned: not routed");
     routing
         .add_learned("acme", IpAddr::V4(Ipv4Addr::new(10, 40, 1, 11)), 600)
         .await
@@ -191,6 +212,8 @@ async fn a_tunnel_on_a_utun_device() {
     // A socket bound to the tunnel finds its way out through it (probes).
     let probe = tokio::net::TcpSocket::new_v4().unwrap();
     craked::sys::mark(&probe, craked::routing::ids(0).mark).unwrap();
+    let probe6 = tokio::net::TcpSocket::new_v6().unwrap();
+    craked::sys::mark(&probe6, craked::routing::ids(0).mark).unwrap();
 
     // DNS: acme.internal's names go to craked's server (here a stand-in).
     let server = UdpSocket::bind((Ipv4Addr::LOCALHOST, craked::dns_queue::PORT)).unwrap();
@@ -228,6 +251,7 @@ async fn a_tunnel_on_a_utun_device() {
     routing.down("acme", 0, Some(&dev)).await.unwrap();
     assert_ne!(way("10.40.1.10"), dev);
     assert_ne!(way("10.40.2.7"), dev);
+    assert_ne!(way("fd40:1::10"), dev);
 }
 
 /// The source of the first SYN to `dst` that comes out of the utun device

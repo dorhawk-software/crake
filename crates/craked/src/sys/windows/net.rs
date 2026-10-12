@@ -21,10 +21,12 @@ impl Net {
         if apply { Self::Ip } else { Self::Noop }
     }
 
-    /// The tunnel's IPv6 address: not given yet, as IPv6 isn't routed
-    /// here (`Routing::routes_ipv6`).
-    pub async fn assign6(&self, _dev: &str, _addr: std::net::Ipv6Addr, _prefix: u8) -> Result<()> {
-        Ok(())
+    /// The tunnel's IPv6 address.
+    pub async fn assign6(&self, dev: &str, addr: std::net::Ipv6Addr, prefix: u8) -> Result<()> {
+        if let Self::Noop = self {
+            return Ok(());
+        }
+        iphelper::set_address(iphelper::luid(dev)?, addr.into(), prefix)
     }
 
     pub async fn assign(
@@ -38,9 +40,13 @@ impl Net {
             return Ok(());
         }
         let luid = iphelper::luid(dev)?;
-        iphelper::set_address(luid, addr, prefix)?;
+        iphelper::set_address(luid, addr.into(), prefix)?;
         if let Some(mtu) = mtu {
-            iphelper::set_mtu(luid, mtu)?;
+            iphelper::set_mtu(luid, mtu, false)?;
+            // IPv6 needs at least 1280; an adapter without it says no.
+            if let Err(e) = iphelper::set_mtu(luid, mtu, true) {
+                tracing::debug!("{dev}'s IPv6 MTU: {e:#}");
+            }
         }
         Ok(())
     }
@@ -59,7 +65,8 @@ impl Net {
         Ok(())
     }
 
-    /// IPv6 DNS servers aren't asked here yet: nothing to route.
+    /// IPv6 DNS servers aren't asked here yet (craked's own DNS server
+    /// asks IPv4 ones): nothing to route.
     pub async fn route_dns6(&self, _dev: &str, _dns: std::net::Ipv6Addr) -> Result<()> {
         Ok(())
     }
@@ -68,7 +75,9 @@ impl Net {
     /// adds up front).
     pub async fn route_dns(&self, dev: &str, dns: Ipv4Addr) -> Result<()> {
         match self {
-            Self::Ip => iphelper::add_route(iphelper::luid(dev)?, dns, crate::hosts::V4_BITS),
+            Self::Ip => {
+                iphelper::add_route(iphelper::luid(dev)?, dns.into(), crate::hosts::V4_BITS)
+            }
             Self::Noop => Ok(()),
         }
     }
