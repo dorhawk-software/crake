@@ -147,7 +147,12 @@ pub(super) fn open_panel(at: Option<(i32, i32)>, cx: &mut App) {
             window_bounds: Some(WindowBounds::Windowed(bounds)),
             titlebar: None,
             window_decorations: Some(WindowDecorations::Client),
-            window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
+            // Windows rounds the panel itself (`sys::rounded_frame`): opaque.
+            window_background: if cfg!(windows) {
+                gpui_kit::WindowBackgroundAppearance::Opaque
+            } else {
+                gpui_kit::WindowBackgroundAppearance::Transparent
+            },
             // With the patched X11 backend: above other windows, out of the
             // taskbar, focusable (see vendor/gpui-pre-linux/CRAKE-PATCH.md).
             kind: if placed.is_some() {
@@ -162,6 +167,7 @@ pub(super) fn open_panel(at: Option<(i32, i32)>, cx: &mut App) {
         },
         move |window, cx| {
             crate::sys::plain_frame(window);
+            crate::sys::rounded_frame(window, crate::theme::Theme::current(cx).line);
             // The visible panel, without the shadow margin, is the window for the desktop.
             window.set_client_inset(px(panel::MARGIN));
             cx.new(|cx| Panel::new(model, requests, motion, upward, window, cx))

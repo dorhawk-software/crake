@@ -58,6 +58,9 @@ pub fn private_dir() -> Result<PathBuf, String> {
 /// Linux windows need nothing more: Crake's own frame is the frame.
 pub fn plain_frame(_window: &gpui_kit::Window) {}
 
+/// Windows rounds the panel itself; here it rounds its own card.
+pub fn rounded_frame(_window: &gpui_kit::Window, _border: gpui_kit::Rgba) {}
+
 /// A command-line program started from the app: on Linux it has no window.
 pub fn no_console(_cmd: &mut std::process::Command) {}
 

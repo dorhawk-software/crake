@@ -95,10 +95,26 @@ pub fn executable(path: &Path) -> bool {
 /// Crake's windows draw their own rounded card on a transparent window:
 /// Windows 11 mustn't add its square outline or round the window itself.
 pub fn plain_frame(window: &gpui_kit::Window) {
+    use windows_sys::Win32::Graphics::Dwm::{DWMWA_COLOR_NONE, DWMWCP_DONOTROUND};
+    frame(window, DWMWCP_DONOTROUND, DWMWA_COLOR_NONE);
+}
+
+/// The panel, opaque and the size of its card: Windows rounds it and draws
+/// its hairline (in `border`, the theme's line) and its shadow, which a
+/// transparent window with a card rounding itself didn't get (and DirectX
+/// left a light fringe at its corners).
+pub fn rounded_frame(window: &gpui_kit::Window, border: gpui_kit::Rgba) {
+    use windows_sys::Win32::Graphics::Dwm::DWMWCP_ROUND;
+    let channel = |c: f32| (c.clamp(0., 1.) * f32::from(u8::MAX)).round() as u8;
+    // COLORREF: 0x00BBGGRR.
+    let color = u32::from_le_bytes([channel(border.r), channel(border.g), channel(border.b), 0]);
+    frame(window, DWMWCP_ROUND, color);
+}
+
+fn frame(window: &gpui_kit::Window, corners: i32, border: u32) {
     use raw_window_handle::{HasWindowHandle, RawWindowHandle};
     use windows_sys::Win32::Graphics::Dwm::{
-        DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND,
-        DwmSetWindowAttribute,
+        DWMWA_BORDER_COLOR, DWMWA_WINDOW_CORNER_PREFERENCE, DwmSetWindowAttribute,
     };
     let Ok(handle) = HasWindowHandle::window_handle(window) else {
         return;
@@ -107,21 +123,19 @@ pub fn plain_frame(window: &gpui_kit::Window) {
         return;
     };
     let hwnd = win32.hwnd.get() as windows_sys::Win32::Foundation::HWND;
-    let none: u32 = DWMWA_COLOR_NONE;
-    let square = DWMWCP_DONOTROUND;
     // SAFETY: a live window of this process; each value is the size given.
     unsafe {
         DwmSetWindowAttribute(
             hwnd,
             DWMWA_BORDER_COLOR as u32,
-            (&raw const none).cast(),
+            (&raw const border).cast(),
             size_of::<u32>() as u32,
         );
         DwmSetWindowAttribute(
             hwnd,
             DWMWA_WINDOW_CORNER_PREFERENCE as u32,
-            (&raw const square).cast(),
-            size_of_val(&square) as u32,
+            (&raw const corners).cast(),
+            size_of_val(&corners) as u32,
         );
     }
 }

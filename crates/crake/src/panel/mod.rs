@@ -130,11 +130,12 @@ impl Render for Panel {
             .flex()
             .flex_col()
             .bg(t.panel)
-            .border_1()
-            .border_color(t.line)
             // The hairline is the edge (DESIGN.md: no offset shadows). A drawn
-            // shadow bands through XWayland's transparency.
-            .rounded(px(10.))
+            // shadow bands through XWayland's transparency. Windows rounds the
+            // panel and draws its hairline itself (`sys::rounded_frame`).
+            .when(!cfg!(windows), |d| {
+                d.border_1().border_color(t.line).rounded(px(10.))
+            })
             .text_color(t.ink)
             .font_family(fonts::UI)
             .text_size(px(14.))
