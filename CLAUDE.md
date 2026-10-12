@@ -233,7 +233,10 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    (openconnect lists them in `INTERNAL_IP4_DNS`) are registered with
    resolved, get a /128 through the tunnel, and their answers are held
    like IPv4 ones (Linux; netns-tested). The public-NXDOMAIN rescue
-   routes the AAAA records a tunnel knows too (netns-tested). Still open:
+   routes the AAAA records a tunnel knows too, and watches public DNS
+   reached over IPv6 as well (a dual-stack network's router often hands
+   one out; the rewritten answer gets the UDP checksum IPv6 requires;
+   netns-tested). Still open:
    DNS over TCP across segments, IPv6 DNS servers on macOS and Windows,
    DNS-over-TLS upstreams (Crake can't see those failures), IPv6 in
    split-horizon (A only).

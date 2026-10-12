@@ -294,21 +294,36 @@ fn ask_over_ipv6(tun: &mut File, name: &str, addr: Ipv4Addr) -> bool {
     let sock = UdpSocket::bind("[::]:0").unwrap();
     sock.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
     sock.send_to(&query(name), "[fd40::53]:53").unwrap();
+    let q = read_query6(tun);
+    tun.write_all(&reply6(&q, 0, &[addr.into()])).unwrap();
+    let mut answer = [0u8; 512];
+    sock.recv_from(&mut answer)
+        .expect("the answer reached the app");
+    let _ = sock.send_to(b"first", (addr, 443));
+    first_packet_through_tunnel(tun, IpAddr::V4(addr))
+}
+
+/// Wait for an IPv6 UDP packet to port 53 leaving through `dev`.
+fn read_query6(dev: &mut File) -> Vec<u8> {
     let start = Instant::now();
     let mut buf = [0u8; 2048];
-    let q = loop {
+    loop {
         assert!(
             start.elapsed() < Duration::from_secs(5),
-            "no IPv6 DNS query left through the tunnel"
+            "no IPv6 DNS query left"
         );
-        match tun.read(&mut buf) {
+        match dev.read(&mut buf) {
             Ok(n) if n > 48 && buf[0] >> 4 == 6 && buf[6] == 17 && buf[42..44] == [0, 53] => {
-                break buf[..n].to_vec();
+                return buf[..n].to_vec();
             }
             _ => std::thread::sleep(Duration::from_millis(2)),
         }
-    };
-    let dns = answer_message(&q[48..], 0, &[addr.into()]);
+    }
+}
+
+/// The answer packet to an IPv6 query packet: rcode plus records.
+fn reply6(q: &[u8], rcode: u8, addrs: &[IpAddr]) -> Vec<u8> {
+    let dns = answer_message(&q[48..], rcode, addrs);
     let mut udp = Vec::new();
     udp.extend_from_slice(&q[42..44]);
     udp.extend_from_slice(&q[40..42]);
@@ -333,12 +348,35 @@ fn ask_over_ipv6(tun: &mut File, name: &str, addr: Ipv4Addr) -> bool {
     ip.extend_from_slice(&q[24..40]);
     ip.extend_from_slice(&q[8..24]);
     ip.extend_from_slice(&udp);
-    tun.write_all(&ip).unwrap();
-    let mut answer = [0u8; 512];
-    sock.recv_from(&mut answer)
-        .expect("the answer reached the app");
-    let _ = sock.send_to(b"first", (addr, 443));
-    first_packet_through_tunnel(tun, IpAddr::V4(addr))
+    ip
+}
+
+/// The app asks public DNS reached over IPv6 (the test plays it at
+/// fd00:1a::1 on `uplink`), which doesn't know `name`; the tunnel's DNS
+/// knows it as `addr`. Returns what the app got and whether its first
+/// packet went through the tunnel.
+fn ask_public_over_ipv6(
+    uplink: &mut File,
+    tun: &mut File,
+    name: &str,
+    addr: Ipv4Addr,
+) -> (Vec<IpAddr>, bool) {
+    let sock = UdpSocket::bind("[::]:0").unwrap();
+    sock.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    sock.send_to(&query(name), "[fd00:1a::1]:53").unwrap();
+    let q = read_query6(uplink);
+    uplink.write_all(&reply6(&q, 3, &[])).unwrap();
+    if let Some(tq) = try_read_query(tun, Duration::from_millis(1500)) {
+        tun.write_all(&answer(&tq, addr)).unwrap();
+    }
+    let mut buf = [0u8; 1500];
+    let (n, _) = sock.recv_from(&mut buf).expect("the app got an answer");
+    let addrs = craked::dns::parse_message(&buf[..n])
+        .map(|a| a.addrs)
+        .unwrap_or_default();
+    let app = UdpSocket::bind("0.0.0.0:0").unwrap();
+    let _ = app.send_to(b"first", (addr, 5432));
+    (addrs, first_packet_through_tunnel(tun, IpAddr::V4(addr)))
 }
 
 fn checksum(header: &[u8]) -> u16 {
@@ -661,6 +699,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     let gw: Ipv4Addr = "192.0.2.10".parse().unwrap();
     let git6: Ipv6Addr = "fd40:1::7".parse().unwrap();
     let db6: Ipv6Addr = "fd40:1::5".parse().unwrap();
+    let db_v6net: Ipv4Addr = "10.58.70.120".parse().unwrap();
     let over6: Ipv4Addr = "10.33.6.6".parse().unwrap();
 
     // Run the blocking socket work off the runtime; the queue thread needs it.
@@ -690,6 +729,9 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
                 None,
                 Some(db6.into()),
             ),
+            // Public DNS reached over IPv6 (a dual-stack network's router
+            // often hands out one): rescued the same way.
+            ask_public_over_ipv6(&mut uplink, &mut tun, "db.v6net.example", db_v6net),
         );
         // Under the organisation's own domain (gateway vpn.acme.example):
         // public DNS knows it, and the tunnel's DNS knows better.
@@ -735,7 +777,14 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     })
     .await
     .unwrap();
-    publics_handled(publics, db, db6, site);
+    let (p0, p1, p2, p3, p4, over_v6) = publics;
+    assert_eq!(
+        over_v6.0,
+        vec![IpAddr::V4(db_v6net)],
+        "public DNS over IPv6 didn't know it; the tunnel's answer replaced it"
+    );
+    assert!(over_v6.1, "and it was routed first");
+    publics_handled((p0, p1, p2, p3, p4), db, db6, site);
 
     let (fe, office, www) = splits;
     assert_eq!(

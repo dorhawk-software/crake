@@ -24,6 +24,7 @@ const DESTINATION: Range<usize> = 16..20;
 /// headers aren't followed (a first SYN or an ICMPv6 notice has none).
 const IPV6: u8 = 6;
 pub const IPV6_HEADER: usize = 40;
+const PAYLOAD_LENGTH: Range<usize> = 4..6;
 const NEXT_HEADER: usize = 6;
 const SOURCE6: Range<usize> = 8..24;
 const DESTINATION6: Range<usize> = 24..40;
@@ -190,6 +191,33 @@ pub fn with_udp_data(packet: V4<'_>, data: &[u8]) -> Option<Vec<u8>> {
     let udp = &mut out[ip..];
     udp[UDP_LENGTH].copy_from_slice(&udp_len.to_be_bytes());
     udp[UDP_CHECKSUM].fill(0);
+    Some(out)
+}
+
+/// The same IPv6 UDP packet carrying `data` instead: the payload length
+/// fixed and the UDP checksum, which IPv6 requires, computed over the
+/// pseudo-header (RFC 8200, 8.1).
+pub fn with_udp_data6(packet: V6<'_>, data: &[u8]) -> Option<Vec<u8>> {
+    let udp_len = u16::try_from(UDP_HEADER + data.len()).ok()?;
+    let mut out = Vec::with_capacity(IPV6_HEADER + usize::from(udp_len));
+    out.extend_from_slice(packet.bytes.get(..IPV6_HEADER + UDP_HEADER)?);
+    out.extend_from_slice(data);
+    out[PAYLOAD_LENGTH].copy_from_slice(&udp_len.to_be_bytes());
+    let udp = IPV6_HEADER..out.len();
+    out[udp.clone()][UDP_LENGTH].copy_from_slice(&udp_len.to_be_bytes());
+    out[udp.clone()][UDP_CHECKSUM].fill(0);
+    let mut pseudo = Vec::with_capacity(IPV6_HEADER + out.len());
+    pseudo.extend_from_slice(&out[SOURCE6]);
+    pseudo.extend_from_slice(&out[DESTINATION6]);
+    pseudo.extend_from_slice(&u32::from(udp_len).to_be_bytes());
+    pseudo.extend_from_slice(&[0, 0, 0, UDP]);
+    pseudo.extend_from_slice(&out[udp.clone()]);
+    // A computed zero is sent as all ones: zero means "none", not allowed.
+    let sum = match checksum(&pseudo) {
+        0 => u16::MAX,
+        sum => sum,
+    };
+    out[udp][UDP_CHECKSUM].copy_from_slice(&sum.to_be_bytes());
     Some(out)
 }
 

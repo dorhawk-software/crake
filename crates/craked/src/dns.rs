@@ -252,8 +252,19 @@ pub fn rewrite(failure: &Failure, mut reply: Message) -> Option<Vec<u8>> {
 /// The same packet with a different DNS message: lengths and the IPv4 header
 /// checksum fixed, the (optional) UDP checksum cleared.
 pub fn replace_payload(packet: &[u8], dns: &[u8]) -> Option<Vec<u8>> {
-    dns_payload(packet)?;
-    packet::with_udp_data(packet::V4::parse(packet, packet::UDP)?, dns)
+    if let Some(ip) = packet::V4::parse(packet, packet::UDP) {
+        dns_payload(packet)?;
+        return packet::with_udp_data(ip, dns);
+    }
+    let ip = packet::V6::parse(packet, packet::UDP)?;
+    udp_dns(ip.payload()?)?;
+    packet::with_udp_data6(ip, dns)
+}
+
+/// The DNS message in a public answer (UDP from port 53), from a server
+/// reached over IPv4 or IPv6: what the rescue reads and may replace.
+pub fn public_payload(packet: &[u8]) -> Option<&[u8]> {
+    dns_payload(packet).or_else(|| udp_dns(packet::V6::parse(packet, packet::UDP)?.payload()?))
 }
 
 /// The organisation's own domain, from its gateway's name:
@@ -479,8 +490,22 @@ pub(crate) mod tests {
         assert!(parse_packet(&ipv6(packet::TCP, tcp)).is_some());
         let other = &udp_packet(5353, &msg)[packet::IPV4_MIN..];
         assert!(parse_packet(&ipv6(packet::UDP, other)).is_none());
-        // The public-DNS rescue rewrites IPv4 packets only.
-        assert!(dns_payload(&ipv6(packet::UDP, udp)).is_none());
+        // The public-DNS rescue reads and rewrites IPv6 answers too, with
+        // the checksum IPv6 requires.
+        let held = ipv6(packet::UDP, udp);
+        assert_eq!(public_payload(&held), Some(&msg[..]));
+        let other = response("git.acme.internal", &["10.33.8.8".parse().unwrap()]);
+        let out = replace_payload(&held, &other).unwrap();
+        assert_eq!(public_payload(&out), Some(&other[..]));
+        let mut pseudo = out[8..40].to_vec();
+        pseudo.extend_from_slice(&((out.len() - 40) as u32).to_be_bytes());
+        pseudo.extend_from_slice(&[0, 0, 0, packet::UDP]);
+        pseudo.extend_from_slice(&out[40..]);
+        assert_eq!(packet::checksum(&pseudo), 0, "a valid UDP checksum");
+        assert_eq!(
+            usize::from(u16::from_be_bytes([out[4], out[5]])),
+            out.len() - 40
+        );
     }
 
     #[test]

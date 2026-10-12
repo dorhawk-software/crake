@@ -431,7 +431,7 @@ impl Routing {
              add rule inet {TABLE} public_dns iifname \"lo\" return\n\
              add rule inet {TABLE} public_dns iifname \"crake-*\" return\n\
              add rule inet {TABLE} public_dns iifname @{TUNNEL_DEVICES} return\n\
-             add rule inet {TABLE} public_dns meta nfproto ipv4 udp sport 53 queue num {QUEUE_NUM} bypass\n\
+             add rule inet {TABLE} public_dns udp sport 53 queue num {QUEUE_NUM} bypass\n\
              {unreachable}"
         ))
         .await

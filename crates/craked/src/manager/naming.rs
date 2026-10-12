@@ -35,7 +35,7 @@ impl Manager {
     /// Called with each public DNS answer (a whole packet), before it's let
     /// through: `rescue_answer`'s packet carrying the tunnel's answer instead.
     pub async fn rescue(&self, packet: &[u8]) -> Option<Vec<u8>> {
-        let payload = dns::dns_payload(packet)?;
+        let payload = dns::public_payload(packet)?;
         let answer = self.rescue_answer(payload).await?;
         dns::replace_payload(packet, &answer)
     }
