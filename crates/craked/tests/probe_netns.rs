@@ -354,23 +354,7 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
     mgr.redo("acme", &["10.70.0.5"]).await.unwrap();
     assert!(sh("nft list set inet crake learned_acme").contains("10.70.0.5"));
 
-    // Forget: gone, and the next visit is a first one again (probed and
-    // routed afresh, although it was probed moments ago), not blocked.
-    mgr.forget("acme", "10.70.0.6").await.unwrap();
-    assert!(!sh("nft list set inet crake learned_acme").contains("10.70.0.6"));
-    let again = tokio::task::spawn_blocking(|| {
-        let first = connect("10.70.0.6", 443, Duration::from_secs(5));
-        std::thread::sleep(Duration::from_millis(1500));
-        (first, connect("10.70.0.6", 443, Duration::from_secs(5)))
-    })
-    .await
-    .unwrap();
-    assert!(
-        again.1.0.is_ok(),
-        "forgotten, then routed again on the next visit: {:?}",
-        again.1.0
-    );
-    assert!(sh("nft list set inet crake learned_acme").contains("10.70.0.6"));
+    forget_is_not_forbid(&mgr).await;
 
     mgr.shutdown().await;
     stop.store(true, Ordering::Relaxed);
@@ -395,6 +379,43 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
         !log.contains("192.168.0.50") && !log.contains("10.70.9.9"),
         "{log}"
     );
+}
+
+/// Forget: gone, and the next visit is a first one again (probed and
+/// routed afresh, although it was probed moments ago), not blocked. A
+/// connection open to it ends (a browser would wait on it).
+async fn forget_is_not_forbid(mgr: &Manager) {
+    let held = tokio::task::spawn_blocking(|| connect("10.70.0.6", 443, Duration::from_secs(5)).0)
+        .await
+        .unwrap()
+        .expect("10.70.0.6 answers through ACME");
+    mgr.forget("acme", "10.70.0.6").await.unwrap();
+    assert!(!sh("nft list set inet crake learned_acme").contains("10.70.0.6"));
+    let ended = tokio::task::spawn_blocking(move || {
+        let mut held = held;
+        held.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        let mut buf = [0u8; 1];
+        held.read(&mut buf)
+    })
+    .await
+    .unwrap();
+    assert!(
+        !matches!(&ended, Err(e) if e.kind() == std::io::ErrorKind::WouldBlock),
+        "the open connection was closed: {ended:?}"
+    );
+    let again = tokio::task::spawn_blocking(|| {
+        let first = connect("10.70.0.6", 443, Duration::from_secs(5));
+        std::thread::sleep(Duration::from_millis(1500));
+        (first, connect("10.70.0.6", 443, Duration::from_secs(5)))
+    })
+    .await
+    .unwrap();
+    assert!(
+        again.1.0.is_ok(),
+        "forgotten, then routed again on the next visit: {:?}",
+        again.1.0
+    );
+    assert!(sh("nft list set inet crake learned_acme").contains("10.70.0.6"));
 }
 
 /// rp_filter=1 everywhere, as Fedora has it (scripts/netns-test.sh starts

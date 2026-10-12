@@ -205,10 +205,26 @@ impl Manager {
     }
 
     pub(super) fn name_for(&self, addr: Ipv4Addr) -> Option<String> {
-        let seen = self.seen_names.lock().unwrap();
-        seen.get(&addr)
+        let seen = self
+            .seen_names
+            .lock()
+            .unwrap()
+            .get(&addr)
             .filter(|(_, at)| at.elapsed() < SEEN_NAME_FOR)
-            .map(|(n, _)| n.clone())
+            .map(|(n, _)| n.clone());
+        // Failing that, the name a tunnel's DNS gave this address last (an
+        // app that kept the address in its own DNS cache, as browsers do,
+        // reaches it without asking: probing finds it by address).
+        seen.or_else(|| {
+            let store = self.hosts.lock().unwrap();
+            store
+                .tunnels
+                .values()
+                .flat_map(|t| &t.answers)
+                .filter(|(_, (addrs, _))| addrs.contains(&addr))
+                .max_by_key(|(_, (_, at))| *at)
+                .map(|(name, _)| name.clone())
+        })
     }
 
     /// Route the addresses of one answer through the tunnel, and say so.

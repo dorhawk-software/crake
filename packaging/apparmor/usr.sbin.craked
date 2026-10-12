@@ -2,8 +2,8 @@
 # /etc/apparmor.d/usr.sbin.craked). craked runs as root and reads what the
 # network sends (DNS answers, connection events), so it gets only what it
 # needs: its own files, netlink (routes, nftables, the DNS queue,
-# conntrack), its D-Bus name and the calls it makes (resolved, polkit), ip
-# and nft, and openconnect with the hook it runs.
+# conntrack), its D-Bus name and the calls it makes (resolved, polkit), ip,
+# nft and ss, and openconnect with the hook it runs.
 # Tested enforced by scripts/vm-test.sh.
 
 abi <abi/3.0>,
@@ -62,6 +62,10 @@ profile craked /usr/sbin/craked flags=(attach_disconnected) {
   # Routes, rules and nftables.
   /{usr/,}{s,}bin/ip ix,
   /{usr/,}{s,}bin/nft ix,
+  # Forget closes open connections to what it forgot (ss -K, sock_diag).
+  /{usr/,}{s,}bin/ss ix,
+  /etc/iproute2/** r,
+  /usr/share/iproute2/** r,
   /etc/iproute2/** r,
   /usr/share/iproute2/** r,
   /usr/lib/iproute2/** r,

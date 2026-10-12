@@ -125,6 +125,20 @@ fn netlink_socket(groups: u32, nonblocking: bool) -> io::Result<OwnedFd> {
     }
 }
 
+/// Close this machine's TCP connections to `target` (iproute2's `ss -K`,
+/// the kernel's socket destroy): the apps see them end and open new ones,
+/// which are found and routed as on a first visit. After Forget, an open
+/// keep-alive connection would otherwise sit there, its packets now going
+/// direct to nothing.
+pub async fn close_to(target: crate::hosts::Target) {
+    let _ = tokio::process::Command::new("ss")
+        .args(["-K", "-t", "dst", &target.to_string()])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .await;
+}
+
 /// Forget one flow, so its next packet starts a new entry (and is routed and
 /// NATed afresh). Blocking; call from a blocking context.
 pub fn delete(flow: Flow) -> io::Result<()> {

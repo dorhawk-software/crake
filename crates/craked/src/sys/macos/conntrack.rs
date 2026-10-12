@@ -45,6 +45,10 @@ impl Events {
     }
 }
 
+/// macOS can't close another process's connections from outside: after
+/// Forget, an open connection ends when the app gives up on it.
+pub async fn close_to(_target: crate::hosts::Target) {}
+
 /// Nothing to reset from outside on macOS: the app's next SYN takes the
 /// route Crake just added.
 pub fn delete(_flow: Flow) -> io::Result<()> {

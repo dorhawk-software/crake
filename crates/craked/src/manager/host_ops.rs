@@ -401,10 +401,13 @@ impl Manager {
         }
         // Forgotten, not forbidden (that's Undo): the next visit is a first
         // one. Probed again even if it was probed moments ago, and its name
-        // asked of DNS again rather than taken from a cache, so it's routed
-        // before the first packet again, under its name.
+        // asked of DNS again rather than taken from the system's cache, so
+        // it's routed before the first packet again, under its name.
         self.probed.lock().unwrap().retain(|a, _| !t.contains(*a));
         self.resolved.flush().await;
+        // Open connections to it end, so apps open new ones (a browser
+        // reusing a keep-alive connection would wait on it).
+        crate::conntrack::close_to(t).await;
         let msg = format!("Stopped sending {t} through {label}.");
         self.record(
             LogKind::Undone,

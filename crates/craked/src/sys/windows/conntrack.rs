@@ -119,6 +119,16 @@ fn table() -> io::Result<HashMap<Flow, TcpState>> {
         .collect())
 }
 
+/// Close this machine's TCP connections to `target`, so the apps open new
+/// ones, found and routed as on a first visit (after Forget, an open
+/// keep-alive connection would sit there, its packets now going direct).
+pub async fn close_to(target: crate::hosts::Target) {
+    let Ok(now) = table() else { return };
+    for flow in now.into_keys().filter(|f| target.contains(f.dst)) {
+        let _ = delete(flow);
+    }
+}
+
 /// Reset a connection stuck without an answer, so the app's next attempt
 /// takes the route Crake just added (Linux deletes its conntrack entry).
 pub fn delete(flow: Flow) -> io::Result<()> {
