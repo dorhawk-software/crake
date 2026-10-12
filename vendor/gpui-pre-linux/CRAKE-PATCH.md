@@ -27,7 +27,10 @@ taken the change (the patch applies backwards), the script drops this copy
 and the `[patch]`. `scripts/check-gpui-patch.sh` (in the lint gate) fails
 the build if Cargo quietly stopped using this copy.
 
-Upstream (GPUI is Zed's): reported as
-https://github.com/zed-industries/zed/issues/65493, with both changes as
-proposed there (this patch is exactly that, so once upstream has it the
-weekly update notices and drops this copy).
+Upstream (GPUI is Zed's; gpui-pre-* are snapshots of Zed's crates, packaged
+by gpui-kit's author): change 1 is zed-industries/zed#64447 (reported by
+someone else; its fix also sets static gravity, which a window with a title
+bar needs), change 2 is zed-industries/zed#65493 (ours; this patch is the
+fix proposed there). Once upstream has both, the weekly update notices and
+drops this copy; if upstream's fix differs from this patch, the patch stops
+applying and the update opens an issue instead.
