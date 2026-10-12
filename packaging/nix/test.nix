@@ -21,6 +21,7 @@ in {
   name = "crake";
 
   nodes.gateway = { pkgs, ... }: {
+    virtualisation.memorySize = 2048;
     networking.firewall.enable = false;
     networking.nftables.enable = true;
     # From the LAN, ACME's network doesn't answer: only the tunnel reaches it.
@@ -94,6 +95,10 @@ in {
   nodes.client = { nodes, pkgs, ... }: {
     imports = [ self.nixosModules.default ];
     services.crake.enable = true;
+    # The client runs craked, openconnect and the whole GPUI journey
+    # (software-rendered): the test VM's 1 vCPU / 1 GB default is cramped.
+    virtualisation.cores = 2;
+    virtualisation.memorySize = 4096;
     networking.firewall.enable = false;
     # The journey runs as root with the system's own tools.
     environment.systemPackages = [ pkgs.curl pkgs.nftables pkgs.dbus pkgs.util-linux ];
