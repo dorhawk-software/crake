@@ -283,8 +283,8 @@ forgotten so the app's next try goes through.
 - ✅ Gateways that only admit Cisco's client, said openly
 - ✅ OpenVPN 3 profiles, including sessions started elsewhere
 - ✅ Tray, panel, log, settings, new tunnel, sign-in, tunnel detail; light and dark
-- 🟡 Networks that block UDP: built and tested against a real AnyConnect server, not yet tried on
-  such a network
+- ✅ Networks that block UDP: noticed, run over TCP on the same session, and remembered for next
+  time — tested on a real network that blocks it
 - 🟡 GlobalProtect, Ivanti/Pulse, Juniper, Fortinet, F5 and Array: spoken through openconnect,
   marked Beta in the app until each has been used against a real gateway
 - ✅ Tunnels that can't be up together: refused with the reason, before they half-work
