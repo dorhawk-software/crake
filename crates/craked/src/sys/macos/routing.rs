@@ -234,7 +234,10 @@ fn nat_rules(devices: &[String]) -> String {
 async fn keep_ways(except: &[Target]) -> Result<Vec<(Target, Ipv4Addr)>> {
     let mut kept = Vec::new();
     for t in except {
-        let (default, via) = cmd::way_to(t.addr()).await?;
+        // IPv6 routing on macOS isn't built yet (a later slice); only IPv4
+        // exceptions are kept on their way.
+        let IpAddr::V4(a) = t.addr() else { continue };
+        let (default, via) = cmd::way_to(a).await?;
         let (true, Some(via)) = (default, via) else {
             continue;
         };

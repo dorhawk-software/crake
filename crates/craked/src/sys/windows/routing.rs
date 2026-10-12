@@ -139,7 +139,11 @@ impl Routing {
             return Ok(());
         };
         for t in routes.targets {
-            iphelper::delete_route(luid, t.addr(), t.prefix_len())?;
+            // IPv6 routing on Windows isn't built yet (IP Helper v6 is a later
+            // slice); only IPv4 routes were ever added.
+            if let IpAddr::V4(a) = t.addr() {
+                iphelper::delete_route(luid, a, t.prefix_len())?;
+            }
         }
         iphelper::delete_route(luid, Ipv4Addr::UNSPECIFIED, 0)?;
         for r in routes.kept {
@@ -176,8 +180,8 @@ impl Routing {
         let Some(routes) = map.get_mut(name) else {
             return Ok(());
         };
-        if self.real {
-            iphelper::add_route(iphelper::luid(&routes.device)?, t.addr(), t.prefix_len())?;
+        if self.real && let IpAddr::V4(a) = t.addr() {
+            iphelper::add_route(iphelper::luid(&routes.device)?, a, t.prefix_len())?;
         }
         routes.targets.insert(t);
         Ok(())
@@ -188,8 +192,8 @@ impl Routing {
         let Some(routes) = map.get_mut(name) else {
             return Ok(());
         };
-        if routes.targets.remove(&t) && self.real {
-            iphelper::delete_route(iphelper::luid(&routes.device)?, t.addr(), t.prefix_len())?;
+        if routes.targets.remove(&t) && self.real && let IpAddr::V4(a) = t.addr() {
+            iphelper::delete_route(iphelper::luid(&routes.device)?, a, t.prefix_len())?;
         }
         Ok(())
     }
@@ -202,7 +206,8 @@ impl Routing {
 fn keep_ways(except: &[Target]) -> Result<Vec<iphelper::Route>> {
     let mut kept = Vec::new();
     for t in except {
-        let (mut way, prefix) = iphelper::best_route(t.addr())?;
+        let IpAddr::V4(a) = t.addr() else { continue };
+        let (mut way, prefix) = iphelper::best_route(a)?;
         if prefix > 0 {
             continue;
         }

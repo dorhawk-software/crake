@@ -7,7 +7,7 @@
 //! everything into a device nobody reads would cut the runner off.
 #![cfg(target_os = "macos")]
 
-use std::net::{Ipv4Addr, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, UdpSocket};
 use std::os::fd::{FromRawFd, OwnedFd};
 use std::process::Command;
 
@@ -124,7 +124,7 @@ async fn a_tunnel_on_a_utun_device() {
     // Pinned and learned hosts: routes through it; nothing else.
     let routing = Routing::new(true);
     let pinned: Vec<Target> = vec!["10.40.2.0/24".parse().unwrap()];
-    let learned = [(Ipv4Addr::new(10, 40, 1, 10), 600)];
+    let learned = [(IpAddr::V4(Ipv4Addr::new(10, 40, 1, 10)), 600)];
     routing
         .up(&Plan {
             name: "acme",
@@ -142,12 +142,12 @@ async fn a_tunnel_on_a_utun_device() {
     assert_eq!(way("10.40.2.7"), dev);
     assert_ne!(way("10.40.1.11"), dev, "not learned: not routed");
     routing
-        .add_learned("acme", Ipv4Addr::new(10, 40, 1, 11), 600)
+        .add_learned("acme", IpAddr::V4(Ipv4Addr::new(10, 40, 1, 11)), 600)
         .await
         .unwrap();
     assert_eq!(way("10.40.1.11"), dev);
     routing
-        .remove_learned("acme", Ipv4Addr::new(10, 40, 1, 11))
+        .remove_learned("acme", IpAddr::V4(Ipv4Addr::new(10, 40, 1, 11)))
         .await
         .unwrap();
     assert_ne!(way("10.40.1.11"), dev, "forgotten");
@@ -170,7 +170,7 @@ async fn a_tunnel_on_a_utun_device() {
     let connecting = tokio::spawn(early.connect("10.40.1.99:80".parse().unwrap()));
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
     routing
-        .add_learned("acme", Ipv4Addr::new(10, 40, 1, 99), 600)
+        .add_learned("acme", IpAddr::V4(Ipv4Addr::new(10, 40, 1, 99)), 600)
         .await
         .unwrap();
     let syn = tokio::task::spawn_blocking({
