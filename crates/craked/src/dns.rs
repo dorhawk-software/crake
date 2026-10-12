@@ -174,16 +174,16 @@ pub fn public_failure(payload: &[u8]) -> Option<Failure> {
     question(&msg, &[RecordType::A, RecordType::AAAA])
 }
 
-/// A public answer with IPv4 addresses: the question, and what it said.
-/// Names under an organisation's domain may have a private address too
-/// (split-horizon DNS), which only the tunnel's DNS knows.
-pub fn public_answer(payload: &[u8]) -> Option<(Failure, Vec<Ipv4Addr>)> {
+/// A public answer with addresses (A or AAAA): the question, and what it
+/// said. Names under an organisation's domain may have a private address
+/// too (split-horizon DNS), which only the tunnel's DNS knows.
+pub fn public_answer(payload: &[u8]) -> Option<(Failure, Vec<IpAddr>)> {
     let msg = Message::from_vec(payload).ok()?;
     if msg.metadata.response_code != ResponseCode::NoError {
         return None;
     }
-    let addrs = a_records(&msg);
-    Some((question(&msg, &[RecordType::A])?, addrs))
+    let addrs = records(&msg);
+    Some((question(&msg, &[RecordType::A, RecordType::AAAA])?, addrs))
 }
 
 /// The single question of a response, if it is one a tunnel could answer.
@@ -298,9 +298,16 @@ pub fn organisation(gateway: &str) -> Option<String> {
 }
 
 /// An address only reachable inside some network: RFC 1918 or carrier-grade NAT.
-pub fn is_private(a: Ipv4Addr) -> bool {
-    let shift = Ipv4Addr::BITS - CARRIER_NAT_BITS;
-    a.is_private() || u32::from(a) >> shift == u32::from(CARRIER_NAT) >> shift
+/// A private address: RFC 1918 and carrier NAT for IPv4, unique local
+/// (fc00::/7) for IPv6.
+pub fn is_private(a: impl Into<IpAddr>) -> bool {
+    match a.into() {
+        IpAddr::V4(a) => {
+            let shift = Ipv4Addr::BITS - CARRIER_NAT_BITS;
+            a.is_private() || u32::from(a) >> shift == u32::from(CARRIER_NAT) >> shift
+        }
+        IpAddr::V6(a) => a.is_unique_local(),
+    }
 }
 
 pub fn normalize(name: &str) -> String {
@@ -346,9 +353,11 @@ pub(crate) mod tests {
             Some("example.com")
         );
         assert_eq!(organisation("192.0.2.1"), None);
-        assert!(is_private("10.40.9.30".parse().unwrap()));
-        assert!(is_private("100.64.1.1".parse().unwrap()));
-        assert!(!is_private("198.51.100.32".parse().unwrap()));
+        assert!(is_private("10.40.9.30".parse::<Ipv4Addr>().unwrap()));
+        assert!(is_private("100.64.1.1".parse::<Ipv4Addr>().unwrap()));
+        assert!(!is_private("198.51.100.32".parse::<Ipv4Addr>().unwrap()));
+        assert!(is_private("fd40:1::10".parse::<IpAddr>().unwrap()));
+        assert!(!is_private("2001:db8::1".parse::<IpAddr>().unwrap()));
     }
 
     use super::*;

@@ -20,6 +20,10 @@ use craked::config::{Config, Protocol, TunnelConfig};
 use craked::hook_server;
 use craked::manager::Manager;
 
+#[path = "dns_netns/wire.rs"]
+mod wire;
+use wire::*;
+
 const FAKE: &str = r#"#!/bin/sh
 export TUNDEV=crake-acme VPNGATEWAY=192.0.2.10 INTERNAL_IP4_ADDRESS=10.40.255.7 \
   INTERNAL_IP4_NETMASK=255.255.255.255 INTERNAL_IP4_DNS='10.40.0.2 fd40::53' \
@@ -146,18 +150,21 @@ fn ask_split(
     uplink: &mut File,
     tun: &mut File,
     name: &str,
-    public: Ipv4Addr,
-    tunnel_knows: Ipv4Addr,
+    public: impl Into<IpAddr>,
+    tunnel_knows: impl Into<IpAddr>,
     private_answers: bool,
 ) -> Public {
+    let (public, tunnel_knows) = (public.into(), tunnel_knows.into());
+    let kind = if public.is_ipv6() { 28 } else { 1 };
     let sock = UdpSocket::bind("0.0.0.0:0").unwrap();
     sock.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
-    sock.send_to(&query(name), "192.168.0.1:53").unwrap();
+    sock.send_to(&query_for(name, kind), "192.168.0.1:53")
+        .unwrap();
     let q = read_query(uplink);
-    uplink.write_all(&answer(&q, public)).unwrap();
+    uplink.write_all(&reply(&q, 0, &[public])).unwrap();
     let tunnel_asked = match try_read_query(tun, Duration::from_millis(1500)) {
         Some(tq) => {
-            tun.write_all(&answer(&tq, tunnel_knows)).unwrap();
+            tun.write_all(&reply(&tq, 0, &[tunnel_knows])).unwrap();
             true
         }
         None => false,
@@ -184,7 +191,8 @@ fn ask_split(
         .unwrap_or_default();
     let first_through_tunnel = match addrs.first() {
         Some(a) => {
-            let _ = sock.send_to(b"first", (*a, 5432));
+            let app = UdpSocket::bind(if a.is_ipv6() { "[::]:0" } else { "0.0.0.0:0" }).unwrap();
+            let _ = app.send_to(b"first", (*a, 5432));
             first_packet_through_tunnel(tun, *a)
         }
         None => false,
@@ -195,61 +203,6 @@ fn ask_split(
         tunnel_asked,
         first_through_tunnel,
     }
-}
-
-/// A SYN in this packet: (destination, port).
-fn syn_to(p: &[u8]) -> Option<(Ipv4Addr, u16)> {
-    if p.len() < 40 || p[0] >> 4 != 4 || p[9] != 6 {
-        return None;
-    }
-    let ihl = usize::from(p[0] & 0x0f) * 4;
-    let t = p.get(ihl..)?;
-    (t.len() >= 20 && t[13] & 0x12 == 0x02).then(|| {
-        (
-            Ipv4Addr::new(p[16], p[17], p[18], p[19]),
-            u16::from_be_bytes([t[2], t[3]]),
-        )
-    })
-}
-
-/// The SYN-ACK answering `syn`.
-fn tcp_synack(syn: &[u8]) -> Vec<u8> {
-    let sum16 = |d: &[u8]| -> u32 {
-        d.chunks(2)
-            .map(|c| u32::from(u16::from_be_bytes([c[0], c.get(1).copied().unwrap_or(0)])))
-            .sum()
-    };
-    let fold = |mut s: u32| -> u16 {
-        while s >> 16 != 0 {
-            s = (s & 0xffff) + (s >> 16);
-        }
-        !(s as u16)
-    };
-    let ihl = usize::from(syn[0] & 0x0f) * 4;
-    let t = &syn[ihl..];
-    let seq = u32::from_be_bytes([t[4], t[5], t[6], t[7]]);
-    let mut tcp = vec![0u8; 20];
-    tcp[0..2].copy_from_slice(&t[2..4]);
-    tcp[2..4].copy_from_slice(&t[0..2]);
-    tcp[4..8].copy_from_slice(&777_000u32.to_be_bytes());
-    tcp[8..12].copy_from_slice(&seq.wrapping_add(1).to_be_bytes());
-    tcp[12] = 5 << 4;
-    tcp[13] = 0x12;
-    tcp[14..16].copy_from_slice(&65535u16.to_be_bytes());
-    let (src, dst) = (&syn[16..20], &syn[12..16]);
-    let mut pseudo = Vec::new();
-    pseudo.extend_from_slice(src);
-    pseudo.extend_from_slice(dst);
-    pseudo.extend_from_slice(&[0, 6, 0, 20]);
-    let c = fold(sum16(&pseudo) + sum16(&tcp));
-    tcp[16..18].copy_from_slice(&c.to_be_bytes());
-    let mut ip = vec![0x45, 0, 0, 40, 0, 0, 0, 0, 64, 6, 0, 0];
-    ip.extend_from_slice(src);
-    ip.extend_from_slice(dst);
-    let c = fold(sum16(&ip));
-    ip[10..12].copy_from_slice(&c.to_be_bytes());
-    ip.extend_from_slice(&tcp);
-    ip
 }
 
 fn try_read_query(tun: &mut File, wait: Duration) -> Option<Vec<u8>> {
@@ -321,36 +274,6 @@ fn read_query6(dev: &mut File) -> Vec<u8> {
     }
 }
 
-/// The answer packet to an IPv6 query packet: rcode plus records.
-fn reply6(q: &[u8], rcode: u8, addrs: &[IpAddr]) -> Vec<u8> {
-    let dns = answer_message(&q[48..], rcode, addrs);
-    let mut udp = Vec::new();
-    udp.extend_from_slice(&q[42..44]);
-    udp.extend_from_slice(&q[40..42]);
-    udp.extend_from_slice(&((8 + dns.len()) as u16).to_be_bytes());
-    udp.extend_from_slice(&[0, 0]);
-    udp.extend_from_slice(&dns);
-    // UDP over IPv6 must carry its checksum (pseudo-header included).
-    let mut pseudo = Vec::new();
-    pseudo.extend_from_slice(&q[24..40]);
-    pseudo.extend_from_slice(&q[8..24]);
-    pseudo.extend_from_slice(&(udp.len() as u32).to_be_bytes());
-    pseudo.extend_from_slice(&[0, 0, 0, 17]);
-    pseudo.extend_from_slice(&udp);
-    if pseudo.len() % 2 == 1 {
-        pseudo.push(0);
-    }
-    let c = checksum(&pseudo);
-    udp[6..8].copy_from_slice(&c.to_be_bytes());
-    let mut ip = vec![0x60, 0, 0, 0];
-    ip.extend_from_slice(&(udp.len() as u16).to_be_bytes());
-    ip.extend_from_slice(&[17, 64]);
-    ip.extend_from_slice(&q[24..40]);
-    ip.extend_from_slice(&q[8..24]);
-    ip.extend_from_slice(&udp);
-    ip
-}
-
 /// The app asks public DNS reached over IPv6 (the test plays it at
 /// fd00:1a::1 on `uplink`), which doesn't know `name`; the tunnel's DNS
 /// knows it as `addr`. Returns what the app got and whether its first
@@ -377,119 +300,6 @@ fn ask_public_over_ipv6(
     let app = UdpSocket::bind("0.0.0.0:0").unwrap();
     let _ = app.send_to(b"first", (addr, 5432));
     (addrs, first_packet_through_tunnel(tun, IpAddr::V4(addr)))
-}
-
-fn checksum(header: &[u8]) -> u16 {
-    let mut sum: u32 = header
-        .chunks(2)
-        .map(|c| u32::from(u16::from_be_bytes([c[0], c[1]])))
-        .sum();
-    while sum >> 16 != 0 {
-        sum = (sum & 0xffff) + (sum >> 16);
-    }
-    !(sum as u16)
-}
-
-/// Turn the query packet into an answer packet with one A record.
-fn answer(query: &[u8], addr: Ipv4Addr) -> Vec<u8> {
-    reply(query, 0, &[addr.into()])
-}
-
-fn nxdomain(query: &[u8]) -> Vec<u8> {
-    reply(query, 3, &[])
-}
-
-/// Turn the query packet into an answer packet: rcode plus A (or AAAA)
-/// records.
-fn reply(query: &[u8], rcode: u8, addrs: &[IpAddr]) -> Vec<u8> {
-    let ihl = usize::from(query[0] & 0x0f) * 4;
-    let udp = &query[ihl..];
-    let dns = answer_message(&udp[8..], rcode, addrs);
-    let mut udp_out = Vec::new();
-    udp_out.extend_from_slice(&udp[2..4]); // sport = their dport (53)
-    udp_out.extend_from_slice(&udp[0..2]); // dport = their sport
-    udp_out.extend_from_slice(&((8 + dns.len()) as u16).to_be_bytes());
-    udp_out.extend_from_slice(&[0, 0]); // no UDP checksum
-    udp_out.extend_from_slice(&dns);
-
-    let mut ip = vec![0x45, 0, 0, 0, 0, 0, 0, 0, 64, 17, 0, 0];
-    ip.extend_from_slice(&query[16..20]); // src = the DNS server
-    ip.extend_from_slice(&query[12..16]); // dst = us
-    let total = (20 + udp_out.len()) as u16;
-    ip[2..4].copy_from_slice(&total.to_be_bytes());
-    let c = checksum(&ip);
-    ip[10..12].copy_from_slice(&c.to_be_bytes());
-    ip.extend_from_slice(&udp_out);
-    ip
-}
-
-/// The answer to a DNS query message: rcode plus A records (AAAA for an
-/// IPv6 address).
-fn answer_message(query: &[u8], rcode: u8, addrs: &[IpAddr]) -> Vec<u8> {
-    let mut dns = query.to_vec();
-    dns[2] = 0x81; // response, recursion desired
-    dns[3] = 0x80 | rcode; // recursion available
-    dns[7] = addrs.len() as u8;
-    dns[10] = 0; // drop EDNS from additional count
-    dns[11] = 0;
-    // Cut the additional section: question ends after the name plus 4 bytes.
-    let mut i = 12;
-    while dns[i] != 0 {
-        i += usize::from(dns[i]) + 1;
-    }
-    dns.truncate(i + 5);
-    for addr in addrs {
-        let (kind, data) = match addr {
-            IpAddr::V4(a) => (1, a.octets().to_vec()),
-            IpAddr::V6(a) => (28, a.octets().to_vec()),
-        };
-        dns.extend_from_slice(&[0xc0, 0x0c, 0, kind, 0, 1, 0, 0, 0, 60, 0]);
-        dns.push(data.len() as u8);
-        dns.extend_from_slice(&data);
-    }
-    dns
-}
-
-/// A reply segment to the client's `seg` (PSH|ACK) from the server at `seq`,
-/// acknowledging what `seg` carried.
-fn tcp_reply(seg: &[u8], seq: u32, data: &[u8]) -> Vec<u8> {
-    let ihl = usize::from(seg[0] & 0x0f) * 4;
-    let t = &seg[ihl..];
-    let carried = seg.len() - ihl - usize::from(t[12] >> 4) * 4;
-    let their_seq = u32::from_be_bytes([t[4], t[5], t[6], t[7]]);
-    let mut tcp = vec![0u8; 20];
-    tcp[0..2].copy_from_slice(&t[2..4]);
-    tcp[2..4].copy_from_slice(&t[0..2]);
-    tcp[4..8].copy_from_slice(&seq.to_be_bytes());
-    tcp[8..12].copy_from_slice(&their_seq.wrapping_add(carried as u32).to_be_bytes());
-    tcp[12] = 5 << 4;
-    tcp[13] = 0x18;
-    tcp[14..16].copy_from_slice(&65535u16.to_be_bytes());
-    tcp.extend_from_slice(data);
-    let (src, dst) = (&seg[16..20], &seg[12..16]);
-    let mut pseudo = Vec::new();
-    pseudo.extend_from_slice(src);
-    pseudo.extend_from_slice(dst);
-    pseudo.extend_from_slice(&[0, 6]);
-    pseudo.extend_from_slice(&(tcp.len() as u16).to_be_bytes());
-    let sum = |d: &[u8]| -> u32 {
-        d.chunks(2)
-            .map(|c| u32::from(u16::from_be_bytes([c[0], c.get(1).copied().unwrap_or(0)])))
-            .sum()
-    };
-    let mut s = sum(&pseudo) + sum(&tcp);
-    while s >> 16 != 0 {
-        s = (s & 0xffff) + (s >> 16);
-    }
-    tcp[16..18].copy_from_slice(&(!(s as u16)).to_be_bytes());
-    let mut ip = vec![0x45, 0, 0, 0, 0, 0, 0, 0, 64, 6, 0, 0];
-    ip.extend_from_slice(src);
-    ip.extend_from_slice(dst);
-    ip[2..4].copy_from_slice(&((20 + tcp.len()) as u16).to_be_bytes());
-    let c = checksum(&ip);
-    ip[10..12].copy_from_slice(&c.to_be_bytes());
-    ip.extend_from_slice(&tcp);
-    ip
 }
 
 /// A TCP packet leaving through the TUN that matches `want`, within 5 s.
@@ -532,7 +342,7 @@ fn ask_tcp(tun: &mut File, name: &str, addr: Ipv4Addr) -> bool {
         answer
     });
     let syn = read_tcp(tun, |p| {
-        syn_to(p) == Some(("10.40.0.2".parse().unwrap(), 53))
+        syn_to(p) == Some(("10.40.0.2".parse::<IpAddr>().unwrap(), 53))
     });
     tun.write_all(&tcp_synack(&syn)).unwrap();
     // The client's segment carrying the query (after its bare ACK).
@@ -552,21 +362,6 @@ fn ask_tcp(tun: &mut File, name: &str, addr: Ipv4Addr) -> bool {
         "the app got the answer"
     );
     first_packet_through_tunnel(tun, IpAddr::V4(addr))
-}
-
-fn query(name: &str) -> Vec<u8> {
-    query_for(name, 1)
-}
-
-/// A query for `name`'s records of type `kind` (1: A, 28: AAAA).
-fn query_for(name: &str, kind: u8) -> Vec<u8> {
-    let mut m = vec![0xab, 0xcd, 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 0];
-    for label in name.split('.') {
-        m.push(label.len() as u8);
-        m.extend_from_slice(label.as_bytes());
-    }
-    m.extend_from_slice(&[0, 0, kind, 0, 1]);
-    m
 }
 
 /// Ask the tunnel's DNS (over IPv4) for `name`'s IPv6 address; the test
@@ -699,6 +494,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     let gw: Ipv4Addr = "192.0.2.10".parse().unwrap();
     let git6: Ipv6Addr = "fd40:1::7".parse().unwrap();
     let db6: Ipv6Addr = "fd40:1::5".parse().unwrap();
+    let fe6_private: Ipv6Addr = "fd40:9::30".parse().unwrap();
     let db_v6net: Ipv4Addr = "10.58.70.120".parse().unwrap();
     let over6: Ipv4Addr = "10.33.6.6".parse().unwrap();
 
@@ -763,6 +559,15 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
                 www_public,
                 false,
             ),
+            // Its IPv6 address (AAAA) the same way.
+            ask_split(
+                &mut uplink,
+                &mut tun,
+                "fe6.acme.example",
+                "2001:db8:5::32".parse::<Ipv6Addr>().unwrap(),
+                fe6_private,
+                true,
+            ),
         );
         let r = (
             ask(&mut tun, "git.acme.internal", git),
@@ -786,20 +591,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     assert!(over_v6.1, "and it was routed first");
     publics_handled((p0, p1, p2, p3, p4), db, db6, site);
 
-    let (fe, office, www) = splits;
-    assert_eq!(
-        fe.addrs,
-        vec![IpAddr::V4(fe_private)],
-        "the private address won: {fe:?}"
-    );
-    assert!(fe.tunnel_asked && fe.first_through_tunnel, "{fe:?}");
-    assert_eq!(office.addrs, vec![IpAddr::V4(office_public)], "{office:?}");
-    assert!(
-        office.tunnel_asked && !office.first_through_tunnel,
-        "{office:?}"
-    );
-    assert_eq!(www.addrs, vec![IpAddr::V4(www_public)], "{www:?}");
-    assert!(!www.first_through_tunnel, "{www:?}");
+    splits_handled(splits, fe_private, office_public, www_public, fe6_private);
 
     let (git_first, wiki_first, public_routed, gw_routed, tcp_first, v6_first, over6_first) =
         results;
@@ -883,6 +675,38 @@ fn publics_handled(
         "public successes never go to the tunnel"
     );
     assert!(!known.first_through_tunnel, "and stay direct");
+}
+
+/// Names under the organisation's domain: the tunnel's private address
+/// (IPv4 or IPv6) wins when it answers through the tunnel, else the
+/// public one stands.
+fn splits_handled(
+    splits: (Public, Public, Public, Public),
+    fe_private: Ipv4Addr,
+    office_public: Ipv4Addr,
+    www_public: Ipv4Addr,
+    fe6_private: Ipv6Addr,
+) {
+    let (fe, office, www, fe6) = splits;
+    assert_eq!(
+        fe6.addrs,
+        vec![IpAddr::V6(fe6_private)],
+        "the private IPv6 address won: {fe6:?}"
+    );
+    assert!(fe6.tunnel_asked && fe6.first_through_tunnel, "{fe6:?}");
+    assert_eq!(
+        fe.addrs,
+        vec![IpAddr::V4(fe_private)],
+        "the private address won: {fe:?}"
+    );
+    assert!(fe.tunnel_asked && fe.first_through_tunnel, "{fe:?}");
+    assert_eq!(office.addrs, vec![IpAddr::V4(office_public)], "{office:?}");
+    assert!(
+        office.tunnel_asked && !office.first_through_tunnel,
+        "{office:?}"
+    );
+    assert_eq!(www.addrs, vec![IpAddr::V4(www_public)], "{www:?}");
+    assert!(!www.first_through_tunnel, "{www:?}");
 }
 
 /// What the log says about the test's names.

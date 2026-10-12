@@ -517,6 +517,23 @@ async fn an_address_another_tunnel_has_stays_there_and_says_so() {
     // Moving it is the user's choice.
     mgr.move_hosts(&a, &b, &["10.0.0.1"]).await.unwrap();
     assert!(sends(&mgr, &b, "10.0.0.1").await && !sends(&mgr, &a, "10.0.0.1").await);
+
+    // The same for an IPv6 address both companies use.
+    mgr.add_host(&a, "fd00::1").await.unwrap();
+    mgr.learn_from_dns(
+        &b,
+        craked::dns::Answer {
+            name: "v6.nordbank.internal".into(),
+            addrs: vec!["fd00::1".parse().unwrap()],
+        },
+    )
+    .await;
+    assert!(sends(&mgr, &a, "fd00::1").await && !sends(&mgr, &b, "fd00::1").await);
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(
+        log.contains("v6.nordbank.internal can't go through Nordbank."),
+        "{log}"
+    );
 }
 
 /// The tunnel sends this host through itself (learned or pinned).
@@ -556,15 +573,22 @@ async fn known_names_keep_working_while_a_tunnels_dns_is_silent() {
     )
     .await
     .unwrap();
-    // Its DNS said where GitLab is, while it still answered.
-    mgr.learn_from_dns(
-        &t,
-        craked::dns::Answer {
-            name: "gitlab.initech.internal".into(),
-            addrs: vec!["10.81.1.4".parse().unwrap()],
-        },
-    )
-    .await;
+    // Its DNS said where GitLab is, while it still answered: an A answer
+    // and an AAAA answer (each keeps the other), and Docs only by IPv4.
+    for (name, addr) in [
+        ("gitlab.initech.internal", "10.81.1.4"),
+        ("gitlab.initech.internal", "fd81:1::4"),
+        ("docs.initech.internal", "10.81.1.5"),
+    ] {
+        mgr.learn_from_dns(
+            &t,
+            craked::dns::Answer {
+                name: name.into(),
+                addrs: vec![addr.parse().unwrap()],
+            },
+        )
+        .await;
+    }
 
     mgr.dns_checked(&t, false).await;
     mgr.dns_checked(&t, false).await;
@@ -590,8 +614,20 @@ async fn known_names_keep_working_while_a_tunnels_dns_is_silent() {
         mgr.keep_answer(&ask("gitlab.initech.internal", RecordType::AAAA))
             .await,
     );
-    assert_eq!(v6.metadata.response_code, ResponseCode::NoError);
-    assert!(v6.answers.is_empty(), "it exists, just no IPv6 we know of");
+    assert_eq!(
+        craked::dns::records(&v6),
+        vec!["fd81:1::4".parse::<std::net::IpAddr>().unwrap()],
+        "its IPv6 address, remembered too"
+    );
+    let no_v6 = reply(
+        mgr.keep_answer(&ask("docs.initech.internal", RecordType::AAAA))
+            .await,
+    );
+    assert_eq!(no_v6.metadata.response_code, ResponseCode::NoError);
+    assert!(
+        no_v6.answers.is_empty(),
+        "it exists, just no IPv6 we know of"
+    );
     let unknown = reply(
         mgr.keep_answer(&ask("wiki.initech.internal", RecordType::A))
             .await,

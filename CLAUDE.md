@@ -238,8 +238,12 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    one out; the rewritten answer gets the UDP checksum IPv6 requires;
    netns-tested). Still open:
    DNS over TCP across segments, IPv6 DNS servers on macOS and Windows,
-   DNS-over-TLS upstreams (Crake can't see those failures), IPv6 in
-   split-horizon (A only).
+   DNS-over-TLS upstreams (Crake can't see those failures).
+   Split-horizon takes AAAA questions too (a unique local fc00::/7
+   address counts as private), the memory answerer (7h) remembers and
+   serves IPv6 addresses (an A and an AAAA answer each keep the other's),
+   and "one address, two companies" covers IPv6 addresses (netns and
+   lifecycle tests).
 4. Connection probing and automatic learning; undo. **Built**, proven in a
    throwaway namespace (the fake gateway drops packets not from the tunnel
    address, like a real one; the test fails if the stuck flow isn't

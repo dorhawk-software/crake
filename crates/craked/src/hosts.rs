@@ -235,7 +235,7 @@ pub struct TunnelHosts {
     /// The last good answer its DNS gave for each name: (addresses, when),
     /// to keep known names working while that DNS doesn't answer.
     #[serde(default)]
-    pub answers: BTreeMap<String, (Vec<Ipv4Addr>, u64)>,
+    pub answers: BTreeMap<String, (Vec<IpAddr>, u64)>,
 }
 
 impl TunnelHosts {
@@ -266,13 +266,26 @@ impl TunnelHosts {
     }
 
     /// Remember what its DNS said for `name`. True when that's news.
-    pub fn remember(&mut self, name: &str, addrs: &[Ipv4Addr], now: u64) -> bool {
+    pub fn remember(&mut self, name: &str, addrs: &[IpAddr], now: u64) -> bool {
         const KEEP: usize = 1000;
+        // An A answer and an AAAA answer come apart: each replaces only the
+        // addresses of its own family.
+        let mut all: Vec<IpAddr> = self
+            .answers
+            .get(name)
+            .map(|(a, _)| {
+                a.iter()
+                    .copied()
+                    .filter(|old| !addrs.iter().any(|new| new.is_ipv6() == old.is_ipv6()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        all.extend_from_slice(addrs);
         let fresh = self.answers.get(name).is_none_or(|(a, at)| {
-            a != addrs || now.saturating_sub(*at) > crate::units::SECS_PER_HOUR
+            *a != all || now.saturating_sub(*at) > crate::units::SECS_PER_HOUR
         });
         if fresh {
-            self.answers.insert(name.to_owned(), (addrs.to_vec(), now));
+            self.answers.insert(name.to_owned(), (all, now));
             if self.answers.len() > KEEP {
                 // The longest unseen goes.
                 if let Some(old) = self

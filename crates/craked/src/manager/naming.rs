@@ -14,18 +14,12 @@ impl Manager {
             return;
         }
         // The last good answer, for when this DNS stops answering (7h).
-        // IPv4 only for now; the outage fallback (keep.rs) serves A records.
-        let v4: Vec<std::net::Ipv4Addr> = answer
-            .addrs
-            .iter()
-            .filter_map(|a| match a {
-                IpAddr::V4(x) => Some(*x),
-                IpAddr::V6(_) => None,
-            })
-            .collect();
-        if !v4.is_empty() {
+        {
             let mut store = self.hosts.lock().unwrap();
-            if store.tunnel(name).remember(&answer.name, &v4, hosts::now()) {
+            if store
+                .tunnel(name)
+                .remember(&answer.name, &answer.addrs, hosts::now())
+            {
                 store.save();
             }
         }
@@ -123,7 +117,7 @@ impl Manager {
         {
             let mut no_split = self.no_split.lock().unwrap();
             no_split.retain(|_, at| at.elapsed() < UNKNOWN_FOR);
-            if no_split.contains_key(&question.name) {
+            if no_split.contains_key(&(question.name.clone(), question.qtype)) {
                 return None;
             }
         }
@@ -138,7 +132,7 @@ impl Manager {
             if reply.metadata.response_code != ResponseCode::NoError {
                 continue;
             }
-            let private: Vec<Ipv4Addr> = dns::a_records(&reply)
+            let private: Vec<IpAddr> = dns::records(&reply)
                 .into_iter()
                 .filter(|a| dns::is_private(*a) && !public.contains(a))
                 .filter(|a| learning.allows(Some(&question.name), *a))
@@ -155,7 +149,7 @@ impl Manager {
             let mark = crate::routing::ids(index).mark;
             let mut answers = false;
             for port in WEB_PORTS {
-                let addr = SocketAddrV4::new(private[0], port);
+                let addr = SocketAddr::new(private[0], port);
                 if crate::probe::through_tunnel(addr, mark, WEB_PROBE)
                     .await
                     .is_some()
@@ -169,7 +163,7 @@ impl Manager {
             }
             let answer = Answer {
                 name: question.name.clone(),
-                addrs: private.iter().copied().map(IpAddr::V4).collect(),
+                addrs: private.clone(),
             };
             self.learn_answer(&tunnel, &answer, Why::PrivateAddress)
                 .await;
@@ -190,7 +184,7 @@ impl Manager {
         self.no_split
             .lock()
             .unwrap()
-            .insert(question.name.clone(), Instant::now());
+            .insert((question.name.clone(), question.qtype), Instant::now());
         None
     }
 
@@ -230,7 +224,7 @@ impl Manager {
                 .tunnels
                 .values()
                 .flat_map(|t| &t.answers)
-                .filter(|(_, (addrs, _))| matches!(addr, IpAddr::V4(a) if addrs.contains(&a)))
+                .filter(|(_, (addrs, _))| addrs.contains(&addr))
                 .max_by_key(|(_, (_, at))| *at)
                 .map(|(name, _)| name.clone())
         })
@@ -262,10 +256,7 @@ impl Manager {
             // private address. One address goes through one tunnel; it
             // stays where it is, and the user may move it.
             if let Some(owner) = self.owner_of(*addr, name) {
-                // The "two companies, one address" notice is IPv4-only for now.
-                if let IpAddr::V4(v4) = addr {
-                    self.contested(name, &label, &owner, &answer.name, *v4);
-                }
+                self.contested(name, &label, &owner, &answer.name, *addr);
                 continue;
             }
             if self.never(Some(&answer.name), *addr) {

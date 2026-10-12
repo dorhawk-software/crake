@@ -160,15 +160,11 @@ impl Manager {
             .get(&tunnel)
             .and_then(|t| {
                 t.answers.get(&qname).map(|(a, _)| a.clone()).or_else(|| {
-                    // Only IPv4 answers are kept for now (AAAA learning is a
-                    // later slice), matching `answers` above.
-                    let named: Vec<Ipv4Addr> = t
+                    let named: Vec<IpAddr> = t
                         .names
                         .iter()
-                        .filter_map(|(a, n)| match *a {
-                            IpAddr::V4(v) if *n == qname && t.covers(*a) => Some(v),
-                            _ => None,
-                        })
+                        .filter(|(a, n)| **n == qname && t.covers(**a))
+                        .map(|(a, _)| *a)
                         .collect();
                     (!named.is_empty()).then_some(named)
                 })
@@ -176,8 +172,15 @@ impl Manager {
         let Some(addrs) = known else {
             return crate::hush::reply_code(query, 2);
         };
-        if qtype != RecordType::A {
-            // The name exists; it just has no such record we know of.
+        // The name exists; another type (or the other family) is a record
+        // we know none of.
+        let v6 = match qtype {
+            RecordType::A => false,
+            RecordType::AAAA => true,
+            _ => return crate::keep::answer(query, &[]),
+        };
+        let addrs: Vec<IpAddr> = addrs.into_iter().filter(|a| a.is_ipv6() == v6).collect();
+        if addrs.is_empty() {
             return crate::keep::answer(query, &[]);
         }
         let learning = self.learning(&tunnel);
@@ -225,7 +228,7 @@ impl Manager {
 
     /// `addr` answers through `tunnel` on a web port (in development and
     /// tests, where nothing is applied, it's taken as answering).
-    pub(super) async fn still_answers(&self, tunnel: &str, addr: Ipv4Addr) -> bool {
+    pub(super) async fn still_answers(&self, tunnel: &str, addr: IpAddr) -> bool {
         if !self.cfg.apply_network {
             return true;
         }
@@ -234,7 +237,7 @@ impl Manager {
         };
         let mark = crate::routing::ids(index).mark;
         for port in WEB_PORTS {
-            if crate::probe::through_tunnel(SocketAddrV4::new(addr, port), mark, WEB_PROBE)
+            if crate::probe::through_tunnel(SocketAddr::new(addr, port), mark, WEB_PROBE)
                 .await
                 .is_some()
             {

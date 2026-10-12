@@ -93,7 +93,7 @@ impl Manager {
         label: &str,
         owner: &str,
         host: &str,
-        addr: Ipv4Addr,
+        addr: IpAddr,
     ) {
         {
             let mut seen = self.contested.lock().unwrap();
@@ -104,7 +104,7 @@ impl Manager {
             seen.insert(key, Instant::now());
         }
         let owner_label = self.label(owner);
-        let theirs = th_name(&self.hosts.lock().unwrap(), owner, IpAddr::V4(addr))
+        let theirs = th_name(&self.hosts.lock().unwrap(), owner, addr)
             .map(|n| format!(" ({n})"))
             .unwrap_or_default();
         self.log.append(LogEntry {

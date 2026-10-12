@@ -5,7 +5,7 @@
 //! through the tunnel. Anything else gets SERVFAIL: it doesn't resolve,
 //! honestly.
 
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -28,19 +28,23 @@ pub fn question(query: &[u8]) -> Option<(String, RecordType)> {
     Some((crate::dns::normalize(&q.name.to_ascii()), q.query_type))
 }
 
-/// An answer to `query` with these A records (none: "no such record", for
-/// a name that exists).
-pub fn answer(query: &[u8], addrs: &[Ipv4Addr]) -> Option<Vec<u8>> {
+/// An answer to `query` with these addresses: A records for IPv4 ones,
+/// AAAA for IPv6 (none: "no such record", for a name that exists).
+pub fn answer(query: &[u8], addrs: &[IpAddr]) -> Option<Vec<u8>> {
     let mut out = crate::hush::reply_code(query, 0)?;
     // Few records: the count fits its low byte.
     out[dns::ANSWERS_LOW_BYTE] = u8::try_from(addrs.len()).ok()?;
     for a in addrs {
+        let (kind, data) = match a {
+            IpAddr::V4(a) => (RecordType::A, a.octets().to_vec()),
+            IpAddr::V6(a) => (RecordType::AAAA, a.octets().to_vec()),
+        };
         out.extend_from_slice(&dns::NAME_POINTER);
-        out.extend_from_slice(&u16::from(RecordType::A).to_be_bytes());
+        out.extend_from_slice(&u16::from(kind).to_be_bytes());
         out.extend_from_slice(&u16::from(DNSClass::IN).to_be_bytes());
         out.extend_from_slice(&TTL.to_be_bytes());
-        out.extend_from_slice(&(size_of::<Ipv4Addr>() as u16).to_be_bytes());
-        out.extend_from_slice(&a.octets());
+        out.extend_from_slice(&u16::try_from(data.len()).ok()?.to_be_bytes());
+        out.extend_from_slice(&data);
     }
     Some(out)
 }
@@ -78,7 +82,7 @@ mod tests {
             Some(("gitlab.initech.internal".to_owned(), RecordType::A))
         );
         let a: Ipv4Addr = "10.81.1.4".parse().unwrap();
-        let r = answer(&q, &[a]).unwrap();
+        let r = answer(&q, &[a.into()]).unwrap();
         let msg = Message::from_vec(&r).unwrap();
         assert_eq!(msg.metadata.id, 0x4242);
         assert_eq!(
@@ -87,6 +91,10 @@ mod tests {
         );
         assert_eq!(crate::dns::a_records(&msg), vec![a]);
         assert!(msg.answers.iter().all(|r| r.ttl == TTL));
+        let q6 = crate::dns::query(0x4243, "gitlab.initech.internal", RecordType::AAAA);
+        let a6: IpAddr = "fd81:1::4".parse().unwrap();
+        let msg = Message::from_vec(&answer(&q6, &[a6]).unwrap()).unwrap();
+        assert_eq!(crate::dns::records(&msg), vec![a6]);
         let fail = crate::hush::reply_code(&q, 2).unwrap();
         let msg = Message::from_vec(&fail).unwrap();
         assert_eq!(

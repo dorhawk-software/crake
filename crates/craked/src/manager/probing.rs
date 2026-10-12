@@ -42,10 +42,6 @@ impl Manager {
     /// A private address a tunnel's DNS gave for a name: inside one of
     /// the tunnels, almost surely (`probe::KNOWN_INSIDE_WAIT`).
     pub fn known_inside(&self, addr: IpAddr) -> bool {
-        // Remembered answers are IPv4 (`TunnelHosts::answers`).
-        let IpAddr::V4(addr) = addr else {
-            return false;
-        };
         if !crate::dns::is_private(addr) {
             return false;
         }
