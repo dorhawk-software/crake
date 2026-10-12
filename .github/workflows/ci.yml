@@ -9,6 +9,8 @@ name: CI
 
 on:
   push:
+    # Dependabot's branches are tested as pull requests: not twice.
+    branches-ignore: ["dependabot/**"]
   pull_request:
   # The weekly GPUI update starts CI on its branch (gpui.yml).
   workflow_dispatch:
