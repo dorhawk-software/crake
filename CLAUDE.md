@@ -122,8 +122,12 @@ makes the first connection take the probe wait again). Direct is preferred when
 it answers within a round trip (`DIRECT_WAIT` 400 ms); past that only a tunnel
 might reach it. Only SYNs worth racing are held: a tunnel's `Only` scope, its
 pushed split-include networks, or the private ranges for a learn-anything
-tunnel, minus the local networks and the gateways (`sync_syn_race` keeps the
-`syn_watch`/`syn_skip` sets in step as tunnels come and go). Off with
+tunnel (fc00::/7 for IPv6), minus the local networks and the gateways
+(`sync_syn_race` keeps the `syn_watch`/`syn_skip` sets, and `syn_watch6`/
+`syn_skip6`, in step as tunnels come and go, and once more when a tunnel's
+pushed networks are known; the sets `auto-merge`, since nft refuses
+overlapping intervals and a pushed 10.40.0.0/16 inside 10.0.0.0/8 had
+silently kept the race's update out). IPv6 SYNs are raced too. Off with
 `race_first_syn = false` (default on); passive conntrack probing still handles
 anything not held. Windows' equivalent is a WFP callout driver (not built; the
 first probed connection there is still reset). The tunnel race and learn/log
@@ -250,9 +254,11 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    as DNS answers and starts the probe at once: "Unreachable directly.
    Through ACME it answered in 31 ms." (netns-tested).
    IPv6 on Linux: conntrack's IPv6 connections are probed the same way
-   (passively; the probe's socket by family; the stuck entry deleted;
-   netns-tested with a host only the tunnel answers over IPv6).
-   Still open: UDP; for IPv6, the first-SYN race and ICMPv6 unreachable.
+   (passively; the probe's socket by family; the stuck entry deleted), a
+   router's ICMPv6 "unreachable" (no route, prohibited, address
+   unreachable, policy, reject route; never "port unreachable") starts
+   the probe at once, and the first-SYN race holds IPv6 SYNs (all
+   netns-tested). Still open: UDP.
 5. Multiple simultaneous tunnels, try order, conflict handling.
    **Requested:** detect tunnels that can't be up together. When switching a
    tunnel on, compare what it pushes with the tunnels already up: its own

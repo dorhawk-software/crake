@@ -178,6 +178,8 @@ impl Manager {
             }
             self.traffic.track(&info.device, name);
         }
+        // Again, now that its pushed networks and gateway are known.
+        self.sync_syn_race().await;
         let domains = self.domains(name);
         self.register_dns(name, &display, &info, &domains).await;
         // Remember them, to keep them private while it's off.

@@ -194,6 +194,51 @@ pub fn up_script(plan: &Plan) -> String {
     s
 }
 
+/// The first-SYN race's sets and rule, one set pair per address family.
+/// The sets merge what overlaps (a tunnel's pushed 10.40.0.0/16 inside a
+/// learn-anything tunnel's 10.0.0.0/8): nft refuses overlapping intervals
+/// otherwise, and the whole race with them.
+fn race_script(watch: &[Target], skip: &[Target]) -> String {
+    let queue = crate::syn_queue::QUEUE_NUM;
+    let mut s = format!(
+        "add table inet {TABLE}\n\
+         add set inet {TABLE} syn_watch {{ type ipv4_addr; flags interval; auto-merge; }}\n\
+         add set inet {TABLE} syn_skip {{ type ipv4_addr; flags interval; auto-merge; }}\n\
+         add set inet {TABLE} syn_watch6 {{ type ipv6_addr; flags interval; auto-merge; }}\n\
+         add set inet {TABLE} syn_skip6 {{ type ipv6_addr; flags interval; auto-merge; }}\n\
+         add chain inet {TABLE} syn_race {{ type route hook output priority mangle - 10; policy accept; }}\n\
+         flush set inet {TABLE} syn_watch\n\
+         flush set inet {TABLE} syn_skip\n\
+         flush set inet {TABLE} syn_watch6\n\
+         flush set inet {TABLE} syn_skip6\n\
+         flush chain inet {TABLE} syn_race\n"
+    );
+    for (set, list, v6) in [
+        ("syn_watch", watch, false),
+        ("syn_skip", skip, false),
+        ("syn_watch6", watch, true),
+        ("syn_skip6", skip, true),
+    ] {
+        let items: Vec<String> = list
+            .iter()
+            .filter(|t| t.is_ipv6() == v6)
+            .map(Target::to_string)
+            .collect();
+        if !items.is_empty() {
+            s += &format!(
+                "add element inet {TABLE} {set} {{ {} }}\n",
+                items.join(", ")
+            );
+        }
+    }
+    let syn = "ct state new meta l4proto tcp tcp flags & (fin | syn | rst | ack) == syn";
+    s += &format!(
+        "add rule inet {TABLE} syn_race {syn} ip daddr @syn_watch ip daddr != @syn_skip queue num {queue} bypass\n\
+         add rule inet {TABLE} syn_race {syn} ip6 daddr @syn_watch6 ip6 daddr != @syn_skip6 queue num {queue} bypass\n"
+    );
+    s
+}
+
 /// Remove a tunnel's chains and sets; fine if they don't exist.
 /// Tunnel devices Crake didn't name (OpenVPN 3's tun0, ...): their DNS
 /// answers are the tunnel's, not public ones.
@@ -344,6 +389,9 @@ impl Routing {
             format!(
                 "add rule inet {TABLE} public_dns meta nfproto ipv4 icmp type destination-unreachable \
                  icmp code {{ net-unreachable, host-unreachable, net-prohibited, host-prohibited, admin-prohibited }} \
+                 queue num {QUEUE_NUM} bypass\n\
+                 add rule inet {TABLE} public_dns meta nfproto ipv6 icmpv6 type destination-unreachable \
+                 icmpv6 code {{ no-route, admin-prohibited, addr-unreachable, policy-fail, reject-route }} \
                  queue num {QUEUE_NUM} bypass\n"
             )
         } else {
@@ -384,34 +432,7 @@ impl Routing {
         if watch.is_empty() {
             return self.race_down().await;
         }
-        let queue = crate::syn_queue::QUEUE_NUM;
-        let elems = |ts: &[Target]| {
-            ts.iter()
-                .map(Target::to_string)
-                .collect::<Vec<_>>()
-                .join(", ")
-        };
-        let watch_add = format!(
-            "add element inet {TABLE} syn_watch {{ {} }}\n",
-            elems(watch)
-        );
-        let skip_add = if skip.is_empty() {
-            String::new()
-        } else {
-            format!("add element inet {TABLE} syn_skip {{ {} }}\n", elems(skip))
-        };
-        nft(&format!(
-            "add table inet {TABLE}\n\
-             add set inet {TABLE} syn_watch {{ type ipv4_addr; flags interval; }}\n\
-             add set inet {TABLE} syn_skip {{ type ipv4_addr; flags interval; }}\n\
-             add chain inet {TABLE} syn_race {{ type route hook output priority mangle - 10; policy accept; }}\n\
-             flush set inet {TABLE} syn_watch\n\
-             flush set inet {TABLE} syn_skip\n\
-             flush chain inet {TABLE} syn_race\n\
-             {watch_add}{skip_add}\
-             add rule inet {TABLE} syn_race ct state new meta l4proto tcp tcp flags & (fin | syn | rst | ack) == syn ip daddr @syn_watch ip daddr != @syn_skip queue num {queue} bypass\n"
-        ))
-        .await
+        nft(&race_script(watch, skip)).await
     }
 
     pub async fn race_down(&self) -> Result<()> {
@@ -655,6 +676,19 @@ mod tests {
             "add rule inet crake block_globex meta mark 0 ip6 daddr != { ::1, fe80::/10, ff00::/8 } \
              meta l4proto tcp reject with tcp reset"
         ));
+    }
+
+    #[test]
+    fn race_script_has_a_set_pair_per_family() {
+        let s = race_script(
+            &["10.0.0.0/8".parse().unwrap(), "fc00::/7".parse().unwrap()],
+            &["192.168.0.0/24".parse().unwrap()],
+        );
+        assert!(s.contains("add element inet crake syn_watch { 10.0.0.0/8 }"));
+        assert!(s.contains("add element inet crake syn_watch6 { fc00::/7 }"));
+        assert!(s.contains("add element inet crake syn_skip { 192.168.0.0/24 }"));
+        assert!(!s.contains("add element inet crake syn_skip6"), "{s}");
+        assert!(s.contains("ip6 daddr @syn_watch6 ip6 daddr != @syn_skip6 queue num"));
     }
 
     #[test]

@@ -11,7 +11,7 @@
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpStream};
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
@@ -26,7 +26,10 @@ use craked::manager::Manager;
 
 const FAKE: &str = r#"#!/bin/sh
 export TUNDEV=crake-acme VPNGATEWAY=192.0.2.10 INTERNAL_IP4_ADDRESS=10.40.255.7 \
-  INTERNAL_IP4_NETMASK=255.255.255.255 INTERNAL_IP4_DNS=10.40.0.2
+  INTERNAL_IP4_NETMASK=255.255.255.255 INTERNAL_IP4_DNS=10.40.0.2 \
+  INTERNAL_IP6_ADDRESS=fd40:ff::7 INTERNAL_IP6_NETMASK=fd40:ff::7/128 \
+  CISCO_SPLIT_INC=1 CISCO_SPLIT_INC_0_ADDR=10.70.0.0 CISCO_SPLIT_INC_0_MASKLEN=16 \
+  CISCO_IPV6_SPLIT_INC=1 CISCO_IPV6_SPLIT_INC_0_ADDR=fd70:: CISCO_IPV6_SPLIT_INC_0_MASKLEN=48
 reason=connect "$CRAKE_TEST_HOOK" || exit 1
 trap 'exit 0' TERM
 while :; do sleep 0.1; done
@@ -76,8 +79,9 @@ fn fold(mut sum: u32) -> u16 {
     !(sum as u16)
 }
 
-/// The tunnel's own IPv6 address (the test gives it; craked takes a
-/// tunnel's IPv6 address from openconnect in a later slice).
+/// The tunnel's own IPv6 address, as the fake openconnect hands it over.
+/// The pushed split networks lie inside the private ranges a learn-anything
+/// tunnel races (10.0.0.0/8, fc00::/7): the race's sets must merge them.
 const TUNNEL_V6: &str = "fd40:ff::7";
 
 /// A TCP segment answering `syn` (IPv4 or IPv6) with the given flags
@@ -145,6 +149,28 @@ fn host_unreachable(syn: &[u8]) -> Vec<u8> {
     ip
 }
 
+/// The router's (fd00:1a::1) ICMPv6 "address unreachable" about an IPv6
+/// `syn`.
+fn host_unreachable6(syn: &[u8]) -> Vec<u8> {
+    let router: Ipv6Addr = "fd00:1a::1".parse().unwrap();
+    let mut icmp = vec![1, 3, 0, 0, 0, 0, 0, 0];
+    icmp.extend_from_slice(syn);
+    let mut pseudo = Vec::new();
+    pseudo.extend_from_slice(&router.octets());
+    pseudo.extend_from_slice(&syn[8..24]);
+    pseudo.extend_from_slice(&(icmp.len() as u32).to_be_bytes());
+    pseudo.extend_from_slice(&[0, 0, 0, 58]);
+    let c = fold(sum16(&pseudo) + sum16(&icmp));
+    icmp[2..4].copy_from_slice(&c.to_be_bytes());
+    let mut ip = vec![0x60, 0, 0, 0];
+    ip.extend_from_slice(&(icmp.len() as u16).to_be_bytes());
+    ip.extend_from_slice(&[58, 64]);
+    ip.extend_from_slice(&router.octets());
+    ip.extend_from_slice(&syn[8..24]);
+    ip.extend_from_slice(&icmp);
+    ip
+}
+
 /// A SYN (no ACK) in this packet, IPv4 or IPv6: (source, destination,
 /// port).
 fn syn_of(p: &[u8]) -> Option<(IpAddr, IpAddr, u16)> {
@@ -188,7 +214,12 @@ fn responder(mut uplink: File, mut tun: File, world: Arc<Mutex<World>>, stop: Ar
                 if w.refuse_direct.contains(&dst) {
                     uplink.write_all(&tcp_reply(&buf[..n], 0x14)).unwrap();
                 } else if w.unreachable_direct.contains(&dst) {
-                    uplink.write_all(&host_unreachable(&buf[..n])).unwrap();
+                    let notice = if dst.is_ipv6() {
+                        host_unreachable6(&buf[..n])
+                    } else {
+                        host_unreachable(&buf[..n])
+                    };
+                    uplink.write_all(&notice).unwrap();
                 }
             }
         }
@@ -249,11 +280,12 @@ async fn start_probe(race: bool) -> Probe {
     {
         let mut w = world.lock().unwrap();
         w.behind_tunnel.extend(
-            ["10.70.0.5", "10.70.0.6", "10.70.0.8", "fd70::5"]
+            ["10.70.0.5", "10.70.0.6", "10.70.0.8", "fd70::5", "fd70::8"]
                 .map(|a| a.parse::<IpAddr>().unwrap()),
         );
         w.refuse_direct.insert("10.70.0.6".parse().unwrap());
         w.unreachable_direct.insert("10.70.0.8".parse().unwrap());
+        w.unreachable_direct.insert("fd70::8".parse().unwrap());
     }
     let stop = Arc::new(AtomicBool::new(false));
     let responder = {
@@ -305,9 +337,6 @@ async fn start_probe(race: bool) -> Probe {
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
-    sh(&format!(
-        "ip -6 addr add {TUNNEL_V6}/128 dev crake-acme nodad"
-    ));
 
     Probe {
         mgr,
@@ -348,6 +377,13 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
             let unreachable_first = connect("10.70.0.8", 443, Duration::from_secs(2));
             std::thread::sleep(Duration::from_millis(400));
             let unreachable_again = connect("10.70.0.8", 443, Duration::from_millis(500));
+            // 2c. The same over ICMPv6 ("address unreachable").
+            let unreachable6_first = connect("[fd70::8]", 443, Duration::from_secs(2));
+            std::thread::sleep(Duration::from_millis(400));
+            let unreachable6 = (
+                unreachable6_first,
+                connect("[fd70::8]", 443, Duration::from_millis(500)),
+            );
             // 3. Down everywhere. 4. The local network. 5. The never list.
             let down = connect("10.70.0.7", 22, Duration::from_secs(1));
             let lan = connect("192.168.0.50", 80, Duration::from_secs(1));
@@ -357,7 +393,7 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
                 silent,
                 silent6,
                 (refused_first, refused_again),
-                (unreachable_first, unreachable_again),
+                (unreachable_first, unreachable_again, unreachable6),
                 down,
                 lan,
                 never,
@@ -399,7 +435,13 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
         world.lock().unwrap().tunnel_syns,
         std::fs::read_to_string(dir.path().join("log")).unwrap_or_default()
     );
-    let (first, again) = unreachable;
+    let (first, again, v6) = unreachable;
+    assert!(v6.0.0.is_err(), "the router said unreachable: {:?}", v6.0.0);
+    assert!(
+        v6.1.0.is_ok(),
+        "ICMPv6: probed at once, before the wait: {:?}",
+        v6.1.0
+    );
     assert!(
         first.0.is_err(),
         "the router said unreachable: {:?}",
@@ -464,6 +506,11 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
     assert!(
         !log.contains("192.168.0.50") && !log.contains("10.70.9.9"),
         "{log}"
+    );
+    assert!(
+        log.lines()
+            .any(|l| l.contains("fd70::8") && l.contains("Unreachable directly.")),
+        "the ICMPv6 notice started the probe, not the wait:\n{log}"
     );
 }
 
@@ -557,11 +604,14 @@ async fn the_first_connection_is_routed_when_the_syn_is_held() {
 
     // 10.70.0.5 answers only through the tunnel, and was never probed. One
     // connection, held and raced: it succeeds, fast.
-    let (first, down) = tokio::task::spawn_blocking(|| {
+    let (first, first6, down) = tokio::task::spawn_blocking(|| {
         let first = connect("10.70.0.5", 5432, Duration::from_secs(4));
+        // fd70::5 likewise, over IPv6 (a unique local address: raced for a
+        // learn-anything tunnel).
+        let first6 = connect("[fd70::5]", 5432, Duration::from_secs(4));
         // 10.70.0.7 answers nowhere: held, raced, let through, fails.
         let down = connect("10.70.0.7", 22, Duration::from_secs(4));
-        (first, down)
+        (first, first6, down)
     })
     .await
     .unwrap();
@@ -579,6 +629,15 @@ async fn the_first_connection_is_routed_when_the_syn_is_held() {
         first.1
     );
     assert!(down.0.is_err(), "a host nothing answers for still fails");
+    assert!(
+        first6.0.is_ok() && first6.1 < Duration::from_secs(2),
+        "the first IPv6 connection, held and routed: {first6:?}\n{}",
+        sh("nft list chain inet crake syn_race; nft list set inet crake syn_watch6")
+    );
+    // The race knows the tunnel as it came up (its gateway never raced),
+    // although its pushed networks overlap the private ranges it races.
+    let skip = sh("nft list set inet crake syn_skip");
+    assert!(skip.contains("192.0.2.10"), "{skip}");
 
     // The SYN that got through went out the tunnel, and the host is learned.
     assert!(

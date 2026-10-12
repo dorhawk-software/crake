@@ -121,25 +121,29 @@ impl Manager {
         if !self.routing.is_real() || !self.cfg.probing || !self.cfg.race_first_syn {
             return;
         }
-        // (name, gateway, pushed networks) of each routed tunnel.
-        let routed: Vec<(String, Option<Ipv4Addr>, Vec<String>)> = {
+        // (name, gateways, pushed networks) of each routed tunnel.
+        let routed: Vec<(String, Vec<IpAddr>, Vec<String>)> = {
             let map = self.tunnels.lock().unwrap();
             map.values()
                 .filter(|e| e.routed)
                 .map(|e| {
-                    let gw = e.info.as_ref().and_then(|i| i.gateway);
-                    let splits = e.info.as_ref().map(|i| i.split_include.clone());
-                    (e.config.name.clone(), gw, splits.unwrap_or_default())
+                    let i = e.info.as_ref();
+                    let gw = i.and_then(|i| i.gateway).map(IpAddr::V4);
+                    let gw6 = i.and_then(|i| i.gateway6).map(IpAddr::V6);
+                    let splits = i.map(|i| i.split_include.clone());
+                    (
+                        e.config.name.clone(),
+                        gw.into_iter().chain(gw6).collect(),
+                        splits.unwrap_or_default(),
+                    )
                 })
                 .collect()
         };
         let mut watch: BTreeSet<Target> = BTreeSet::new();
         let mut skip: BTreeSet<Target> = BTreeSet::new();
         let mut anything = false;
-        for (name, gw, splits) in &routed {
-            if let Some(gw) = gw {
-                skip.insert(Target::host(*gw));
-            }
+        for (name, gws, splits) in &routed {
+            skip.extend(gws.iter().map(|gw| Target::host(*gw)));
             match self.learning(name) {
                 crate::policy::Learning::Anything => anything = true,
                 crate::policy::Learning::Only { nets, .. } => watch.extend(nets),
@@ -153,15 +157,16 @@ impl Manager {
         // address: race those (the local networks and gateways are skipped).
         if anything {
             watch.extend(
-                ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+                ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"]
                     .iter()
                     .filter_map(|n| n.parse::<Target>().ok()),
             );
         }
-        skip.extend(crate::probe::Local::load().networks());
-        // The race holds IPv4 SYNs only, for now; IPv6 is probed passively.
-        let v4 = |ts: BTreeSet<Target>| ts.into_iter().filter(|t| !t.is_ipv6()).collect();
-        let (watch, skip): (Vec<Target>, Vec<Target>) = (v4(watch), v4(skip));
+        let local = crate::probe::Local::load();
+        skip.extend(local.networks());
+        skip.extend(local.networks6());
+        let (watch, skip): (Vec<Target>, Vec<Target>) =
+            (watch.into_iter().collect(), skip.into_iter().collect());
         if let Err(e) = self.routing.race_up(&watch, &skip).await {
             tracing::error!("the first-SYN race rule: {e:#}");
         }

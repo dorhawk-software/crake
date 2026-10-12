@@ -38,20 +38,29 @@ impl Direct {
     }
 }
 
-/// The flow of a first SYN held in NFQUEUE (an IPv4 TCP packet with SYN set
-/// and ACK clear): (source, destination, ports).
+/// The flow of a first SYN held in NFQUEUE (an IPv4 or IPv6 TCP packet
+/// with SYN set and ACK clear): (source, destination, ports).
 pub fn syn_flow(packet: &[u8]) -> Option<Flow> {
-    let ip = packet::V4::parse(packet, packet::TCP)?;
-    let tcp = ip.payload()?;
-    if !packet::first_syn(tcp) {
-        return None;
-    }
-    Some(Flow {
-        src: ip.src().into(),
-        dst: ip.dst().into(),
+    let flow = tcp_flow(packet)?;
+    packet::first_syn(flow.1).then_some(flow.0)
+}
+
+/// The connection a TCP packet (IPv4 or IPv6) belongs to, and its segment.
+fn tcp_flow(packet: &[u8]) -> Option<(Flow, &[u8])> {
+    let (src, dst, tcp): (IpAddr, IpAddr, &[u8]) = match packet::V4::parse(packet, packet::TCP) {
+        Some(ip) => (ip.src().into(), ip.dst().into(), ip.payload()?),
+        None => {
+            let ip = packet::V6::parse(packet, packet::TCP)?;
+            (ip.src().into(), ip.dst().into(), ip.payload()?)
+        }
+    };
+    let flow = Flow {
+        src,
+        dst,
         sport: packet::source_port(tcp)?,
         dport: packet::destination_port(tcp)?,
-    })
+    };
+    Some((flow, tcp))
 }
 
 /// The direct attempt's outcome in the first-SYN race (`race_held`).
@@ -87,15 +96,18 @@ pub fn unreachable(packet: &[u8]) -> Option<Flow> {
     // Network or host unreachable (0, 1); network, host or anything
     // administratively prohibited (9, 10, 13).
     const CODES: [u8; 5] = [0, 1, 9, 10, 13];
-    let icmp = packet::V4::parse(packet, packet::ICMP)?.payload()?;
-    let inner = packet::V4::parse(packet::unreachable_about(icmp, &CODES)?, packet::TCP)?;
-    let tcp = inner.payload()?;
-    Some(Flow {
-        src: inner.src().into(),
-        dst: inner.dst().into(),
-        sport: packet::source_port(tcp)?,
-        dport: packet::destination_port(tcp)?,
-    })
+    // ICMPv6: no route (0), administratively prohibited (1), address
+    // unreachable (3), source address failed policy (5), reject route (6);
+    // never "port unreachable" (4), which isn't TCP's.
+    const CODES6: [u8; 5] = [0, 1, 3, 5, 6];
+    let inner = match packet::V4::parse(packet, packet::ICMP) {
+        Some(ip) => packet::unreachable_about(ip.payload()?, &CODES)?,
+        None => {
+            let ip = packet::V6::parse(packet, packet::ICMPV6)?;
+            packet::unreachable6_about(ip.payload()?, &CODES6)?
+        }
+    };
+    Some(tcp_flow(inner)?.0)
 }
 
 /// How long an address a tunnel's DNS gave (for a name, private) gets to
@@ -348,6 +360,45 @@ mod tests {
         assert!(unreachable(b"short").is_none());
     }
 
+    /// An IPv6 SYN from 2001:db8:1::42 port 40000 to fd70::8 port 443.
+    fn syn6() -> Vec<u8> {
+        let src: Ipv6Addr = "2001:db8:1::42".parse().unwrap();
+        let dst: Ipv6Addr = "fd70::8".parse().unwrap();
+        let mut p = vec![0x60, 0, 0, 0, 0, 20, 6, 64];
+        p.extend_from_slice(&src.octets());
+        p.extend_from_slice(&dst.octets());
+        p.extend_from_slice(&[0x9c, 0x40, 0x01, 0xbb, 0, 0, 0, 1, 0, 0, 0, 0, 0x50, 0x02]);
+        p.extend_from_slice(&[0xff, 0xff, 0, 0, 0, 0]);
+        p
+    }
+
+    /// A router's ICMPv6 "destination unreachable" (`code`) about `inner`.
+    fn icmp6(code: u8, inner: &[u8]) -> Vec<u8> {
+        let mut p = vec![0x60, 0, 0, 0, 0, 0, 58, 64];
+        p.extend_from_slice(&"2001:db8:1::1".parse::<Ipv6Addr>().unwrap().octets());
+        p.extend_from_slice(&"2001:db8:1::42".parse::<Ipv6Addr>().unwrap().octets());
+        p.extend_from_slice(&[1, code, 0, 0, 0, 0, 0, 0]);
+        p.extend_from_slice(inner);
+        p
+    }
+
+    #[test]
+    fn reads_ipv6_syns_and_unreachables() {
+        let want = Flow {
+            src: "2001:db8:1::42".parse().unwrap(),
+            dst: "fd70::8".parse().unwrap(),
+            sport: 40000,
+            dport: 443,
+        };
+        assert_eq!(syn_flow(&syn6()), Some(want));
+        let mut synack = syn6();
+        synack[packet::IPV6_HEADER + 13] = 0x12;
+        assert_eq!(syn_flow(&synack), None, "a SYN-ACK isn't a first SYN");
+        assert_eq!(unreachable(&icmp6(3, &syn6())), Some(want), "address");
+        assert_eq!(unreachable(&icmp6(1, &syn6())), Some(want), "prohibited");
+        assert_eq!(unreachable(&icmp6(4, &syn6())), None, "port: not TCP's");
+    }
+
     #[test]
     fn local_networks() {
         let l = Local {
@@ -375,5 +426,10 @@ mod tests {
             "a /128 is no network"
         );
         assert!(!l.on_link("2001:db8:2::1".parse().unwrap()));
+        assert_eq!(
+            l.networks6(),
+            vec!["2001:db8:1::/64".parse::<Target>().unwrap()],
+            "a /128 is no network"
+        );
     }
 }
