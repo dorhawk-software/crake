@@ -43,7 +43,7 @@ jobs:
   check:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $APT
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -64,7 +64,7 @@ jobs:
   windows:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends mingw-w64
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -83,7 +83,7 @@ jobs:
   macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -103,7 +103,7 @@ jobs:
   windows-build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -120,7 +120,7 @@ jobs:
               throw "$f.exe needs VCRUNTIME140.dll"
             }
           }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: crake-windows
           path: |
@@ -131,7 +131,7 @@ jobs:
   network:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $APT
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -152,12 +152,12 @@ jobs:
       # cache-nix-action removes its old caches.
       actions: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Let the test's VMs use KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
-      - uses: nixbuild/nix-quick-install-action@v30
+      - uses: nixbuild/nix-quick-install-action@v35
         with:
           nix_conf: |
             system-features = kvm nixos-test benchmark big-parallel
@@ -184,13 +184,13 @@ jobs:
   packages:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: This week (the cache starts afresh each week, with its Rust)
         id: week
         run: echo "week=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
       # rustup, Cargo's downloads and both builds (the .deb's on 22.04 and
       # Arch's with Arch's Rust), as the Windows and check jobs keep theirs.
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
           path: ~/crake-cache
           key: packages-${{ steps.week.outputs.week }}-${{ hashFiles('Cargo.lock') }}
@@ -206,12 +206,12 @@ jobs:
       - name: Let the cache be saved
         if: github.ref == 'refs/heads/main'
         run: sudo chmod -R a+rX ~/crake-cache
-      - uses: actions/cache/save@v4
+      - uses: actions/cache/save@v6
         if: github.ref == 'refs/heads/main'
         with:
           path: ~/crake-cache
           key: packages-${{ steps.week.outputs.week }}-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: crake-packages
           path: |
@@ -229,8 +229,8 @@ jobs:
       matrix:
         system: ["22.04", "24.04", "26.04", "debian:12", "debian:13", "fedora:43", "fedora:44", "fedora:45", "archlinux:latest"]
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: crake-packages
           path: target
