@@ -1,0 +1,57 @@
+# Weekly: the newest gpui-kit with Crake's GPUI patch on it
+# (scripts/update-gpui.sh). Something new: a pull request on branch
+# gpui-update, and CI run on it (a pull request opened with this
+# workflow's token doesn't start CI by itself). The patch no longer
+# applies: an issue saying so. Upstream took the change: the same pull
+# request drops the vendored copy. Dependabot leaves GPUI to this.
+name: GPUI
+
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - name: The newest gpui-kit, Crake's patch on it
+        id: update
+        run: |
+          set +e
+          scripts/update-gpui.sh > update.txt 2>&1
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+          cat update.txt
+      - name: A pull request, tested by CI
+        if: steps.update.outputs.code == '0'
+        run: |
+          git add -A Cargo.toml Cargo.lock crates vendor
+          if git diff --cached --quiet; then exit 0; fi
+          git switch -C gpui-update
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "GPUI: $(tail -n1 update.txt)"
+          git push -f origin gpui-update
+          gh pr view gpui-update >/dev/null 2>&1 || gh pr create --base main --head gpui-update \
+            --title "GPUI update" --body-file update.txt
+          gh workflow run ci.yml --ref gpui-update
+      - name: An issue when the patch no longer applies
+        if: steps.update.outputs.code == '2'
+        run: |
+          title="GPUI: Crake's patch no longer applies"
+          if [ -z "$(gh issue list --state open --search "in:title $title" --json number --jq '.[].number')" ]; then
+            gh issue create --title "$title" --body-file update.txt
+          fi
+      - name: Anything else is a failure
+        if: steps.update.outputs.code != '0' && steps.update.outputs.code != '2'
+        run: exit 1

@@ -1,0 +1,71 @@
+--- a/src/linux/x11/window.rs
++++ b/src/linux/x11/window.rs
+@@ -19,7 +19,7 @@
+     connection::Connection,
+     cookie::{Cookie, VoidCookie},
+     errors::ConnectionError,
+-    properties::{WmHints, WmSizeHints},
++    properties::{WmHints, WmSizeHints, WmSizeHintsSpecification},
+     protocol::{
+         sync,
+         xinput::{self, ConnectionExt as _},
+@@ -77,6 +77,9 @@
+         _NET_WM_WINDOW_TYPE_NOTIFICATION,
+         _NET_WM_WINDOW_TYPE_DIALOG,
+         _NET_WM_STATE_MODAL,
++        _NET_WM_STATE_SKIP_TASKBAR,
++        _NET_WM_STATE_SKIP_PAGER,
++        _NET_WM_STATE_ABOVE,
+         _NET_WM_SYNC,
+         _NET_SUPPORTED,
+         _MOTIF_WM_HINTS,
+@@ -511,7 +514,10 @@
+             // https://stackoverflow.com/questions/43218127/x11-xlib-xcb-creating-a-window-requires-border-pixel-if-specifying-colormap-wh
+             .border_pixel(visual_set.black_pixel)
+             .colormap(colormap)
+-            .override_redirect((params.kind == WindowKind::PopUp) as u32)
++            // CRAKE PATCH: pop-ups stay managed (not override-redirect), so the
++            // window manager gives them focus and focus-out tells the app that
++            // the user clicked elsewhere.
++            .override_redirect(0)
+             .event_mask(
+                 xproto::EventMask::EXPOSURE
+                     | xproto::EventMask::STRUCTURE_NOTIFY
+@@ -614,14 +620,20 @@
+             }
+ 
+             if params.kind == WindowKind::PopUp {
++                // CRAKE PATCH: a pop-up (Crake's tray panel) floats above other
++                // windows and stays out of the taskbar and pager.
+                 check_reply(
+-                    || "X11 ChangeProperty32 setting window type for pop-up failed.",
++                    || "X11 ChangeProperty32 setting state for pop-up failed.",
+                     xcb.change_property32(
+                         xproto::PropMode::REPLACE,
+                         x_window,
+-                        atoms._NET_WM_WINDOW_TYPE,
++                        atoms._NET_WM_STATE,
+                         xproto::AtomEnum::ATOM,
+-                        &[atoms._NET_WM_WINDOW_TYPE_NOTIFICATION],
++                        &[
++                            atoms._NET_WM_STATE_SKIP_TASKBAR,
++                            atoms._NET_WM_STATE_SKIP_PAGER,
++                            atoms._NET_WM_STATE_ABOVE,
++                        ],
+                     ),
+                 )?;
+             }
+@@ -790,6 +802,13 @@
+                     Some((f32::from(size.width) as i32, f32::from(size.height) as i32));
+             }
+             size_hints.max_size = Some((max_texture_size as i32, max_texture_size as i32));
++            // CRAKE PATCH: the app chose this position (e.g. next to a tray
++            // icon); without this hint the window manager places it itself.
++            size_hints.position = Some((
++                WmSizeHintsSpecification::UserSpecified,
++                bounds.origin.x.0,
++                bounds.origin.y.0,
++            ));
+             check_reply(
+                 || {
+                     format!(

@@ -1,0 +1,25 @@
+# Dependencies kept current: Rust crates and the workflows' actions, each
+# weekly as one grouped pull request (one CI run, not one per crate). GPUI
+# (gpui-kit, gpui-pre-*, gpui-fast-*) is left to .github/workflows/gpui.yml,
+# which re-applies Crake's patch: a bump here would quietly drop it.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      crates:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "gpui-kit"
+      - dependency-name: "gpui-kit-*"
+      - dependency-name: "gpui-pre*"
+      - dependency-name: "gpui-fast*"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

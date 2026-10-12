@@ -153,7 +153,15 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
   to it: upward from a bottom bar (the user runs Dash to Panel), downward from
   a top bar, within that monitor. It closes on focus loss. Placement needs a
   small patch to GPUI's X11 backend, vendored in `vendor/gpui-pre-linux`
-  (see its `CRAKE-PATCH.md`). A GNOME Shell extension would be the most native
+  (see its `CRAKE-PATCH.md`). Kept current (requested, 2026-10-12: no
+  stale dependencies): the patch is `vendor/gpui-pre-linux.patch`,
+  `scripts/update-gpui.sh` re-applies it to the newest gpui-kit's GPUI
+  (and drops the vendored copy once upstream has the change), the weekly
+  `.github/workflows/gpui.yml` opens a pull request or an issue, and the
+  lint gate fails if Cargo stopped using the patched copy
+  (`scripts/check-gpui-patch.sh`: a mismatched `[patch]` is only a Cargo
+  warning). Dependabot (`.github/dependabot.yml`) keeps every other crate
+  and the actions current, weekly, grouped; it leaves GPUI alone. A GNOME Shell extension would be the most native
   option; not now.
 - UI is GPUI via `gpui-kit` 0.7, like the sibling app tern
   (`~/RustroverProjects/tern`); follow its patterns. `CRAKE_DEMO=1` shows the

@@ -10,6 +10,8 @@ name: CI
 on:
   push:
   pull_request:
+  # The weekly GPUI update starts CI on its branch (gpui.yml).
+  workflow_dispatch:
 
 permissions:
   contents: read

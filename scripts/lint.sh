@@ -4,7 +4,8 @@
 # cargo-deny (known vulnerabilities, licences, banned and unknown sources) and
 # cargo-machete (unused dependencies), no client names in what would be committed
 # (scripts/check-private.sh), and no file or function past its size limit
-# (scripts/check-size.sh, clippy::too_many_lines). Exits non-zero if any fails.
+# (scripts/check-size.sh, clippy::too_many_lines), and Crake's patched GPUI
+# the one built (scripts/check-gpui-patch.sh). Exits non-zero if any fails.
 #
 #   scripts/lint.sh            # run it by hand
 #
@@ -29,5 +30,6 @@ step "cargo deny" cargo deny --log-level error check
 step "cargo machete" cargo machete
 step "private names" scripts/check-private.sh
 step "file sizes" scripts/check-size.sh
+step "patched GPUI in use" scripts/check-gpui-patch.sh
 
 exit $fail
