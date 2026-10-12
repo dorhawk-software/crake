@@ -556,16 +556,25 @@ fn to_dict(s: &Snapshot) -> HashMap<String, OwnedValue> {
         "address".into(),
         text(
             &info
-                .and_then(|i| i.address)
-                .map(|a| a.to_string())
+                .and_then(|i| {
+                    i.address
+                        .map(|a| a.to_string())
+                        .or_else(|| i.address6.map(|(a, _)| a.to_string()))
+                })
                 .unwrap_or_default(),
         ),
     );
     d.insert(
         "dns".into(),
         strings(
-            info.map(|i| i.dns.iter().map(|a| a.to_string()).collect())
-                .unwrap_or_default(),
+            info.map(|i| {
+                i.dns
+                    .iter()
+                    .map(ToString::to_string)
+                    .chain(i.dns6.iter().map(ToString::to_string))
+                    .collect()
+            })
+            .unwrap_or_default(),
         ),
     );
     d.insert(

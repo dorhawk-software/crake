@@ -222,8 +222,14 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    Over TCP too: a tunnel DNS answer that fits one segment (almost every A
    answer) is held like a UDP one (netns-tested); one spread over several
    segments isn't read, and probing catches its connection.
-   Still open: DNS over TCP across segments, DNS servers reached over IPv6, DNS-over-TLS upstreams (Crake
-   can't see those failures), IPv6 addresses in answers.
+   IPv6 addresses in answers (AAAA, from a tunnel DNS reached over IPv4)
+   are routed before the first packet too, on Linux (netns-tested; the
+   tunnel gets the IPv6 address openconnect hands over,
+   `INTERNAL_IP6_ADDRESS`). Still open: DNS over TCP across segments, DNS
+   servers reached over IPv6 (openconnect lists them in
+   `INTERNAL_IP4_DNS`; craked shows them but asks only IPv4 ones),
+   DNS-over-TLS upstreams (Crake can't see those failures), IPv6 in the
+   public-NXDOMAIN rescue and split-horizon.
 4. Connection probing and automatic learning; undo. **Built**, proven in a
    throwaway namespace (the fake gateway drops packets not from the tunnel
    address, like a real one; the test fails if the stuck flow isn't
@@ -365,7 +371,11 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    IT only allows *.acme.internal and 10.40.0.0/16 through ACME."). Full
    tunnel: everything not marked by another tunnel goes through except the
    gateway, on-link networks, loopback, link-local and multicast; its DNS
-   becomes resolved's default route (`~.`). D-Bus ListTunnels has
+   becomes resolved's default route (`~.`). IPv6 (Linux) goes through
+   too when the gateway gave the tunnel an IPv6 address; without one it
+   is refused rather than sent around the tunnel (TCP reset at once, so
+   apps fall back to IPv4; the rest dropped), as AnyConnect does by
+   default (netns-tested both ways). D-Bus ListTunnels has
    managed/policy/full_tunnel/managed_file; the panel shows the Managed tag
    and the policy line as in tray-panel.html (the demo data now matches).
    Helpdesk copies (panel, log) can leave host names out

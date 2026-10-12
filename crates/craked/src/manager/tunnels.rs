@@ -283,10 +283,13 @@ impl Manager {
         let info = TunnelInfo {
             device: device.to_owned(),
             gateway: fields.get("gateway").and_then(|g| g.parse().ok()),
+            gateway6: fields.get("gateway").and_then(|g| g.parse().ok()),
             address: own.map(|(a, _)| a),
             prefix: own.map(|(_, p)| p),
             mtu: None,
             dns,
+            address6: None,
+            dns6: Vec::new(),
             domains: domains
                 .into_iter()
                 .map(|d| dns::normalize(&d))
@@ -373,6 +376,9 @@ impl Manager {
                             info.mtu,
                         )
                         .await?;
+                }
+                if let Some((addr, prefix)) = info.address6 {
+                    self.net.assign6(&info.device, addr, prefix).await?;
                 }
                 self.tunnel_up(name, &display, info, msg.reason == "connect")
                     .await

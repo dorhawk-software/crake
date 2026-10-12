@@ -21,6 +21,12 @@ impl Net {
         if apply { Self::Ip } else { Self::Noop }
     }
 
+    /// The tunnel's IPv6 address: not given yet, as IPv6 isn't routed
+    /// here (`Routing::routes_ipv6`).
+    pub async fn assign6(&self, _dev: &str, _addr: std::net::Ipv6Addr, _prefix: u8) -> Result<()> {
+        Ok(())
+    }
+
     /// The tunnel's address (a utun device is point to point: its own
     /// address at both ends) and MTU.
     pub async fn assign(

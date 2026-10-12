@@ -36,6 +36,28 @@ trap 'ip link del crake-acme; exit 0' TERM
 while :; do sleep 0.1; done
 "#;
 
+// Like FAKE, but openconnect hands over an IPv6 address too, which craked
+// gives the device.
+const FAKE_IP6: &str = r#"#!/bin/sh
+ip link add crake-acme type dummy 2>/dev/null
+ip link set crake-acme up
+export TUNDEV=crake-acme VPNGATEWAY=192.0.2.10 INTERNAL_IP4_ADDRESS=10.40.255.7 \
+  INTERNAL_IP4_NETMASK=255.255.255.255 INTERNAL_IP4_DNS=10.40.0.2 \
+  INTERNAL_IP6_ADDRESS=fd00:ac::7 INTERNAL_IP6_NETMASK=fd00:ac::7/64
+reason=connect "$CRAKE_TEST_HOOK" || exit 1
+trap 'ip link del crake-acme; exit 0' TERM
+while :; do sleep 0.1; done
+"#;
+
+/// A TCP connection to `addr` within half a second: how it ended.
+fn tcp_to(addr: &str) -> std::io::ErrorKind {
+    let addr: std::net::SocketAddr = addr.parse().unwrap();
+    match std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(500)) {
+        Ok(_) => std::io::ErrorKind::Other,
+        Err(e) => e.kind(),
+    }
+}
+
 fn enabled() -> bool {
     std::env::var("CRAKE_NETNS_TEST").as_deref() == Ok("1")
 }
@@ -354,7 +376,8 @@ async fn a_full_tunnel_takes_everything_but_the_gateway_and_the_lan() {
     let socket = cfg.hook_socket.clone();
     let mgr = Manager::new(cfg).unwrap();
     sh("ip link add uplink type dummy; ip link set uplink up; \
-        ip addr add 192.168.0.242/24 dev uplink; ip route add default via 192.168.0.1 dev uplink");
+        ip addr add 192.168.0.242/24 dev uplink; ip route add default via 192.168.0.1 dev uplink; \
+        ip -6 addr add fd00:1a::242/64 dev uplink nodad; ip -6 route add default via fd00:1a::1 dev uplink");
     mgr.init().await.unwrap();
     let _srv = hook_server::serve(mgr.clone(), &socket).unwrap();
 
@@ -373,6 +396,41 @@ async fn a_full_tunnel_takes_everything_but_the_gateway_and_the_lan() {
         err.to_string(),
         "Everything already goes through ACME (full tunnel)."
     );
+    // No IPv6 address on the tunnel: IPv6 is refused at once, never sent
+    // around it; the LAN's IPv6 isn't touched.
+    assert_eq!(
+        tcp_to("[2001:db8::40]:443"),
+        std::io::ErrorKind::ConnectionRefused,
+        "{}",
+        sh("nft list ruleset")
+    );
+    assert_eq!(tcp_to("[fd00:1a::50]:443"), std::io::ErrorKind::TimedOut);
+
+    mgr.disconnect("acme").unwrap();
+    wait_for(&mgr, TunnelState::Off).await;
+    assert_eq!(
+        tcp_to("[2001:db8::40]:443"),
+        std::io::ErrorKind::TimedOut,
+        "off: IPv6 goes its own way again"
+    );
+
+    // With an IPv6 address from the gateway: craked gives it to the
+    // device, and IPv6 goes through too (but the LAN's).
+    std::fs::write(dir.path().join("openconnect"), FAKE_IP6).unwrap();
+    mgr.connect("acme").unwrap();
+    wait_for(&mgr, TunnelState::Connected).await;
+    assert!(
+        sh("ip -6 addr show dev crake-acme").contains("fd00:ac::7/64"),
+        "{}",
+        sh("ip -6 addr show dev crake-acme")
+    );
+    assert!(
+        goes_through_tunnel6("2001:db8::40"),
+        "{}",
+        sh("nft list ruleset")
+    );
+    assert!(!goes_through_tunnel6("fd00:1a::50"), "never the LAN");
+    assert!(goes_through_tunnel("203.0.113.40"));
 
     mgr.disconnect("acme").unwrap();
     wait_for(&mgr, TunnelState::Off).await;

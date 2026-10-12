@@ -2,7 +2,7 @@
 //! Split-include networks and DNS domains are hints only; nothing here is routed.
 
 use std::collections::BTreeMap;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use anyhow::{Context, Result};
 
@@ -11,12 +11,20 @@ pub struct TunnelInfo {
     pub device: String,
     /// The gateway's IPv4 address, if it has one.
     pub gateway: Option<Ipv4Addr>,
+    /// The gateway's IPv6 address, if it's reached over IPv6.
+    pub gateway6: Option<Ipv6Addr>,
     pub address: Option<Ipv4Addr>,
     pub prefix: Option<u8>,
     pub mtu: Option<u32>,
     pub dns: Vec<Ipv4Addr>,
+    /// The tunnel's IPv6 address and prefix length, if it has one.
+    pub address6: Option<(Ipv6Addr, u8)>,
+    /// IPv6 DNS servers. openconnect lists them with the IPv4 ones in
+    /// `INTERNAL_IP4_DNS`; craked asks only IPv4 ones for now, so these are
+    /// shown, not used.
+    pub dns6: Vec<Ipv6Addr>,
     pub domains: Vec<String>,
-    /// `a.b.c.d/len`
+    /// `a.b.c.d/len` or `v6::/len`
     pub split_include: Vec<String>,
     pub split_exclude: Vec<String>,
 }
@@ -46,11 +54,30 @@ impl TunnelInfo {
             (None, None) => address.map(|_| crate::hosts::V4_BITS),
         };
         let mtu = get("INTERNAL_IP4_MTU").and_then(|m| m.parse().ok());
-        let dns = get("INTERNAL_IP4_DNS")
+        let servers = get("INTERNAL_IP4_DNS")
             .unwrap_or("")
             .split_whitespace()
-            .map(|d| d.parse::<Ipv4Addr>().context("INTERNAL_IP4_DNS"))
+            .chain(get("INTERNAL_IP6_DNS").unwrap_or("").split_whitespace())
+            .map(|d| d.parse::<IpAddr>().context("INTERNAL_IP4_DNS"))
             .collect::<Result<Vec<_>>>()?;
+        let dns = servers
+            .iter()
+            .filter_map(|a| match a {
+                IpAddr::V4(a) => Some(*a),
+                IpAddr::V6(_) => None,
+            })
+            .collect();
+        let dns6 = servers
+            .iter()
+            .filter_map(|a| match a {
+                IpAddr::V6(a) => Some(*a),
+                IpAddr::V4(_) => None,
+            })
+            .collect();
+        let address6 = get("INTERNAL_IP6_ADDRESS")
+            .map(|a| a.parse::<Ipv6Addr>().context("INTERNAL_IP6_ADDRESS"))
+            .transpose()?
+            .map(|a| (a, prefix6(get("INTERNAL_IP6_NETMASK"))));
 
         let mut domains: Vec<String> = Vec::new();
         for d in get("CISCO_DEF_DOMAIN")
@@ -64,17 +91,31 @@ impl TunnelInfo {
             }
         }
 
-        let gateway = get("VPNGATEWAY").and_then(|g| g.parse().ok());
+        let gateway_addr = get("VPNGATEWAY").and_then(|g| g.parse::<IpAddr>().ok());
+        let (gateway, gateway6) = match gateway_addr {
+            Some(IpAddr::V4(a)) => (Some(a), None),
+            Some(IpAddr::V6(a)) => (None, Some(a)),
+            None => (None, None),
+        };
         Ok(Self {
             device,
             gateway,
+            gateway6,
             address,
             prefix,
             mtu,
             dns,
+            address6,
+            dns6,
             domains,
-            split_include: split_list(env, "CISCO_SPLIT_INC"),
-            split_exclude: split_list(env, "CISCO_SPLIT_EXC"),
+            split_include: split_list(env, "CISCO_SPLIT_INC", false)
+                .into_iter()
+                .chain(split_list(env, "CISCO_IPV6_SPLIT_INC", true))
+                .collect(),
+            split_exclude: split_list(env, "CISCO_SPLIT_EXC", false)
+                .into_iter()
+                .chain(split_list(env, "CISCO_IPV6_SPLIT_EXC", true))
+                .collect(),
         })
     }
 }
@@ -82,16 +123,31 @@ impl TunnelInfo {
 /// More split networks than any gateway pushes: the rest is ignored.
 const MAX_SPLITS: usize = 1024;
 
-fn split_list(env: &BTreeMap<String, String>, base: &str) -> Vec<String> {
+/// openconnect's `INTERNAL_IP6_NETMASK` is the address with its length
+/// (`fd40::7/64`); a bare length is taken too. Without one: the address alone.
+fn prefix6(netmask: Option<&str>) -> u8 {
+    netmask
+        .and_then(|m| m.rsplit('/').next())
+        .and_then(|l| l.parse::<u8>().ok())
+        .filter(|l| *l <= crate::hosts::V6_BITS)
+        .unwrap_or(crate::hosts::V6_BITS)
+}
+
+/// The split networks under `base` (`CISCO_SPLIT_INC`, or the IPv6 list
+/// `CISCO_IPV6_SPLIT_INC` when `v6`), as `addr/len`.
+fn split_list(env: &BTreeMap<String, String>, base: &str, v6: bool) -> Vec<String> {
     let n: usize = env.get(base).and_then(|n| n.parse().ok()).unwrap_or(0);
+    let bits = if v6 {
+        crate::hosts::V6_BITS
+    } else {
+        crate::hosts::V4_BITS
+    };
     (0..n.min(MAX_SPLITS))
         .filter_map(|i| {
             let addr = env.get(&format!("{base}_{i}_ADDR"))?;
             let len = env.get(&format!("{base}_{i}_MASKLEN"))?;
-            addr.parse::<Ipv4Addr>().ok()?;
-            len.parse::<u8>()
-                .ok()
-                .filter(|l| *l <= crate::hosts::V4_BITS)?;
+            let addr = addr.parse::<IpAddr>().ok().filter(|a| a.is_ipv6() == v6)?;
+            let len = len.parse::<u8>().ok().filter(|l| *l <= bits)?;
             Some(format!("{addr}/{len}"))
         })
         .collect()
@@ -152,6 +208,31 @@ mod tests {
         assert_eq!(info.dns.len(), 2);
         assert_eq!(info.domains, ["acme.internal", "corp.acme"]);
         assert_eq!(info.split_include, ["10.40.0.0/16", "172.16.0.0/12"]);
+    }
+
+    #[test]
+    fn parses_ipv6() {
+        let info = TunnelInfo::from_env(&env(&[
+            ("TUNDEV", "crake-acme"),
+            ("INTERNAL_IP4_ADDRESS", "10.40.1.7"),
+            ("INTERNAL_IP4_DNS", "10.40.0.2 fd40::53"),
+            ("INTERNAL_IP6_ADDRESS", "fd40:ff::7"),
+            ("INTERNAL_IP6_NETMASK", "fd40:ff::7/64"),
+            ("CISCO_IPV6_SPLIT_INC", "1"),
+            ("CISCO_IPV6_SPLIT_INC_0_ADDR", "fd40::"),
+            ("CISCO_IPV6_SPLIT_INC_0_MASKLEN", "48"),
+        ]))
+        .unwrap();
+        assert_eq!(info.dns, ["10.40.0.2".parse::<Ipv4Addr>().unwrap()]);
+        assert_eq!(info.dns6, ["fd40::53".parse::<Ipv6Addr>().unwrap()]);
+        assert_eq!(info.address6, Some(("fd40:ff::7".parse().unwrap(), 64)));
+        assert_eq!(info.split_include, ["fd40::/48"]);
+        let bare = TunnelInfo::from_env(&env(&[
+            ("TUNDEV", "crake-acme"),
+            ("INTERNAL_IP6_ADDRESS", "fd40:ff::7"),
+        ]))
+        .unwrap();
+        assert_eq!(bare.address6, Some(("fd40:ff::7".parse().unwrap(), 128)));
     }
 
     #[test]

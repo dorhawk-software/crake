@@ -40,6 +40,22 @@ impl Net {
         ip(&up).await
     }
 
+    /// Give `dev` its IPv6 address (no duplicate-address detection: the
+    /// tunnel's other end is the gateway). Idempotent.
+    pub async fn assign6(&self, dev: &str, addr: std::net::Ipv6Addr, prefix: u8) -> Result<()> {
+        let Self::Ip = self else { return Ok(()) };
+        ip(&[
+            "-6",
+            "addr",
+            "replace",
+            &format!("{addr}/{prefix}"),
+            "dev",
+            dev,
+            "nodad",
+        ])
+        .await
+    }
+
     /// A dummy link with one address (see `hush`). Idempotent.
     pub async fn dummy(&self, dev: &str, addr: Ipv4Addr) -> Result<()> {
         let Self::Ip = self else { return Ok(()) };

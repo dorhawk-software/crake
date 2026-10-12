@@ -75,7 +75,8 @@ fn chain_defs(name: &str) -> String {
     format!(
         "add chain inet {TABLE} out_{name} {{ type route hook output priority mangle; policy accept; }}\n\
          add chain inet {TABLE} nat_{name} {{ type nat hook postrouting priority srcnat; policy accept; }}\n\
-         add chain inet {TABLE} dns_{name} {{ type filter hook input priority filter; policy accept; }}\n"
+         add chain inet {TABLE} dns_{name} {{ type filter hook input priority filter; policy accept; }}\n\
+         add chain inet {TABLE} block_{name} {{ type filter hook output priority filter; policy accept; }}\n"
     )
 }
 
@@ -90,6 +91,7 @@ pub fn up_script(plan: &Plan) -> String {
         pinned,
         learned,
         full_except,
+        ipv6,
     } = *plan;
     let mark = ids(index).mark;
     let (ls, ps) = (learned_set(name), pinned_set(name));
@@ -101,6 +103,7 @@ pub fn up_script(plan: &Plan) -> String {
         "flush chain inet {TABLE} out_{name}\n\
          flush chain inet {TABLE} nat_{name}\n\
          flush chain inet {TABLE} dns_{name}\n\
+         flush chain inet {TABLE} block_{name}\n\
          flush set inet {TABLE} {ls}\n\
          flush set inet {TABLE} {ps}\n\
          flush set inet {TABLE} {ls6}\n\
@@ -123,11 +126,36 @@ pub fn up_script(plan: &Plan) -> String {
         .iter()
         .map(|s| s.to_string())
         .collect();
-        list.extend(except.iter().map(Target::to_string));
+        list.extend(
+            except
+                .iter()
+                .filter(|t| !t.is_ipv6())
+                .map(Target::to_string),
+        );
         s += &format!(
             "add rule inet {TABLE} out_{name} meta mark 0 ip daddr != {{ {} }} meta mark set {mark:#x}\n",
             list.join(", ")
         );
+        // IPv6 likewise: loopback, link-local and multicast stay.
+        let mut list6: Vec<String> = ["::1", "fe80::/10", "ff00::/8"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        list6.extend(except.iter().filter(|t| t.is_ipv6()).map(Target::to_string));
+        let list6 = list6.join(", ");
+        s += &if ipv6 {
+            format!(
+                "add rule inet {TABLE} out_{name} meta mark 0 ip6 daddr != {{ {list6} }} meta mark set {mark:#x}\n"
+            )
+        } else {
+            // The tunnel has no IPv6 address: never sent around the tunnel.
+            // TCP is reset, so apps fall back to IPv4 at once (an ICMPv6
+            // reject doesn't reach a local socket); the rest is dropped.
+            format!(
+                "add rule inet {TABLE} block_{name} meta mark 0 ip6 daddr != {{ {list6} }} meta l4proto tcp reject with tcp reset\n\
+                 add rule inet {TABLE} block_{name} meta mark 0 ip6 daddr != {{ {list6} }} drop\n"
+            )
+        };
     }
     if !dns.is_empty() {
         let servers: Vec<String> = dns.iter().map(Ipv4Addr::to_string).collect();
@@ -188,7 +216,8 @@ pub fn down_script(name: &str) -> String {
     let mut s = format!("add table inet {TABLE}\n");
     s += &chain_defs(name);
     s += &format!(
-        "delete chain inet {TABLE} out_{name}\ndelete chain inet {TABLE} nat_{name}\ndelete chain inet {TABLE} dns_{name}\n"
+        "delete chain inet {TABLE} out_{name}\ndelete chain inet {TABLE} nat_{name}\n\
+         delete chain inet {TABLE} dns_{name}\ndelete chain inet {TABLE} block_{name}\n"
     );
     s += &set_defs(name, 1);
     s += &format!(
@@ -568,6 +597,7 @@ mod tests {
                 ("fd40::1".parse().unwrap(), 60),
             ],
             full_except: None,
+            ipv6: false,
         });
         assert!(s.contains("add element inet crake pinned_acme { 10.40.0.0/16 }"));
         assert!(s.contains("add element inet crake learned_acme { 10.33.1.1 timeout 60s }"));
@@ -597,11 +627,33 @@ mod tests {
             full_except: Some(&[
                 "203.0.113.9".parse().unwrap(),
                 "192.168.1.0/24".parse().unwrap(),
+                "fd00:1a::/64".parse().unwrap(),
             ]),
+            ipv6: true,
         });
         assert!(full.contains(
             "add rule inet crake out_globex meta mark 0 ip daddr != { 127.0.0.0/8, 169.254.0.0/16, \
              224.0.0.0/4, 255.255.255.255, 203.0.113.9, 192.168.1.0/24 } meta mark set 0x43520002"
+        ));
+        assert!(full.contains(
+            "add rule inet crake out_globex meta mark 0 ip6 daddr != { ::1, fe80::/10, ff00::/8, \
+             fd00:1a::/64 } meta mark set 0x43520002"
+        ));
+        assert!(!full.contains("reject"), "{full}");
+        let no_v6 = up_script(&Plan {
+            name: "globex",
+            index: 1,
+            device: "crake-globex",
+            timeout: 60,
+            dns: &[],
+            pinned: &[],
+            learned: &[],
+            full_except: Some(&[]),
+            ipv6: false,
+        });
+        assert!(no_v6.contains(
+            "add rule inet crake block_globex meta mark 0 ip6 daddr != { ::1, fe80::/10, ff00::/8 } \
+             meta l4proto tcp reject with tcp reset"
         ));
     }
 

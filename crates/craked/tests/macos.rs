@@ -135,6 +135,7 @@ async fn a_tunnel_on_a_utun_device() {
             pinned: &pinned,
             learned: &learned,
             full_except: None,
+            ipv6: false,
         })
         .await
         .unwrap();

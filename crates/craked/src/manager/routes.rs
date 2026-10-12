@@ -44,10 +44,11 @@ impl Manager {
         }
         // A full tunnel takes everything but its own gateway and the LAN.
         let full_except = (self.learning(name) == crate::policy::Learning::FullTunnel).then(|| {
-            let mut v: Vec<Target> = crate::probe::Local::load().networks();
-            if let Some(gw) = info.gateway {
-                v.push(Target::host(gw));
-            }
+            let local = crate::probe::Local::load();
+            let mut v: Vec<Target> = local.networks();
+            v.extend(local.networks6());
+            v.extend(info.gateway.map(Target::host));
+            v.extend(info.gateway6.map(Target::host));
             v
         });
         self.routing
@@ -60,6 +61,7 @@ impl Manager {
                 pinned: &pinned,
                 learned: &learned,
                 full_except: full_except.as_deref(),
+                ipv6: info.address6.is_some(),
             })
             .await?;
         self.set_routed(name, true);

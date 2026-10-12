@@ -43,4 +43,8 @@ pub struct Plan<'a> {
     /// (the gateway, the local networks). Other tunnels' hosts still go
     /// their own way.
     pub full_except: Option<&'a [Target]>,
+    /// The tunnel has an IPv6 address: a full tunnel takes IPv6 too.
+    /// Without one, a full tunnel refuses IPv6 rather than let it go
+    /// around the tunnel.
+    pub ipv6: bool,
 }

@@ -9,7 +9,7 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
-use std::net::{IpAddr, Ipv4Addr, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, UdpSocket};
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
@@ -23,6 +23,7 @@ use craked::manager::Manager;
 const FAKE: &str = r#"#!/bin/sh
 export TUNDEV=crake-acme VPNGATEWAY=192.0.2.10 INTERNAL_IP4_ADDRESS=10.40.255.7 \
   INTERNAL_IP4_NETMASK=255.255.255.255 INTERNAL_IP4_DNS=10.40.0.2 \
+  INTERNAL_IP6_ADDRESS=fd40:ff::7 INTERNAL_IP6_NETMASK=fd40:ff::7/64 \
   CISCO_DEF_DOMAIN=acme.internal
 reason=connect "$CRAKE_TEST_HOOK" || exit 1
 trap 'exit 0' TERM
@@ -278,15 +279,16 @@ fn checksum(header: &[u8]) -> u16 {
 
 /// Turn the query packet into an answer packet with one A record.
 fn answer(query: &[u8], addr: Ipv4Addr) -> Vec<u8> {
-    reply(query, 0, &[addr])
+    reply(query, 0, &[addr.into()])
 }
 
 fn nxdomain(query: &[u8]) -> Vec<u8> {
     reply(query, 3, &[])
 }
 
-/// Turn the query packet into an answer packet: rcode plus A records.
-fn reply(query: &[u8], rcode: u8, addrs: &[Ipv4Addr]) -> Vec<u8> {
+/// Turn the query packet into an answer packet: rcode plus A (or AAAA)
+/// records.
+fn reply(query: &[u8], rcode: u8, addrs: &[IpAddr]) -> Vec<u8> {
     let ihl = usize::from(query[0] & 0x0f) * 4;
     let udp = &query[ihl..];
     let dns = answer_message(&udp[8..], rcode, addrs);
@@ -308,8 +310,9 @@ fn reply(query: &[u8], rcode: u8, addrs: &[Ipv4Addr]) -> Vec<u8> {
     ip
 }
 
-/// The answer to a DNS query message: rcode plus A records.
-fn answer_message(query: &[u8], rcode: u8, addrs: &[Ipv4Addr]) -> Vec<u8> {
+/// The answer to a DNS query message: rcode plus A records (AAAA for an
+/// IPv6 address).
+fn answer_message(query: &[u8], rcode: u8, addrs: &[IpAddr]) -> Vec<u8> {
     let mut dns = query.to_vec();
     dns[2] = 0x81; // response, recursion desired
     dns[3] = 0x80 | rcode; // recursion available
@@ -323,8 +326,13 @@ fn answer_message(query: &[u8], rcode: u8, addrs: &[Ipv4Addr]) -> Vec<u8> {
     }
     dns.truncate(i + 5);
     for addr in addrs {
-        dns.extend_from_slice(&[0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4]);
-        dns.extend_from_slice(&addr.octets());
+        let (kind, data) = match addr {
+            IpAddr::V4(a) => (1, a.octets().to_vec()),
+            IpAddr::V6(a) => (28, a.octets().to_vec()),
+        };
+        dns.extend_from_slice(&[0xc0, 0x0c, 0, kind, 0, 1, 0, 0, 0, 60, 0]);
+        dns.push(data.len() as u8);
+        dns.extend_from_slice(&data);
     }
     dns
 }
@@ -421,7 +429,7 @@ fn ask_tcp(tun: &mut File, name: &str, addr: Ipv4Addr) -> bool {
     });
     let ihl = usize::from(seg[0] & 0x0f) * 4;
     let data = &seg[ihl + usize::from(seg[ihl + 12] >> 4) * 4..];
-    let reply = answer_message(&data[2..], 0, &[addr]);
+    let reply = answer_message(&data[2..], 0, &[addr.into()]);
     let mut framed = (reply.len() as u16).to_be_bytes().to_vec();
     framed.extend_from_slice(&reply);
     tun.write_all(&tcp_reply(&seg, 777_001, &framed)).unwrap();
@@ -434,13 +442,37 @@ fn ask_tcp(tun: &mut File, name: &str, addr: Ipv4Addr) -> bool {
 }
 
 fn query(name: &str) -> Vec<u8> {
+    query_for(name, 1)
+}
+
+/// A query for `name`'s records of type `kind` (1: A, 28: AAAA).
+fn query_for(name: &str, kind: u8) -> Vec<u8> {
     let mut m = vec![0xab, 0xcd, 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 0];
     for label in name.split('.') {
         m.push(label.len() as u8);
         m.extend_from_slice(label.as_bytes());
     }
-    m.extend_from_slice(&[0, 0, 1, 0, 1]);
+    m.extend_from_slice(&[0, 0, kind, 0, 1]);
     m
+}
+
+/// Ask the tunnel's DNS (over IPv4) for `name`'s IPv6 address; the test
+/// answers `addr`. Returns whether the app's first packet to `addr` left
+/// through the tunnel.
+fn ask_aaaa(tun: &mut File, name: &str, addr: Ipv6Addr) -> bool {
+    let sock = UdpSocket::bind("0.0.0.0:0").unwrap();
+    sock.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    sock.send_to(&query_for(name, 28), "10.40.0.2:53").unwrap();
+    let q = read_query(tun);
+    tun.write_all(&reply(&q, 0, &[addr.into()])).unwrap();
+    let mut buf = [0u8; 512];
+    let (n, _) = sock
+        .recv_from(&mut buf)
+        .expect("the answer reached the app");
+    assert!(buf[..n].windows(16).any(|w| w == addr.octets()));
+    let app = UdpSocket::bind("[::]:0").unwrap();
+    let _ = app.send_to(b"first", (addr, 443));
+    first_packet_through_tunnel(tun, IpAddr::V6(addr))
 }
 
 /// Ask the tunnel's DNS for `name`; the test answers `addr`. Returns whether
@@ -492,9 +524,11 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     strict_rp_filter();
     // A stand-in for the Wi-Fi, with public DNS at 192.168.0.1 (played by the test).
     let mut uplink = open_tun("uplink");
+    // Dual-stack: an unrouted IPv6 destination goes this way first.
     sh(
         "ip link set uplink up; ip addr add 192.168.0.242/24 dev uplink; \
-        ip route add default via 192.168.0.1 dev uplink",
+        ip route add default via 192.168.0.1 dev uplink; \
+        ip -6 addr add fd00:1a::242/64 dev uplink nodad; ip -6 route add default dev uplink",
     );
     let mut tun = open_tun("crake-acme");
     sh("ip link set crake-acme up");
@@ -550,6 +584,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     let big: Ipv4Addr = "10.33.9.9".parse().unwrap();
     let public: Ipv4Addr = "93.184.215.14".parse().unwrap();
     let gw: Ipv4Addr = "192.0.2.10".parse().unwrap();
+    let git6: Ipv6Addr = "fd40:1::7".parse().unwrap();
 
     // Run the blocking socket work off the runtime; the queue thread needs it.
     let db: Ipv4Addr = "10.58.70.119".parse().unwrap();
@@ -607,6 +642,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
             ask(&mut tun, "www.example.com", public),
             ask(&mut tun, "vpn.acme.internal", gw),
             ask_tcp(&mut tun, "big.acme.internal", big),
+            ask_aaaa(&mut tun, "v6.acme.internal", git6),
         );
         (tun, r, publics, splits)
     })
@@ -654,7 +690,14 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     assert_eq!(www.addrs, vec![IpAddr::V4(www_public)], "{www:?}");
     assert!(!www.first_through_tunnel, "{www:?}");
 
-    let (git_first, wiki_first, public_routed, gw_routed, tcp_first) = results;
+    let (git_first, wiki_first, public_routed, gw_routed, tcp_first, v6_first) = results;
+    assert!(
+        v6_first,
+        "an AAAA answer: the first IPv6 packet went through the tunnel\n{}",
+        sh(
+            "nft list set inet crake learned6_acme; ip -6 addr; ip -6 rule; ip -6 route show table all"
+        )
+    );
     assert!(
         tcp_first,
         "an answer over TCP: the first packet went through the tunnel"
@@ -681,12 +724,18 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
 
     mgr.shutdown().await;
     drop(tun_back);
-    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    logged_what_it_did(dir.path());
+}
+
+/// What the log says about the test's names.
+fn logged_what_it_did(dir: &std::path::Path) {
+    let log = std::fs::read_to_string(dir.join("log")).unwrap();
     assert!(
         log.contains("Sent git.acme.internal through ACME."),
         "{log}"
     );
     assert!(log.contains("Routed before the first packet."), "{log}");
+    assert!(log.contains("Sent v6.acme.internal through ACME."), "{log}");
     assert!(log.contains("Left vpn.acme.internal alone."), "{log}");
     assert!(
         log.contains("Sent db.example.cloud through ACME.")

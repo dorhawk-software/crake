@@ -240,6 +240,23 @@ impl Local {
             .collect()
     }
 
+    /// The IPv6 networks the machine is directly attached to (not tunnels;
+    /// not a lone /128).
+    pub fn networks6(&self) -> Vec<Target> {
+        self.nets6
+            .iter()
+            .filter(|(_, p)| u32::from(*p) < Ipv6Addr::BITS)
+            .filter_map(|(a, p)| {
+                let m = u128::MAX
+                    .checked_shl(Ipv6Addr::BITS - u32::from(*p))
+                    .unwrap_or(0);
+                format!("{}/{p}", Ipv6Addr::from(u128::from(*a) & m))
+                    .parse()
+                    .ok()
+            })
+            .collect()
+    }
+
     /// One of the machine's own (non-tunnel) addresses.
     pub fn is_own(&self, ip: IpAddr) -> bool {
         match ip {
