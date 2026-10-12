@@ -28,20 +28,35 @@ Check "the LAN (198.51.100.20)" {
     $true
 }
 
-# Crake, installed.
+# Crake, installed: with its installer when the disc has one (as a person
+# would), otherwise its files copied and the service made by hand.
 $dir = "$env:ProgramFiles\Crake"
-Check "installed in Program Files\Crake" {
-    New-Item -ItemType Directory -Force $dir | Out-Null
-    Copy-Item -Recurse -Force "$Disc\crake\*" $dir -ErrorAction Stop
-    Test-Path "$dir\openconnect\openconnect.exe"
+$setup = Test-Path "$Disc\crake-setup.exe"
+if ($setup) {
+    Check "the installer installs Crake" {
+        $p = Start-Process "$Disc\crake-setup.exe" -ArgumentList '/S' -Wait -PassThru
+        $p.ExitCode -eq 0 -and (Test-Path "$dir\openconnect\openconnect.exe") -and (Test-Path "$dir\crake.exe")
+    }
+    Check "listed in Installed apps" {
+        (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Crake').DisplayName -eq 'Crake'
+    }
+    Check "openconnect's and Wintun's licences beside them" {
+        (Test-Path "$dir\openconnect\openconnect-LICENSE.txt") -and (Test-Path "$dir\openconnect\wintun-LICENSE.txt")
+    }
+} else {
+    Check "installed in Program Files\Crake" {
+        New-Item -ItemType Directory -Force $dir | Out-Null
+        Copy-Item -Recurse -Force "$Disc\crake\*" $dir -ErrorAction Stop
+        Test-Path "$dir\openconnect\openconnect.exe"
+    }
+    New-Service -Name craked -DisplayName 'Crake' -BinaryPathName "`"$dir\craked.exe`"" `
+        -StartupType Automatic | Out-Null
 }
 Check "the craked service runs" {
-    New-Service -Name craked -DisplayName 'Crake' -BinaryPathName "`"$dir\craked.exe`"" `
-        -StartupType Automatic -ErrorAction Stop | Out-Null
     # craked's debug lines in its log, for when something goes wrong.
     Set-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Services\craked -Name Environment `
-        -Type MultiString -Value 'RUST_LOG=craked=debug,info' 
-    Start-Service craked -ErrorAction Stop
+        -Type MultiString -Value 'RUST_LOG=craked=debug,info'
+    Restart-Service craked -ErrorAction Stop
     (Get-Service craked).Status -eq 'Running'
 }
 Check "it serves the app on 127.0.0.1:47366" {
@@ -79,6 +94,15 @@ Check "no crake adapters left" { -not (Get-NetAdapter -Name 'crake-*' -ErrorActi
 Check "no DNS rules left" {
     -not (Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters\DnsPolicyConfig' -ErrorAction SilentlyContinue |
         Where-Object PSChildName -like 'Crake *')
+}
+if ($setup) {
+    Check "the uninstaller removes Crake" {
+        Start-Process "$dir\uninstall.exe" -ArgumentList '/S' -Wait
+        # It runs on from a copy of itself: wait for it to finish.
+        for ($i = 0; $i -lt 60 -and (Test-Path $dir); $i++) { Start-Sleep 1 }
+        -not (Test-Path $dir) -and -not (Get-Service craked -ErrorAction SilentlyContinue)
+    }
+    Check "and keeps the tunnels and log in ProgramData" { Test-Path "$env:ProgramData\Crake\log" }
 }
 Say "  craked.log:"
 Get-Content "$env:ProgramData\Crake\craked.log" -ErrorAction SilentlyContinue |

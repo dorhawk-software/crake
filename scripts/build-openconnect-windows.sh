@@ -29,6 +29,10 @@ docker run --rm -v "$OUT:/out" -v "$PWD/scripts/windows:/crake:ro" -e VERSION="$
     --with-vpnc-script=crake-hook.js >/dev/null
   make -j"$(nproc)" >/dev/null
   cp .libs/openconnect.exe .libs/libopenconnect-5.dll /tmp/wintun/bin/amd64/wintun.dll /out/
+  # Their licences, and where the source is (LGPL-2.1: shipped beside them).
+  cp COPYING.LGPL /out/openconnect-LICENSE.txt
+  cp /tmp/wintun/LICENSE.txt /out/wintun-LICENSE.txt
+  printf "openconnect %s, built by Crake from https://www.infradead.org/openconnect/download/openconnect-%s.tar.gz\nwith one change: https://github.com/dorhawk-software/crake/blob/main/scripts/windows/openconnect-unbuffered.c\nWintun 0.14.1 (https://www.wintun.net), unmodified.\n" "$VERSION" "$VERSION" > /out/SOURCE.txt
   # The DLLs it needs from MinGW, followed through their own needs.
   SYS=/usr/x86_64-w64-mingw32/sys-root/mingw/bin
   todo="/out/openconnect.exe /out/libopenconnect-5.dll"

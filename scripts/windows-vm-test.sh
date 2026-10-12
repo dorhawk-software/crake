@@ -99,11 +99,24 @@ docker run --rm -v "$PWD:/src:ro" -v "$OUT:/out" -v crake-win-cargo:/usr/local/c
     x86_64-w64-mingw32-strip -o /out/crake-tests.exe "$TEST"
     chown "$HOST_UID" /out/*.exe'
 
+# The installer, when CI's crake.exe is at hand (GPUI's release shaders need
+# a Windows runner): around the craked and hook just built.
+SETUP=
+if [ -f target/windows/app/crake.exe ]; then
+  cp target/windows/app/crake.exe "$OUT/"
+  scripts/build-windows-installer.sh "$OUT" >/dev/null
+  SETUP=$(ls target/windows/crake-setup-*.exe | tail -n1)
+else
+  echo "   (no target/windows/app/crake.exe: installed by copying, not the installer;"
+  echo "    gh run download -n crake-windows -D target/windows/app)"
+fi
+
 # --- The test disc ----------------------------------------------------------
 mkdir -p "$WORK/test/crake/openconnect" "$WORK/test/e2e"
 cp "$OUT/craked.exe" "$OUT/crake-hook.exe" packaging/windows/crake-hook.js "$WORK/test/crake/"
 cp target/windows/openconnect/* "$WORK/test/crake/openconnect/"
 cp "$OUT/crake-tests.exe" scripts/windows-vm-test/run.ps1 "$WORK/test/"
+[ -z "$SETUP" ] || cp "$SETUP" "$WORK/test/crake-setup.exe"
 cp scripts/e2e/ocserv.conf "$WORK/test/e2e/"
 cp scripts/windows-vm-test/gateway.sh "$WORK/test/"
 xorriso -as mkisofs -quiet -output "$WORK/test.iso" -volid CRAKETEST -joliet -rock "$WORK/test"
