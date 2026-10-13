@@ -70,6 +70,71 @@ impl NewTunnel {
         }
         bar
     }
+
+    /// Header: Cancel, the title, close. With macOS's own window buttons
+    /// (top left; `chrome`): no close of Crake's, and Cancel on the right.
+    fn header(&self, t: &Theme, title: String, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let system = crate::chrome::system_buttons(cx);
+        let cancel = div()
+            .id("cancel")
+            .h(px(36.))
+            .px(px(12.))
+            .flex()
+            .items_center()
+            .rounded(px(6.))
+            .font_weight(FontWeight::SEMIBOLD)
+            .cursor_pointer()
+            .hover(|s| s.bg(t.surface))
+            .child("Cancel")
+            .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
+                cx.stop_propagation()
+            })
+            .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
+            .test_support();
+        let close = div()
+            .id("close")
+            .size(px(32.))
+            .rounded_full()
+            .bg(t.surface)
+            .flex()
+            .items_center()
+            .justify_center()
+            .cursor_pointer()
+            .child(
+                svg()
+                    .path("crake/close.svg")
+                    .size(px(14.))
+                    .text_color(t.ink),
+            )
+            .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
+                cx.stop_propagation()
+            })
+            .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
+            .test_support();
+        let (left, right) = if system {
+            (None, cancel.into_any_element())
+        } else {
+            (Some(cancel), close.into_any_element())
+        };
+        div()
+            .flex()
+            .items_center()
+            .py(px(10.))
+            .px(px(12.))
+            .border_b_1()
+            .border_color(t.line)
+            .on_mouse_down(gpui_kit::MouseButton::Left, |_, window, _| {
+                window.start_window_move()
+            })
+            .child(div().flex_1().flex().children(left))
+            .child(
+                div()
+                    .text_size(px(15.))
+                    .font_weight(FontWeight::BOLD)
+                    .child(title),
+            )
+            .child(div().flex_1().flex().justify_end().child(right))
+    }
 }
 
 impl Render for NewTunnel {
@@ -143,67 +208,7 @@ impl Render for NewTunnel {
                     }
                 }
             }))
-            // Header: Cancel, the title, close.
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .py(px(10.))
-                    .px(px(12.))
-                    .border_b_1()
-                    .border_color(t.line)
-                    .on_mouse_down(gpui_kit::MouseButton::Left, |_, window, _| {
-                        window.start_window_move()
-                    })
-                    .child(
-                        div().flex_1().child(
-                            div()
-                                .id("cancel")
-                                .h(px(36.))
-                                .px(px(12.))
-                                .flex()
-                                .items_center()
-                                .rounded(px(6.))
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .cursor_pointer()
-                                .hover(|s| s.bg(t.surface))
-                                .child("Cancel")
-                                .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
-                                    cx.stop_propagation()
-                                })
-                                .on_click(cx.listener(|_, _, _, cx| cx.emit(Close))),
-                        ),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(15.))
-                            .font_weight(FontWeight::BOLD)
-                            .child(title),
-                    )
-                    .child(
-                        div().flex_1().flex().justify_end().child(
-                            div()
-                                .id("close")
-                                .size(px(32.))
-                                .rounded_full()
-                                .bg(t.surface)
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .cursor_pointer()
-                                .child(
-                                    svg()
-                                        .path("crake/close.svg")
-                                        .size(px(14.))
-                                        .text_color(t.ink),
-                                )
-                                .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
-                                    cx.stop_propagation()
-                                })
-                                .on_click(cx.listener(|_, _, _, cx| cx.emit(Close))),
-                        ),
-                    ),
-            )
+            .child(self.header(&t, title, cx))
             .child(self.steps(&t, cx))
             .child(
                 div()

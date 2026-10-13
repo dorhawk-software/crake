@@ -11,6 +11,12 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **macOS: Crake's windows open in front.** Settings, New tunnel, the log and a tunnel's details
+  opened behind the app you were in.
+- **macOS: the Mac's own window buttons.** Close, minimise and zoom sit top left as in every Mac
+  app, instead of Crake's header being drawn under them; Crake's own close button is gone there.
+- **macOS: Crake shows as Crake in System Settings' background items,** with its icon, not under
+  the developer's name.
 - **macOS on Intel Macs too.** The installer and the Homebrew cask now carry Crake for both Apple
   Silicon and Intel.
 - **Works with encrypted DNS (DNS over TLS).** A tunnel's own DNS is asked plainly, as it must be,

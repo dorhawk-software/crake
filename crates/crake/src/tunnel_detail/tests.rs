@@ -18,6 +18,9 @@ struct Opened {
 fn open(cx: &mut TestAppContext) -> Opened {
     cx.update(|cx| {
         gpui_kit::init(cx);
+        cx.set_global(crate::chrome::Chrome {
+            system_buttons: false,
+        });
         cx.set_global(crate::prefs::Prefs {
             scratch: true,
             ..Default::default()
@@ -162,4 +165,29 @@ fn the_header(cx: &mut TestAppContext) {
     // Back to Settings → Tunnels.
     w.click("back", cx);
     assert!(matches!(w.next(), Some(Request::Settings)));
+}
+
+/// With macOS's own window buttons (top left): no × of Crake's, and the
+/// header starts after them.
+#[gpui_kit::test]
+fn with_the_systems_window_buttons(cx: &mut TestAppContext) {
+    let w = open(cx);
+    cx.update(|cx| {
+        cx.set_global(crate::chrome::Chrome {
+            system_buttons: true,
+        })
+    });
+    let (close, back) = cx
+        .update_window(w.window, |_, window, cx| {
+            window.refresh();
+            window.render_frame(cx);
+            (window.try_find("close"), window.find("back").bounds())
+        })
+        .unwrap();
+    assert!(close.is_none(), "Crake's own × is there too");
+    assert!(
+        f32::from(back.origin.x) >= crate::chrome::BUTTONS_WIDTH,
+        "\"Tunnels\" starts at {:.0} px, under the system's buttons",
+        f32::from(back.origin.x)
+    );
 }

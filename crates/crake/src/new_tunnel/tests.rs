@@ -13,7 +13,12 @@ struct Opened {
 }
 
 fn open(cx: &mut TestAppContext) -> Opened {
-    cx.update(gpui_kit::init);
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        cx.set_global(crate::chrome::Chrome {
+            system_buttons: false,
+        });
+    });
     let model = cx.new(|_| Model::default());
     let (tx, requests) = async_channel::unbounded();
     let (window, view) = cx.update(|cx| {
@@ -430,5 +435,53 @@ fn asking_the_gateway_says_for_how_long_after_a_moment() {
     assert_eq!(
         said(Duration::from_millis(5400)),
         "Asking the gateway\u{2026} 5 s"
+    );
+}
+
+/// Cancel is a button the size of its word, not half the header (its
+/// hover background showed it spanning everything left of the title).
+#[gpui_kit::test]
+fn cancel_is_as_wide_as_its_word(cx: &mut TestAppContext) {
+    let w = open(cx);
+    let (cancel, header) = cx
+        .update_window(w.window, |_, window, cx| {
+            window.render_frame(cx);
+            (window.find("cancel").bounds(), window.bounds())
+        })
+        .unwrap();
+    let width = f32::from(cancel.size.width);
+    assert!(
+        width < 120.,
+        "Cancel is {width:.0} px wide in a {:.0} px window",
+        f32::from(header.size.width)
+    );
+}
+
+/// With macOS's own window buttons (top left): no × of Crake's, and
+/// Cancel moves to the right, where the × was.
+#[gpui_kit::test]
+fn with_the_systems_window_buttons(cx: &mut TestAppContext) {
+    let w = open(cx);
+    cx.update(|cx| {
+        cx.set_global(crate::chrome::Chrome {
+            system_buttons: true,
+        })
+    });
+    let (close, cancel, size) = cx
+        .update_window(w.window, |_, window, cx| {
+            window.refresh();
+            window.render_frame(cx);
+            (
+                window.try_find("close"),
+                window.find("cancel").bounds(),
+                window.bounds().size,
+            )
+        })
+        .unwrap();
+    assert!(close.is_none(), "Crake's own × is there too");
+    assert!(
+        f32::from(cancel.origin.x) > f32::from(size.width) / 2.,
+        "Cancel is at {:.0} px, on the left under the system's buttons",
+        f32::from(cancel.origin.x)
     );
 }

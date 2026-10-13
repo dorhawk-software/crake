@@ -185,8 +185,20 @@ pub(super) fn open_panel(at: Option<(i32, i32)>, cx: &mut App) {
     }
 }
 
+/// macOS: Crake is a menu bar app (LSUIElement) and its panel doesn't
+/// activate it, so a window it opens would land behind the app in front.
+/// Make Crake the active app first, as menu bar apps do. (GPUI's
+/// `activate_window` only orders the window front.)
+fn to_front(cx: &mut App) {
+    cx.global_mut::<Shell>().activations += 1;
+    if cfg!(target_os = "macos") {
+        cx.activate(true);
+    }
+}
+
 /// Settings (design/screens/settings.html), one window.
 pub(super) fn open_settings(cx: &mut App) {
+    to_front(cx);
     if let Some(handle) = cx.global::<Shell>().settings
         && handle
             .update(cx, |_, window, _| window.activate_window())
@@ -214,7 +226,7 @@ pub(super) fn open_settings(cx: &mut App) {
             titlebar: Some(gpui_kit::TitlebarOptions {
                 title: Some("Crake settings".into()),
                 appears_transparent: true,
-                traffic_light_position: None,
+                traffic_light_position: crate::chrome::traffic_lights(),
             }),
             window_decorations: Some(WindowDecorations::Client),
             window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
@@ -247,6 +259,7 @@ pub(super) fn open_settings(cx: &mut App) {
 /// Tunnel detail (design/screens/tunnel-detail.html). One at a time: asked
 /// for another tunnel, it shows that one instead.
 pub(super) fn open_detail(tunnel: String, cx: &mut App) {
+    to_front(cx);
     if let Some((shown, handle)) = cx.global_mut::<Shell>().detail.take() {
         if shown == tunnel
             && handle
@@ -271,7 +284,7 @@ pub(super) fn open_detail(tunnel: String, cx: &mut App) {
             titlebar: Some(gpui_kit::TitlebarOptions {
                 title: Some("Crake tunnel".into()),
                 appears_transparent: true,
-                traffic_light_position: None,
+                traffic_light_position: crate::chrome::traffic_lights(),
             }),
             window_decorations: Some(WindowDecorations::Client),
             window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
@@ -304,6 +317,7 @@ pub(super) fn open_detail(tunnel: String, cx: &mut App) {
 /// New tunnel (design/screens/new-tunnel.html), or the same window editing
 /// a tunnel added in the app. One at a time.
 pub(super) fn open_new_tunnel(editing: Option<String>, cx: &mut App) {
+    to_front(cx);
     if let Some(handle) = cx.global_mut::<Shell>().new_tunnel.take() {
         let _ = handle.update(cx, |_, window, _| window.remove_window());
     }
@@ -327,7 +341,7 @@ pub(super) fn open_new_tunnel(editing: Option<String>, cx: &mut App) {
             titlebar: Some(gpui_kit::TitlebarOptions {
                 title: Some("Crake new tunnel".into()),
                 appears_transparent: true,
-                traffic_light_position: None,
+                traffic_light_position: crate::chrome::traffic_lights(),
             }),
             window_decorations: Some(WindowDecorations::Client),
             window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
@@ -358,6 +372,7 @@ pub(super) fn open_new_tunnel(editing: Option<String>, cx: &mut App) {
 
 /// The sign-in window for a tunnel (one at a time per tunnel).
 pub(super) fn open_sign_in(tunnel: client::Tunnel, cx: &mut App) {
+    to_front(cx);
     let shell = cx.global::<Shell>();
     let (model, requests) = (shell.model.clone(), shell.requests.clone());
     let spec = signin::Spec {
@@ -426,6 +441,7 @@ pub(super) fn centered(w: f32, h: f32, cx: &App) -> Bounds<gpui_kit::Pixels> {
 
 /// The full log: one window, brought back if it's already open.
 pub(super) fn open_log(cx: &mut App) {
+    to_front(cx);
     if let Some(handle) = cx.global::<Shell>().log
         && handle
             .update(cx, |_, window, _| window.activate_window())
@@ -444,7 +460,7 @@ pub(super) fn open_log(cx: &mut App) {
             titlebar: Some(gpui_kit::TitlebarOptions {
                 title: Some("Crake log".into()),
                 appears_transparent: true,
-                traffic_light_position: None,
+                traffic_light_position: crate::chrome::traffic_lights(),
             }),
             window_decorations: Some(WindowDecorations::Client),
             window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
@@ -470,5 +486,62 @@ pub(super) fn open_log(cx: &mut App) {
         let handle: AnyWindowHandle = handle.into();
         let _ = handle.update(cx, |_, window, _| window.activate_window());
         cx.global_mut::<Shell>().log = Some(handle);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui_kit::TestAppContext;
+
+    use super::*;
+
+    /// The app shell as main() starts it, in demo mode (no craked, no tray).
+    fn start_app(cx: &mut TestAppContext) {
+        cx.update(gpui_kit::init);
+        cx.update(|cx| {
+            crate::start(
+                cx,
+                crate::Setup {
+                    model: Model::default(),
+                    x11: false,
+                    demo: true,
+                    connect: None,
+                    tray: false,
+                    single_instance: false,
+                    openvpn3: false,
+                    autostart: false,
+                },
+            )
+        });
+    }
+
+    fn activations(cx: &mut TestAppContext) -> u32 {
+        cx.update(|cx| cx.global::<Shell>().activations)
+    }
+
+    /// Every window Crake opens makes Crake the active app first, also
+    /// when it's open already: on macOS (a menu bar app, whose panel
+    /// doesn't activate it) they opened behind the app in front.
+    #[gpui_kit::test]
+    fn every_window_brings_crake_to_the_front(cx: &mut TestAppContext) {
+        start_app(cx);
+        type Open = fn(&mut App);
+        let opens: [(&str, Open); 4] = [
+            ("Settings", open_settings),
+            ("the log", open_log),
+            ("New tunnel", |cx| open_new_tunnel(None, cx)),
+            ("tunnel detail", |cx| open_detail("acme".into(), cx)),
+        ];
+        for (name, open) in opens {
+            for time in ["opening", "opening again"] {
+                let before = activations(cx);
+                cx.update(open);
+                cx.run_until_parked();
+                assert!(
+                    activations(cx) > before,
+                    "{time} {name} left Crake behind the app in front"
+                );
+            }
+        }
     }
 }

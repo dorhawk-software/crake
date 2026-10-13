@@ -2,11 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- craked as a launchd daemon (/Library/LaunchDaemons): root, started at
      boot, started again if it stops; launchd's SIGTERM switches every
-     tunnel off. Its log is craked's stderr. -->
+     tunnel off. Its log is craked's stderr. AssociatedBundleIdentifiers
+     names Crake.app, so System Settings' background items show it as
+     Crake, with its icon, rather than under the signing certificate's
+     name. -->
 <plist version="1.0">
 <dict>
     <key>Label</key>
     <string>software.dorhawk.craked</string>
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>software.dorhawk.Crake</string>
+    </array>
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/sbin/craked</string>

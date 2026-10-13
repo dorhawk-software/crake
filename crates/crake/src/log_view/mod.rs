@@ -297,13 +297,20 @@ impl Log {
     }
 
     fn header(&self, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {
+        // macOS draws its own window buttons top left (`chrome`): the
+        // title starts after them, and there's no close of Crake's.
+        let system = crate::chrome::system_buttons(cx);
         div()
             .id("header")
             .flex()
             .items_center()
             .gap(px(8.))
             .py(px(10.))
-            .pl(px(20.))
+            .pl(px(if system {
+                crate::chrome::BUTTONS_WIDTH
+            } else {
+                20.
+            }))
             .pr(px(12.))
             .border_b_1()
             .border_color(t.line)
@@ -313,9 +320,11 @@ impl Log {
             })
             .child(
                 div()
+                    .id("log-title")
                     .text_size(px(17.))
                     .font_weight(FontWeight::BOLD)
-                    .child("Log"),
+                    .child("Log")
+                    .test_support(),
             )
             .child(
                 div()
@@ -344,30 +353,32 @@ impl Log {
                     .px(px(12.))
                     .on_click(cx.listener(|this, _, _, cx| this.export(cx))),
             )
-            .child(
-                div()
-                    .id("close")
-                    // The header moves the window; its buttons keep their clicks.
-                    .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
-                        cx.stop_propagation()
-                    })
-                    .size(px(32.))
-                    .ml(px(4.))
-                    .rounded_full()
-                    .bg(t.surface)
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .cursor_pointer()
-                    .child(
-                        svg()
-                            .path("crake/close.svg")
-                            .size(px(14.))
-                            .text_color(t.ink),
-                    )
-                    .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
-                    .test_support(),
-            )
+            .when(!system, |header| {
+                header.child(
+                    div()
+                        .id("close")
+                        // The header moves the window; its buttons keep their clicks.
+                        .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
+                            cx.stop_propagation()
+                        })
+                        .size(px(32.))
+                        .ml(px(4.))
+                        .rounded_full()
+                        .bg(t.surface)
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor_pointer()
+                        .child(
+                            svg()
+                                .path("crake/close.svg")
+                                .size(px(14.))
+                                .text_color(t.ink),
+                        )
+                        .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
+                        .test_support(),
+                )
+            })
     }
 
     fn filters(&self, model: &Model, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {

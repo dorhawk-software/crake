@@ -16,6 +16,9 @@ struct Opened {
 fn open(cx: &mut TestAppContext, section: Section) -> Opened {
     cx.update(|cx| {
         gpui_kit::init(cx);
+        cx.set_global(crate::chrome::Chrome {
+            system_buttons: false,
+        });
         cx.set_global(Prefs {
             scratch: true,
             ..Prefs::default()
@@ -231,4 +234,29 @@ fn tunnels(cx: &mut TestAppContext) {
 fn about_offers_a_coffee(cx: &mut TestAppContext) {
     let w = open(cx, Section::About);
     assert!(w.shown("coffee", cx), "About has the coffee card's button");
+}
+
+/// With macOS's own window buttons (over the sidebar's top): no × of
+/// Crake's, and the sidebar's heading starts below them.
+#[gpui_kit::test]
+fn with_the_systems_window_buttons(cx: &mut TestAppContext) {
+    let w = open(cx, Section::Tunnels);
+    cx.update(|cx| {
+        cx.set_global(crate::chrome::Chrome {
+            system_buttons: true,
+        })
+    });
+    let (close, first) = cx
+        .update_window(w.window, |_, window, cx| {
+            window.refresh();
+            window.render_frame(cx);
+            (window.try_find("close"), window.find("nav-title").bounds())
+        })
+        .unwrap();
+    assert!(close.is_none(), "Crake's own × is there too");
+    assert!(
+        f32::from(first.origin.y) >= crate::chrome::HEADER_HEIGHT,
+        "The heading starts at {:.0} px, under the system's buttons",
+        f32::from(first.origin.y)
+    );
 }

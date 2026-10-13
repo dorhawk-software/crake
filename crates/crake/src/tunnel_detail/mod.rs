@@ -115,13 +115,20 @@ impl Render for TunnelDetail {
         .absolute()
         .inset_0();
 
+        // macOS draws its own window buttons top left (`chrome`): the
+        // header starts after them, and has no close of Crake's.
+        let system = crate::chrome::system_buttons(cx);
         let header = div()
             .flex()
             .items_center()
             .gap(px(10.))
             .pt(px(10.))
             .pb(px(10.))
-            .pl(px(10.))
+            .pl(px(if system {
+                crate::chrome::BUTTONS_WIDTH
+            } else {
+                10.
+            }))
             .pr(px(12.))
             .border_b_1()
             .border_color(t.line)
@@ -161,28 +168,30 @@ impl Render for TunnelDetail {
                     }))
                     .test_support(),
             )
-            .child(
-                div()
-                    .id("close")
-                    .size(px(32.))
-                    .rounded_full()
-                    .bg(t.surface)
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .cursor_pointer()
-                    .child(
-                        svg()
-                            .path("crake/close.svg")
-                            .size(px(14.))
-                            .text_color(t.ink),
-                    )
-                    .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
-                        cx.stop_propagation()
-                    })
-                    .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
-                    .test_support(),
-            );
+            .when(!system, |header| {
+                header.child(
+                    div()
+                        .id("close")
+                        .size(px(32.))
+                        .rounded_full()
+                        .bg(t.surface)
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor_pointer()
+                        .child(
+                            svg()
+                                .path("crake/close.svg")
+                                .size(px(14.))
+                                .text_color(t.ink),
+                        )
+                        .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
+                            cx.stop_propagation()
+                        })
+                        .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
+                        .test_support(),
+                )
+            });
 
         let top = div()
             .pt(px(24.))

@@ -47,6 +47,9 @@ pub enum Section {
     About,
 }
 
+/// Above the sidebar's heading (settings.html), where no window buttons sit.
+const NAV_TOP: f32 = 16.;
+
 impl Section {
     const ALL: [Section; 7] = [
         Self::Tunnels,
@@ -181,6 +184,7 @@ impl Render for Settings {
             .filter(|(_, at)| at.elapsed() < crate::model::FAILURE_SHOWN)
             .map(|(text, _)| text.clone());
 
+        let system = crate::chrome::system_buttons(cx);
         div()
             .id("settings")
             .track_focus(&self.focus)
@@ -223,33 +227,39 @@ impl Render for Settings {
                         // No title bar: the window moves by this top strip
                         // and the heading (not by its controls: a drag
                         // started there would swallow their clicks).
+                        // With macOS's own buttons (`chrome`) it stays, empty:
+                        // the page keeps its place.
                         div()
+                            .h(px(32.))
                             .flex()
                             .justify_end()
                             .on_mouse_down(gpui_kit::MouseButton::Left, |_, window, _| {
                                 window.start_window_move()
                             })
-                            .child(
-                                div()
-                                    .id("close")
-                                    .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
-                                        cx.stop_propagation()
-                                    })
-                                    .size(px(32.))
-                                    .rounded_full()
-                                    .bg(t.surface)
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .cursor_pointer()
-                                    .child(
-                                        svg()
-                                            .path("crake/close.svg")
-                                            .size(px(14.))
-                                            .text_color(t.ink),
-                                    )
-                                    .on_click(cx.listener(|_, _, _, cx| cx.emit(Close))),
-                            ),
+                            .when(!system, |strip| {
+                                strip.child(
+                                    div()
+                                        .id("close")
+                                        .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
+                                            cx.stop_propagation()
+                                        })
+                                        .size(px(32.))
+                                        .rounded_full()
+                                        .bg(t.surface)
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .cursor_pointer()
+                                        .child(
+                                            svg()
+                                                .path("crake/close.svg")
+                                                .size(px(14.))
+                                                .text_color(t.ink),
+                                        )
+                                        .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
+                                        .test_support(),
+                                )
+                            }),
                     )
                     .child(
                         div()
@@ -497,12 +507,19 @@ impl Settings {
     }
 
     fn nav(&self, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {
+        // macOS draws its own window buttons over the sidebar's top
+        // (`chrome`): the heading starts below them.
+        let top = if crate::chrome::system_buttons(cx) {
+            crate::chrome::HEADER_HEIGHT
+        } else {
+            NAV_TOP
+        };
         let mut nav = div()
             .id("nav")
             .w(px(222.))
             .flex_none()
             .h_full()
-            .pt(px(16.))
+            .pt(px(top))
             .px(px(12.))
             .bg(t.surface)
             // GPUI clips to a rectangle, not the card's rounded corners: the
@@ -512,6 +529,7 @@ impl Settings {
             .border_color(t.line)
             .child(
                 div()
+                    .id("nav-title")
                     .on_mouse_down(gpui_kit::MouseButton::Left, |_, window, _| {
                         window.start_window_move()
                     })
@@ -527,7 +545,8 @@ impl Settings {
                             .text_size(px(17.))
                             .font_weight(FontWeight::BOLD)
                             .child("Settings"),
-                    ),
+                    )
+                    .test_support(),
             );
         for (i, section) in Section::ALL.into_iter().enumerate() {
             let (label, _, icon) = section.info();

@@ -21,6 +21,9 @@ fn open(cx: &mut TestAppContext) -> Opened {
 fn open_with(cx: &mut TestAppContext, sample: Model) -> Opened {
     cx.update(|cx| {
         gpui_kit::init(cx);
+        cx.set_global(crate::chrome::Chrome {
+            system_buttons: false,
+        });
         cx.set_global(crate::prefs::Prefs {
             scratch: true,
             ..Default::default()
@@ -181,4 +184,29 @@ fn copy_for_helpdesk_and_close(cx: &mut TestAppContext) {
     });
     w.click("close", cx);
     assert!(closed.get());
+}
+
+/// With macOS's own window buttons (top left): no × of Crake's, and the
+/// title starts after them.
+#[gpui_kit::test]
+fn with_the_systems_window_buttons(cx: &mut TestAppContext) {
+    let w = open(cx);
+    cx.update(|cx| {
+        cx.set_global(crate::chrome::Chrome {
+            system_buttons: true,
+        })
+    });
+    let (close, title) = cx
+        .update_window(w.window, |_, window, cx| {
+            window.refresh();
+            window.render_frame(cx);
+            (window.try_find("close"), window.find("log-title").bounds())
+        })
+        .unwrap();
+    assert!(close.is_none(), "Crake's own × is there too");
+    assert!(
+        f32::from(title.origin.x) >= crate::chrome::BUTTONS_WIDTH,
+        "\"Log\" starts at {:.0} px, under the system's buttons",
+        f32::from(title.origin.x)
+    );
 }

@@ -1219,6 +1219,15 @@ change of network; what was displaced is kept in
 /var/db/crake/system-dns.json until it's given back, so a craked that
 died puts it back when it starts. tests/macos.rs checks macOS really asks
 craked's server for a public name and gets its own servers back.
+Windows on macOS (2026-10-13, a colleague's first Mac run): opening one
+makes Crake the active app first (`windows::to_front`; a menu bar app's
+non-activating panel left them behind the app in front); the system draws
+the window buttons, top left, and Crake's headers leave them room and drop
+their own × (`chrome.rs`; design/proposals/macos-window-buttons.html,
+option A, chosen by the user, as on Windows); craked's launchd plist and
+the login agent name Crake.app (`AssociatedBundleIdentifiers`), or System
+Settings' background items list them under the certificate's owner. Each
+has a test that failed first (asked for: desired state, fail, fix, pass).
 The panel under the menu bar (2026-10-13): tray-icon reports a click
 and the icon's rect in pixels (points times the icon's display's scale,
 from the main display's top-left); `sys::tray_click` turns the icon's

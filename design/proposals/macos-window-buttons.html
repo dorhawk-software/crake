@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: macOS window buttons</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53; --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; --accentSoft: #17332F; }
+  body { margin: 0; background: #0B0C0D; color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 48px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 980px; }
+  .intro b { color: var(--ink); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; margin-top: 22px; }
+  .cap { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 14px; min-height: 54px; }
+  .win { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 22px; box-shadow: 0 30px 60px -30px rgba(0,0,0,.6); }
+  .bar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 56px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+  .lights { display: flex; gap: 8px; padding-left: 6px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .lights i:nth-child(1) { background: #FF5F57; } .lights i:nth-child(2) { background: #FEBC2E; } .lights i:nth-child(3) { background: #28C840; }
+  .tbtn { height: 36px; padding: 0 12px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; }
+  .x { width: 32px; height: 32px; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; }
+  .title { font-size: 15px; font-weight: 700; }
+  .steps { display: flex; gap: 0; padding: 14px 20px 16px; font-size: 13px; color: var(--muted); }
+  .steps span { flex: 1; } .steps .on { color: var(--ink); font-weight: 700; }
+  .body { padding: 16px 20px 22px; color: var(--muted); font-size: 13px; }
+  .settings { display: flex; height: 190px; }
+  .side { width: 200px; background: var(--surface); padding: 14px 10px; box-sizing: border-box; }
+  .side .it { height: 34px; display: flex; align-items: center; padding: 0 10px; border-radius: 6px; font-size: 13.5px; }
+  .side .it.cur { background: var(--accentSoft); font-weight: 700; }
+  .main { flex: 1; padding: 14px 16px 0 30px; }
+  .main h3 { margin: 0; font-size: 22px; }
+  .logbar { display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 12px 0 18px; border-bottom: 1px solid var(--line); }
+  .ob { height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; font-size: 13px; }
+  .note { font-size: 12px; color: var(--muted); margin: -12px 0 22px 2px; }
+  .ring { outline: 2px dashed #F97066; outline-offset: 3px; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>macOS window buttons.</b> Crake's windows draw their own header (Cancel, the title, ×), as on Linux. On macOS the system's red, yellow and green buttons appear on top of it, over "Cancel" (the colleague's screenshot). Two ways to fix it, shown on New tunnel, Settings and the log. Linux and Windows stay as they are either way.</div>
+  <div class="cols">
+    <div>
+      <div class="cap">A. The Mac's own buttons (recommended)</div>
+      <div class="sub">macOS's buttons top left, where every Mac app has them; Crake's × goes (the red button closes). New tunnel's Cancel moves to the right. The same choice as on Windows: the system draws the window's frame.</div>
+
+      <div class="win">
+        <div class="bar"><div class="lights"><i></i><i></i><i></i></div><span class="title">New tunnel</span><div style="display:flex;justify-content:flex-end"><span class="tbtn">Cancel</span></div></div>
+        <div class="steps"><span class="on">① Server</span><span>② Sign-in</span><span>③ Routing</span></div>
+      </div>
+      <div class="win">
+        <div class="settings">
+          <div class="side"><div class="lights" style="padding: 2px 0 16px 4px"><i></i><i></i><i></i></div><div class="it cur">Tunnels</div><div class="it">General</div><div class="it">Learning</div></div>
+          <div class="main"><h3>Tunnels</h3><div style="color:var(--muted);font-size:13px;margin-top:4px">In the order traffic takes.</div></div>
+        </div>
+      </div>
+      <div class="win">
+        <div class="logbar"><div class="lights" style="padding:0 10px 0 0"><i></i><i></i><i></i></div><span style="font-size:17px;font-weight:700">Log</span><span style="font-size:13px;color:var(--muted)">Kept for 30 days on this machine</span><span style="flex:1"></span><span class="ob">Copy for helpdesk</span><span class="ob">Export…</span></div>
+        <div class="body">Today …</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="cap">B. Crake's own header everywhere</div>
+      <div class="sub">macOS's buttons hidden; the windows look exactly as on Linux, × and Cancel included. Consistent across systems, but unlike any other Mac app: no yellow minimise, no green zoom, and the close button on the wrong side for a Mac.</div>
+
+      <div class="win">
+        <div class="bar"><div><span class="tbtn">Cancel</span></div><span class="title">New tunnel</span><div style="display:flex;justify-content:flex-end"><span class="x"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ECEDEE" stroke-width="2.2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg></span></div></div>
+        <div class="steps"><span class="on">① Server</span><span>② Sign-in</span><span>③ Routing</span></div>
+      </div>
+      <div class="win">
+        <div class="settings">
+          <div class="side"><div class="it cur">Tunnels</div><div class="it">General</div><div class="it">Learning</div></div>
+          <div class="main"><div style="display:flex;justify-content:flex-end"><span class="x"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ECEDEE" stroke-width="2.2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg></span></div><h3 style="margin-top:-10px">Tunnels</h3><div style="color:var(--muted);font-size:13px;margin-top:4px">In the order traffic takes.</div></div>
+        </div>
+      </div>
+      <div class="win">
+        <div class="logbar"><span style="font-size:17px;font-weight:700">Log</span><span style="font-size:13px;color:var(--muted)">Kept for 30 days on this machine</span><span style="flex:1"></span><span class="ob">Copy for helpdesk</span><span class="ob">Export…</span><span class="x" style="margin-left:4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ECEDEE" stroke-width="2.2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg></span></div>
+        <div class="body">Today …</div>
+      </div>
+    </div>
+  </div>
+  <div class="intro" style="margin-top:6px">Today on macOS (what the colleague sees): the buttons drawn over "Cancel", and Crake's × still on the right.</div>
+  <div class="win" style="max-width: 560px; margin-top: 12px">
+    <div class="bar"><div style="position:relative"><span class="tbtn">Cancel</span><div class="lights" style="position:absolute;left:0;top:0;padding:0"><i></i><i></i><i></i></div></div><span class="title">New tunnel</span><div style="display:flex;justify-content:flex-end"><span class="x"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ECEDEE" stroke-width="2.2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg></span></div></div>
+  </div>
+</div>
+</body>
+</html>

@@ -13,6 +13,8 @@ mod windows;
 mod autostart;
 
 mod chart;
+// Who draws the window buttons: macOS, or Crake.
+mod chrome;
 
 mod client;
 
@@ -73,8 +75,11 @@ const LAST_HOST: u8 = 250;
 mod e2e_tests;
 #[cfg(all(test, any(target_os = "linux", windows)))]
 mod journey_kit;
+// What the macOS package installs, read from packaging/macos: any system.
 #[cfg(all(test, target_os = "linux"))]
 mod journey_tests;
+#[cfg(test)]
+mod macos_packaging_tests;
 // The app's side against a real craked: the Linux and Windows tests'.
 #[cfg(all(test, any(target_os = "linux", windows)))]
 mod test_app;
@@ -210,6 +215,10 @@ struct Shell {
     tray_motion: Option<gpui_kit::Task<()>>,
     /// The open panel's motion; a refit keeps it, so nothing replays.
     panel_motion: Option<std::rc::Rc<panel::Motion>>,
+    /// How many times a window asked for Crake to be the active app
+    /// (`windows::to_front`); tests read it, as GPUI's test platform
+    /// records no activation.
+    activations: u32,
 }
 
 impl Global for Shell {}
@@ -505,6 +514,7 @@ pub(crate) fn start(cx: &mut App, setup: Setup) -> bool {
         tray_shape: tray::Shape::Off,
         tray_motion: None,
         panel_motion: None,
+        activations: 0,
     });
     // The tray follows the model, whatever changed it: craked, or a
     // sign-in in this app.

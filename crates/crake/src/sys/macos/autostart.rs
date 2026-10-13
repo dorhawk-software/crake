@@ -6,6 +6,10 @@
 use std::path::{Path, PathBuf};
 
 const LABEL: &str = "software.dorhawk.crake";
+/// Crake.app's bundle identifier (packaging/macos/Info.plist): System
+/// Settings shows the agent as Crake, with its icon, not under the name on
+/// the signing certificate.
+const APP: &str = "software.dorhawk.Crake";
 
 fn path() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
@@ -41,6 +45,7 @@ fn agent(exe: &str, flag: &str) -> String {
          <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
          <plist version=\"1.0\">\n<dict>\n\
          \t<key>Label</key>\n\t<string>{LABEL}</string>\n\
+         \t<key>AssociatedBundleIdentifiers</key>\n\t<array>\n\t\t<string>{APP}</string>\n\t</array>\n\
          \t<key>ProgramArguments</key>\n\t<array>\n\t\t<string>{}</string>\n\t\t<string>{}</string>\n\t</array>\n\
          \t<key>RunAtLoad</key>\n\t<true/>\n\
          \t<key>LimitLoadToSessionType</key>\n\t<string>Aqua</string>\n\
@@ -66,5 +71,8 @@ mod tests {
         assert!(a.contains("<string>--autostart</string>"));
         assert!(a.contains("<key>RunAtLoad</key>\n\t<true/>"));
         assert!(a.contains("<string>software.dorhawk.crake</string>"));
+        assert!(a.contains(
+            "<key>AssociatedBundleIdentifiers</key>\n\t<array>\n\t\t<string>software.dorhawk.Crake</string>"
+        ));
     }
 }
