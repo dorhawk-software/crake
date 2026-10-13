@@ -1154,10 +1154,31 @@ change of network; what was displaced is kept in
 /var/db/crake/system-dns.json until it's given back, so a craked that
 died puts it back when it starts. tests/macos.rs checks macOS really asks
 craked's server for a public name and gets its own servers back.
-Not yet: the
-panel's placement under the menu bar, an installer (.pkg, signed and
-notarized with the user's Apple Developer account: ask for its details
-then). The app's `sys/macos/`: the Keychain (security-framework,
+The panel under the menu bar (2026-10-13): tray-icon reports a click
+and the icon's rect in pixels (points times the icon's display's scale,
+from the main display's top-left); `sys::tray_click` turns the icon's
+bottom centre into points (each display's scale from CoreGraphics'
+display mode), and the panel hangs a gap below it (`place::Bar::EDGE`),
+kept inside that display (`monitors`: CGDisplayBounds, global points,
+which is also how GPUI places a window relative to the main display). A
+pop-up window there is a non-activating NSPanel above other windows on
+every Space. Not yet seen on a real Mac.
+The installer (2026-10-13): `scripts/build-macos-pkg.sh` makes
+target/macos/Crake-<version>.pkg on a Mac: Crake.app in /Applications
+(packaging/macos/Info.plist: a menu bar app, LSUIElement; the icon
+`assets/icons/app/crake.icns`, from `scripts/make-icons.sh` at 824 of
+1024 points as macOS' icons are), craked in /usr/local/sbin with its
+launchd plist, the hook and the uninstaller
+(`sudo /usr/local/libexec/crake/uninstall`) in /usr/local/libexec/crake;
+`postinstall` bootstraps craked, an upgrade leaving the handover flag
+first (tunnels stay signed in). Apple Silicon only; openconnect from
+Homebrew (the app says `brew install openconnect` when it's missing), not
+bundled yet. Unsigned (the app ad hoc): signing and notarizing need the
+user's Apple Developer account (ask for its details then).
+`scripts/macos-pkg-test.sh` (CI job macos) installs it on the runner,
+checks craked serves /var/run/crake.sock under launchd, installs again
+over it (craked restarted) and uninstalls (nothing left); CI uploads the
+package as `crake-macos`. The app's `sys/macos/`: the Keychain (security-framework,
 labelled items), the menu bar through `sys/menu_tray.rs` (the tray-icon
 code Windows used, now shared), the private folder in the user's
 $TMPDIR, plain notifications (notify-rust has no actions there),

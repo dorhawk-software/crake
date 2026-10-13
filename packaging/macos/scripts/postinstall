@@ -1,0 +1,21 @@
+#!/bin/sh
+# After the files are in place: craked (re)started by launchd. An upgrade
+# over a running craked leaves the handover flag first, so it hands its
+# tunnels to the new one signed in (craked's manager/handover.rs), as the
+# Linux packages do.
+LABEL=software.dorhawk.craked
+PLIST=/Library/LaunchDaemons/$LABEL.plist
+chown root:wheel "$PLIST"
+chmod 644 "$PLIST"
+if launchctl print "system/$LABEL" >/dev/null 2>&1; then
+    mkdir -p /var/run/crake
+    : > /var/run/crake/handover
+    launchctl bootout "system/$LABEL" 2>/dev/null || true
+fi
+# bootout returns before launchd has quite let go of the job.
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+    launchctl bootstrap system "$PLIST" 2>/dev/null && exit 0
+    sleep 1
+done
+echo "craked didn't start: launchctl bootstrap system $PLIST" >&2
+exit 1

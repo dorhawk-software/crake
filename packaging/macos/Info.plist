@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Crake.app (scripts/build-macos-pkg.sh fills in the version). A menu
+     bar app: no Dock icon (LSUIElement), its windows open from the bird. -->
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Crake</string>
+    <key>CFBundleDisplayName</key>
+    <string>Crake</string>
+    <key>CFBundleIdentifier</key>
+    <string>software.dorhawk.Crake</string>
+    <key>CFBundleExecutable</key>
+    <string>crake</string>
+    <key>CFBundleIconFile</key>
+    <string>Crake</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>@VERSION@</string>
+    <key>CFBundleVersion</key>
+    <string>@VERSION@</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>dorhawk.software. GPL-3.0-or-later.</string>
+</dict>
+</plist>

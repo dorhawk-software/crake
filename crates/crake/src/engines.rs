@@ -87,6 +87,8 @@ impl Engines {
             "openvpn3" => None,
             _ if !self.openconnect => Some(if cfg!(windows) {
                 "Needs openconnect, which comes with Crake but is missing. Reinstall Crake."
+            } else if cfg!(target_os = "macos") {
+                "Needs openconnect, which isn\u{2019}t installed. Install it with Homebrew (brew.sh): brew install openconnect"
             } else {
                 "Needs openconnect, which isn\u{2019}t installed: sudo apt install openconnect"
             }),
@@ -96,9 +98,12 @@ impl Engines {
 }
 
 /// How to get openconnect back, in a sentence: Linux takes it from the
-/// distribution, Windows has it from Crake's installer.
+/// distribution, macOS from Homebrew, Windows has it from Crake's
+/// installer.
 pub const GET_OPENCONNECT: &str = if cfg!(windows) {
     "It comes with Crake, but it\u{2019}s missing: reinstall Crake."
+} else if cfg!(target_os = "macos") {
+    "Install it with Homebrew (brew.sh): brew install openconnect"
 } else {
     "Install it with: sudo apt install openconnect"
 };
@@ -208,9 +213,12 @@ mod tests {
             browser: false,
             openconnect_version: None,
         };
-        // Linux: from the distribution; Windows: it came with Crake.
+        // Linux: from the distribution; macOS: Homebrew; Windows: it came
+        // with Crake.
         let how = if cfg!(windows) {
             "Reinstall Crake"
+        } else if cfg!(target_os = "macos") {
+            "brew install openconnect"
         } else {
             "sudo apt install openconnect"
         };
