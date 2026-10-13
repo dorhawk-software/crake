@@ -42,10 +42,12 @@ APP=/Applications/Crake.app
 if [ -n "${CRAKE_UNIVERSAL:-}" ]; then
     for f in "$APP/Contents/MacOS/crake" /usr/local/sbin/craked /usr/local/libexec/crake/hook; do
         archs=$(lipo -archs "$f")
-        case " $archs " in
-            *" arm64 "*" x86_64 "* | *" x86_64 "*" arm64 "*) ;;
-            *) fail "$f is $archs, not universal" ;;
-        esac
+        for arch in arm64 x86_64; do
+            case " $archs " in
+                *" $arch "*) ;;
+                *) fail "$f is $archs, not universal" ;;
+            esac
+        done
     done
 fi
 if [ -n "${CRAKE_KEYCHAIN:-}" ]; then
