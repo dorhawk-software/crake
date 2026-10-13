@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: browsers that look names up themselves</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4;
+    --accent: #2DD4BF; --track: #4A4E53; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --ink: #1A1C1E; --muted: #5A5F64;
+    --accent: #0F766E; --track: #BDBDB8; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 40px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 980px; margin-bottom: 18px; }
+  .intro b { color: var(--ink); }
+  .cols { display: flex; gap: 36px; flex-wrap: wrap; align-items: flex-start; }
+  .cap { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 452px; min-height: 54px; }
+  .panel { width: 452px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding-bottom: 8px; }
+  .sec { padding: 12px 18px 4px; font-size: 13px; font-weight: 600; }
+  .row { display: grid; grid-template-columns: 18px 1fr auto; gap: 10px; padding: 8px 18px 10px; }
+  .row .w { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .row .t { font-family: 'Atkinson Hyperlegible Mono', monospace; font-size: 12px; color: var(--muted); }
+  .rule { border-top: 1px solid var(--line); margin-top: 6px; }
+  .tun { display: flex; align-items: center; gap: 12px; padding: 9px 18px; }
+  .tun .n { font-size: 15px; font-weight: 700; }
+  .tun .s { font-size: 13px; color: var(--muted); margin-left: 8px; }
+  .tun .p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .sw { width: 46px; height: 26px; border-radius: 13px; background: var(--accent); position: relative; flex: none; margin-left: auto; }
+  .sw::after { content: ''; position: absolute; top: 3px; left: 23px; width: 20px; height: 20px; border-radius: 50%; background: #fff; }
+  .note { margin: 0 18px 8px; padding: 10px 12px; background: var(--surface); border-radius: 8px; font-size: 13px;
+    display: flex; gap: 12px; align-items: flex-start; }
+  .note .got { flex: none; border: none; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+  .settings { width: 560px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px 28px 26px; }
+  .settings h3 { margin: 0 0 4px; font-size: 22px; }
+  .settings .lede { color: var(--muted); margin-bottom: 18px; }
+  .setting { display: flex; gap: 16px; align-items: flex-start; padding: 14px 0; border-top: 1px solid var(--line); }
+  .setting .l { font-weight: 600; } .setting .d { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .warn { margin-top: 10px; padding: 10px 12px; background: var(--surface); border-radius: 8px; font-size: 13px; }
+  .tick { width: 18px; height: 18px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>Browsers that look names up themselves.</b> Firefox with DNS over HTTPS on, or Chrome, Edge and Brave
+    with Secure DNS set to a provider by hand, ask their own DNS, past the computer's. Crake then never sees a company's name
+    fail there, so it can't send it through the tunnel before the browser connects: the site still opens, after the probe's
+    wait (3 s), the first time. "Copy for helpdesk" already says so. How should the app itself say it? Shown only while a
+    tunnel that learns is up, and only for browsers found on this computer.</div>
+  <div class="cols">
+    <div>
+      <div class="cap">A. A notice in the panel (recommended)</div>
+      <div class="sub">Under "Tunnels", like the AnyConnect notice: once, until "Got it" (remembered per browser; it comes
+        back if another browser starts doing it). Says what happens and what fixes it.</div>
+      <div class="panel">
+        <div class="sec">What Crake did</div>
+        <div class="row"><svg class="tick" viewBox="0 0 18 18"><path d="M6 15V4M12 15V8" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/></svg>
+          <div><div>Sent git.acme.internal through ACME.</div><div class="w">It didn’t answer directly. Through ACME it answered in 38 ms.</div></div><span class="t">13:21</span></div>
+        <div class="rule"></div>
+        <div class="sec">Tunnels</div>
+        <div class="tun"><div><div><span class="n">ACME</span><span class="s">Connected · 3 hosts</span></div>
+          <div class="p">Your profile · learning on</div></div><div class="sw"></div></div>
+        <div class="note"><span>Firefox looks names up itself (DNS over HTTPS), so the first visit to an ACME site there waits
+          a few seconds. Turning DNS over HTTPS off in Firefox’s settings fixes it.</span><button class="got">Got it</button></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">B. A line in Settings → Names</div>
+      <div class="sub">Quieter: nothing in the panel; it's there when someone looks at how Crake handles names (where
+        "Ask the tunnels about unknown names" lives). Easy to never see.</div>
+      <div class="settings">
+        <h3>Names</h3><div class="lede">How Crake finds names only a tunnel knows.</div>
+        <div class="setting"><div><div class="l">Ask the tunnels about unknown names</div>
+          <div class="d">When public DNS has never heard of a name, Crake asks each tunnel’s DNS.</div>
+          <div class="warn">Firefox looks names up itself (DNS over HTTPS), so Crake can’t ask the tunnels about names
+            opened there; the first visit to such a site waits a few seconds. Turning DNS over HTTPS off in Firefox’s
+            settings fixes it.</div></div>
+          <div class="sw" style="margin-top:2px"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>if (location.search.includes('dark=false')) document.body.classList.add('light');</script>
+</body>
+</html>
