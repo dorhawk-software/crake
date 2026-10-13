@@ -1,0 +1,32 @@
+# Asks dorhawk-software/packages to publish a release of Crake into
+# packages.dorhawk.software, by hand (Actions → Packages → Run workflow):
+# what the release workflow's `packages` job does after each release.
+name: Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release to publish (empty: the latest)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  ask:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Ask packages.dorhawk.software to publish
+        env:
+          GH_TOKEN: ${{ secrets.PACKAGES_DISPATCH_TOKEN }}
+          OWN_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [ -z "$TAG" ]; then
+            TAG=$(GH_TOKEN=$OWN_TOKEN gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          fi
+          gh api repos/dorhawk-software/packages/dispatches -f event_type=release \
+            -f "client_payload[repo]=$GITHUB_REPOSITORY" -f "client_payload[tag]=$TAG"
+          echo "Asked to publish $GITHUB_REPOSITORY $TAG."
