@@ -8,7 +8,9 @@
 #   notarize <pkg> Apple's notary service checks the package (App Store
 #                  Connect API key: APPLE_API_KEY, APPLE_API_KEY_ID,
 #                  APPLE_API_ISSUER_ID); its ticket is stapled to the
-#                  package, which Gatekeeper must then accept
+#                  package, which Gatekeeper must then accept. Waits up to
+#                  CRAKE_NOTARY_WAIT (default 2h: a team's first
+#                  submissions can take hours, later ones minutes)
 # Nothing secret is printed.
 set -eu
 case ${1:-} in
@@ -40,14 +42,20 @@ notarize)
   key=$(mktemp)
   printf '%s\n' "$APPLE_API_KEY" > "$key"
   out=$(xcrun notarytool submit "$pkg" --key "$key" --key-id "$APPLE_API_KEY_ID" \
-    --issuer "$APPLE_API_ISSUER_ID" --wait --timeout 30m --output-format json) || true
+    --issuer "$APPLE_API_ISSUER_ID" --wait --timeout "${CRAKE_NOTARY_WAIT:-2h}" \
+    --output-format json) || true
   echo "$out"
   id=$(printf '%s' "$out" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+  if printf '%s' "$out" | grep -q 'Timeout of'; then
+    rm -f "$key"
+    echo "Apple hasn't finished checking submission $id yet; nothing was refused." >&2
+    exit 1
+  fi
   if ! printf '%s' "$out" | grep -q '"status":"Accepted"'; then
     [ -z "$id" ] || xcrun notarytool log "$id" --key "$key" \
       --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID"
     rm -f "$key"
-    echo "notarization failed" >&2
+    echo "Apple refused the package (its log is above)." >&2
     exit 1
   fi
   rm -f "$key"
