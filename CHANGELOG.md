@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.5.0 (2026-10-13)
+
 - **The panel says when a browser looks names up itself.** Firefox with DNS over HTTPS on, or
   Chrome, Edge and Brave with Secure DNS set to a provider of their own, ask their own DNS, so
   Crake can't send a company's names through the tunnel before they connect: the first visit
@@ -19,9 +21,6 @@ What's new in each Crake release, for the people using it. The newest is at the 
   DNS, who answers the computer's DNS, and which browsers look names up themselves (DNS over
   HTTPS, where Crake can't route a company's names before the first packet). A helpdesk no
   longer has to ask you to look it up (with host names hidden, the addresses are left out too).
-
-## 0.5.0 (2026-10-13)
-
 - **"Start when you log in" set up by an older Crake is brought up to date** when Crake starts, so
   on macOS it too shows as Crake, with its icon, in System Settings' background items.
 - **macOS and Windows: when the network's DNS stops answering, the internet keeps working.** While
