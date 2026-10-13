@@ -31,6 +31,31 @@ fn open(cx: &mut TestAppContext) -> Opened {
     }
 }
 
+/// Opened as the app opens it (windows.rs): the view itself, no Root, so
+/// no key binding of Root's moves the focus on Tab.
+fn open_as_the_app(cx: &mut TestAppContext) -> Opened {
+    cx.update(gpui_kit::init);
+    let model = cx.new(|_| Model::default());
+    let (tx, requests) = async_channel::unbounded();
+    let (window, view) = cx.update(|cx| {
+        let mut view = None;
+        let window = cx
+            .open_window(WindowOptions::default(), |window, cx| {
+                let v = cx.new(|cx| NewTunnel::new(model, tx, None, window, cx));
+                view = Some(v.clone());
+                v
+            })
+            .expect("a window");
+        (window.into(), view.expect("the view"))
+    });
+    cx.run_until_parked();
+    Opened {
+        window,
+        view,
+        requests,
+    }
+}
+
 impl Opened {
     fn click(&self, id: impl Into<gpui_kit::ElementId>, cx: &mut TestAppContext) {
         let id = id.into();
@@ -364,4 +389,32 @@ fn with_no_profiles_the_list_is_the_import(cx: &mut TestAppContext) {
     });
     assert!(w.shown("import-ovpn", cx));
     assert!(!w.shown("profile", cx), "no list to choose from");
+}
+
+#[gpui_kit::test]
+fn tab_goes_from_the_name_to_the_gateway_and_back(cx: &mut TestAppContext) {
+    let w = open_as_the_app(cx);
+    w.type_into(|t| t.name.clone(), "Globex", cx);
+    w.click(("protocol", ANYCONNECT), cx);
+    w.type_into(|t| t.name.clone(), "", cx);
+    let focused =
+        |w: &Opened, cx: &mut TestAppContext, field: fn(&NewTunnel) -> Entity<InputState>| {
+            let input = w.read(cx, field);
+            cx.update_window(w.window, |_, window, cx| {
+                input.read(cx).focus_handle(cx).is_focused(window)
+            })
+            .unwrap()
+        };
+    let press = |w: &Opened, cx: &mut TestAppContext, key: &str| {
+        cx.update_window(w.window, |_, window, cx| window.press(key, cx))
+            .unwrap();
+        cx.run_until_parked();
+    };
+    press(&w, cx, "tab");
+    assert!(focused(&w, cx, |t| t.gateway.clone()), "Tab: the gateway");
+    press(&w, cx, "shift-tab");
+    assert!(
+        focused(&w, cx, |t| t.name.clone()),
+        "Shift+Tab: the name again"
+    );
 }

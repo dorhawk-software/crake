@@ -8,8 +8,8 @@ use std::time::Duration;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyElement, Context, Div, Entity, FocusHandle, FontWeight, Pixels, Stateful, Subscription,
-    Task, TestSupportExt, Window, div, px, svg,
+    AnyElement, Context, Div, Entity, FocusHandle, Focusable, FontWeight, Pixels, Stateful,
+    Subscription, Task, TestSupportExt, Window, div, px, svg,
 };
 
 use crate::Request;
@@ -473,6 +473,36 @@ impl NewTunnel {
     }
 
     /// Can step `step` be left? Says what's missing if not.
+    /// The text fields of the step on screen, in the order Tab goes
+    /// through them.
+    fn tab_order(&self) -> Vec<Entity<InputState>> {
+        match self.step {
+            1 if self.protocol == "openvpn3" => vec![self.name.clone()],
+            1 => vec![self.name.clone(), self.gateway.clone()],
+            2 => vec![self.user.clone()],
+            _ => Vec::new(),
+        }
+    }
+
+    /// Tab to the step's next text field (`back`: Shift+Tab, the one
+    /// before): nothing in GPUI moves the focus on Tab by itself here.
+    pub(super) fn tab(&mut self, back: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let fields = self.tab_order();
+        let Some(at) = fields
+            .iter()
+            .position(|f| f.read(cx).focus_handle(cx).is_focused(window))
+        else {
+            return;
+        };
+        let next = if back {
+            (at + fields.len() - 1) % fields.len()
+        } else {
+            (at + 1) % fields.len()
+        };
+        fields[next].update(cx, |f, cx| f.focus(window, cx));
+        cx.notify();
+    }
+
     fn check(&mut self, step: usize, cx: &Context<Self>) -> bool {
         if step == 2
             && self.method == "browser"

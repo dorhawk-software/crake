@@ -127,8 +127,14 @@ impl Render for NewTunnel {
             .font_family(fonts::UI)
             .text_size(px(14.))
             .line_height(px(20.))
-            .on_key_down(cx.listener(|this, e: &gpui_kit::KeyDownEvent, _, cx| {
-                if e.keystroke.key == "escape" {
+            .on_key_down(cx.listener(|this, e: &gpui_kit::KeyDownEvent, window, cx| {
+                // Tab moves between the step's fields here, and only here:
+                // the app's windows have no Root binding it (a test
+                // window's has, so the key stops at this card).
+                if e.keystroke.key == "tab" {
+                    this.tab(e.keystroke.modifiers.shift, window, cx);
+                    cx.stop_propagation();
+                } else if e.keystroke.key == "escape" {
                     if this.open_select.is_some() {
                         this.open_select = None;
                         cx.notify();
