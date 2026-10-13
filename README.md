@@ -15,7 +15,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-GPL--3.0-0F766E?style=flat-square" alt="Licence GPL-3.0" /></a>
   <a href="#building-and-trying-it"><img src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20Ubuntu%20%C2%B7%20Debian%20%C2%B7%20Fedora%20%C2%B7%20Arch%20%C2%B7%20NixOS-115E59?style=flat-square" alt="Platform: Linux, Ubuntu, Debian, Fedora, Arch and NixOS" /></a>
   <a href="Cargo.toml"><img src="https://img.shields.io/badge/Rust-2024%20%C2%B7%20GPUI-0F766E?style=flat-square" alt="Rust 2024 and GPUI" /></a>
-  <a href="#status"><img src="https://img.shields.io/badge/status-coming%20soon-5A5F64?style=flat-square" alt="Status: coming soon" /></a>
+  <a href="https://github.com/dorhawk-software/crake/releases/latest"><img src="https://img.shields.io/github/v/release/dorhawk-software/crake?style=flat-square&label=release&color=5A5F64" alt="Latest release" /></a>
   <a href="#built-with-ai"><img src="https://img.shields.io/badge/built%20with-Claude-5A5F64?style=flat-square" alt="Built with Claude" /></a>
 </p>
 
@@ -28,6 +28,10 @@ only answers from inside, and then routes just that host and tells you why, in o
 
 **Company VPNs either take all your traffic, or only the networks someone wrote into a list years
 ago. Neither knows what you actually open.**
+
+<p align="center">
+  <a href="https://youtu.be/MzXZIYudz50"><img src="docs/media/video.jpg" alt="Crake in a minute: a narrated video on YouTube. Its first frame: most VPNs send everything through the company." width="760" /></a>
+</p>
 
 |        | Step                 | How                                                                                       |
 | ------ | -------------------- | ----------------------------------------------------------------------------------------- |
