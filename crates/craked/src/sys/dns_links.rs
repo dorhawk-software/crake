@@ -19,6 +19,8 @@ static LINKS: Mutex<BTreeMap<String, Link>> = Mutex::new(BTreeMap::new());
 /// Public names come to craked's server too (while a tunnel is up): it
 /// asks the system's own DNS servers and can rescue what they don't know.
 static PUBLIC: AtomicBool = AtomicBool::new(false);
+/// The system has its own DNS back for a while (its servers stopped answering).
+static GIVEN_BACK: AtomicBool = AtomicBool::new(false);
 
 fn links() -> std::sync::MutexGuard<'static, BTreeMap<String, Link>> {
     LINKS
@@ -37,9 +39,16 @@ pub fn remove(device: &str) {
     links().remove(device);
 }
 
-/// Whether public names come to craked's server now.
+/// Whether public names come to craked's server now: wanted, and not
+/// given back to the system for a while (`stand_in::Watch`).
 pub fn public() -> bool {
-    PUBLIC.load(Ordering::Relaxed)
+    PUBLIC.load(Ordering::Relaxed) && !GIVEN_BACK.load(Ordering::Relaxed)
+}
+
+/// The system's own servers stopped answering craked: it has its DNS back
+/// for now (true), or craked stands in again (false).
+pub fn set_given_back(on: bool) {
+    GIVEN_BACK.store(on, Ordering::Relaxed);
 }
 
 /// Public names come to craked's server (Windows: its NRPT root rule;

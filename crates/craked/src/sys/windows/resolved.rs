@@ -34,7 +34,13 @@ pub use super::super::dns_links::{owner, public};
 /// public answers in nftables instead), or stop.
 pub fn set_public(on: bool) -> Result<()> {
     super::super::dns_links::set_public(on);
-    if on {
+    refresh_public()
+}
+
+/// The root rule there or gone, as `dns_links::public` now says (wanted,
+/// and not given back to the system for a while).
+pub fn refresh_public() -> Result<()> {
+    if super::super::dns_links::public() {
         write_rule(PUBLIC_RULE, &[], true)
     } else {
         delete(&format!("{POLICY}\\{PREFIX}{PUBLIC_RULE}"));

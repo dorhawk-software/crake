@@ -11,6 +11,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **macOS and Windows: when the network's DNS stops answering, the internet keeps working.** While
+  a tunnel is up, Crake answers the computer's DNS and asks the network's servers in its stead. If
+  they stop answering (a hotel's sign-in page, a network that changed), Crake now gives the
+  computer its own DNS back, says so, and tries again two minutes later.
 - **Undo and Redo change the chart's tick, and only that.** Undo takes one off its count, or turns
   it grey when nothing's left; Redo puts it back. Undoing and redoing used to add a decision each
   time, as if Crake had routed the host again.

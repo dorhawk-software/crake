@@ -23,6 +23,13 @@ pub fn set_public(on: bool) {
     every_name();
 }
 
+/// Public names to craked's server again, or back to the system's, as
+/// `dns_links::public` now says.
+pub fn refresh_public() -> anyhow::Result<()> {
+    every_name();
+    Ok(())
+}
+
 /// craked's server gets every name while public names are wanted or a
 /// full tunnel is up.
 fn every_name() {

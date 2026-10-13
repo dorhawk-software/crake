@@ -135,9 +135,54 @@ async fn public(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> 
         ask(query, None, &servers).await
     };
     let Some(reply) = reply else {
-        return crate::hush::reply_code(query, 2);
+        let give_back = watch().unanswered(std::time::Instant::now());
+        if give_back {
+            give_the_system_its_dns_back(mgr);
+        }
+        return crate::hush::reply_code(query, SERVFAIL);
     };
+    watch().answered();
     Some(mgr.rescue_answer(&reply).await.unwrap_or(reply))
+}
+
+/// SERVFAIL: no answer to give.
+const SERVFAIL: u8 = 2;
+
+/// Whether the system's servers answer craked's public questions.
+static WATCH: std::sync::Mutex<crate::stand_in::Watch> =
+    std::sync::Mutex::new(crate::stand_in::Watch::new());
+
+fn watch() -> std::sync::MutexGuard<'static, crate::stand_in::Watch> {
+    WATCH
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// The system's servers stopped answering craked: rather than fail every
+/// name, public names go straight to them again (a full tunnel's still
+/// go through it), and craked stands in again `RETRY` later.
+fn give_the_system_its_dns_back(mgr: &Arc<Manager>) {
+    super::dns_links::set_given_back(true);
+    if let Err(e) = super::resolved::refresh_public() {
+        tracing::warn!("giving the system its DNS back: {e:#}");
+    }
+    let minutes = crate::stand_in::RETRY.as_secs() / crate::units::SECS_PER_MINUTE;
+    mgr.log().system(
+        None,
+        "This network's DNS doesn't answer through Crake.",
+        Some(format!(
+            "The computer asks it directly again, so the internet keeps working. Names only a tunnel knows may not resolve meanwhile; Crake tries again in {minutes} minutes."
+        )),
+    );
+    tokio::spawn(async {
+        tokio::time::sleep(crate::stand_in::RETRY).await;
+        if watch().retry(std::time::Instant::now()) {
+            super::dns_links::set_given_back(false);
+            if let Err(e) = super::resolved::refresh_public() {
+                tracing::warn!("standing in for the system's DNS again: {e:#}");
+            }
+        }
+    });
 }
 
 /// Ask DNS servers in turn (IPv4 or IPv6): a tunnel's through the tunnel
