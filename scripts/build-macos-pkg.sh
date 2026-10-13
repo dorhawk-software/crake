@@ -6,23 +6,28 @@
 # for now. Not signed or notarized yet (that needs the user's Apple
 # Developer account): the app is signed ad hoc, as the linker signs every
 # binary on Apple Silicon. openconnect isn't bundled: Homebrew's is used.
-# Writes target/macos/Crake-<version>.pkg.
+# Writes target/macos/Crake-<version>.pkg. CRAKE_PROFILE=dev packs the
+# development build instead (CI: the one its tests just built, so the
+# package costs a minute, not a second, optimised build of everything).
 set -eu
 cd "$(dirname "$0")/.."
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
 OUT=target/macos
-cargo build --release --locked -p crake -p craked
+PROFILE=${CRAKE_PROFILE:-release}
+BIN=target/$PROFILE
+[ "$PROFILE" != dev ] || BIN=target/debug
+cargo build --profile "$PROFILE" --locked -p crake -p craked
 rm -rf "${OUT:?}"
 ROOT=$OUT/root
 APP=$ROOT/Applications/Crake.app
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$ROOT/usr/local/sbin" \
   "$ROOT/usr/local/libexec/crake" "$ROOT/Library/LaunchDaemons"
-cp target/release/crake "$APP/Contents/MacOS/crake"
+cp "$BIN/crake" "$APP/Contents/MacOS/crake"
 cp assets/icons/app/crake.icns "$APP/Contents/Resources/Crake.icns"
 sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$APP/Contents/Info.plist"
 codesign --force --sign - "$APP"
-cp target/release/craked "$ROOT/usr/local/sbin/craked"
-cp target/release/crake-hook "$ROOT/usr/local/libexec/crake/hook"
+cp "$BIN/craked" "$ROOT/usr/local/sbin/craked"
+cp "$BIN/crake-hook" "$ROOT/usr/local/libexec/crake/hook"
 cp packaging/macos/uninstall.sh "$ROOT/usr/local/libexec/crake/uninstall"
 cp packaging/macos/software.dorhawk.craked.plist "$ROOT/Library/LaunchDaemons/"
 # Installed where it says, never "relocated" to another copy of Crake.app

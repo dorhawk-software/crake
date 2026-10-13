@@ -1178,7 +1178,9 @@ user's Apple Developer account (ask for its details then).
 `scripts/macos-pkg-test.sh` (CI job macos) installs it on the runner,
 checks craked serves /var/run/crake.sock under launchd, installs again
 over it (craked restarted) and uninstalls (nothing left); CI uploads the
-package as `crake-macos`. The app's `sys/macos/`: the Keychain (security-framework,
+package as `crake-macos`. CI packs the development build its tests just
+built (`CRAKE_PROFILE=dev`): a release build took 9 minutes and a bigger
+cache; releases (signed, later) build release. The app's `sys/macos/`: the Keychain (security-framework,
 labelled items), the menu bar through `sys/menu_tray.rs` (the tray-icon
 code Windows used, now shared), the private folder in the user's
 $TMPDIR, plain notifications (notify-rust has no actions there),

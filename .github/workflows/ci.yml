@@ -103,8 +103,10 @@ jobs:
           BIN=$(cargo test -p craked --test macos --no-run --locked --message-format=json |
             jq -r 'select(.executable != null and .target.name == "macos") | .executable')
           sudo CRAKE_MACOS_ROOT=1 "$BIN" --nocapture
-      - name: The installer package (unsigned)
-        run: sh scripts/build-macos-pkg.sh
+      # Of the development build the tests used: a release build compiled
+      # everything again, optimised (9 min, and a bigger cache).
+      - name: The installer package (unsigned, development build)
+        run: CRAKE_PROFILE=dev sh scripts/build-macos-pkg.sh
       - name: It installs, runs craked, upgrades and uninstalls
         run: sh scripts/macos-pkg-test.sh target/macos/Crake-*.pkg
       - uses: actions/upload-artifact@v7
