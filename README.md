@@ -239,7 +239,7 @@ sudo dnf install crake
 The repository is signed with the key `B17A 7118 E977 36C2 02AD 5EAF F1D1 52DA 1BBD 1C97`
 (dorhawk.software packages).
 
-**macOS on Apple Silicon (preview):** `brew install --cask dorhawk-software/tap/crake`, which brings
+**macOS on Apple Silicon and Intel (preview):** `brew install --cask dorhawk-software/tap/crake`, which brings
 openconnect along. The installer is signed and notarized.
 
 **Windows 11 (preview):** the installer from [Releases](https://github.com/dorhawk-software/crake/releases),
@@ -353,8 +353,8 @@ forgotten so the app's next try goes through.
 - ✅ IPv6 alongside IPv4: learned, routed, kept from going around a full tunnel
 - 🟡 Windows 11: an installer with openconnect included, tested in a VM against a real gateway
   (not code-signed yet)
-- 🟡 macOS on Apple Silicon: a signed and notarized installer, tested on GitHub's Macs, not yet
-  on a real one
+- 🟡 macOS on Apple Silicon and Intel: a signed and notarized installer, tested on GitHub's Macs
+  and first tried on a real Mac against a real gateway
 
 <br/>
 
