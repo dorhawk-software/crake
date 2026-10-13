@@ -19,6 +19,7 @@ use crate::theme::{Theme, fonts};
 
 mod chart;
 mod decisions;
+mod first_run;
 mod tunnels;
 
 #[cfg(test)]
@@ -116,6 +117,8 @@ pub struct Panel {
     chart_hover: crate::timeline::Hover,
     /// The "?" card after "What Crake did" is open.
     help_open: bool,
+    /// No tunnel yet: the bird peeking out of the grass (`first_run`).
+    peek: first_run::Peek,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -145,7 +148,7 @@ impl Render for Panel {
             .child(self.header(model, &t, cx));
 
         if reachable && model.tunnels.is_empty() {
-            panel = panel.child(self.first_run(&t, cx));
+            panel = panel.child(self.first_run(&t, window, cx));
         } else if reachable {
             panel = panel
                 .child(self.chart(model, &t, window, cx))
@@ -179,60 +182,6 @@ impl Render for Panel {
             .items_start()
             .p(px(MARGIN))
             .child(panel.child(fit_window(self.upward)))
-    }
-}
-
-impl Panel {
-    /// No tunnel yet (design/proposals/panel-no-tunnels.html, B): nothing
-    /// to chart or report, so only the bird, one sentence and the way to
-    /// add one.
-    fn first_run(&self, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .border_t_1()
-            .border_color(t.line)
-            .pt(px(34.))
-            .pb(px(30.))
-            .px(px(32.))
-            .flex()
-            .flex_col()
-            .items_center()
-            .child(svg().path("crake/bird.svg").size(px(52.)).text_color(t.ink))
-            .child(
-                div()
-                    .mt(px(14.))
-                    .text_size(px(18.))
-                    .line_height(px(24.))
-                    .font_weight(FontWeight::BOLD)
-                    .child("No tunnels yet"),
-            )
-            .child(
-                div()
-                    .mt(px(6.))
-                    .max_w(px(300.))
-                    .text_center()
-                    .text_color(t.muted)
-                    .child(
-                        "Add the VPN your company gave you. Crake connects to it and sends through only what needs it.",
-                    ),
-            )
-            .child(
-                div()
-                    .id("add-tunnel")
-                    .mt(px(18.))
-                    .w(px(220.))
-                    .h(px(40.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .rounded(px(6.))
-                    .bg(t.accent)
-                    .text_color(t.accent_ink)
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .cursor_pointer()
-                    .child("Add a tunnel\u{2026}")
-                    .on_click(cx.listener(|this, _, _, _| this.send(Request::NewTunnel(None))))
-                    .test_support(),
-            )
     }
 }
 
@@ -408,6 +357,7 @@ impl Panel {
                 ..Default::default()
             },
             help_open: false,
+            peek: first_run::Peek::new(),
             _subscriptions: subscriptions,
         }
     }

@@ -228,6 +228,8 @@ impl gpui_kit::AssetSource for Assets {
         }
         icons!(
             "bird.svg",
+            "bird-grass.svg",
+            "bird-alone.svg",
             "call.svg",
             "mark-routed.svg",
             "mark-left-alone.svg",
