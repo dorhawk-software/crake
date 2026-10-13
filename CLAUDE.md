@@ -1115,7 +1115,8 @@ learned and pinned hosts, its DNS, a default route scoped to the device
 for probes, a full tunnel's halves and kept gateway), /etc/resolver
 files (one per domain, marked as Crake's and whose; others' files left
 alone) sending the tunnels' domains to craked's own DNS server, which is
-now shared with Windows (`sys/dns_server.rs`, on 127.0.0.1:53530 there;
+now shared with Windows (`sys/dns_server.rs`, on 127.53.0.1:53 there, an
+address craked adds to lo0;
 whose a name is: `sys/dns_links.rs`), sockets bound with IP_BOUND_IF,
 byte counters from getifaddrs. openconnect can't name utun devices, so
 on macOS craked doesn't pass `--interface` and takes the utunN it
@@ -1141,8 +1142,19 @@ tunnel's IPv6 halves (without an IPv6 address: reject routes to ::1,
 refused at once), IPv6 DNS servers asked by craked's DNS server;
 tests/macos.rs checks the routes and that a reject route refuses at once,
 as root on CI.
-Not yet: public names (no root resolver in
-/etc/resolver: no rescue, no full tunnel's DNS for every name), the
+Public names (2026-10-13): /etc/resolver can't name a resolver for
+every name, so while a tunnel is up craked's server stands in for the
+primary network service's DNS servers in the dynamic store
+(`sys/macos/primary_dns.rs`, system-configuration: `State:` DHCP's,
+`Setup:`'s when the user typed servers), as vpnc-script does, and asks
+the servers it displaced (`system_dns`): the public-name rescue,
+split-horizon, and a full tunnel's DNS for every name, as on Windows. A
+watch on those keys takes their place again after a DHCP renewal or a
+change of network; what was displaced is kept in
+/var/db/crake/system-dns.json until it's given back, so a craked that
+died puts it back when it starts. tests/macos.rs checks macOS really asks
+craked's server for a public name and gets its own servers back.
+Not yet: the
 panel's placement under the menu bar, an installer (.pkg, signed and
 notarized with the user's Apple Developer account: ask for its details
 then). The app's `sys/macos/`: the Keychain (security-framework,

@@ -103,8 +103,8 @@ pub fn counters(devices: &HashMap<String, String>) -> (u64, u64, HashMap<String,
     (physical, tunnels, each)
 }
 
-/// The system's own DNS servers, for public names craked's server would
-/// forward: none yet, as public names don't come to it on macOS.
-pub fn system_dns() -> Vec<std::net::Ipv4Addr> {
-    Vec::new()
+/// The system's own DNS servers, which craked's server asks for public
+/// names: the ones it stands in for (`primary_dns`).
+pub fn system_dns() -> Vec<std::net::IpAddr> {
+    super::primary_dns::upstream()
 }

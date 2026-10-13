@@ -2,9 +2,9 @@
 //! DNS) as /etc/resolver files, one per domain, which send the domain's
 //! names to craked's own DNS server (`dns_queue`); it looks up whose a name
 //! is in `sys::dns_links`. Each file says it's Crake's and whose; files
-//! someone else wrote are left alone. Not yet: a full tunnel's DNS for
-//! every name (macOS takes that from the network settings, not from
-//! /etc/resolver).
+//! someone else wrote are left alone. Every other name (the public-name
+//! rescue, a full tunnel's DNS) can't be sent by a file: craked's server
+//! stands in for the primary service's DNS servers then (`primary_dns`).
 
 use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
@@ -17,18 +17,33 @@ const DIR: &str = "/etc/resolver";
 /// The first line of every file Crake writes, then the link's device.
 const MARK: &str = "# Written by Crake for ";
 
+/// Public names to craked's server (while a tunnel is up), or not.
+pub fn set_public(on: bool) {
+    super::super::dns_links::set_public(on);
+    every_name();
+}
+
+/// craked's server gets every name while public names are wanted or a
+/// full tunnel is up.
+fn every_name() {
+    let links = super::super::dns_links::public() || super::super::dns_links::everything();
+    super::primary_dns::want(links);
+}
+
 pub enum Resolved {
     Real,
     Noop,
 }
 
 impl Resolved {
-    /// Files a craked before this one left behind go first.
+    /// Files a craked before this one left behind go first, and the
+    /// system's DNS servers it stood in for come back.
     pub fn new(enabled: bool) -> Self {
         if enabled {
             for (path, _) in ours() {
                 let _ = std::fs::remove_file(path);
             }
+            super::primary_dns::put_back_left_behind();
             Self::Real
         } else {
             Self::Noop
@@ -48,6 +63,7 @@ impl Resolved {
             return Ok(());
         }
         super::super::dns_links::set(device, servers, domains, everything);
+        every_name();
         std::fs::create_dir_all(DIR)?;
         // Domains it no longer has go.
         for (path, owner) in ours() {
@@ -84,6 +100,7 @@ impl Resolved {
     pub async fn revert(&self, device: &str) {
         super::super::dns_links::remove(device);
         if let Self::Real = self {
+            every_name();
             for (path, owner) in ours() {
                 if owner == device {
                     let _ = std::fs::remove_file(path);
@@ -125,7 +142,7 @@ mod tests {
     fn a_file_points_at_crakes_server_and_says_whose_it_is() {
         let text = super::contents("utun5");
         assert!(text.starts_with("# Written by Crake for utun5\n"));
-        assert!(text.contains("nameserver 127.0.0.1\nport 53530\n"));
+        assert!(text.contains("nameserver 127.53.0.1\nport 53\n"));
         assert!(super::file_name("acme.internal"));
         assert!(!super::file_name("../hosts"));
         assert!(!super::file_name(".acme.internal"));

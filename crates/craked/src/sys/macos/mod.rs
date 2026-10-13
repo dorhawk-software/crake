@@ -1,7 +1,8 @@
 //! macOS: the same interfaces as Linux (the macOS plan in CLAUDE.md):
 //! per-host routes on the tunnel's utun device and its address (`route`,
 //! `ifconfig`: `routing`, `net`), /etc/resolver files sending the tunnels'
-//! domains to craked's own DNS server (`resolved`, `dns_queue`), the
+//! domains to craked's own DNS server (`resolved`, `dns_queue`), and
+//! every name while a tunnel is up (`primary_dns`), the
 //! kernel's TCP connection list for probing (`conntrack`).
 
 pub mod conntrack;
@@ -13,6 +14,7 @@ pub mod syn_queue;
 
 mod cmd;
 mod host;
+mod primary_dns;
 pub use host::*;
 
 /// macOS names utun devices itself (utun0, utun1, ...): openconnect takes

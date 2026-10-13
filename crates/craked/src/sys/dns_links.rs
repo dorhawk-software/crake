@@ -42,11 +42,16 @@ pub fn public() -> bool {
     PUBLIC.load(Ordering::Relaxed)
 }
 
-/// Windows sends public names to craked's server (its NRPT root rule);
-/// macOS doesn't yet.
-#[cfg(windows)]
+/// Public names come to craked's server (Windows: its NRPT root rule;
+/// macOS: its server in the primary service's DNS settings).
 pub fn set_public(on: bool) {
     PUBLIC.store(on, Ordering::Relaxed);
+}
+
+/// A full tunnel's link is registered: every name is its.
+#[cfg(target_os = "macos")]
+pub fn everything() -> bool {
+    links().values().any(|(_, _, everything)| *everything)
 }
 
 /// The link that answers for `name` (its most specific domain; failing

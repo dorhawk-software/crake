@@ -1,8 +1,9 @@
 //! macOS, as root (CI job `macos`, GitHub's runner): craked's macOS parts
 //! on a real utun device this test makes itself (openconnect makes one the
 //! same way): the tunnel's address, its DNS route, learned and pinned hosts
-//! as routes, and /etc/resolver files sending a domain's names to craked's
-//! server (a stand-in that answers every A question with 10.40.1.10).
+//! as routes, /etc/resolver files sending a domain's names to craked's
+//! server (a stand-in that answers every A question with 10.40.1.10), and
+//! that server standing in for the system's DNS servers (public names).
 //! Skipped unless CRAKE_MACOS_ROOT=1. Not a full tunnel: routing
 //! everything into a device nobody reads would cut the runner off.
 #![cfg(target_os = "macos")]
@@ -216,7 +217,8 @@ async fn a_tunnel_on_a_utun_device() {
     craked::sys::mark(&probe6, craked::routing::ids(0).mark).unwrap();
 
     // DNS: acme.internal's names go to craked's server (here a stand-in).
-    let server = UdpSocket::bind((Ipv4Addr::LOCALHOST, craked::dns_queue::PORT)).unwrap();
+    craked::dns_queue::add_address().unwrap();
+    let server = UdpSocket::bind((craked::dns_queue::ADDR, craked::dns_queue::PORT)).unwrap();
     std::thread::spawn(move || {
         let mut buf = [0u8; 512];
         while let Ok((n, from)) = server.recv_from(&mut buf) {
@@ -244,6 +246,28 @@ async fn a_tunnel_on_a_utun_device() {
         found.contains("10.40.1.10"),
         "macOS asked craked's server: {found}"
     );
+
+    // Every other name too, while a tunnel is up: craked's server stands
+    // in for the primary service's DNS servers, and asks those.
+    let before = nameservers();
+    craked::resolved::set_public(true);
+    let upstream = craked::sys::system_dns();
+    assert!(
+        !upstream.is_empty() && !upstream.contains(&IpAddr::V4(craked::dns_queue::ADDR)),
+        "the servers it stands in for: {upstream:?}"
+    );
+    let found = sh(
+        "dscacheutil",
+        &["-q", "host", "-a", "name", "www.globex.example"],
+    );
+    assert!(
+        found.contains("10.40.1.10"),
+        "macOS asked craked's server for a public name: {found}\n{}",
+        sh("scutil", &["--dns"])
+    );
+    craked::resolved::set_public(false);
+    assert!(craked::sys::system_dns().is_empty());
+    assert_eq!(nameservers(), before, "the system's own servers back");
 
     // A full tunnel without an IPv6 address refuses IPv6 with reject
     // routes (sys::macos::cmd::reject_args, here for a test prefix): a
@@ -283,6 +307,18 @@ async fn a_tunnel_on_a_utun_device() {
     assert_ne!(way("10.40.1.10"), dev);
     assert_ne!(way("10.40.2.7"), dev);
     assert_ne!(way("fd40:1::10"), dev);
+}
+
+/// Every DNS server macOS' resolvers name (`scutil --dns`).
+fn nameservers() -> Vec<String> {
+    let mut found: Vec<String> = sh("scutil", &["--dns"])
+        .lines()
+        .filter(|l| l.trim_start().starts_with("nameserver["))
+        .map(|l| l.split_once(':').map_or(l, |(_, s)| s).trim().to_owned())
+        .collect();
+    found.sort();
+    found.dedup();
+    found
 }
 
 /// The source of the first SYN to `dst` that comes out of the utun device

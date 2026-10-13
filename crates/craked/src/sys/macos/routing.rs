@@ -12,7 +12,8 @@
 //! tunnel with another source address (a connection that started before
 //! its host was routed, on its next SYN) is NATed to the tunnel's address
 //! by pf, in an anchor of Crake's (`nat`), as Linux masquerades. Public
-//! DNS answers aren't watched (not yet on macOS).
+//! DNS answers aren't watched here: craked's own DNS server gets public
+//! names (`resolved::set_public`).
 
 use std::collections::{BTreeSet, HashMap};
 use std::net::IpAddr;
@@ -143,12 +144,19 @@ impl Routing {
         Ok(())
     }
 
-    /// Linux watches public DNS answers; not yet on macOS.
+    /// Public names to craked's own DNS server, which can rescue what
+    /// public DNS doesn't know (Linux watches the answers in nftables).
     pub async fn public_up(&self, _probing: bool) -> Result<()> {
+        if self.real {
+            super::resolved::set_public(true);
+        }
         Ok(())
     }
 
     pub async fn public_down(&self) -> Result<()> {
+        if self.real {
+            super::resolved::set_public(false);
+        }
         Ok(())
     }
 

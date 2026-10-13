@@ -70,7 +70,7 @@ pub fn interfaces6() -> Vec<(String, std::net::Ipv6Addr, u8)> {
 
 /// The DNS servers Windows was given (DHCP, or by hand) on the adapters
 /// that are up, Crake's own tunnels left out: where public names go.
-pub fn system_dns() -> Vec<Ipv4Addr> {
+pub fn system_dns() -> Vec<std::net::IpAddr> {
     let mut found = Vec::new();
     each_adapter(
         windows_sys::Win32::Networking::WinSock::AF_INET,
@@ -86,9 +86,9 @@ pub fn system_dns() -> Vec<Ipv4Addr> {
                     let s = &*server;
                     if let Some(addr) = ipv4(s.Address.lpSockaddr)
                         && !addr.is_loopback()
-                        && !found.contains(&addr)
+                        && !found.contains(&addr.into())
                     {
-                        found.push(addr);
+                        found.push(addr.into());
                     }
                     server = s.Next;
                 }

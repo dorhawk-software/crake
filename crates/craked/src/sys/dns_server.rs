@@ -124,11 +124,11 @@ async fn answer(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> 
     }
 }
 
-/// A public name: asked of Windows' own DNS servers, whose answer the
+/// A public name: asked of the system's own DNS servers, whose answer the
 /// manager may rescue (a name only a tunnel knows, a public name with a
 /// private address).
 async fn public(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> {
-    let servers: Vec<IpAddr> = super::system_dns().into_iter().map(IpAddr::V4).collect();
+    let servers = super::system_dns();
     let reply = if tcp {
         ask_tcp(query, None, &servers).await
     } else {

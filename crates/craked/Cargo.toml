@@ -44,5 +44,9 @@ nfq-updated = "0.2.6"
 windows-service = "0.8"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Console", "Win32_System_RemoteDesktop", "Win32_System_Threading", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_Networking_WinSock", "Win32_System_Registry"] }
 
+# macOS: the system's DNS settings (the dynamic store), for every name.
+[target.'cfg(target_os = "macos")'.dependencies]
+system-configuration = "0.6"
+
 [dev-dependencies]
 tempfile = "3"
