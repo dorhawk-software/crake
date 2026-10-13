@@ -3,7 +3,8 @@
 # GitHub release whose text is CHANGELOG.md's section for that version
 # (scripts/release-notes.sh, which also refuses a tag that disagrees with
 # the version in Cargo.toml, the Nix package or the PKGBUILD). Only a
-# commit that passed CI on main is released.
+# commit that passed CI on main is released. The macOS cask in
+# dorhawk-software/homebrew-tap follows (HOMEBREW_TAP_DEPLOY_KEY).
 name: Release
 
 on:
@@ -159,3 +160,29 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
             --verify-tag --title "Crake ${GITHUB_REF_NAME#v}" --notes-file notes.md
+
+  homebrew:
+    needs: publish
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: macos
+          path: dist
+      - name: The cask in dorhawk-software/homebrew-tap, at this version
+        env:
+          DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+        run: |
+          V=${GITHUB_REF_NAME#v}
+          SHA=$(sha256sum "dist/Crake-$V.pkg" | cut -d' ' -f1)
+          mkdir -p ~/.ssh && printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/tap && chmod 600 ~/.ssh/tap
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/tap -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          git clone -q git@github.com:dorhawk-software/homebrew-tap.git tap
+          sed -e "s/@VERSION@/$V/" -e "s/@SHA256@/$SHA/" packaging/macos/crake.rb.in > tap/Casks/crake.rb
+          cd tap
+          git config user.name "Crake release"
+          git config user.email ondrej@dorhawk.software
+          git add Casks/crake.rb
+          git commit -q -m "crake $V"
+          git push -q origin HEAD

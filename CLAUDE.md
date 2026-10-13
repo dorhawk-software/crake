@@ -811,8 +811,16 @@ version that disagrees, or on a commit CI hasn't passed
 installer (openconnect included, unsigned) and the macOS package (signed,
 notarized, installed and removed on the runner) in release mode with the
 same scripts CI uses, and publishes them with SHA256SUMS as the GitHub
-release, its text the changelog's section. Still to come: the AUR, a
-Homebrew tap, the apt/dnf repository.
+release, its text the changelog's section. Then the Homebrew cask
+(`packaging/macos/crake.rb.in`, the version and the package's checksum
+filled in) is pushed to **dorhawk-software/homebrew-tap** (public, created
+with the user's go-ahead 2026-10-13; `brew install --cask
+dorhawk-software/tap/crake` installs Homebrew's openconnect with it) with
+a write deploy key of that repository only (secret
+HOMEBREW_TAP_DEPLOY_KEY; the organisation had deploy keys off, the user
+switches them on). Still to come: the AUR, the apt/dnf repository. Known
+gap on macOS: "Start at login" writes ~/.config/autostart, which macOS
+ignores (needs a LaunchAgent or SMAppService).
 
 ## Packaging and dependencies (decided with the user)
 
