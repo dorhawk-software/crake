@@ -11,6 +11,19 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.2.0 (2026-10-13)
+
+- **Your first tunnel is easy to find.** With no tunnel yet, the panel says so and offers
+  **Add a tunnel…**, while the bird peeks out of the grass now and then, looking for one. The
+  tray's menu has **New tunnel…** too, on every system.
+- **New tunnel shows it's still asking the gateway:** the dashed head turns, and after a moment
+  the line says for how long. A slow gateway no longer looks like nothing is happening.
+- **Tab** goes from New tunnel's name to its gateway, and Shift+Tab back.
+- **packages.dorhawk.software** has a start page with the commands to add it. On a system with
+  32-bit packages switched on, apt noted that the repository has none; fetch the sources file
+  again to quiet it:
+  `curl -fsSL https://packages.dorhawk.software/apt/dorhawk.sources | sudo tee /etc/apt/sources.list.d/dorhawk.sources >/dev/null`
+
 ## 0.1.0 (2026-10-13)
 
 The first release. Crake connects to the VPNs you already have, and sends nothing through them
