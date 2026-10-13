@@ -67,6 +67,8 @@ pub struct Model {
     /// craked's view of the computer (its tunnels' devices and DNS, who
     /// answers the system's DNS), for helpdesk copies.
     pub diagnostics: Vec<String>,
+    /// Browsers that look names up themselves (`browser_dns`), by name.
+    pub own_dns_browsers: Vec<String>,
 }
 
 /// One of a tunnel's hosts (craked's HostDetails).
@@ -599,10 +601,21 @@ impl Model {
             }
         }
         // What only craked sees: saves asking the user to run commands.
-        if !self.diagnostics.is_empty() {
+        if !self.diagnostics.is_empty() || !self.own_dns_browsers.is_empty() {
             s += "\nCrake's view of this computer\n";
             for line in &self.diagnostics {
                 s += &format!("  {}\n", say(line));
+            }
+            if !self.own_dns_browsers.is_empty() {
+                let names = crate::browser_dns::and_list(&self.own_dns_browsers);
+                let verb = if self.own_dns_browsers.len() == 1 {
+                    "looks"
+                } else {
+                    "look"
+                };
+                s += &format!(
+                    "  {names} {verb} names up themselves (DNS over HTTPS): Crake can't route a company's names there before the first packet.\n"
+                );
             }
         }
         s
@@ -866,5 +879,20 @@ mod tests {
         for host in ["10.8.0.6", "10.8.0.1", "initech.internal", "192.168.1.1"] {
             assert!(!hidden.contains(host), "{host} in: {hidden}");
         }
+    }
+
+    /// A browser that looks names up itself is in the helpdesk copy: why
+    /// a company's names don't route before the first packet there.
+    #[test]
+    fn helpdesk_copies_say_which_browsers_look_names_up_themselves() {
+        let m = Model {
+            own_dns_browsers: vec!["Firefox".into(), "Chrome".into()],
+            ..Default::default()
+        };
+        let copy = m.helpdesk(false);
+        assert!(
+            copy.contains("Firefox and Chrome look names up themselves (DNS over HTTPS)"),
+            "{copy}"
+        );
     }
 }

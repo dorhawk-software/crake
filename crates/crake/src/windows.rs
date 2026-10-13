@@ -85,6 +85,7 @@ pub(super) fn toggle_panel(at: Option<(i32, i32)>, cx: &mut App) {
 /// rounded frame and shadow on a transparent background. Through XWayland it
 /// opens at the tray icon; otherwise wherever the desktop puts it.
 pub(super) fn open_panel(at: Option<(i32, i32)>, cx: &mut App) {
+    refresh_browsers(cx);
     let shell = cx.global::<Shell>();
     let (model, requests, x11) = (shell.model.clone(), shell.requests.clone(), shell.x11);
     let motion = match &shell.panel_motion {
@@ -183,6 +184,22 @@ pub(super) fn open_panel(at: Option<(i32, i32)>, cx: &mut App) {
         let _ = handle.update(cx, |_, window, _| window.activate_window());
         cx.global_mut::<Shell>().panel = Some(handle);
     }
+}
+
+/// Which browsers look names up themselves, read again from their
+/// settings files (not in tests: nothing of this computer's).
+fn refresh_browsers(cx: &mut App) {
+    if cx.try_global::<prefs::Prefs>().is_none_or(|p| p.scratch) {
+        return;
+    }
+    let found = crate::browser_dns::found();
+    let model = cx.global::<Shell>().model.clone();
+    model.update(cx, |m, cx| {
+        if m.own_dns_browsers != found {
+            m.own_dns_browsers = found;
+            cx.notify();
+        }
+    });
 }
 
 /// macOS: Crake is a menu bar app (LSUIElement) and its panel doesn't
@@ -441,6 +458,7 @@ pub(super) fn centered(w: f32, h: f32, cx: &App) -> Bounds<gpui_kit::Pixels> {
 
 /// The full log: one window, brought back if it's already open.
 pub(super) fn open_log(cx: &mut App) {
+    refresh_browsers(cx);
     to_front(cx);
     if let Some(handle) = cx.global::<Shell>().log
         && handle

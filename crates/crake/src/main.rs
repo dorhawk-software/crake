@@ -11,6 +11,8 @@ mod updates;
 mod windows;
 
 mod autostart;
+// Browsers that look names up themselves (DNS over HTTPS).
+mod browser_dns;
 
 mod chart;
 // Who draws the window buttons: macOS, or Crake.
