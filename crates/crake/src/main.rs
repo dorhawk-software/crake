@@ -24,6 +24,8 @@ mod engines;
 
 mod gateway_cert;
 
+mod head;
+
 mod keyring;
 
 mod log_view;

@@ -137,7 +137,8 @@ const MODES: [(&str, &str, &str, &str); 4] = [
 #[derive(Clone, Debug, PartialEq)]
 enum Detect {
     Idle,
-    Asking,
+    /// Since when.
+    Asking(std::time::Instant),
     Done(Found),
 }
 
@@ -422,7 +423,7 @@ impl NewTunnel {
             cx.notify();
             return;
         }
-        self.detect = Detect::Asking;
+        self.detect = Detect::Asking(std::time::Instant::now());
         self.detecting = Some(cx.spawn(async move |this, cx| {
             cx.background_executor().timer(ASKING_AT_LEAST).await;
             let found = cx
@@ -522,7 +523,7 @@ impl NewTunnel {
                 Some("Which gateway? Its name or address, like vpn.example.com.")
             }
             1 if self.protocol().is_none() => match self.detect {
-                Detect::Asking => Some("Still asking the gateway. A moment."),
+                Detect::Asking(_) => Some("Still asking the gateway. A moment."),
                 _ => Some("Pick the protocol: the gateway didn\u{2019}t say."),
             },
             2 if self.method == "certificate"

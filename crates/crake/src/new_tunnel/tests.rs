@@ -418,3 +418,17 @@ fn tab_goes_from_the_name_to_the_gateway_and_back(cx: &mut TestAppContext) {
         "Shift+Tab: the name again"
     );
 }
+
+#[test]
+fn asking_the_gateway_says_for_how_long_after_a_moment() {
+    use std::time::Duration;
+    let said = super::server::asking_said;
+    assert_eq!(
+        said(Duration::from_millis(900)),
+        "Asking the gateway\u{2026}"
+    );
+    assert_eq!(
+        said(Duration::from_millis(5400)),
+        "Asking the gateway\u{2026} 5 s"
+    );
+}
