@@ -303,7 +303,8 @@ impl Timeline {
                     .font_family(fonts::MONO)
                     .text_size(px(11.))
                     .line_height(px(12.))
-                    .text_color(t.accent)
+                    // Undone (all of them): grey, as its tick.
+                    .text_color(if m.undone { t.muted } else { t.accent })
                     .child(m.count.to_string()),
             );
         }
@@ -404,7 +405,9 @@ impl Paint {
                     if let Some(p) =
                         crate::chart::rounded_bar(x, stroke_top(height, g), baseline, s.tick)
                     {
-                        window.paint_path(p, self.accent);
+                        // Undone: grey (teal means Crake decided, and that
+                        // decision was taken back).
+                        window.paint_path(p, if m.undone { self.muted } else { self.accent });
                     }
                 }
             } else {

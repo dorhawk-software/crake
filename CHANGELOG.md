@@ -11,6 +11,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Undo and Redo change the chart's tick, and only that.** Undo takes one off its count, or turns
+  it grey when nothing's left; Redo puts it back. Undoing and redoing used to add a decision each
+  time, as if Crake had routed the host again.
+
 ## 0.4.0 (2026-10-13)
 
 - **macOS: a tunnel can no longer take the whole internet down.** While a tunnel is up, Crake

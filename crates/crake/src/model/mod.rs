@@ -11,6 +11,8 @@ use crate::tray::{MenuTunnel, Shape};
 mod days;
 mod demo;
 mod kept;
+// Which decisions still stand (undo, redo), for the charts.
+mod standing;
 
 // The log by day and the sample data, as the rest of the app knows them.
 use self::days::local_time;
@@ -155,8 +157,10 @@ pub struct Mark {
     pub ago: f32,
     /// A two-stroke tick (routed) or a circle (left alone).
     pub routed: bool,
-    /// How many decisions it stands for.
+    /// How many decisions it stands for (still standing: not undone).
     pub count: usize,
+    /// Every decision it stands for was undone: drawn grey.
+    pub undone: bool,
     /// The latest of them (RFC 3339): a new one makes the tick grow again.
     pub ts: String,
     /// "13:21", local time.
@@ -511,43 +515,53 @@ impl Model {
     /// all), decisions at most `merge` minutes apart sharing one.
     pub fn marks_within(&self, span: f32, tunnel: Option<&str>, merge: f32) -> Vec<Mark> {
         let now = jiff::Timestamp::now();
-        let mut events: Vec<(f32, &LogEntry)> = self
-            .log
-            .iter()
-            .filter(|e| matches!(e.kind, LogKind::Routed | LogKind::LeftAlone))
-            .filter(|e| tunnel.is_none_or(|t| e.tunnel.as_deref() == Some(t)))
-            .filter_map(|e| {
+        let events: Vec<(f32, &LogEntry, bool)> = standing::decisions(&self.log)
+            .into_iter()
+            .filter(|(e, _)| tunnel.is_none_or(|t| e.tunnel.as_deref() == Some(t)))
+            .filter_map(|(e, stands)| {
                 let t: jiff::Timestamp = e.ts.parse().ok()?;
                 let ago =
                     (now.as_second() - t.as_second()) as f32 / crate::units::SECS_PER_MINUTE_F;
-                (0. ..=span).contains(&ago).then_some((ago, e))
+                (0. ..=span).contains(&ago).then_some((ago, e, stands))
             })
             .collect();
-        // Oldest first.
-        events.sort_by(|a, b| b.0.total_cmp(&a.0));
-        let mut groups: Vec<(f32, bool, Vec<&LogEntry>)> = Vec::new();
-        for (ago, e) in events {
+        // Oldest first (`decisions` is).
+        let mut groups: Vec<(f32, bool, Vec<standing::Decision>)> = Vec::new();
+        for (ago, e, stands) in events {
             let routed = e.kind == LogKind::Routed;
             match groups.iter_mut().rev().find(|g| g.1 == routed) {
                 Some(g) if g.0 - ago <= merge => {
                     g.0 = ago; // the mark stands where the latest of them is
-                    g.2.push(e);
+                    g.2.push((e, stands));
                 }
-                _ => groups.push((ago, routed, vec![e])),
+                _ => groups.push((ago, routed, vec![(e, stands)])),
             }
         }
         groups
             .into_iter()
-            .map(|(ago, routed, entries)| Mark {
-                ago,
-                routed,
-                count: entries.len(),
-                ts: entries.last().map(|e| e.ts.clone()).unwrap_or_default(),
-                time: entries
-                    .last()
-                    .map(|e| local_time(&e.ts))
-                    .unwrap_or_default(),
-                text: mark_text(&entries),
+            .map(|(ago, routed, entries)| {
+                let standing: Vec<&LogEntry> = entries
+                    .iter()
+                    .filter(|(_, s)| *s)
+                    .map(|(e, _)| *e)
+                    .collect();
+                let all: Vec<&LogEntry> = entries.iter().map(|(e, _)| *e).collect();
+                // The latest of them, undone or not: undo and redo don't
+                // make the tick grow in again.
+                let last = all.last().copied();
+                Mark {
+                    ago,
+                    routed,
+                    count: if standing.is_empty() {
+                        all.len()
+                    } else {
+                        standing.len()
+                    },
+                    undone: routed && standing.is_empty(),
+                    ts: last.map(|e| e.ts.clone()).unwrap_or_default(),
+                    time: last.map(|e| local_time(&e.ts)).unwrap_or_default(),
+                    text: mark_text(if standing.is_empty() { &all } else { &standing }),
+                }
             })
             .collect()
     }
@@ -765,5 +779,57 @@ mod tests {
             ..Default::default()
         }]));
         assert_eq!(m.shape(), Shape::Trouble);
+    }
+
+    /// Undo takes back the decision it's about, Redo brings that same one
+    /// back: the tick's count goes down and up (grey once nothing stands),
+    /// no decision is added, and the tick doesn't grow in again. Any run of
+    /// undos and redos ends where it began.
+    #[test]
+    fn undo_and_redo_change_their_tick_and_add_none() {
+        let at = |secs: i64, kind: LogKind, msg: &str, host: &str| LogEntry {
+            ts: jiff::Timestamp::now()
+                .checked_sub(jiff::SignedDuration::from_secs(secs))
+                .unwrap()
+                .to_string(),
+            ..entry(kind, msg, &[host])
+        };
+        let (a, b) = ("10.0.0.1", "10.0.0.2");
+        let mut m = Model {
+            log: vec![
+                at(600, LogKind::Routed, "Sent a through ACME.", a),
+                at(580, LogKind::Routed, "Sent b through ACME.", b),
+            ],
+            ..Default::default()
+        };
+        let start = m.marks();
+        assert_eq!(start.len(), 1, "{start:?}");
+        assert_eq!((start[0].count, start[0].undone), (2, false));
+        let mut secs = 500;
+        let mut then = |m: &mut Model, kind: LogKind, msg: &str, host: &str| {
+            secs -= 10;
+            m.log.push(at(secs, kind, msg, host));
+            m.marks()
+        };
+        let undone = then(&mut m, LogKind::Undone, "a goes direct again.", a);
+        assert_eq!(undone.len(), 1, "{undone:?}");
+        assert_eq!(
+            (undone[0].count, undone[0].undone),
+            (1, false),
+            "undo counts one less"
+        );
+        let redone = then(&mut m, LogKind::Routed, "Sent a through ACME again.", a);
+        assert_eq!(redone, start, "redo is back where it began");
+        then(&mut m, LogKind::Undone, "a goes direct again.", a);
+        let both = then(&mut m, LogKind::Undone, "b goes direct again.", b);
+        assert_eq!(both.len(), 1, "{both:?}");
+        assert!(both[0].undone, "nothing stands: grey");
+        for _ in 0..10 {
+            then(&mut m, LogKind::Routed, "Sent a through ACME again.", a);
+            then(&mut m, LogKind::Undone, "a goes direct again.", a);
+        }
+        then(&mut m, LogKind::Routed, "Sent a through ACME again.", a);
+        let back = then(&mut m, LogKind::Routed, "Sent b through ACME again.", b);
+        assert_eq!(back, start, "ten undos and redos later: as it was");
     }
 }
