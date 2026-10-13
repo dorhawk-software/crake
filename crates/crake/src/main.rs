@@ -356,6 +356,10 @@ fn main() {
             if !start(cx, setup) {
                 std::process::exit(0);
             }
+            // An entry an older Crake wrote, as this one writes it.
+            if !demo {
+                autostart::refresh();
+            }
 
             debug("ready; the panel opens from the tray icon");
             // CRAKE_SHOW=detail:<tunnel> (development): open tunnel detail.

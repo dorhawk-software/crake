@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **"Start when you log in" set up by an older Crake is brought up to date** when Crake starts, so
+  on macOS it too shows as Crake, with its icon, in System Settings' background items.
 - **macOS and Windows: when the network's DNS stops answering, the internet keeps working.** While
   a tunnel is up, Crake answers the computer's DNS and asks the network's servers in its stead. If
   they stop answering (a hotel's sign-in page, a network that changed), Crake now gives the
