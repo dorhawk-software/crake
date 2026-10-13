@@ -296,7 +296,11 @@ forgotten so the app's next try goes through.
   SELinux enforcing)
 - ✅ An Arch package (PKGBUILD for the AUR), tested the same way
 - ✅ NixOS: a flake with the package and a module (`services.crake.enable`), tested in NixOS VMs
-- ⚪ IPv6
+- ✅ IPv6 alongside IPv4: learned, routed, kept from going around a full tunnel
+- 🟡 Windows 11: an installer with openconnect included, tested in a VM against a real gateway
+  (not code-signed yet)
+- 🟡 macOS on Apple Silicon: a signed and notarized installer, tested on GitHub's Macs, not yet
+  on a real one
 
 <br/>
 

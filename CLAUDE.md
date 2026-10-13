@@ -797,6 +797,23 @@ The user doesn't want development builds installed on their machine.
   (`add`, `pin`, `unpin`, `forget`, `list`). Ctrl+C removes everything; state
   lives in `/tmp/crake-dev`. `dev/` is git-ignored.
 
+## Releases (decided with the user, 2026-10-13)
+
+`CHANGELOG.md`, written by hand for the people using Crake, in its copy
+voice (not generated from commits, which are written for developers):
+whenever a change matters to users, a line goes under "Unreleased". To
+release: that heading becomes `## <version> (<YYYY-MM-DD>)`, the version
+goes into Cargo.toml, packaging/nix/package.nix and packaging/arch/PKGBUILD,
+the commit passes CI on main, then the tag `v<version>` is pushed.
+`.github/workflows/release.yml` refuses a tag without its section, with a
+version that disagrees, or on a commit CI hasn't passed
+(`scripts/release-notes.sh`); it builds the .deb and RPM, the Windows
+installer (openconnect included, unsigned) and the macOS package (signed,
+notarized, installed and removed on the runner) in release mode with the
+same scripts CI uses, and publishes them with SHA256SUMS as the GitHub
+release, its text the changelog's section. Still to come: the AUR, a
+Homebrew tap, the apt/dnf repository.
+
 ## Packaging and dependencies (decided with the user)
 
 Crake drives VPN engines it doesn't contain: openconnect (AnyConnect,
@@ -1179,9 +1196,11 @@ Application certificate (Crake.app, craked, the hook: hardened runtime,
 secure timestamp) and a Developer ID Installer certificate (the .pkg),
 both made from signing requests created here (no Mac needed), and an App
 Store Connect API key with Developer access for notarization (its own,
-not the account's Admin key used for another app). The keys, .p12
-bundles and the .p8 are in `~/.config/crake-signing/` on the user's
-machine and in their password manager; CI has them as the secrets
+not the account's Admin key used for another app). The two .p12
+bundles (each certificate with its key) with their passwords and the .p8
+are kept in the user's password manager only (not on disk); the
+certificates are the user's, not Crake's: other dorhawk.software Mac apps
+may be signed with them too; CI has them as the secrets
 MACOS_APP_P12(_PASSWORD), MACOS_INSTALLER_P12(_PASSWORD), APPLE_API_KEY,
 APPLE_API_KEY_ID, APPLE_API_ISSUER_ID, only in the steps that use them
 (never in a build: crates' build scripts run there).

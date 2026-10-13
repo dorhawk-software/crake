@@ -1,0 +1,161 @@
+# A release: pushing the tag v<version> builds every package in release
+# mode with the same scripts CI tests them with, and publishes them as one
+# GitHub release whose text is CHANGELOG.md's section for that version
+# (scripts/release-notes.sh, which also refuses a tag that disagrees with
+# the version in Cargo.toml, the Nix package or the PKGBUILD). Only a
+# commit that passed CI on main is released.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+# A release runs to its end; another tag waits.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  notes:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: The changelog's section, every version matching the tag
+        run: scripts/release-notes.sh "${GITHUB_REF_NAME#v}" > notes.md
+      - name: The tagged commit passed CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          passed=$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" --status success \
+            --json databaseId --jq length)
+          if [ "$passed" = 0 ]; then
+            echo "CI hasn't passed for $GITHUB_SHA: push it to main, let CI pass, then tag." >&2
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: notes
+          path: notes.md
+
+  linux:
+    needs: notes
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: This week (CI's package cache is kept per week)
+        id: week
+        run: echo "week=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v6
+        with:
+          path: ~/crake-cache
+          key: packages-${{ steps.week.outputs.week }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            packages-${{ steps.week.outputs.week }}-
+            packages-
+      - name: The .deb (built on Ubuntu 22.04) and the RPM from the same files
+        run: CRAKE_CACHE=$HOME/crake-cache scripts/build-deb.sh && scripts/build-rpm.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux
+          path: |
+            target/deb/*.deb
+            target/rpm/*.rpm
+
+  windows-exe:
+    needs: notes
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
+      - name: crake.exe, craked.exe and crake-hook.exe
+        run: cargo build --release --locked -p crake -p craked
+      - name: No Visual C++ runtime needed (a fresh Windows has none)
+        shell: pwsh
+        run: |
+          foreach ($f in 'crake', 'craked', 'crake-hook') {
+            if (Select-String -Path "target/release/$f.exe" -Pattern 'VCRUNTIME140' -SimpleMatch -Quiet) {
+              throw "$f.exe needs VCRUNTIME140.dll"
+            }
+          }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-exe
+          path: |
+            target/release/crake.exe
+            target/release/craked.exe
+            target/release/crake-hook.exe
+
+  windows:
+    needs: windows-exe
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-exe
+          path: target/windows/app
+      - name: The installer, with openconnect and Wintun (unsigned)
+        run: scripts/build-openconnect-windows.sh && scripts/build-windows-installer.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: target/windows/crake-setup-*.exe
+
+  macos:
+    needs: notes
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
+      - name: A keychain with the Developer ID certificates
+        env:
+          MACOS_APP_P12: ${{ secrets.MACOS_APP_P12 }}
+          MACOS_APP_P12_PASSWORD: ${{ secrets.MACOS_APP_P12_PASSWORD }}
+          MACOS_INSTALLER_P12: ${{ secrets.MACOS_INSTALLER_P12 }}
+          MACOS_INSTALLER_P12_PASSWORD: ${{ secrets.MACOS_INSTALLER_P12_PASSWORD }}
+        run: echo "CRAKE_KEYCHAIN=$(sh scripts/macos-signing.sh setup)" >> "$GITHUB_ENV"
+      - name: The installer package, signed
+        run: sh scripts/build-macos-pkg.sh
+      - name: Notarized by Apple
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: sh scripts/macos-signing.sh notarize target/macos/Crake-*.pkg
+      - name: It installs, runs craked, upgrades and uninstalls
+        run: sh scripts/macos-pkg-test.sh target/macos/Crake-*.pkg
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos
+          path: target/macos/Crake-*.pkg
+
+  publish:
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && mv notes.md .. && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
+      - name: The GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --verify-tag --title "Crake ${GITHUB_REF_NAME#v}" --notes-file notes.md

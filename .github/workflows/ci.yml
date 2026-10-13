@@ -121,10 +121,10 @@ jobs:
       # with the Developer ID when the keychain is there.
       - name: The installer package (development build)
         run: CRAKE_PROFILE=dev sh scripts/build-macos-pkg.sh
-      # Apple's notary service takes minutes: for tags and runs started
-      # by hand only.
+      # Apple's notary service takes minutes: for runs started by hand only
+      # (releases are notarized by release.yml).
       - name: Notarized by Apple
-        if: env.SIGNING == 'true' && (github.ref_type == 'tag' || github.event_name == 'workflow_dispatch')
+        if: env.SIGNING == 'true' && github.event_name == 'workflow_dispatch'
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
