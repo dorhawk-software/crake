@@ -474,13 +474,17 @@ async fn follow(
 ) {
     let mut tick = tokio::time::interval(Duration::from_secs(2));
     let mut unseen = 0;
+    // openvpn3 says so in its log when the server ends the session.
+    let mut expired = false;
+    let created = created(conn, path).await;
     loop {
         tokio::select! {
             msg = signals.next() => {
-                if !matches!(msg, Some(Ok(_))) {
+                let Some(Ok(msg)) = msg else {
                     let _ = requests.send(Request::Detached(tunnel.to_owned(), Some("OpenVPN 3 went quiet.".into()))).await;
                     return;
-                }
+                };
+                expired |= says_expired(&msg);
             }
             _ = tick.tick() => {}
             r = replies.recv() => {
@@ -507,6 +511,13 @@ async fn follow(
             }
         };
         if let Some(why) = ended {
+            let why = if expired {
+                Some(expired_said(
+                    created.map(|c| c.elapsed().unwrap_or_default()),
+                ))
+            } else {
+                why
+            };
             disconnect(conn, path).await;
             let _ = requests
                 .send(Request::Detached(tunnel.to_owned(), why))
@@ -514,6 +525,49 @@ async fn follow(
             return;
         }
     }
+}
+
+/// When openvpn3 created the session (its `session_created`, seconds
+/// since 1970), if it says.
+async fn created(conn: &Connection, path: &str) -> Option<std::time::SystemTime> {
+    let secs: u64 = property(conn, SESSIONS, path, SESSIONS, "session_created")
+        .await
+        .ok()?;
+    Some(std::time::UNIX_EPOCH + Duration::from_secs(secs))
+}
+
+/// A log line openvpn3 forwards for the session saying the server ended
+/// it ("[SESSION_EXPIRED]"): a sign-in that ran out, a time limit.
+fn says_expired(msg: &zbus::Message) -> bool {
+    if msg.header().member().map(|m| m.as_str()) != Some("Log") {
+        return false;
+    }
+    let body = msg.body();
+    // (group, category, message), with the session's token in newer ones.
+    let text = body
+        .deserialize::<(u32, u32, String, String)>()
+        .map(|(_, _, a, b)| a + &b)
+        .or_else(|_| body.deserialize::<(u32, u32, String)>().map(|(_, _, m)| m))
+        .unwrap_or_default();
+    text.contains("SESSION_EXPIRED")
+}
+
+/// Why it stopped, when the server ended the session after `lasted`.
+fn expired_said(lasted: Option<Duration>) -> String {
+    const MINUTE: u64 = 60;
+    let after = lasted
+        .map(|d| d.as_secs() / MINUTE)
+        .filter(|m| *m > 0)
+        .map(|m| {
+            format!(
+                " (this one after {m} minute{})",
+                if m == 1 { "" } else { "s" }
+            )
+        })
+        .unwrap_or_default();
+    format!(
+        "Its session expired: the server ends sessions after a while{after}. Switch it on to sign in again."
+    )
 }
 
 /// Open a web sign-in page in the browser, once per URL.
@@ -615,4 +669,45 @@ async fn answer(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn log(body: impl serde::Serialize + zbus::zvariant::DynamicType) -> zbus::Message {
+        zbus::Message::signal(
+            "/net/openvpn/v3/sessions/s1",
+            "net.openvpn.v3.backends",
+            "Log",
+        )
+        .unwrap()
+        .build(&body)
+        .unwrap()
+    }
+
+    #[test]
+    fn the_server_ending_the_session_is_recognised() {
+        // As openvpn3 forwards it, with or without the session's token.
+        assert!(says_expired(&log((
+            16u32,
+            2u32,
+            "{tag:1} [SESSION_EXPIRED] "
+        ))));
+        assert!(says_expired(&log((
+            16u32,
+            2u32,
+            "token",
+            "[SESSION_EXPIRED] "
+        ))));
+        assert!(!says_expired(&log((16u32, 2u32, "Disconnected"))));
+        assert_eq!(
+            expired_said(Some(Duration::from_secs(58 * 60 + 12))),
+            "Its session expired: the server ends sessions after a while (this one after 58 minutes). Switch it on to sign in again."
+        );
+        assert_eq!(
+            expired_said(None),
+            "Its session expired: the server ends sessions after a while. Switch it on to sign in again."
+        );
+    }
 }

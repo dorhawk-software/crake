@@ -56,6 +56,10 @@ pub(super) fn on_update(update: client::Update, cx: &mut App) {
                 notify::crex();
             }
         }
+        // A tunnel stopped by itself: say why, offer to switch it back on.
+        if entry.is_unexpected_stop() && how != "none" {
+            notify::stopped(&entry, requests.clone());
+        }
         // "Ask me first": the user decides (with the call, if they like).
         if entry.kind == crake_proto::LogKind::Asked {
             let display = model.read(cx).display_of(entry.tunnel.as_deref());

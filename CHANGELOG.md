@@ -11,6 +11,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **A tunnel that stops by itself says so, and why.** A notification tells you, with **Switch on**
+  to sign in again. When an OpenVPN 3 server ends the session (many do after an hour or so), the
+  log and the notification say the session expired and after how long, instead of only "the
+  session is gone".
+
 ## 0.2.0 (2026-10-13)
 
 - **Your first tunnel is easy to find.** With no tunnel yet, the panel says so and offers

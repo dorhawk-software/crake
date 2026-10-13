@@ -13,7 +13,7 @@ use crate::Request;
 // macOS: notify-rust shows plain notifications there (no actions, no
 // urgency); the panel offers what the buttons would.
 #[cfg(target_os = "macos")]
-pub use plain::{also_answered, asked, routed};
+pub use plain::{also_answered, asked, routed, stopped};
 
 /// Crake decided it, not you.
 pub fn worth_telling(entry: &LogEntry) -> bool {
@@ -30,6 +30,9 @@ const ROUTED_SHOWN: u32 = 8000;
 const ALSO_ANSWERED_SHOWN: u32 = 15_000;
 #[cfg(not(target_os = "macos"))]
 const ASKED_SHOWN: u32 = 20_000;
+/// A tunnel that stopped by itself: until dismissed (it may need you).
+#[cfg(not(target_os = "macos"))]
+const STOPPED_SHOWN: u32 = 0;
 
 /// What every notification starts from: the entry's message and reason.
 #[cfg(not(target_os = "macos"))]
@@ -118,6 +121,29 @@ pub fn asked(entry: &LogEntry, display: String, requests: async_channel::Sender<
     });
 }
 
+/// A tunnel stopped without being asked to (`LogEntry::is_unexpected_stop`):
+/// say why, and offer to switch it back on (sign-in opens if it needs one).
+#[cfg(not(target_os = "macos"))]
+pub fn stopped(entry: &LogEntry, requests: async_channel::Sender<Request>) {
+    let Some(tunnel) = entry.tunnel.clone() else {
+        return;
+    };
+    let mut n = note(entry, Urgency::Normal, STOPPED_SHOWN);
+    n.action("on", "Switch on").action("default", "Open Crake");
+    std::thread::spawn(move || {
+        let Ok(handle) = n.show() else { return };
+        handle.wait_for_action(|action| match action {
+            "on" => {
+                requests.send_blocking(Request::Switch(tunnel, true)).ok();
+            }
+            "default" => {
+                requests.send_blocking(Request::Panel(None)).ok();
+            }
+            _ => {}
+        });
+    });
+}
+
 #[cfg(target_os = "macos")]
 mod plain {
     use super::{LogEntry, Notification, Request};
@@ -145,6 +171,10 @@ mod plain {
     }
 
     pub fn asked(entry: &LogEntry, _display: String, _requests: async_channel::Sender<Request>) {
+        show(entry);
+    }
+
+    pub fn stopped(entry: &LogEntry, _requests: async_channel::Sender<Request>) {
         show(entry);
     }
 }

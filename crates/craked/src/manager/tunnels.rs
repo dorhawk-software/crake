@@ -401,7 +401,7 @@ impl Manager {
         }
         self.set_state(name, state, true);
         let msg = match state {
-            TunnelState::Trouble => format!("{label} stopped unexpectedly."),
+            TunnelState::Trouble => crake_proto::stopped_unexpectedly(label),
             _ => format!("Switched {label} off."),
         };
         self.log.system(Some(name), msg, reason);

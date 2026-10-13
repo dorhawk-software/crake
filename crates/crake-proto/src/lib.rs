@@ -131,6 +131,15 @@ pub enum LogKind {
     Asked,
 }
 
+/// How the log says a tunnel stopped without being asked to:
+/// "{label} stopped unexpectedly." (craked writes it; the app notifies on
+/// it, with a way to switch the tunnel back on).
+pub fn stopped_unexpectedly(label: &str) -> String {
+    format!("{label}{STOPPED}")
+}
+
+const STOPPED: &str = " stopped unexpectedly.";
+
 /// One line of the append-only JSON log.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogEntry {
@@ -151,6 +160,13 @@ pub struct LogEntry {
     /// can move them there ("When two tunnels answer: Ask me").
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub others: Vec<String>,
+}
+
+impl LogEntry {
+    /// A tunnel stopped without being asked to (`stopped_unexpectedly`).
+    pub fn is_unexpected_stop(&self) -> bool {
+        self.kind == LogKind::System && self.tunnel.is_some() && self.message.ends_with(STOPPED)
+    }
 }
 
 /// A signed-in session: what `openconnect --authenticate` prints. Sign-in
@@ -345,5 +361,21 @@ mod tests {
         ]);
         assert_eq!(env.len(), 2);
         assert!(!env.contains_key("HOME"));
+    }
+
+    #[test]
+    fn a_tunnel_that_stopped_by_itself_is_told_apart() {
+        let entry = |message: String, tunnel: Option<&str>| LogEntry {
+            ts: String::new(),
+            kind: LogKind::System,
+            tunnel: tunnel.map(str::to_owned),
+            message,
+            reason: None,
+            hosts: Vec::new(),
+            others: Vec::new(),
+        };
+        assert!(entry(stopped_unexpectedly("Initech"), Some("initech")).is_unexpected_stop());
+        assert!(!entry("Switched Initech off.".into(), Some("initech")).is_unexpected_stop());
+        assert!(!entry(stopped_unexpectedly("Initech"), None).is_unexpected_stop());
     }
 }
