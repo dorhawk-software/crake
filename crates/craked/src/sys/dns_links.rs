@@ -45,6 +45,12 @@ pub fn public() -> bool {
     PUBLIC.load(Ordering::Relaxed) && !GIVEN_BACK.load(Ordering::Relaxed)
 }
 
+/// Whether the system has its DNS back for a while (its servers stopped
+/// answering craked).
+pub fn given_back() -> bool {
+    GIVEN_BACK.load(Ordering::Relaxed)
+}
+
 /// The system's own servers stopped answering craked: it has its DNS back
 /// for now (true), or craked stands in again (false).
 pub fn set_given_back(on: bool) {

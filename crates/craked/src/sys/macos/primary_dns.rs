@@ -81,6 +81,11 @@ pub fn put_back_left_behind() {
     apply(false);
 }
 
+/// Whether craked's server stands in for the system's DNS servers now.
+pub fn standing_in() -> bool {
+    !displaced().is_empty()
+}
+
 /// The servers craked's server stands in for, asked for public names:
 /// the ones the user typed, or else DHCP's.
 pub fn upstream() -> Vec<IpAddr> {

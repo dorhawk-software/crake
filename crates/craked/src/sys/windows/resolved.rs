@@ -245,3 +245,28 @@ fn rule_keys() -> Vec<String> {
     unsafe { RegCloseKey(key) };
     found
 }
+
+/// Who answers the system's DNS, for helpdesk copies (`Manager::diagnostics`).
+pub fn view() -> Vec<String> {
+    let links = super::super::dns_links::public();
+    let line = if super::super::dns_links::given_back() {
+        "Public names: given back to Windows's own DNS for now (it stopped answering Crake)."
+            .to_owned()
+    } else if links {
+        let servers: Vec<String> = super::system_dns()
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        format!(
+            "Public names: Crake answers Windows's DNS, asking {}.",
+            if servers.is_empty() {
+                "nothing (no server known)".to_owned()
+            } else {
+                servers.join(", ")
+            }
+        )
+    } else {
+        "Public names: Windows's own DNS answers them.".to_owned()
+    };
+    vec![line]
+}

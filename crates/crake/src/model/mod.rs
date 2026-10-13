@@ -64,6 +64,9 @@ pub struct Model {
     pub host_rows: std::collections::HashMap<String, Vec<HostRow>>,
     /// Tunnel detail: bytes through each tunnel per minute, two days.
     pub tunnel_traffic: std::collections::HashMap<String, Vec<(u64, u64)>>,
+    /// craked's view of the computer (its tunnels' devices and DNS, who
+    /// answers the system's DNS), for helpdesk copies.
+    pub diagnostics: Vec<String>,
 }
 
 /// One of a tunnel's hosts (craked's HostDetails).
@@ -359,6 +362,7 @@ impl Model {
             }
             // Handled by the app (it ends the session).
             Update::AttachRefused(_) => {}
+            Update::Diagnostics(lines) => self.diagnostics = lines,
             Update::Traffic(t) => self.traffic = t,
             Update::Days(d) => self.days = d,
             Update::Settings(s) => self.settings = s,
@@ -592,6 +596,13 @@ impl Model {
             s += &format!("  {}  {}\n", d.time, say(&d.entry.message));
             if let Some(r) = &d.entry.reason {
                 s += &format!("         {}\n", say(r));
+            }
+        }
+        // What only craked sees: saves asking the user to run commands.
+        if !self.diagnostics.is_empty() {
+            s += "\nCrake's view of this computer\n";
+            for line in &self.diagnostics {
+                s += &format!("  {}\n", say(line));
             }
         }
         s
@@ -831,5 +842,29 @@ mod tests {
         then(&mut m, LogKind::Routed, "Sent a through ACME again.", a);
         let back = then(&mut m, LogKind::Routed, "Sent b through ACME again.", b);
         assert_eq!(back, start, "ten undos and redos later: as it was");
+    }
+
+    /// The helpdesk copy carries craked's view of the computer; with host
+    /// names hidden, its addresses and domains are left out too.
+    #[test]
+    fn helpdesk_copies_carry_crakeds_view_and_hide_its_hosts() {
+        let m = Model {
+            diagnostics: vec![
+                "Initech: tun0, address 10.8.0.6, DNS 10.8.0.1 for initech.internal; 2 hosts learned, 0 pinned".into(),
+                "Public names: Crake answers the Mac's DNS, asking 192.168.1.1.".into(),
+            ],
+            ..Default::default()
+        };
+        let shown = m.helpdesk(false);
+        assert!(shown.contains("Crake's view of this computer"), "{shown}");
+        assert!(
+            shown.contains("DNS 10.8.0.1 for initech.internal"),
+            "{shown}"
+        );
+        let hidden = m.helpdesk(true);
+        assert!(hidden.contains("Crake's view of this computer"), "{hidden}");
+        for host in ["10.8.0.6", "10.8.0.1", "initech.internal", "192.168.1.1"] {
+            assert!(!hidden.contains(host), "{host} in: {hidden}");
+        }
     }
 }

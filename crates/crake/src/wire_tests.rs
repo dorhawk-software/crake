@@ -129,6 +129,16 @@ async fn the_app_and_craked_work_together_over_dbus() {
     })
     .await;
 
+    // "Copy for helpdesk" carries craked's view of the computer: what a
+    // helpdesk would otherwise ask the user to look up by hand.
+    app.until("craked's view in the helpdesk copy", |m| {
+        let copy = m.helpdesk(false);
+        copy.contains("Crake's view of this computer")
+            && copy.contains("Initech: tun0")
+            && copy.contains("10.8.0.1")
+    })
+    .await;
+
     // A host sent through it from tunnel detail's "Add a host".
     app.send(Command::AddHosts(
         "initech".into(),

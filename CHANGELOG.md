@@ -11,6 +11,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **"Copy for helpdesk" says what Crake sees on this computer:** each tunnel's device, address and
+  DNS, and who answers the computer's DNS. A helpdesk no longer has to ask you to look it up
+  (with host names hidden, the addresses are left out too).
+
 ## 0.5.0 (2026-10-13)
 
 - **"Start when you log in" set up by an older Crake is brought up to date** when Crake starts, so

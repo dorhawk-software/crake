@@ -291,6 +291,13 @@ impl Service {
             .collect()
     }
 
+    /// craked's view of the computer, line by line (each tunnel's device,
+    /// address and DNS; who answers the system's DNS): for the app's
+    /// helpdesk copies.
+    async fn diagnostics(&self) -> Vec<String> {
+        self.mgr.diagnostics()
+    }
+
     /// Direct traffic per minute for the last hour: (minute since the epoch,
     /// bytes), oldest first. Counters only.
     async fn traffic_last_hour(&self) -> Vec<(u64, u64)> {

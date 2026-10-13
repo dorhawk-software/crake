@@ -27,6 +27,7 @@ use hickory_proto::rr::RecordType;
 mod app_tunnels;
 mod attached;
 mod clash;
+mod diagnostics;
 mod handover;
 mod host_ops;
 mod naming;

@@ -75,6 +75,8 @@ pub enum Update {
     /// craked wouldn't route through an OpenVPN 3 session (it clashes with
     /// a tunnel that's up): the app ends it.
     AttachRefused(String),
+    /// craked's view of the computer, line by line, for helpdesk copies.
+    Diagnostics(Vec<String>),
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -336,6 +338,13 @@ async fn session(
                 {
                     return Ok(());
                 }
+                // craked's view of the computer, for helpdesk copies (an
+                // older craked has none: nothing is sent).
+                if let Ok(d) = api.call::<_, Vec<String>>("Diagnostics", &()).await
+                    && !send(Update::Diagnostics(d)).await
+                {
+                    return Ok(());
+                }
             }
             msg = signals.next() => {
                 let Some(Ok(msg)) = msg else {
@@ -350,6 +359,9 @@ async fn session(
                     Some("TunnelChanged") => {
                         let tunnels = api.tunnels().await?;
                         if !send(Update::Tunnels(tunnels)).await { return Ok(()); }
+                        // What changed with it: devices, DNS.
+                        if let Ok(d) = api.call::<_, Vec<String>>("Diagnostics", &()).await
+                            && !send(Update::Diagnostics(d)).await { return Ok(()); }
                     }
                     Some("LogAppended") => {
                         let json: String = msg.body().deserialize()?;

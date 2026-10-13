@@ -197,6 +197,14 @@ fn ifindex(device: &str) -> Result<i32> {
     Ok(i as i32)
 }
 
+/// Who answers the system's DNS, for helpdesk copies (`Manager::diagnostics`).
+pub fn view() -> Vec<String> {
+    vec![
+        "Public names: the system asks its own DNS (systemd-resolved); Crake watches the answers in the firewall."
+            .to_owned(),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
