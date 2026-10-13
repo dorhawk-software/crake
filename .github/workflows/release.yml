@@ -4,7 +4,8 @@
 # (scripts/release-notes.sh, which also refuses a tag that disagrees with
 # the version in Cargo.toml, the Nix package or the PKGBUILD). Only a
 # commit that passed CI on main is released. The macOS cask in
-# dorhawk-software/homebrew-tap follows (HOMEBREW_TAP_DEPLOY_KEY).
+# dorhawk-software/homebrew-tap follows (HOMEBREW_TAP_DEPLOY_KEY), and the
+# .deb and RPM go into packages.dorhawk.software (R2; scripts/publish-repo.sh).
 name: Release
 
 on:
@@ -61,6 +62,10 @@ jobs:
             packages-
       - name: The .deb (built on Ubuntu 22.04) and the RPM from the same files
         run: CRAKE_CACHE=$HOME/crake-cache scripts/build-deb.sh && scripts/build-rpm.sh
+      - name: The RPM signed with the package repository's key
+        env:
+          PACKAGES_GPG_KEY: ${{ secrets.PACKAGES_GPG_KEY }}
+        run: scripts/sign-rpm.sh target/rpm
       - uses: actions/upload-artifact@v7
         with:
           name: linux
@@ -186,3 +191,25 @@ jobs:
           git add Casks/crake.rb
           git commit -q -m "crake $V"
           git push -q origin HEAD
+
+  repository:
+    needs: publish
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux
+          path: dist
+      - name: Into packages.dorhawk.software (apt and dnf), signed
+        env:
+          PACKAGES_GPG_KEY: ${{ secrets.PACKAGES_GPG_KEY }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+        run: |
+          mkdir -p flat && find dist \( -name '*.deb' -o -name '*.rpm' \) -exec cp {} flat/ \;
+          scripts/publish-repo.sh flat
+      - name: apt and dnf install it from there
+        run: scripts/repo-test.sh --live https://packages.dorhawk.software

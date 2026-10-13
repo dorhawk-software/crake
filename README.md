@@ -213,6 +213,39 @@ Crake removes its table, rules and links. The namespace tests check that nothing
 
 <br/>
 
+## Installing
+
+**Ubuntu 22.04 and newer, Debian 12 and 13:** from Crake's own signed repository, so updates come
+with the rest of the system's.
+
+```sh
+sudo install -d /etc/apt/keyrings
+curl -fsSL https://packages.dorhawk.software/key.asc | sudo tee /etc/apt/keyrings/dorhawk.asc >/dev/null
+curl -fsSL https://packages.dorhawk.software/apt/dorhawk.sources | sudo tee /etc/apt/sources.list.d/dorhawk.sources >/dev/null
+sudo apt update && sudo apt install crake
+```
+
+**Fedora 43 and newer:**
+
+```sh
+sudo dnf config-manager addrepo --from-repofile=https://packages.dorhawk.software/rpm/dorhawk.repo
+sudo dnf install crake
+```
+
+The repository is signed with the key `B17A 7118 E977 36C2 02AD 5EAF F1D1 52DA 1BBD 1C97`
+(dorhawk.software packages).
+
+**macOS on Apple Silicon (preview):** `brew install --cask dorhawk-software/tap/crake`, which brings
+openconnect along. The installer is signed and notarized.
+
+**Windows 11 (preview):** the installer from [Releases](https://github.com/dorhawk-software/crake/releases),
+openconnect included. It isn't code-signed yet, so Windows asks before running it.
+
+**Arch Linux:** the PKGBUILD in `packaging/arch` (the AUR is coming). **NixOS:** the flake's module,
+`services.crake.enable = true;`.
+
+<br/>
+
 ## Building and trying it
 
 Nothing needs installing: it runs from `target/`.

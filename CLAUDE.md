@@ -818,7 +818,28 @@ with the user's go-ahead 2026-10-13; `brew install --cask
 dorhawk-software/tap/crake` installs Homebrew's openconnect with it) with
 a write deploy key of that repository only (secret
 HOMEBREW_TAP_DEPLOY_KEY; the organisation had deploy keys off, the user
-switches them on). Still to come: the AUR, the apt/dnf repository. Known
+switches them on). **The apt/dnf repository (built 2026-10-13):**
+`packages.dorhawk.software` is the R2 bucket `dorhawk-packages` (the
+user's Cloudflare account; custom domain, TLS 1.2 minimum, the r2.dev URL
+off), signed with a key of its own ("dorhawk.software packages",
+B17A7118E97736C202AD5EAFF1D152DA1BBD1C97, RSA 4096, signing only, no
+expiry; private half only in the user's password manager and the secret
+PACKAGES_GPG_KEY; public half `packaging/repo/dorhawk-packages.asc`, served
+as /key.asc). Not Crake's alone: other dorhawk.software apps may ship from
+it. The release's `linux` job signs the RPM (`scripts/sign-rpm.sh`), the
+`repository` job runs `scripts/publish-repo.sh` (secrets R2_ACCESS_KEY_ID,
+R2_SECRET_ACCESS_KEY; variables R2_ACCOUNT_ID, R2_BUCKET): what the bucket
+has is fetched (old versions stay), the indexes rebuilt and signed
+(`scripts/build-repo.sh`: apt `dists/stable` with InRelease, dnf
+`repodata` with repomd.xml.asc, plus `apt/dorhawk.sources`,
+`rpm/dorhawk.repo` for users) and uploaded in order (packages, index
+contents, signed tops, stale dnf files deleted; packages cached a year,
+indexes no-cache), then `scripts/repo-test.sh --live` installs from it.
+`scripts/repo-test.sh` alone checks the same with a throwaway key, served
+from a folder to Debian 13, Ubuntu 22.04 and Fedora 44 containers with no
+network, and that a tampered index is refused; publishing was tried
+against a local S3 server (moto). The README's "Installing" has the
+commands. Still to come: the AUR. Known
 gap on macOS: "Start at login" writes ~/.config/autostart, which macOS
 ignores (needs a LaunchAgent or SMAppService).
 
