@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.3.0 (2026-10-13)
+
 - **OpenVPN 3: a second session for the same tunnel no longer stops both.** When a new session turns
   up (openvpn3's indicator reconnecting, say) it takes over from the old one, and the old one
   ending can't take the new one down.
