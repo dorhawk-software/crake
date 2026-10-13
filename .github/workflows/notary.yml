@@ -1,0 +1,41 @@
+# What Apple's notary service says about Crake's submissions, started by
+# hand (Actions → Notary → Run workflow): the latest ones with their
+# status, or one submission in full with Apple's log (why it was refused).
+# The App Store Connect key stays in the secrets.
+name: Notary
+
+on:
+  workflow_dispatch:
+    inputs:
+      submission:
+        description: "A submission's id, for its status and Apple's log (empty: the latest submissions)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    runs-on: macos-latest
+    steps:
+      - name: Apple's answer
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          SUBMISSION: ${{ inputs.submission }}
+        run: |
+          key=$(mktemp)
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$APPLE_API_KEY" > "$key"
+          auth=(--key "$key" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID")
+          if [ -z "$SUBMISSION" ]; then
+            xcrun notarytool history "${auth[@]}"
+          elif [[ "$SUBMISSION" =~ ^[0-9a-f-]{36}$ ]]; then
+            xcrun notarytool info "$SUBMISSION" "${auth[@]}"
+            xcrun notarytool log "$SUBMISSION" "${auth[@]}" || echo "No log yet: Apple is still checking it."
+          else
+            echo "Not a submission id: $SUBMISSION" >&2
+            exit 1
+          fi
