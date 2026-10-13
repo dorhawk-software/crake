@@ -213,3 +213,21 @@ jobs:
           fi
           gh api repos/dorhawk-software/packages/dispatches -f event_type=release \
             -f "client_payload[repo]=$GITHUB_REPOSITORY" -f "client_payload[tag]=$GITHUB_REF_NAME"
+
+  aur:
+    needs: publish
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      # The AUR builds from the tag's source tarball (packaging/arch). Skipped
+      # until the AUR account's key is a secret here (registration there
+      # was closed when this was written).
+      - name: Into the AUR
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
+        run: |
+          if [ -z "$AUR_SSH_KEY" ]; then
+            echo "No AUR_SSH_KEY: the AUR isn't updated."
+            exit 0
+          fi
+          scripts/aur-publish.sh "${GITHUB_REF_NAME#v}"

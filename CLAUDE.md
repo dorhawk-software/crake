@@ -846,7 +846,15 @@ at once when nothing is new). Crake's release only asks, in its
 fine-grained token of the user's: Contents read/write on that repository
 only; without it the hourly run finds the release). Crake's own release
 RPM is no longer signed; the repository signs what it serves. The
-README's "Installing" has the commands. Still to come: the AUR. Known
+README's "Installing" has the commands. **The AUR (2026-10-13):** the
+release's `aur` job runs `scripts/aur-publish.sh <version>` (the PKGBUILD
+with the version and the tag's source tarball's real checksum, its install
+script and a .SRCINFO made in an Arch container, where makepkg checks the
+checksum; pushed to ssh://aur@aur.archlinux.org/crake.git with the secret
+AUR_SSH_KEY; `--dry-run` pushes nothing). Skipped while there's no secret:
+AUR registration was closed that day (bot sign-ups); once the user has an
+account with the key, publish the current release by hand with the
+script, then releases keep it current. Known
 gap on macOS: "Start at login" writes ~/.config/autostart, which macOS
 ignores (needs a LaunchAgent or SMAppService).
 
