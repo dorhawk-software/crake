@@ -173,6 +173,9 @@ fn argb(tree: &resvg::usvg::Tree, size: u32) -> Vec<u8> {
 pub struct Art {
     /// The outline drawn so far (0–1), or none.
     pub outline: Option<f32>,
+    /// The outline dashed, as the connecting icon is, its dashes moved
+    /// this far along one dash and gap (0–1), or none.
+    pub dashes: Option<f32>,
     /// How filled the head is (0–1).
     pub fill: f32,
     /// How open the eye is: 0 closed (a slit), 1 open.
@@ -212,6 +215,10 @@ const SIL_LENGTH: f32 = 44.;
 const MARK_1: &str = "M17.95 9.65l1.6-1.8";
 const MARK_2: &str = "M19.2 11.25l1.9-.8";
 const MARK_LENGTH: f32 = 2.45;
+/// The connecting icon's dashes (assets/icons/tray-head-connecting.svg), and
+/// one dash and gap.
+const DASHES: &str = "2.4 1.9";
+const DASH_PERIOD: f32 = 4.3;
 
 impl Art {
     // literal: the head's drawing (assets/icons/tray-head-*.svg)
@@ -257,6 +264,12 @@ impl Art {
                 over += r##"<path d="M19.2 8.25v1.7" fill="none" stroke="#0b1514" stroke-width="1.15" stroke-linecap="round"/><circle cx="19.2" cy="11.35" r="0.6" fill="#0b1514"/>"##;
             }
         }
+        let dashed = self.dashes.map_or(String::new(), |p| {
+            format!(
+                r##"<path d="{SIL}" fill="none" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" stroke-dasharray="{DASHES}" stroke-dashoffset="{:.3}"/>"##,
+                -DASH_PERIOD * p
+            )
+        });
         let outline = self.outline.map_or(String::new(), |p| {
             format!(
                 r##"<path d="{SIL}" fill="none" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="{SIL_LENGTH}" stroke-dashoffset="{:.2}"/>"##,
@@ -264,7 +277,7 @@ impl Art {
             )
         });
         format!(
-            r##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="7.1 6.6 15.2 15.2"><defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="30" height="30"><g{}><path d="{SIL}" fill="#fff" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>{holes}</g></mask></defs><rect x="0" y="0" width="30" height="30" fill="#ffffff" opacity="{:.2}" mask="url(#m)"/>{outline}{over}</svg>"##,
+            r##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="7.1 6.6 15.2 15.2"><defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="30" height="30"><g{}><path d="{SIL}" fill="#fff" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>{holes}</g></mask></defs><rect x="0" y="0" width="30" height="30" fill="#ffffff" opacity="{:.2}" mask="url(#m)"/>{outline}{dashed}{over}</svg>"##,
             tuck_transform(self.tuck),
             self.fill
         )
@@ -290,7 +303,7 @@ fn rest(shape: Shape) -> Art {
             ..head
         },
         Shape::Connecting => Art {
-            outline: Some(1.),
+            dashes: Some(0.),
             fill: 0.,
             ..Art::default()
         },
@@ -313,11 +326,11 @@ pub fn transition(from: Shape, to: Shape) -> Vec<Art> {
     let head = rest(Shape::Listening);
     let steps = |n: usize| (1..=n).map(move |i| crate::motion::ease_out(i as f32 / n as f32));
     match (from, to) {
-        // The outline completes, the head fills in, then the eye opens.
+        // The dashed head fills in, then the eye opens.
         (Shape::Connecting, Shape::Listening | Shape::Routed) => {
             let mut v: Vec<Art> = steps(3)
                 .map(|f| Art {
-                    outline: Some(1.),
+                    dashes: Some(0.),
                     fill: f,
                     eye: 0.,
                     ..Art::default()
@@ -402,22 +415,19 @@ pub fn transition(from: Shape, to: Shape) -> Vec<Art> {
 }
 
 // literal: the icon's motion, frame by frame (design/proposals/animations.html)
-/// Connecting: the outline draws itself, holds a moment, and starts again.
+/// Connecting: the dashed head, its dashes going round the outline, one
+/// dash and gap every 0.7 s, as on dorhawk.software/crake
+/// (design/proposals/tray-connecting.html). Every frame is the whole head,
+/// so a frame the bar misses only makes the dashes jump a little; a line
+/// drawing itself read as blinking there.
 pub fn connecting_loop() -> Vec<Art> {
-    let mut v: Vec<Art> = (1..=12)
+    const STEPS: u8 = 10;
+    (0..STEPS)
         .map(|i| Art {
-            outline: Some(crate::motion::ease_out(i as f32 / 12.)),
+            dashes: Some(f32::from(i) / f32::from(STEPS)),
             ..Art::default()
         })
-        .collect();
-    v.extend(std::iter::repeat_n(
-        Art {
-            outline: Some(1.),
-            ..Art::default()
-        },
-        5,
-    ));
-    v
+        .collect()
 }
 
 #[cfg(test)]
@@ -476,7 +486,11 @@ mod tests {
             let last = transition(from, to).last().unwrap().icon();
             assert!(close(&last, &ICONS[to.index()]), "{from:?} -> {to:?}");
         }
-        assert!(!connecting_loop().is_empty());
+        // Connecting goes round from the dashed head at rest, every frame
+        // the whole head, its dashes moved on.
+        let frames: Vec<Icon> = connecting_loop().iter().map(Art::icon).collect();
+        assert!(close(&frames[0], &ICONS[Shape::Connecting.index()]));
+        assert!(frames.windows(2).all(|w| w[0] != w[1]));
     }
 
     #[test]

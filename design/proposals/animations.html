@@ -93,7 +93,7 @@ const SIL = 'M8.5 20.5V12A3.75 3.75 0 0 1 15.95 11.4L16 10.4L20.6 11.6L16 12.8C1
 const SIL_LENGTH = 44, MARK_1 = 'M17.95 9.65l1.6-1.8', MARK_2 = 'M19.2 11.25l1.9-.8', MARK_LENGTH = 2.45;
 let maskId = 0;
 function art(a, size) {
-  a = { outline: null, fill: 0, eye: 0, calls: null, badge: null, ...a };
+  a = { outline: null, dashes: null, fill: 0, eye: 0, calls: null, badge: null, ...a };
   let holes = '', over = '';
   if (a.eye > 0.02) holes += `<circle cx="12.35" cy="11.4" r="${1.55 * a.eye}" fill="#000"/>`;
   if (a.eye < 0.98) { const w = 3.9 * (1 - a.eye) + 0.1; holes += `<rect x="${12.35 - w / 2}" y="10.7" width="${w}" height="1.4" rx="0.7" fill="#000"/>`; }
@@ -109,21 +109,23 @@ function art(a, size) {
     if (a.badge > 0.8) over += `<path d="M19.2 8.25v1.7" fill="none" stroke="#0b1514" stroke-width="1.15" stroke-linecap="round"/><circle cx="19.2" cy="11.35" r="0.6" fill="#0b1514"/>`;
   }
   const outline = a.outline == null ? '' : `<path d="${SIL}" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="${SIL_LENGTH}" stroke-dashoffset="${SIL_LENGTH * (1 - a.outline)}"/>`;
+  // Connecting: the dashed head, its dashes moved along (design/proposals/tray-connecting.html).
+  const dashed = a.dashes == null ? '' : `<path d="${SIL}" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-dasharray="2.4 1.9" stroke-dashoffset="${-4.3 * a.dashes}"/>`;
   const id = 'm' + (maskId++);
-  return `<svg width="${size}" height="${size}" viewBox="7.1 6.6 15.2 15.2"><defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="30" height="30"><path d="${SIL}" fill="#fff" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>${holes}</mask></defs><rect width="30" height="30" fill="#fff" opacity="${a.fill}" mask="url(#${id})"/>${outline}${over}</svg>`;
+  return `<svg width="${size}" height="${size}" viewBox="7.1 6.6 15.2 15.2"><defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="30" height="30"><path d="${SIL}" fill="#fff" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>${holes}</mask></defs><rect width="30" height="30" fill="#fff" opacity="${a.fill}" mask="url(#${id})"/>${outline}${dashed}${over}</svg>`;
 }
 const ease = t => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
 const steps = n => Array.from({ length: n }, (_, i) => ease((i + 1) / n));
 const head = { fill: 1, eye: 1 };
-const loop = [...Array.from({ length: 12 }, (_, i) => ({ outline: ease((i + 1) / 12) })), ...Array(5).fill({ outline: 1 })];
+const loop = Array.from({ length: 10 }, (_, i) => ({ dashes: i / 10 }));
 const crex = [];
 for (let k = 0; k < 2; k++) crex.push(...steps(2).map(p => ({ ...head, calls: [p, 0, 1] })), ...steps(2).map(q => ({ ...head, calls: [1, q, 1] })),
   { ...head, calls: [1, 1, 1] }, { ...head, calls: [1, 1, 0.25] });
 crex.push({ ...head, calls: [1, 1, 1] });
 const trayStates = [
-  ['Connecting', 'The head’s outline draws itself, again and again, until the tunnel is up.', [...loop, ...loop, ...loop]],
-  ['Connected', 'The outline completes, the head fills in, then the eye opens.',
-    [...steps(3).map(f => ({ outline: 1, fill: f, eye: 0 })), ...steps(3).map(e => ({ ...head, eye: e }))]],
+  ['Connecting', 'The head drawn dashed, its dashes going round, until the tunnel is up (as on dorhawk.software/crake; the outline drawing itself read as blinking on a 22 px bar).', [...loop, ...loop, ...loop]],
+  ['Connected', 'The dashed head fills in, then the eye opens.',
+    [...steps(3).map(f => ({ dashes: 0, fill: f, eye: 0 })), ...steps(3).map(e => ({ ...head, eye: e }))]],
   ['Routed a host', 'The two teal call marks draw out one after the other, twice: crex, crex. They stay a few seconds, then fade.',
     [...crex, ...Array(58).fill({ ...head, calls: [1, 1, 1] }), ...[0.7, 0.4, 0.15].map(o => ({ ...head, calls: [1, 1, o] })), head]],
   ['Trouble', 'The red badge grows once over the head. It stays still after that.', steps(4).map(b => ({ ...head, badge: b }))],

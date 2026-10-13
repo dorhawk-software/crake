@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: connecting in the tray</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4; }
+  body { margin: 0; background: var(--desk); color: var(--ink);
+    font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 48px; max-width: 1000px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 760px; }
+  .intro b { color: var(--ink); }
+  .grid { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; width: 280px; }
+  .cap { font-size: 14px; font-weight: 700; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  /* Ubuntu's top bar is dark in both themes. */
+  .bar { background: #000; border-radius: 6px; padding: 10px 14px; display: flex; align-items: center; gap: 22px; margin-top: 12px; }
+  .bar svg { display: block; }
+  label { display: inline-flex; gap: 8px; align-items: center; margin-top: 18px; font-size: 13px; color: var(--muted); cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro">
+    <b>Connecting, in the tray.</b> Each icon is shown at the bar's size (22 px) and enlarged, stepping
+    every 70 ms as Crake does (crates/crake/src/tray.rs, <code>connecting_loop</code>). Today's loop draws
+    the outline as a solid line growing around the head; on a 22 px bar it reads as a line blinking.
+    The proposal keeps the connecting icon's dashed head (design/icons/tray-head-connecting.svg) and
+    moves its dashes around the outline: every frame is the whole head.
+  </div>
+  <div class="grid">
+    <div class="card">
+      <div class="cap">Today: the outline draws itself</div>
+      <div class="sub">12 steps, held for 5, again.</div>
+      <div class="bar"><svg id="a1" width="22" height="22" viewBox="7.1 6.6 15.2 15.2"></svg><svg id="a2" width="88" height="88" viewBox="7.1 6.6 15.2 15.2"></svg></div>
+    </div>
+    <div class="card">
+      <div class="cap">Proposed: the dashes go round</div>
+      <div class="sub">The dashed head, its dashes moving along the outline, square ends, one dash length every 0.7 s, as on dorhawk.software/crake.</div>
+      <div class="bar"><svg id="b1" width="22" height="22" viewBox="7.1 6.6 15.2 15.2"></svg><svg id="b2" width="88" height="88" viewBox="7.1 6.6 15.2 15.2"></svg></div>
+    </div>
+  </div>
+  <label><input type="checkbox" id="drop"> Drop some frames, as GNOME's tray extension does</label>
+</div>
+<script>
+const SIL = 'M8.5 20.5V12A3.75 3.75 0 0 1 15.95 11.4L16 10.4L20.6 11.6L16 12.8C16 15.5 15.1 17.8 13.4 20.5Z';
+const LEN = 44, DASH = '2.4 1.9', PERIOD = 4.3;
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+const path = attrs => `<path d="${SIL}" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" ${attrs}/>`;
+// Today: crates/crake/src/tray.rs connecting_loop.
+const today = [];
+for (let i = 1; i <= 12; i++) today.push(path(`stroke-linecap="round" stroke-dasharray="${LEN}" stroke-dashoffset="${(LEN * (1 - easeOut(i / 12))).toFixed(2)}"`));
+for (let i = 0; i < 5; i++) today.push(path(`stroke-linecap="round" stroke-dasharray="${LEN}" stroke-dashoffset="0"`));
+// Proposed: the connecting icon's dashes (square ends, as on dorhawk.software/crake), moving one
+// dash period every 0.7 s (the website's 8.6 in 1.4 s): 10 steps of 70 ms.
+const proposed = [];
+for (let i = 0; i < 10; i++) proposed.push(path(`stroke-dasharray="${DASH}" stroke-dashoffset="${(-PERIOD * i / 10).toFixed(3)}"`));
+let n = 0;
+setInterval(() => {
+  n++;
+  // GNOME's extension misses an update now and then; the bar keeps the last one it got.
+  if (document.getElementById('drop').checked && Math.random() < 0.4) return;
+  for (const [ids, frames] of [[['a1', 'a2'], today], [['b1', 'b2'], proposed]])
+    for (const id of ids) document.getElementById(id).innerHTML = frames[n % frames.length];
+}, 70);
+</script>
+</body>
+</html>
