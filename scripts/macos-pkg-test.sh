@@ -68,9 +68,17 @@ app_id=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Contents/I
 named=$(/usr/libexec/PlistBuddy -c "Print :AssociatedBundleIdentifiers:0" \
     "/Library/LaunchDaemons/$LABEL.plist" 2>/dev/null || true)
 [ "$named" = "$app_id" ] || fail "craked's launchd file names '$named', not Crake.app ($app_id)"
-btm=$(sudo sfltool dumpbtm 2>/dev/null | grep -A16 "Identifier: .*$LABEL" || true)
-echo "$btm" | grep -q "Assoc. Bundle IDs: \[ $app_id \]" ||
-    fail "macOS's background items don't link craked to Crake.app: $btm"
+# macOS fills its record in in the background: up to 30 s.
+linked=no
+for _ in $(seq 30); do
+    btm=$(sudo sfltool dumpbtm 2>/dev/null | grep -A16 "Identifier: .*$LABEL" || true)
+    if echo "$btm" | grep -q "Assoc. Bundle IDs: \[ $app_id \]"; then
+        linked=yes
+        break
+    fi
+    sleep 1
+done
+[ "$linked" = yes ] || fail "macOS's background items don't link craked to Crake.app: $btm"
 # Its windows open in front of the app that's in front.
 sh "$(dirname "$0")/macos-front-test.sh" || fail "Settings opened behind"
 first=$(pid)
