@@ -226,3 +226,9 @@ fn tunnels(cx: &mut TestAppContext) {
         );
     }
 }
+
+#[gpui_kit::test]
+fn about_offers_a_coffee(cx: &mut TestAppContext) {
+    let w = open(cx, Section::About);
+    assert!(w.shown("coffee", cx), "About has the coffee card's button");
+}

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: a coffee in About</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #26292C; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F3F3F0; --line: #E2E2DE; --ink: #1A1C1E; --muted: #5A5F64; --accent: #0F766E; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 48px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 860px; }
+  .intro b { color: var(--ink); }
+  .grid { display: flex; flex-wrap: wrap; gap: 28px; margin-top: 18px; align-items: flex-start; }
+  .cap { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 520px; }
+  .pane { width: 560px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 26px 30px 30px; }
+  h2 { margin: 0; font-size: 22px; }
+  .lede { margin: 4px 0 0; color: var(--muted); }
+  .lede a { color: var(--accent); font-style: italic; }
+  .head { margin-top: 22px; display: flex; gap: 16px; align-items: center; }
+  .head .v { font-size: 20px; font-weight: 700; }
+  .muted { color: var(--muted); }
+  .links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .links a { color: var(--accent); font-weight: 600; text-decoration: none; }
+  .coffee { margin-top: 22px; padding: 14px 16px; border-radius: 10px; background: var(--surface); }
+  .coffee p { margin: 0 0 10px; color: var(--muted); }
+  .coffee p b { color: var(--ink); }
+  .btn { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font-weight: 600; }
+  .note { margin-top: 10px; color: var(--muted); font-size: 13px; }
+  label.t { display: inline-flex; gap: 8px; align-items: center; margin-top: 22px; font-size: 13px; color: var(--muted); cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>A coffee in Settings → About.</b> Crake is free and stays free; a coffee is a thank-you and unlocks
+    nothing. Crake isn't sold through Apple's App Store, so a plain link is fine there (Obálka, which is, keeps donations out
+    of the app). Nowhere else in the app: no reminders, no badge, nothing in the panel.</div>
+  <div class="grid" id="grid"></div>
+  <label class="t"><input type="checkbox" id="light"> Light</label>
+</div>
+<script>
+const bird = `<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 20.5 5.3 15M6.2 20.5l.6-3.4M17.4 20.5l-.6-3.6M20.5 20.5l-1.7-5.2"/><path d="M8.5 20.5V12a3.75 3.75 0 0 1 7.5 0"/><path d="M16 10.4l4.3 1.2-4.3 1.2"/><path d="M16 12.8c0 2.7-.9 5-2.6 7.7"/><circle cx="12.4" cy="10.6" r=".9" fill="currentColor" stroke="none"/><path d="M19.2 6.2l1.4-1.6M21 8.4l1.6-.7" stroke="var(--accent)"/></svg>`;
+const heading = `<h2>About</h2><p class="lede">Named after the corncrake, <a href="#">Crex crex</a>.</p>
+  <div class="head">${bird}<div><div class="v">Crake 0.3.0</div><div class="muted">A VPN client that routes only what needs routing. Built on openconnect.</div><div class="muted">Because a VPN shouldn’t be a chore.</div></div></div>`;
+const a = `<div><div class="cap">A. One more link</div><div class="sub">Next to the other two, and a line saying what it is.</div>
+  <div class="pane">${heading}
+  <div class="links"><a href="#">Source on GitHub</a><span class="muted">·</span><a href="#">dorhawk.software</a><span class="muted">·</span><a href="#">Buy me a coffee</a></div>
+  <div class="note">Crake is free and stays free. A coffee is a thank-you; it doesn’t unlock anything.</div></div></div>`;
+const b = `<div><div class="cap">B. A quiet card</div><div class="sub">Its own small card under the links, as the README says it.</div>
+  <div class="pane">${heading}
+  <div class="links"><a href="#">Source on GitHub</a><span class="muted">·</span><a href="#">dorhawk.software</a></div>
+  <div class="coffee"><p><b>Crake is free and stays free:</b> no ads, no tracking, nothing locked. If it saved you a headache, you can buy its developer a coffee. It’s a thank-you, not a subscription.</p>
+  <span class="btn">Buy me a coffee</span></div></div></div>`;
+document.getElementById('grid').innerHTML = a + b;
+document.getElementById('light').onchange = e => document.body.classList.toggle('light', e.target.checked);
+</script>
+</body>
+</html>

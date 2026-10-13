@@ -13,6 +13,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 - **Works with encrypted DNS (DNS over TLS).** A tunnel's own DNS is asked plainly, as it must be,
   even when the computer encrypts the rest; the log says once that it's on.
+- **Settings → About has a "Buy me a coffee".** Crake is free and stays free; a coffee is a
+  thank-you and unlocks nothing.
 
 ## 0.3.0 (2026-10-13)
 
