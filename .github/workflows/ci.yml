@@ -146,9 +146,6 @@ jobs:
           sh scripts/macos-front-test.sh --expect-behind
           sudo /usr/local/libexec/crake/uninstall
       - name: It installs, runs craked, upgrades and uninstalls
-        env:
-          # Notarized above (runs started by hand, with the certificates).
-          CRAKE_NOTARIZED: ${{ env.SIGNING == 'true' && github.event_name == 'workflow_dispatch' && '1' || '' }}
         run: sh scripts/macos-pkg-test.sh target/macos/Crake-*.pkg
       - uses: actions/upload-artifact@v7
         with:

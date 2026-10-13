@@ -141,8 +141,6 @@ jobs:
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: sh scripts/macos-signing.sh notarize target/macos/Crake-*.pkg
       - name: It installs, runs craked, upgrades and uninstalls
-        env:
-          CRAKE_NOTARIZED: "1"
         run: sh scripts/macos-pkg-test.sh target/macos/Crake-*.pkg
       - uses: actions/upload-artifact@v7
         with:

@@ -62,17 +62,18 @@ test -x "$APP/Contents/MacOS/crake" || fail "no Crake.app"
 plutil -lint "$APP/Contents/Info.plist" >/dev/null || fail "Info.plist"
 codesign --verify --deep "$APP" || fail "Crake.app's signature"
 test -x /usr/local/libexec/crake/hook || fail "no hook"
+# Its windows open in front of the app that's in front.
+sh "$(dirname "$0")/macos-front-test.sh" || fail "Settings opened behind"
 # System Settings' background items show craked as Crake: its launchd
-# file names Crake.app, and macOS's background items database records it.
-# macOS records the link only for a notarized package (CRAKE_NOTARIZED:
-# releases and runs started by hand); a signed one's record is printed.
+# file names Crake.app. What macOS's background items database records
+# is printed, after Crake.app has been opened (the front check above): it
+# linked them in one run and not in others, so it doesn't gate yet.
 app_id=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Contents/Info.plist")
 named=$(/usr/libexec/PlistBuddy -c "Print :AssociatedBundleIdentifiers:0" \
     "/Library/LaunchDaemons/$LABEL.plist" 2>/dev/null || true)
 [ "$named" = "$app_id" ] || fail "craked's launchd file names '$named', not Crake.app ($app_id)"
-# macOS fills its record in in the background: up to 30 s.
 linked=no
-for _ in $(seq "$([ -n "${CRAKE_NOTARIZED:-}" ] && echo 30 || echo 1)"); do
+for _ in $(seq 30); do
     btm=$(sudo sfltool dumpbtm 2>/dev/null | grep -A16 "Identifier: .*$LABEL" || true)
     if echo "$btm" | grep -q "Assoc. Bundle IDs: \[ $app_id \]"; then
         linked=yes
@@ -80,14 +81,8 @@ for _ in $(seq "$([ -n "${CRAKE_NOTARIZED:-}" ] && echo 30 || echo 1)"); do
     fi
     sleep 1
 done
-if [ -n "${CRAKE_NOTARIZED:-}" ]; then
-    [ "$linked" = yes ] || fail "macOS's background items don't link craked to Crake.app: $btm"
-else
-    echo "Not notarized: macOS's record of craked (the link to Crake.app is checked when notarized):"
-    echo "$btm"
-fi
-# Its windows open in front of the app that's in front.
-sh "$(dirname "$0")/macos-front-test.sh" || fail "Settings opened behind"
+echo "macOS's record of craked (linked to Crake.app: $linked):"
+echo "$btm"
 first=$(pid)
 
 # An upgrade: installed again over the running craked.
