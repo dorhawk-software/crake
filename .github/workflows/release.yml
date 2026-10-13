@@ -157,13 +157,19 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      # The artifacts keep their folders (the Linux one has deb/ and rpm/):
+      # the release gets the files, side by side.
       - name: Checksums
-        run: cd dist && mv notes.md .. && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
+        run: |
+          mkdir release
+          find dist -type f ! -name notes.md -exec cp {} release/ \;
+          find dist -type f -name notes.md -exec cp {} notes.md \;
+          cd release && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
       - name: The GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+          gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" \
             --verify-tag --title "Crake ${GITHUB_REF_NAME#v}" --notes-file notes.md
 
   homebrew:
