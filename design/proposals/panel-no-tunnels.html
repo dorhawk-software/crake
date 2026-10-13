@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: no tunnels yet</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+    --ink: #ECEDEE; --muted: #A9AEB4; --bars: #3E4246; --accent: #2DD4BF; --accentInk: #0B1514; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8;
+    --ink: #1A1C1E; --muted: #5A5F64; --bars: #D8D9D5; --accent: #0F766E; --accentInk: #FFFFFF; }
+  body { margin: 0; background: var(--desk); color: var(--ink);
+    font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 48px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 860px; }
+  .intro b { color: var(--ink); }
+  .grid { display: flex; flex-wrap: wrap; gap: 28px; margin-top: 18px; align-items: flex-start; }
+  .cap { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 420px; }
+  .panel { width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0,0,0,.35); }
+  .ph { display: flex; align-items: center; gap: 8px; padding: 14px 18px 12px; border-bottom: 1px solid var(--line); }
+  .ph b { font-size: 17px; } .ph .st { font-size: 13px; color: var(--muted); }
+  .ph .gear { margin-left: auto; color: var(--muted); }
+  .sec { padding: 12px 18px 4px; font-size: 13px; font-weight: 600; }
+  .chart { margin: 4px 18px 10px; height: 52px; display: flex; align-items: flex-end; gap: 3px; }
+  .chart i { flex: 1; background: var(--bars); border-radius: 1px; }
+  .axis { display: flex; justify-content: space-between; margin: 0 18px 12px; font: 11px 'Atkinson Hyperlegible Mono', monospace; color: var(--muted); }
+  .muted { color: var(--muted); font-size: 13px; padding: 2px 18px 12px; }
+  .line { border-top: 1px solid var(--line); }
+  .foot { display: flex; gap: 8px; padding: 12px 18px 16px; border-top: 1px solid var(--line); }
+  .btn { flex: 1; height: 40px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink);
+    font: 600 14px inherit; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accentInk); }
+  .empty { padding: 4px 18px 16px; }
+  .empty p { margin: 0 0 12px; font-size: 13.5px; color: var(--muted); }
+  .first { padding: 34px 32px 30px; text-align: center; }
+  .first svg.bird { color: var(--ink); }
+  .first h3 { margin: 14px 0 6px; font-size: 18px; }
+  .first p { margin: 0 auto 18px; color: var(--muted); max-width: 300px; }
+  .first .btn { max-width: 220px; margin: 0 auto; }
+  .first .alt { margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .menu { width: 230px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 0;
+    box-shadow: 0 12px 32px rgba(0,0,0,.35); font-size: 14px; }
+  .menu div { padding: 6px 16px; } .menu .dim { color: var(--muted); } .menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+  .menu .new { font-weight: 600; }
+  label.t { display: inline-flex; gap: 8px; align-items: center; margin-top: 22px; font-size: 13px; color: var(--muted); cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>No tunnels yet.</b> Crake starts with no tunnel; today the panel says &ldquo;No tunnels yet.&rdquo;
+    and offers nothing to do about it. Both options open New tunnel (the window that exists already)
+    from the panel; the tray&rsquo;s menu gets <b>New tunnel&hellip;</b> either way, always there.</div>
+  <div class="grid">
+    <div>
+      <div class="cap">A. In place</div>
+      <div class="sub">The panel as it always is; Tunnels says what to do and offers the button.</div>
+      <div class="panel">
+        <div class="ph"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 20.5 5.3 15M6.2 20.5l.6-3.4M17.4 20.5l-.6-3.6M20.5 20.5l-1.7-5.2"/><path d="M8.5 20.5V12a3.75 3.75 0 0 1 7.5 0"/><path d="M16 10.4l4.3 1.2-4.3 1.2"/><path d="M16 12.8c0 2.7-.9 5-2.6 7.7"/></svg><b>Crake</b><span class="st">Off</span><svg class="gear" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2" fill="var(--panel)"/><circle cx="15" cy="17" r="2" fill="var(--panel)"/></svg></div>
+        <div class="sec">Last hour</div>
+        <div class="chart" id="bars"></div>
+        <div class="axis"><span>10:34</span><span>11:04</span><span>now</span></div>
+        <div class="line"></div>
+        <div class="sec">What Crake did</div>
+        <div class="muted">Nothing yet. Crake routes nothing until something needs a tunnel.</div>
+        <div class="line"></div>
+        <div class="sec">Tunnels</div>
+        <div class="empty">
+          <p>No tunnels yet. Add the VPN your company gave you: Crake connects to it and sends through only what needs it.</p>
+          <div class="btn primary">Add a tunnel&hellip;</div>
+        </div>
+        <div class="foot"><div class="btn">Full log</div><div class="btn">Copy for helpdesk</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">B. A first-run panel</div>
+      <div class="sub">With no tunnel there is nothing to chart or report yet: only the bird, one sentence and the button.</div>
+      <div class="panel">
+        <div class="ph"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 20.5 5.3 15M6.2 20.5l.6-3.4M17.4 20.5l-.6-3.6M20.5 20.5l-1.7-5.2"/><path d="M8.5 20.5V12a3.75 3.75 0 0 1 7.5 0"/><path d="M16 10.4l4.3 1.2-4.3 1.2"/><path d="M16 12.8c0 2.7-.9 5-2.6 7.7"/></svg><b>Crake</b><span class="st">Off</span><svg class="gear" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2" fill="var(--panel)"/><circle cx="15" cy="17" r="2" fill="var(--panel)"/></svg></div>
+        <div class="first">
+          <svg class="bird" width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 20.5 5.3 15M6.2 20.5l.6-3.4M17.4 20.5l-.6-3.6M20.5 20.5l-1.7-5.2"/><path d="M8.5 20.5V12a3.75 3.75 0 0 1 7.5 0"/><path d="M16 10.4l4.3 1.2-4.3 1.2"/><path d="M16 12.8c0 2.7-.9 5-2.6 7.7"/><circle cx="12.4" cy="10.6" r=".9" fill="currentColor" stroke="none"/></svg>
+          <h3>No tunnels yet</h3>
+          <p>Add the VPN your company gave you. Crake connects to it and sends through only what needs it.</p>
+          <div class="btn primary">Add a tunnel&hellip;</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">The tray&rsquo;s menu (both)</div>
+      <div class="sub">Right-click (or the menu where a tray has no panel): New tunnel&hellip; above Settings.</div>
+      <div class="menu">
+        <div class="dim">Crake: no tunnels yet</div>
+        <hr>
+        <div>Open Crake</div>
+        <div class="new">New tunnel&hellip;</div>
+        <div>Settings&hellip;</div>
+        <hr>
+        <div>Quit</div>
+      </div>
+    </div>
+  </div>
+  <label class="t"><input type="checkbox" id="light"> Light</label>
+</div>
+<script>
+document.getElementById('bars').innerHTML = Array.from({ length: 40 }, () => `<i style="height:${4 + Math.round(Math.random() * 30)}%"></i>`).join('');
+document.getElementById('light').onchange = e => document.body.classList.toggle('light', e.target.checked);
+</script>
+</body>
+</html>

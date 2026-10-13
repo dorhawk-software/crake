@@ -318,6 +318,11 @@ fn main() {
                 model::demo_log()
             } else if demo && std::env::var("CRAKE_SHOW").is_ok_and(|v| v.starts_with("detail:")) {
                 model::demo_detail()
+            } else if std::env::var("CRAKE_DEMO").as_deref() == Ok("empty") {
+                // No tunnel yet: the first-run panel.
+                let mut m = model::demo();
+                m.tunnels.clear();
+                m
             } else if demo {
                 model::demo()
             } else {

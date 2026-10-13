@@ -35,6 +35,8 @@ const SECTION: f32 = 44.;
 const DECISION: f32 = 66.;
 const TUNNEL: f32 = 62.;
 const FOOTER: f32 = 72.;
+/// No tunnel yet: the bird, a sentence and the button.
+const FIRST_RUN: f32 = 270.;
 /// Motion (CLAUDE.md, 7c): the panel opens rising RISE px over OPENS ms; a
 /// switch slides on a critically damped spring (damping = 2 * sqrt of the
 /// stiffness), settling in about 150 ms.
@@ -142,7 +144,9 @@ impl Render for Panel {
             .line_height(px(20.))
             .child(self.header(model, &t, cx));
 
-        if reachable {
+        if reachable && model.tunnels.is_empty() {
+            panel = panel.child(self.first_run(&t, cx));
+        } else if reachable {
             panel = panel
                 .child(self.chart(model, &t, window, cx))
                 .child(self.decisions(model, &t, window, cx))
@@ -175,6 +179,60 @@ impl Render for Panel {
             .items_start()
             .p(px(MARGIN))
             .child(panel.child(fit_window(self.upward)))
+    }
+}
+
+impl Panel {
+    /// No tunnel yet (design/proposals/panel-no-tunnels.html, B): nothing
+    /// to chart or report, so only the bird, one sentence and the way to
+    /// add one.
+    fn first_run(&self, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .border_t_1()
+            .border_color(t.line)
+            .pt(px(34.))
+            .pb(px(30.))
+            .px(px(32.))
+            .flex()
+            .flex_col()
+            .items_center()
+            .child(svg().path("crake/bird.svg").size(px(52.)).text_color(t.ink))
+            .child(
+                div()
+                    .mt(px(14.))
+                    .text_size(px(18.))
+                    .line_height(px(24.))
+                    .font_weight(FontWeight::BOLD)
+                    .child("No tunnels yet"),
+            )
+            .child(
+                div()
+                    .mt(px(6.))
+                    .max_w(px(300.))
+                    .text_center()
+                    .text_color(t.muted)
+                    .child(
+                        "Add the VPN your company gave you. Crake connects to it and sends through only what needs it.",
+                    ),
+            )
+            .child(
+                div()
+                    .id("add-tunnel")
+                    .mt(px(18.))
+                    .w(px(220.))
+                    .h(px(40.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(6.))
+                    .bg(t.accent)
+                    .text_color(t.accent_ink)
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .cursor_pointer()
+                    .child("Add a tunnel\u{2026}")
+                    .on_click(cx.listener(|this, _, _, _| this.send(Request::NewTunnel(None))))
+                    .test_support(),
+            )
     }
 }
 
@@ -356,6 +414,9 @@ impl Panel {
 
     /// The panel's height for the current content, so the window fits it.
     pub fn height(model: &Model) -> f32 {
+        if model.tunnels.is_empty() {
+            return HEADER + FIRST_RUN;
+        }
         let decisions = model.decisions(DECISIONS).len().max(1) as f32;
         let tunnels = model.tunnels.len().max(1) as f32;
         HEADER + CHART + SECTION + decisions * DECISION + SECTION + tunnels * TUNNEL + FOOTER

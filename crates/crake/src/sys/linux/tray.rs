@@ -93,6 +93,16 @@ impl ksni::Tray for Sni {
         );
         items.push(
             StandardItem {
+                label: "New tunnel\u{2026}".into(),
+                activate: Box::new(|this: &mut Self| {
+                    this.requests.send_blocking(Request::NewTunnel(None)).ok();
+                }),
+                ..Default::default()
+            }
+            .into(),
+        );
+        items.push(
+            StandardItem {
                 label: "Settings\u{2026}".into(),
                 activate: Box::new(|this: &mut Self| {
                     this.requests.send_blocking(Request::Settings).ok();

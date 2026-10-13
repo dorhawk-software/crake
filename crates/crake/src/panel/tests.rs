@@ -175,3 +175,25 @@ fn what_crake_did_explains_itself(cx: &mut TestAppContext) {
         "it asks the app for nothing"
     );
 }
+
+#[gpui_kit::test]
+fn with_no_tunnel_the_panel_offers_to_add_one(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    w.model.update(cx, |m, cx| {
+        m.tunnels.clear();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    assert!(matches!(
+        w.click("add-tunnel", cx),
+        Request::NewTunnel(None)
+    ));
+    // Nothing to chart or report yet: no footer.
+    let footer = cx
+        .update_window(w.window, |_, window, cx| {
+            window.render_frame(cx);
+            window.try_find("full-log").is_some()
+        })
+        .unwrap();
+    assert!(!footer, "the first-run panel has no footer");
+}

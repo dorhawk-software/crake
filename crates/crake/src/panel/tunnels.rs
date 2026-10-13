@@ -9,17 +9,8 @@ impl Panel {
         t: &Theme,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
+        // Never empty: with no tunnel the panel shows `first_run` instead.
         let mut list = section("Tunnels", t).mt(px(6.));
-        if model.tunnels.is_empty() {
-            list = list.child(
-                div()
-                    .px(px(18.))
-                    .pb(px(12.))
-                    .text_size(px(13.))
-                    .text_color(t.muted)
-                    .child("No tunnels yet."),
-            );
-        }
         for (i, tunnel) in model.tunnels.iter().enumerate() {
             let on = matches!(tunnel.state.as_str(), "connected" | "connecting");
             let name = tunnel.name.clone();

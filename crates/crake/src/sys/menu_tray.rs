@@ -64,7 +64,7 @@ impl Shown {
 }
 
 /// The fallback menu: the summary, a check mark per tunnel, Open Crake,
-/// Settings, Quit. Each item's id says what it asks for (`on_menu`).
+/// New tunnel, Settings, Quit. Each item's id says what it asks for (`on_menu`).
 fn menu(summary: &str, tunnels: &[MenuTunnel]) -> Menu {
     let menu = Menu::new();
     let _ = menu.append(&MenuItem::with_id("summary", summary, false, None));
@@ -74,6 +74,12 @@ fn menu(summary: &str, tunnels: &[MenuTunnel]) -> Menu {
     }
     let _ = menu.append(&PredefinedMenuItem::separator());
     let _ = menu.append(&MenuItem::with_id("open", "Open Crake", true, None));
+    let _ = menu.append(&MenuItem::with_id(
+        "new-tunnel",
+        "New tunnel\u{2026}",
+        true,
+        None,
+    ));
     let _ = menu.append(&MenuItem::with_id(
         "settings",
         "Settings\u{2026}",
@@ -88,6 +94,7 @@ fn menu(summary: &str, tunnels: &[MenuTunnel]) -> Menu {
 fn on_menu(id: &str) -> Option<Request> {
     match id {
         "open" => Some(Request::Panel(None)),
+        "new-tunnel" => Some(Request::NewTunnel(None)),
         "settings" => Some(Request::Settings),
         "quit" => Some(Request::Quit),
         _ => {
