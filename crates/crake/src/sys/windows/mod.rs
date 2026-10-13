@@ -2,6 +2,7 @@
 //! Credential Manager, the monitors as Windows lays them out, craked as a
 //! service.
 
+pub mod autostart;
 pub mod keyring;
 pub mod single;
 
