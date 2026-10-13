@@ -801,10 +801,17 @@ The user doesn't want development builds installed on their machine.
 
 `CHANGELOG.md`, written by hand for the people using Crake, in its copy
 voice (not generated from commits, which are written for developers):
-whenever a change matters to users, a line goes under "Unreleased". To
-release: that heading becomes `## <version> (<YYYY-MM-DD>)`, the version
-goes into Cargo.toml, packaging/nix/package.nix and packaging/arch/PKGBUILD,
-the commit passes CI on main, then the tag `v<version>` is pushed.
+**every user-facing change adds a line under "Unreleased" in the same
+commit.** To release, `scripts/release.sh <version>` (asked for by the
+user, 2026-10-13; `--dry-run` first shows the changes and pushes
+nothing): it refuses an empty "Unreleased", dates it
+(`## <version> (<YYYY-MM-DD>)`), puts the version into Cargo.toml (and
+Cargo.lock), packaging/nix/package.nix and packaging/arch/PKGBUILD,
+commits "Crake <version>" and pushes, waits for CI on that commit and
+pushes the tag `v<version>`. Interrupted, or after a fix CI asked for, run
+it again with the same version: it waits on main's latest commit and tags
+it. Don't push anything else to main while it waits (a push cancels the
+CI run it's waiting for).
 `.github/workflows/release.yml` refuses a tag without its section, with a
 version that disagrees, or on a commit CI hasn't passed
 (`scripts/release-notes.sh`); it builds the .deb and RPM, the Windows
