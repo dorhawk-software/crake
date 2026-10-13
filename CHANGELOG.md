@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.1.0 (2026-10-13)
+
 The first release. Crake connects to the VPNs you already have, and sends nothing through them
 until a host needs it.
 
@@ -53,13 +55,15 @@ marked Beta in the app until each has been.
 
 ### Where it runs
 
-- **Ubuntu** 26.04, 24.04 and 22.04 and **Debian** 13 and 12: one `.deb`. On Ubuntu 22.04, sign in
-  with a password or a certificate: its openconnect is too old for browser sign-in.
-- **Fedora** 45, 44 and 43: an RPM.
+- **Ubuntu** 26.04, 24.04 and 22.04 and **Debian** 13 and 12: one `.deb`, from Crake's own apt
+  repository at packages.dorhawk.software (see the README). On Ubuntu 22.04, sign in with a
+  password or a certificate: its openconnect is too old for browser sign-in.
+- **Fedora** 45, 44 and 43: an RPM, from the same repository with dnf.
 - **Arch Linux:** a PKGBUILD for the AUR.
 - **NixOS:** a flake with the package and a module (`services.crake.enable`).
 - **Windows 11, preview:** an installer with openconnect included. It isn't code-signed yet, so
   Windows warns before installing it. The first connection to a host Crake has just learned fails
   once; the app's retry goes through.
-- **macOS on Apple Silicon, preview:** a signed and notarized installer. It needs openconnect from
-  Homebrew (`brew install openconnect`). It hasn't been tried on a real Mac yet.
+- **macOS on Apple Silicon, preview:** a signed and notarized installer, also as a Homebrew cask
+  (`brew install --cask dorhawk-software/tap/crake`, which brings openconnect along). It hasn't
+  been tried on a real Mac yet.
