@@ -40,9 +40,11 @@ x11rb = { version = "0.14", features = ["randr"] }
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]
 tray-icon = "0.26"
 
-# The login Keychain.
+# The login Keychain; the displays (where the panel goes), as tray-icon
+# already has them.
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "3"
+objc2-core-graphics = { version = "0.3", default-features = false, features = ["std", "CGDirectDisplay", "CGError"] }
 
 [target.'cfg(windows)'.dependencies]
 # Credential Manager, the monitors, the taskbar's theme.

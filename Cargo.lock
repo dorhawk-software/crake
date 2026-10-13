@@ -1432,6 +1432,7 @@ dependencies = [
  "jiff",
  "ksni",
  "notify-rust",
+ "objc2-core-graphics",
  "oo7",
  "raw-window-handle",
  "resvg 0.46.0",

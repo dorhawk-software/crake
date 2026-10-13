@@ -96,9 +96,10 @@ pub(super) fn open_panel(at: Option<(i32, i32)>, cx: &mut App) {
         .unwrap_or_else(|| Panel::height(model.read(cx)));
     let m = panel::MARGIN;
     let (w, h) = (panel::WIDTH + 2. * m, height + 2. * m);
-    // Where Crake may place it: through XWayland, and on Windows.
-    let placeable = x11 || cfg!(windows);
-    // The real monitors (XRandR, or Windows'); GPUI's own list if that fails.
+    // Where Crake may place it: through XWayland, on Windows and macOS.
+    let placeable = x11 || cfg!(windows) || cfg!(target_os = "macos");
+    // The real monitors (XRandR, Windows' or macOS'); GPUI's own list if
+    // that fails.
     let mut screens = if placeable {
         place::monitors()
     } else {
@@ -121,6 +122,10 @@ pub(super) fn open_panel(at: Option<(i32, i32)>, cx: &mut App) {
     }
     let panel_size = (panel::WIDTH, height);
     let placed = match (placeable, at) {
+        // macOS: the click is the menu bar's edge under the icon.
+        (true, Some((x, y))) if cfg!(target_os = "macos") => {
+            place::place_at_bar((x as f32, y as f32), panel_size, &screens, place::Bar::EDGE)
+        }
         (true, Some((x, y))) => place::place((x as f32, y as f32), panel_size, &screens),
         // No position from the tray (Dash to Panel sends none): work out
         // where the tray is from the desktop's bar.

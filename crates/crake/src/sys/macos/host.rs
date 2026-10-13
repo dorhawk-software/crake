@@ -6,10 +6,58 @@ use std::path::PathBuf;
 
 use crate::place::Rect;
 
-/// GPUI knows macOS' displays itself; Crake's own placement has none to
-/// add yet.
+/// The displays, the main one first, in points from the main display's
+/// top-left corner: where GPUI places windows (relative to the main
+/// display, whose own bounds it gives every display).
 pub fn monitors() -> Vec<Rect> {
-    Vec::new()
+    // Tests see a machine without a display, whatever this one has.
+    if cfg!(test) {
+        return Vec::new();
+    }
+    displays().into_iter().map(|(r, _)| r).collect()
+}
+
+/// Each active display, the main one first, with its scale (pixels per
+/// point).
+fn displays() -> Vec<(Rect, f64)> {
+    use objc2_core_graphics::{
+        CGDisplayBounds, CGDisplayCopyDisplayMode, CGDisplayMode, CGError, CGGetActiveDisplayList,
+        CGMainDisplayID,
+    };
+    const MAX_DISPLAYS: usize = 16;
+    let mut ids = [0u32; MAX_DISPLAYS];
+    let mut count = 0u32;
+    // SAFETY: room for MAX_DISPLAYS ids, and the count, for the call.
+    let err =
+        unsafe { CGGetActiveDisplayList(MAX_DISPLAYS as u32, ids.as_mut_ptr(), &raw mut count) };
+    if err != CGError::Success {
+        return Vec::new();
+    }
+    let main = CGMainDisplayID();
+    let mut found: Vec<(bool, Rect, f64)> = ids
+        .iter()
+        .take(count as usize)
+        .map(|&id| {
+            let b = CGDisplayBounds(id);
+            let mode = CGDisplayCopyDisplayMode(id);
+            let points = CGDisplayMode::width(mode.as_deref());
+            let pixels = CGDisplayMode::pixel_width(mode.as_deref());
+            let scale = if points == 0 {
+                1.
+            } else {
+                pixels as f64 / points as f64
+            };
+            let rect = Rect {
+                x: b.origin.x as f32,
+                y: b.origin.y as f32,
+                w: b.size.width as f32,
+                h: b.size.height as f32,
+            };
+            (id == main, rect, scale)
+        })
+        .collect();
+    found.sort_by_key(|(main, ..)| !main);
+    found.into_iter().map(|(_, r, s)| (r, s)).collect()
 }
 
 /// A folder only this user can read, for files that live as long as a
@@ -43,10 +91,27 @@ pub async fn connect_craked() -> zbus::Result<(zbus::Connection, bool)> {
     ))
 }
 
-/// A click on the menu bar icon, already in the points windows are placed
-/// in.
-pub fn logical(x: f64, y: f64) -> (i32, i32) {
-    (x as i32, y as i32)
+/// Where the panel hangs from: the menu bar's lower edge under the icon
+/// (`place::Bar::EDGE`), in the points windows are placed in.
+pub fn tray_click(_at: tray_icon::dpi::PhysicalPosition<f64>, icon: tray_icon::Rect) -> (i32, i32) {
+    let x = icon.position.x + f64::from(icon.size.width) / 2.;
+    let y = icon.position.y + f64::from(icon.size.height);
+    logical(x, y)
+}
+
+/// tray-icon's pixels (points times the scale of the icon's display) in
+/// points: the display whose bounds hold the point at its own scale.
+fn logical(x: f64, y: f64) -> (i32, i32) {
+    let displays = displays();
+    let scale = displays
+        .iter()
+        .find(|(r, s)| {
+            let (px, py) = ((x / s) as f32, (y / s) as f32);
+            px >= r.x && px < r.x + r.w && py >= r.y && py <= r.y + r.h
+        })
+        .or(displays.first())
+        .map_or(1., |(_, s)| *s);
+    ((x / scale) as i32, (y / scale) as i32)
 }
 
 /// The menu bar is light unless the system's appearance is dark.

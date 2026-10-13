@@ -259,9 +259,15 @@ fn service_pid(name: &str) -> Option<u32> {
     }
 }
 
+/// Where the panel goes from: the click, in the logical pixels windows are
+/// placed in.
+pub fn tray_click(at: tray_icon::dpi::PhysicalPosition<f64>, _icon: tray_icon::Rect) -> (i32, i32) {
+    logical(at.x, at.y)
+}
+
 /// A click's screen position in the logical pixels windows are placed in
 /// (the tray reports physical ones): scaled by its monitor's DPI.
-pub fn logical(x: f64, y: f64) -> (i32, i32) {
+fn logical(x: f64, y: f64) -> (i32, i32) {
     use windows_sys::Win32::Foundation::POINT;
     use windows_sys::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromPoint};
     use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};

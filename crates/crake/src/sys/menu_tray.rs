@@ -13,7 +13,7 @@ const DARK: [u8; 3] = [0x1f; 3];
 use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
-use super::{light_bar, logical, tray_icon_size};
+use super::{light_bar, tray_click, tray_icon_size};
 use crate::Request;
 use crate::tray::{Icon, MenuTunnel, State};
 
@@ -98,12 +98,13 @@ pub fn start(requests: async_channel::Sender<Request>) -> Option<Handle> {
     TrayIconEvent::set_event_handler(Some(move |e: TrayIconEvent| {
         if let TrayIconEvent::Click {
             position,
+            rect,
             button: MouseButton::Left,
             button_state: MouseButtonState::Up,
             ..
         } = e
         {
-            let at = logical(position.x, position.y);
+            let at = tray_click(position, rect);
             clicks.send_blocking(Request::Panel(Some(at))).ok();
         }
     }));

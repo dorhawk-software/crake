@@ -9,10 +9,11 @@
 pub use crate::sys::monitors;
 
 /// Bars, when they don't say: Windows' taskbar and Dash to Panel's (48),
-/// GNOME's top bar (32); a size outside BAR_SIZES isn't a bar's; the tray's
+/// GNOME's top bar (32), macOS' menu bar (24); a size outside BAR_SIZES isn't a bar's; the tray's
 /// icons sit about TRAY_FROM_RIGHT from the bar's right end.
 const TASKBAR: f32 = 48.;
 const TOP_BAR: f32 = 32.;
+const MENU_BAR: f32 = 24.;
 const BAR_SIZES: std::ops::RangeInclusive<f32> = 16. ..=128.;
 const TRAY_FROM_RIGHT: f32 = 200.;
 
@@ -95,6 +96,14 @@ pub struct Bar {
 }
 
 impl Bar {
+    /// A click that is the bar's edge already (macOS: the menu bar's lower
+    /// edge under the icon, `sys::tray_click`): the panel hangs a gap
+    /// below it.
+    pub const EDGE: Bar = Bar {
+        bottom: false,
+        thickness: 0.,
+    };
+
     /// Stock GNOME: the top bar. With Dash to Panel: its panel, at the
     /// bottom unless it's been moved, at its configured size.
     pub fn of_desktop() -> Bar {
@@ -103,6 +112,13 @@ impl Bar {
             return Bar {
                 bottom: true,
                 thickness: TASKBAR,
+            };
+        }
+        // macOS: the menu bar, at the top.
+        if cfg!(target_os = "macos") {
+            return Bar {
+                bottom: false,
+                thickness: MENU_BAR,
             };
         }
         let read = |key: &str| {
