@@ -241,8 +241,25 @@ openconnect along. The installer is signed and notarized.
 **Windows 11 (preview):** the installer from [Releases](https://github.com/dorhawk-software/crake/releases),
 openconnect included. It isn't code-signed yet, so Windows asks before running it.
 
-**Arch Linux:** the PKGBUILD in `packaging/arch` (the AUR is coming). **NixOS:** the flake's module,
-`services.crake.enable = true;`.
+**Arch Linux:** the PKGBUILD in `packaging/arch` (the AUR is coming).
+
+**NixOS:** the flake's module.
+
+```nix
+# flake.nix
+{
+  inputs.crake.url = "github:dorhawk-software/crake";
+  outputs = { nixpkgs, crake, ... }: {
+    nixosConfigurations.laptop = nixpkgs.lib.nixosSystem {
+      modules = [
+        ./configuration.nix
+        crake.nixosModules.default
+        { services.crake.enable = true; }
+      ];
+    };
+  };
+}
+```
 
 <br/>
 
