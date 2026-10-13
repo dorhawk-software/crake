@@ -11,6 +11,10 @@ const AFTER_TUNNELS: Duration = Duration::from_millis(400);
 const ROUTED_SHOWN: Duration = Duration::from_secs(5);
 const OPENVPN3_LOOK: Duration = Duration::from_secs(3);
 const FRAME_MS: u64 = 70;
+/// After a change, how long until the bar is told about the icon again
+/// (`tray::Handle::settle`): well past GNOME's tray extension's 30 ms
+/// batching and its fetch of the image.
+const SETTLE_MS: u64 = 300;
 
 pub(super) fn on_update(update: client::Update, cx: &mut App) {
     // craked refused an OpenVPN 3 session (it clashes with a tunnel that's
@@ -159,13 +163,25 @@ pub(super) fn refresh_tray(cx: &mut App) {
 /// The tray icon's motion from one state to the next (DESIGN.md, Tray icon):
 /// a short run of frames, or, while connecting, the outline drawing itself
 /// over and over. A newer change replaces a running animation.
+/// The bar told about the icon again once it has had time to fetch the
+/// last one (`tray::Handle::settle`).
+async fn settle(handle: &crate::tray::Handle, cx: &mut gpui_kit::AsyncApp) {
+    cx.background_executor()
+        .timer(std::time::Duration::from_millis(SETTLE_MS))
+        .await;
+    handle.settle();
+}
+
 pub(super) fn animate_tray(from: tray::Shape, to: tray::Shape, cx: &mut App) {
     let Some(handle) = cx.global::<Shell>().tray.clone() else {
         return;
     };
     if !motion::enabled() {
         handle.update(|t| t.frame = None);
-        cx.global_mut::<Shell>().tray_motion = None;
+        let task = cx.spawn(async move |cx| {
+            settle(&handle, cx).await;
+        });
+        cx.global_mut::<Shell>().tray_motion = Some(task);
         return;
     }
     let looping = to == tray::Shape::Connecting;
@@ -199,6 +215,7 @@ pub(super) fn animate_tray(from: tray::Shape, to: tray::Shape, cx: &mut App) {
             }
         }
         handle.update(|t| t.frame = None);
+        settle(&handle, cx).await;
     });
     // Dropping the previous task stops its animation.
     cx.global_mut::<Shell>().tray_motion = Some(task);

@@ -8,6 +8,9 @@ use crate::tray::State;
 struct Sni {
     state: State,
     requests: async_channel::Sender<Request>,
+    /// Toggled by `settle`: the largest size listed twice, so the same
+    /// picture still counts as a new icon.
+    nudge: bool,
 }
 
 impl ksni::Tray for Sni {
@@ -27,13 +30,13 @@ impl ksni::Tray for Sni {
             height: size as i32,
             data,
         });
-        small
-            .chain([ksni::Icon {
-                width: icon.width as i32,
-                height: icon.height as i32,
-                data: icon.data,
-            }])
-            .collect()
+        let largest = ksni::Icon {
+            width: icon.width as i32,
+            height: icon.height as i32,
+            data: icon.data,
+        };
+        let again = self.nudge.then(|| largest.clone());
+        small.chain([largest]).chain(again).collect()
     }
 
     fn tool_tip(&self) -> ksni::ToolTip {
@@ -121,6 +124,15 @@ impl Handle {
         self.0.update(|sni| f(&mut sni.state));
     }
 
+    /// Tell the bar about the icon once more, the picture unchanged. GNOME's
+    /// AppIndicator extension drops a NewIcon that arrives while it is still
+    /// fetching the previous one (its `_signalsAccumulator` is cleared only
+    /// after the fetch), so an animation's last change could be lost and its
+    /// last frame stay on the bar.
+    pub fn settle(&self) {
+        self.0.update(|sni| sni.nudge = !sni.nudge);
+    }
+
     /// Take the icon off the bar.
     pub fn shutdown(&self) {
         self.0.shutdown();
@@ -133,8 +145,35 @@ pub fn start(requests: async_channel::Sender<Request>) -> Option<Handle> {
     Sni {
         state: State::default(),
         requests,
+        nudge: false,
     }
     .spawn()
     .ok()
     .map(Handle)
+}
+
+#[cfg(test)]
+mod tests {
+    use ksni::Tray;
+
+    #[test]
+    fn settling_tells_the_bar_again_with_the_same_picture() {
+        let (requests, _) = async_channel::unbounded();
+        let mut sni = super::Sni {
+            state: crate::tray::State::default(),
+            requests,
+            nudge: false,
+        };
+        let before = sni.icon_pixmap();
+        sni.nudge = !sni.nudge;
+        let after = sni.icon_pixmap();
+        // A change ksni sends to the bar (it compares the lists)...
+        assert_ne!(before.len(), after.len());
+        // ...of the same drawings.
+        assert!(after.iter().all(|a| {
+            before
+                .iter()
+                .any(|b| (b.width, &b.data) == (a.width, &a.data))
+        }));
+    }
 }

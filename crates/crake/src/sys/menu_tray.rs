@@ -35,6 +35,10 @@ impl Handle {
         shown.show();
     }
 
+    /// Linux tells its bar again after a change (`sys::linux::tray`); this
+    /// tray sets its image itself.
+    pub fn settle(&self) {}
+
     /// Take the icon out of the notification area.
     pub fn shutdown(&self) {
         let _ = self.0.borrow().tray.set_visible(false);
