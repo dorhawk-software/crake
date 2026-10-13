@@ -197,3 +197,64 @@ fn with_no_tunnel_the_panel_offers_to_add_one(cx: &mut TestAppContext) {
         .unwrap();
     assert!(!footer, "the first-run panel has no footer");
 }
+
+/// Browsers that look names up themselves (design/proposals/browser-dns.html,
+/// A): said under the first connected tunnel that learns, until "Got it",
+/// which remembers each browser it named.
+#[gpui_kit::test]
+fn a_browser_that_looks_names_up_itself_is_said_until_got_it(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    w.model.update(cx, |m, cx| {
+        m.own_dns_browsers = vec!["Firefox".into(), "Chrome".into()];
+        cx.notify();
+    });
+    let mut asked = vec![w.click("browser-dns-got-it", cx)];
+    while let Ok(r) = w.requests.try_recv() {
+        asked.push(r);
+    }
+    let keys: Vec<String> = asked
+        .into_iter()
+        .map(|r| match r {
+            Request::Dismiss(key) => key,
+            other => panic!("{other:?}"),
+        })
+        .collect();
+    assert_eq!(keys, ["browser-dns:Firefox", "browser-dns:Chrome"]);
+}
+
+#[test]
+fn the_browser_notice_names_the_browsers_not_dismissed() {
+    use std::collections::BTreeSet;
+    let mut m = crate::model::demo();
+    m.own_dns_browsers = vec!["Firefox".into(), "Chrome".into()];
+    let (at, names, text) = tunnels::browser_notice(&m, &BTreeSet::new()).expect("shown");
+    assert_eq!(
+        m.tunnels[at].display, "ACME",
+        "the first connected tunnel that learns"
+    );
+    assert_eq!(names, ["Firefox", "Chrome"]);
+    assert_eq!(
+        text,
+        "Firefox and Chrome look names up themselves (DNS over HTTPS), so the first visit there to a site only ACME knows waits a few seconds. Turning DNS over HTTPS off in their settings fixes it."
+    );
+    let firefox: BTreeSet<String> = ["browser-dns:Firefox".to_owned()].into();
+    let (_, names, text) = tunnels::browser_notice(&m, &firefox).expect("Chrome still");
+    assert_eq!(names, ["Chrome"]);
+    assert_eq!(
+        text,
+        "Chrome looks names up itself (DNS over HTTPS), so the first visit there to a site only ACME knows waits a few seconds. Turning DNS over HTTPS off in Chrome\u{2019}s settings fixes it."
+    );
+    let both: BTreeSet<String> = [
+        "browser-dns:Firefox".to_owned(),
+        "browser-dns:Chrome".to_owned(),
+    ]
+    .into();
+    assert!(tunnels::browser_notice(&m, &both).is_none(), "both read");
+    for t in &mut m.tunnels {
+        t.state = "off".into();
+    }
+    assert!(
+        tunnels::browser_notice(&m, &BTreeSet::new()).is_none(),
+        "no tunnel up"
+    );
+}

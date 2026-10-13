@@ -11,6 +11,7 @@ impl Panel {
     ) -> impl IntoElement {
         // Never empty: with no tunnel the panel shows `first_run` instead.
         let mut list = section("Tunnels", t).mt(px(6.));
+        let browsers = browser_notice(model, &cx.global::<crate::prefs::Prefs>().dismissed);
         for (i, tunnel) in model.tunnels.iter().enumerate() {
             let on = matches!(tunnel.state.as_str(), "connected" | "connecting");
             let name = tunnel.name.clone();
@@ -157,7 +158,81 @@ impl Panel {
                         ),
                 );
             }
+            // Browsers that look names up themselves, under the first
+            // tunnel that learns (design/proposals/browser-dns.html, A).
+            if let Some((at, names, text)) = &browsers
+                && *at == i
+            {
+                let keys: Vec<String> = names.iter().map(|n| browser_key(n)).collect();
+                list = list.child(
+                    div()
+                        .id("browser-dns")
+                        .mx(px(18.))
+                        .mb(px(8.))
+                        .px(px(12.))
+                        .py(px(10.))
+                        .rounded(px(8.))
+                        .bg(t.surface)
+                        .flex()
+                        .items_start()
+                        .gap(px(12.))
+                        .text_size(px(13.))
+                        .child(div().flex_1().min_w_0().child(text.clone()))
+                        .child(
+                            div()
+                                .id("browser-dns-got-it")
+                                .flex_none()
+                                .text_color(t.accent)
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .cursor_pointer()
+                                .child("Got it")
+                                .on_click(cx.listener(move |this, _, _, _| {
+                                    for key in &keys {
+                                        this.send(Request::Dismiss(key.clone()));
+                                    }
+                                }))
+                                .test_support(),
+                        )
+                        .test_support(),
+                );
+            }
         }
         list
     }
+}
+
+/// What "Got it" remembers for a browser's notice.
+fn browser_key(name: &str) -> String {
+    format!("browser-dns:{name}")
+}
+
+/// The notice about browsers that look names up themselves: under the
+/// first connected tunnel that learns, naming the browsers not dismissed
+/// yet. Its tunnel's place in the list, the browsers, and what it says.
+pub(super) fn browser_notice(
+    model: &Model,
+    dismissed: &std::collections::BTreeSet<String>,
+) -> Option<(usize, Vec<String>, String)> {
+    let names: Vec<String> = model
+        .own_dns_browsers
+        .iter()
+        .filter(|n| !dismissed.contains(&browser_key(n)))
+        .cloned()
+        .collect();
+    // A tunnel that learns: a full tunnel sends every name through it anyway.
+    let at = model
+        .tunnels
+        .iter()
+        .position(|t| t.state == "connected" && !t.full_tunnel)?;
+    let d = &model.tunnels[at].display;
+    let (verb, whose) = match names.as_slice() {
+        [] => return None,
+        [one] => ("looks names up itself", format!("{one}\u{2019}s")),
+        _ => ("look names up themselves", "their".to_owned()),
+    };
+    let who = crate::browser_dns::and_list(&names);
+    let text = format!(
+        "{who} {verb} (DNS over HTTPS), so the first visit there to a site only {d} knows waits a few seconds. Turning DNS over HTTPS off in {whose} settings fixes it."
+    );
+    Some((at, names, text))
 }

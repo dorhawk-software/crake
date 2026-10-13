@@ -11,6 +11,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **The panel says when a browser looks names up itself.** Firefox with DNS over HTTPS on, or
+  Chrome, Edge and Brave with Secure DNS set to a provider of their own, ask their own DNS, so
+  Crake can't send a company's names through the tunnel before they connect: the first visit
+  there waits a few seconds. A notice under the tunnel says so, and what fixes it, until "Got it".
 - **"Copy for helpdesk" says what Crake sees on this computer:** each tunnel's device, address and
   DNS, who answers the computer's DNS, and which browsers look names up themselves (DNS over
   HTTPS, where Crake can't route a company's names before the first packet). A helpdesk no
