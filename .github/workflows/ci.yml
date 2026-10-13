@@ -133,6 +133,18 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: sh scripts/macos-signing.sh notarize target/macos/Crake-*.pkg
+      # The front-window check against the release before its fix (0.3.0),
+      # where Settings must open behind: proof the check tells the two
+      # apart. Runs started by hand only.
+      - name: Before the fix (0.3.0), Settings opens behind
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v0.3.0 -R "$GITHUB_REPOSITORY" -p 'Crake-*.pkg' -D "$RUNNER_TEMP/old"
+          sudo installer -pkg "$RUNNER_TEMP"/old/Crake-*.pkg -target /
+          sh scripts/macos-front-test.sh --expect-behind
+          sudo /usr/local/libexec/crake/uninstall
       - name: It installs, runs craked, upgrades and uninstalls
         run: sh scripts/macos-pkg-test.sh target/macos/Crake-*.pkg
       - uses: actions/upload-artifact@v7
