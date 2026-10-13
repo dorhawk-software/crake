@@ -156,14 +156,14 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           path: dist
-          merge-multiple: true
-      # The artifacts keep their folders (the Linux one has deb/ and rpm/):
-      # the release gets the files, side by side.
+      # Each artifact in a folder of its own (the Linux one with deb/ and
+      # rpm/ inside): the release gets the files side by side, without the
+      # loose .exe files the Windows installer is made of.
       - name: Checksums
         run: |
           mkdir release
-          find dist -type f ! -name notes.md -exec cp {} release/ \;
-          find dist -type f -name notes.md -exec cp {} notes.md \;
+          find dist -type f ! -path 'dist/windows-exe/*' ! -path 'dist/notes/*' -exec cp {} release/ \;
+          cp dist/notes/notes.md notes.md
           cd release && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
       - name: The GitHub release
         env:

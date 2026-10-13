@@ -21,12 +21,15 @@ apt_client() {
       if ! command -v curl >/dev/null && [ "${URL#file://}" = "$URL" ]; then
         apt-get update -qq >/dev/null && apt-get install -y -qq curl ca-certificates >/dev/null 2>&1
       fi
+      # 32-bit packages on too, as on many desktops (Steam): the repository
+      # must say it serves amd64 only, or apt warns.
+      dpkg --add-architecture i386
       install -d /etc/apt/keyrings /tmp/src
       fetch key.asc > /etc/apt/keyrings/dorhawk.asc
       fetch apt/dorhawk.sources > /tmp/src/dorhawk.sources
       only="-o Dir::Etc::SourceList=/dev/null -o Dir::Etc::SourceParts=/tmp/src"
       apt-get $only update 2>&1 | tail -3
-      apt-get $only update 2>&1 | grep -q "^[EW]:" && exit 1
+      apt-get $only update 2>&1 | grep -q "^[EWN]:" && exit 1
       cd /tmp && apt-get $only download crake >/dev/null
       printf "%s: crake %s\n" "$(. /etc/os-release; echo $PRETTY_NAME)" "$(dpkg-deb -f /tmp/crake_*.deb Version)"'
 }
