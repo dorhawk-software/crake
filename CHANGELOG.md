@@ -11,6 +11,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Works with encrypted DNS (DNS over TLS).** A tunnel's own DNS is asked plainly, as it must be,
+  even when the computer encrypts the rest; the log says once that it's on.
+
 ## 0.3.0 (2026-10-13)
 
 - **OpenVPN 3: a second session for the same tunnel no longer stops both.** When a new session turns

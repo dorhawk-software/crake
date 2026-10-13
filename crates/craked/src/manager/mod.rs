@@ -147,6 +147,8 @@ pub struct Manager {
     net: Net,
     routing: Routing,
     resolved: Resolved,
+    /// "This computer encrypts its DNS" has been said (once per start).
+    encrypted_dns_said: std::sync::atomic::AtomicBool,
     traffic: Arc<crate::traffic::Traffic>,
     /// How each tunnel's packets travel, as openconnect (or the app, for
     /// OpenVPN 3) last said: tunnel -> "DTLS", "ESP", "TLS", "UDP", "TCP".
@@ -309,6 +311,7 @@ impl Manager {
             net,
             routing,
             resolved,
+            encrypted_dns_said: std::sync::atomic::AtomicBool::new(false),
             traffic: Arc::default(),
             transport: Arc::default(),
             unknown: Mutex::new(HashMap::new()),

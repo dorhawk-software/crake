@@ -102,7 +102,28 @@ impl Resolved {
             m.call::<_, _, ()>("SetLinkDefaultRoute", &(index, everything)),
         )
         .await?;
+        // The tunnel encrypts it already, and a company's DNS rarely speaks
+        // TLS: with DNS over TLS on (strict), resolved would ask it over TLS
+        // and every internal name would fail. Off for this link only; an
+        // older resolved without the call keeps its default.
+        let _ = within(
+            "SetLinkDNSOverTLS",
+            WAIT,
+            m.call::<_, _, ()>("SetLinkDNSOverTLS", &(index, "no")),
+        )
+        .await;
         Ok(())
+    }
+
+    /// Whether the system sends its DNS encrypted (resolved's DNSOverTLS:
+    /// "yes", or "opportunistic" where the server speaks it). Public
+    /// answers are then out of Crake's sight.
+    pub async fn encrypts_dns(&self) -> bool {
+        let Ok(Some(m)) = self.manager().await else {
+            return false;
+        };
+        let mode = within("DNSOverTLS", WAIT, m.get_property::<String>("DNSOverTLS")).await;
+        mode.is_ok_and(|m| m == "yes" || m == "opportunistic")
     }
 
     /// What another program (openvpn3) registered for `device`: its DNS

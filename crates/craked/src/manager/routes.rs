@@ -3,6 +3,11 @@
 
 use super::*;
 
+/// Why encrypted public DNS matters to Crake.
+const ENCRYPTED_DNS: &str = "Crake can't see when public DNS doesn't know a name, so it can't ask \
+     your tunnels about it: a name only a tunnel's DNS knows, outside that tunnel's domains, won't \
+     be found. Names under the tunnels' domains work as usual.";
+
 impl Manager {
     /// Load the tunnel's pinned and learned hosts into the kernel. Returns how
     /// many destinations now go through it.
@@ -93,6 +98,7 @@ impl Manager {
             .await;
         // Forget answers cached while the tunnel was off (failures included).
         self.resolved.flush().await;
+        self.say_if_dns_is_encrypted().await;
         if let Err(e) = res {
             tracing::error!("registering {label}'s DNS: {e:#}");
             self.log.system(
@@ -101,6 +107,23 @@ impl Manager {
                 Some(format!("Names under its domains won't resolve. {e:#}")),
             );
         }
+    }
+
+    /// Public DNS sent encrypted (DNS over TLS) is out of Crake's sight: it
+    /// can't tell when public DNS doesn't know a name, so the tunnels
+    /// aren't asked about it. Said once, when a tunnel's DNS is first
+    /// registered.
+    async fn say_if_dns_is_encrypted(&self) {
+        use std::sync::atomic::Ordering;
+        if self.encrypted_dns_said.load(Ordering::Relaxed) || !self.resolved.encrypts_dns().await {
+            return;
+        }
+        self.encrypted_dns_said.store(true, Ordering::Relaxed);
+        self.log.system(
+            None,
+            "This computer encrypts its DNS (DNS over TLS).",
+            Some(ENCRYPTED_DNS.into()),
+        );
     }
 
     pub(super) async fn remove_routing(&self, name: &str) {

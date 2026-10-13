@@ -36,6 +36,12 @@ pub enum Resolved {
 }
 
 impl Resolved {
+    /// DNS over TLS is systemd-resolved's (Linux): here craked's own server
+    /// answers, and sees every public answer.
+    pub async fn encrypts_dns(&self) -> bool {
+        false
+    }
+
     /// Files a craked before this one left behind go first, and the
     /// system's DNS servers it stood in for come back.
     pub fn new(enabled: bool) -> Self {
