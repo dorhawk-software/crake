@@ -75,7 +75,8 @@ if [ "$(gh run view "$run" --json conclusion --jq .conclusion)" != success ]; th
     gh run view "$run" --json jobs --jq '.jobs[] | select(.conclusion != "success") | "  \(.name): \(.conclusion)"' >&2
     fail "CI didn't pass on $sha (no tag was pushed): push a fix to main, then run this again"
 fi
-git tag -a "v$V" -m "Crake $V"
+# The commit CI passed, whatever was committed here meanwhile.
+git tag -a "v$V" -m "Crake $V" "$sha"
 git push -q origin "v$V"
 echo "v$V pushed: the release workflow publishes it."
 echo "  https://github.com/dorhawk-software/crake/actions/workflows/release.yml"
