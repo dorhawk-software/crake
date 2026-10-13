@@ -1236,7 +1236,9 @@ target/macos/Crake-<version>.pkg on a Mac: Crake.app in /Applications
 launchd plist, the hook and the uninstaller
 (`sudo /usr/local/libexec/crake/uninstall`) in /usr/local/libexec/crake;
 `postinstall` bootstraps craked, an upgrade leaving the handover flag
-first (tunnels stay signed in). Apple Silicon only; openconnect from
+first (tunnels stay signed in). Universal (Apple Silicon and Intel:
+`CRAKE_UNIVERSAL=1` joins both builds with lipo; releases and CI runs
+started by hand build it, pushes only Apple Silicon); openconnect from
 Homebrew (the app says `brew install openconnect` when it's missing), not
 bundled yet. **Signing (set up with the user, 2026-10-13):** the user's
 personal Apple Developer account (team 5CTH49SXZ6): a Developer ID
