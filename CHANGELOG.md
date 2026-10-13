@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.4.0 (2026-10-13)
+
 - **macOS: a tunnel can no longer take the whole internet down.** While a tunnel is up, Crake
   answers the Mac's DNS so it can find names only a company knows. On a Mac whose DNS servers it
   couldn't read, every name failed; it now leaves such a Mac's DNS alone.
