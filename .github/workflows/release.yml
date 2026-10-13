@@ -4,8 +4,9 @@
 # (scripts/release-notes.sh, which also refuses a tag that disagrees with
 # the version in Cargo.toml, the Nix package or the PKGBUILD). Only a
 # commit that passed CI on main is released. The macOS cask in
-# dorhawk-software/homebrew-tap follows (HOMEBREW_TAP_DEPLOY_KEY), and the
-# .deb and RPM go into packages.dorhawk.software (R2; scripts/publish-repo.sh).
+# dorhawk-software/homebrew-tap follows (HOMEBREW_TAP_DEPLOY_KEY), and
+# dorhawk-software/packages is asked to put the .deb and RPM into
+# packages.dorhawk.software.
 name: Release
 
 on:
@@ -62,10 +63,6 @@ jobs:
             packages-
       - name: The .deb (built on Ubuntu 22.04) and the RPM from the same files
         run: CRAKE_CACHE=$HOME/crake-cache scripts/build-deb.sh && scripts/build-rpm.sh
-      - name: The RPM signed with the package repository's key
-        env:
-          PACKAGES_GPG_KEY: ${{ secrets.PACKAGES_GPG_KEY }}
-        run: scripts/sign-rpm.sh target/rpm
       - uses: actions/upload-artifact@v7
         with:
           name: linux
@@ -198,24 +195,21 @@ jobs:
           git commit -q -m "crake $V"
           git push -q origin HEAD
 
-  repository:
+  packages:
     needs: publish
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
-        with:
-          name: linux
-          path: dist
-      - name: Into packages.dorhawk.software (apt and dnf), signed
+      # dorhawk-software/packages publishes the .deb and RPM into
+      # packages.dorhawk.software (it signs them; the key is its own). Asked
+      # here when this repository has the token for it; otherwise its
+      # hourly run finds the release within the hour.
+      - name: Ask packages.dorhawk.software to publish this release
         env:
-          PACKAGES_GPG_KEY: ${{ secrets.PACKAGES_GPG_KEY }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
-          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          GH_TOKEN: ${{ secrets.PACKAGES_DISPATCH_TOKEN }}
         run: |
-          mkdir -p flat && find dist \( -name '*.deb' -o -name '*.rpm' \) -exec cp {} flat/ \;
-          scripts/publish-repo.sh flat
-      - name: apt and dnf install it from there
-        run: scripts/repo-test.sh --live https://packages.dorhawk.software
+          if [ -z "$GH_TOKEN" ]; then
+            echo "No PACKAGES_DISPATCH_TOKEN: dorhawk-software/packages picks the release up within the hour."
+            exit 0
+          fi
+          gh api repos/dorhawk-software/packages/dispatches -f event_type=release \
+            -f "client_payload[repo]=$GITHUB_REPOSITORY" -f "client_payload[tag]=$GITHUB_REF_NAME"
