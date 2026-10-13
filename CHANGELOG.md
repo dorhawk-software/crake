@@ -11,6 +11,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **macOS: a tunnel can no longer take the whole internet down.** While a tunnel is up, Crake
+  answers the Mac's DNS so it can find names only a company knows. On a Mac whose DNS servers it
+  couldn't read, every name failed; it now leaves such a Mac's DNS alone.
 - **macOS: Crake's windows open in front.** Settings, New tunnel, the log and a tunnel's details
   opened behind the app you were in.
 - **macOS: the Mac's own window buttons.** Close, minimise and zoom sit top left as in every Mac

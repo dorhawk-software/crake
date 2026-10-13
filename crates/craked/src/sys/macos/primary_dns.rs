@@ -87,18 +87,12 @@ pub fn upstream() -> Vec<IpAddr> {
     let displaced = displaced();
     let named = |prefix: &str| {
         displaced.iter().find_map(|(key, was)| match was {
-            Was::Servers(s) if key.starts_with(prefix) && !s.is_empty() => Some(s.clone()),
+            Was::Servers(s) if key.starts_with(prefix) => Some(s.clone()),
             _ => None,
         })
     };
-    named(SETUP)
-        .or_else(|| named(STATE))
-        .unwrap_or_default()
-        .iter()
-        // A link-local server's zone ("fe80::1%en0") doesn't parse: left out.
-        .filter_map(|s| s.parse().ok())
-        .filter(|a| *a != IpAddr::V4(ADDR))
-        .collect()
+    let (typed, dhcp) = (named(SETUP), named(STATE));
+    crate::stand_in::servers_to_ask(typed.as_deref(), dhcp.as_deref(), IpAddr::V4(ADDR))
 }
 
 /// Bring the dynamic store in line with what's wanted: the primary
@@ -107,7 +101,7 @@ pub fn upstream() -> Vec<IpAddr> {
 fn apply(on: bool) {
     let mut displaced = displaced();
     let store = SCDynamicStoreBuilder::new("Crake").build();
-    let keys: Vec<String> = on
+    let mut keys: Vec<String> = on
         .then(|| primary_service(&store))
         .flatten()
         .map(|id| {
@@ -116,6 +110,25 @@ fn apply(on: bool) {
                 .to_vec()
         })
         .unwrap_or_default();
+    // Only with a server to ask in their stead (what's displaced already
+    // counts, under the key's own name): otherwise every name would fail.
+    if !keys.is_empty() {
+        let servers = |key: &String| match displaced.get(key) {
+            Some(Was::Servers(s)) => Some(s.clone()),
+            Some(Was::Absent) => None,
+            None => dictionary(&store, key)
+                .as_ref()
+                .and_then(servers_of)
+                .filter(|s| s[..] != [ADDR.to_string()]),
+        };
+        let (dhcp, typed) = (servers(&keys[0]), servers(&keys[1]));
+        if !crate::stand_in::may_stand_in(typed.as_deref(), dhcp.as_deref(), IpAddr::V4(ADDR)) {
+            tracing::warn!(
+                "not standing in for the system's DNS: no server of its to ask (DHCP's {dhcp:?}, typed {typed:?})"
+            );
+            keys.clear();
+        }
+    }
     let mut changed = false;
     let gone: Vec<String> = displaced
         .keys()
