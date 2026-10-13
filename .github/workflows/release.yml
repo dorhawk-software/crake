@@ -116,6 +116,9 @@ jobs:
   macos:
     needs: notes
     runs-on: macos-latest
+    env:
+      # For Apple Silicon and Intel Macs: both builds, joined (lipo).
+      CRAKE_UNIVERSAL: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable

@@ -2,8 +2,10 @@
 # Crake for macOS as an installer package, on a Mac (CI job macos):
 # Crake.app in /Applications (the menu bar app), craked as a launchd daemon
 # (/usr/local/sbin, /Library/LaunchDaemons), the hook and the uninstaller in
-# /usr/local/libexec/crake (the system's /usr is sealed). Apple Silicon only
-# for now. openconnect isn't bundled: Homebrew's is used.
+# /usr/local/libexec/crake (the system's /usr is sealed). openconnect isn't
+# bundled: Homebrew's is used. CRAKE_UNIVERSAL=1 builds for Apple Silicon
+# and Intel and joins each binary into one (lipo; releases do); otherwise
+# for this Mac's own architecture only (CI, quicker).
 # Signed with the Developer ID when a keychain holds it
 # (scripts/macos-signing.sh setup; CRAKE_KEYCHAIN names that keychain):
 # every binary with the hardened runtime and a secure timestamp, as
@@ -18,9 +20,25 @@ cd "$(dirname "$0")/.."
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
 OUT=target/macos
 PROFILE=${CRAKE_PROFILE:-release}
-BIN=target/$PROFILE
-[ "$PROFILE" != dev ] || BIN=target/debug
-cargo build --profile "$PROFILE" --locked -p crake -p craked
+DIR=$PROFILE
+[ "$PROFILE" != dev ] || DIR=debug
+ARCHS="arm64"
+if [ -n "${CRAKE_UNIVERSAL:-}" ]; then
+  ARCHS="arm64,x86_64"
+  rustup target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null
+  for t in aarch64-apple-darwin x86_64-apple-darwin; do
+    cargo build --profile "$PROFILE" --locked --target "$t" -p crake -p craked
+  done
+  BIN=target/universal/$DIR
+  mkdir -p "$BIN"
+  for f in crake craked crake-hook; do
+    lipo -create -output "$BIN/$f" \
+      "target/aarch64-apple-darwin/$DIR/$f" "target/x86_64-apple-darwin/$DIR/$f"
+  done
+else
+  cargo build --profile "$PROFILE" --locked -p crake -p craked
+  BIN=target/$DIR
+fi
 rm -rf "${OUT:?}"
 ROOT=$OUT/root
 APP=$ROOT/Applications/Crake.app
@@ -53,7 +71,7 @@ plutil -replace 0.BundleIsRelocatable -bool NO "$OUT/components.plist"
 pkgbuild --root "$ROOT" --component-plist "$OUT/components.plist" \
   --scripts packaging/macos/scripts --identifier software.dorhawk.crake \
   --version "$VERSION" --install-location / "$OUT/crake.pkg"
-sed "s/@VERSION@/$VERSION/g" packaging/macos/distribution.xml > "$OUT/distribution.xml"
+sed -e "s/@VERSION@/$VERSION/g" -e "s/@ARCHS@/$ARCHS/g" packaging/macos/distribution.xml > "$OUT/distribution.xml"
 productbuild --distribution "$OUT/distribution.xml" --resources packaging/macos/resources \
   --package-path "$OUT" "$@" "$OUT/Crake-$VERSION.pkg"
 echo "$OUT/Crake-$VERSION.pkg"

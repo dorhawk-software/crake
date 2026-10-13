@@ -91,6 +91,9 @@ jobs:
       # secrets): only that, the secrets themselves go to the steps that
       # need them, never to the builds (crates' build scripts run there).
       SIGNING: ${{ secrets.MACOS_APP_P12 != '' }}
+      # For Intel Macs too (both builds, joined), in runs started by hand:
+      # a release builds universal, and this tries it first.
+      CRAKE_UNIVERSAL: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable

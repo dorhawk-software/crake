@@ -38,6 +38,16 @@ fi
 sudo installer -pkg "$PKG" -target /
 serving
 APP=/Applications/Crake.app
+# Built universal (CRAKE_UNIVERSAL): every binary for both kinds of Mac.
+if [ -n "${CRAKE_UNIVERSAL:-}" ]; then
+    for f in "$APP/Contents/MacOS/crake" /usr/local/sbin/craked /usr/local/libexec/crake/hook; do
+        archs=$(lipo -archs "$f")
+        case " $archs " in
+            *" arm64 "*" x86_64 "* | *" x86_64 "*" arm64 "*) ;;
+            *) fail "$f is $archs, not universal" ;;
+        esac
+    done
+fi
 if [ -n "${CRAKE_KEYCHAIN:-}" ]; then
     for f in "$APP" /usr/local/sbin/craked /usr/local/libexec/crake/hook; do
         codesign -dv --verbose=2 "$f" 2>&1 | grep -q "Authority=Developer ID Application" ||
