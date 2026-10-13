@@ -451,13 +451,12 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    "Got it, don't show again" that is remembered per tunnel.
 7e. **Certificates and their passwords, kept safely (requested). Built**
    in sign-in (keyring for both; the temporary 0600 copy in
-   `$XDG_RUNTIME_DIR/crake`). Still to come: the import file picker, with
-   the New tunnel screen. The certificate's password goes to the GNOME
-   keyring (Secret Service, via `oo7`), never Crake's files. The certificate
-   itself can be kept in the keyring too, so the user can delete the file
-   from disk: written for each sign-in to a 0600 file in `$XDG_RUNTIME_DIR`
-   (tmpfs) and removed when sign-in ends. A file picker to import one comes
-   with the New tunnel screen.
+   `$XDG_RUNTIME_DIR/crake`), and New tunnel's certificate step imports a
+   file picked on disk into the keyring. The certificate's password goes
+   to the GNOME keyring (Secret Service, via `oo7`), never Crake's files.
+   The certificate itself can be kept in the keyring too, so the user can
+   delete the file from disk: written for each sign-in to a 0600 file in
+   `$XDG_RUNTIME_DIR` (tmpfs) and removed when sign-in ends.
 7c. **Animations (requested). Done.** Tray: the frames in `tray.rs`
    (`transition`, `connecting_loop`), 70 ms apart, shown by `animate_tray`.
    Panel: opens rising 8 px (180 ms), new decision rows slide in (220 ms),
@@ -776,6 +775,11 @@ The user doesn't want development builds installed on their machine.
   keeps those out: only the dependency derivations (crane's `crake-deps`,
   `crake-journey-deps`) go up, which is what the next run reuses. The NixOS VM-boot (~6-8
   min) is uncacheable, so nixos stays the slowest job even cached.
+  When Cargo.lock changes, nixos takes ~50 min (measured on 0.2.0's
+  run: crake-deps 17, crake 2½, crake-journey-deps 25, the journey 3,
+  the VM 1). Merging the two deps derivations was considered and left
+  (2026-10-13): the journey's build turns on GPUI's test-support, so GPUI
+  compiles twice either way; only small shared crates would be saved.
 - Daily use, nothing installed: `sudo ./target/debug/craked --config dev/<yours>.toml --dev`
   (serves the app on `/run/user/<uid>/crake-dev.sock`), then `./target/debug/crake`.
   The app signs in as the user (`openconnect --authenticate`, questions in
