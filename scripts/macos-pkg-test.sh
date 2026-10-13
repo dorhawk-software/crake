@@ -63,12 +63,14 @@ plutil -lint "$APP/Contents/Info.plist" >/dev/null || fail "Info.plist"
 codesign --verify --deep "$APP" || fail "Crake.app's signature"
 test -x /usr/local/libexec/crake/hook || fail "no hook"
 # System Settings' background items show craked as Crake: its launchd
-# file names Crake.app. What macOS recorded is printed, for the record.
+# file names Crake.app, and macOS's background items database records it.
 app_id=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Contents/Info.plist")
 named=$(/usr/libexec/PlistBuddy -c "Print :AssociatedBundleIdentifiers:0" \
     "/Library/LaunchDaemons/$LABEL.plist" 2>/dev/null || true)
 [ "$named" = "$app_id" ] || fail "craked's launchd file names '$named', not Crake.app ($app_id)"
-sudo sfltool dumpbtm 2>/dev/null | grep -B4 -A16 "$LABEL" || echo "(sfltool lists no $LABEL)"
+btm=$(sudo sfltool dumpbtm 2>/dev/null | grep -A16 "Identifier: .*$LABEL" || true)
+echo "$btm" | grep -q "Assoc. Bundle IDs: \[ $app_id \]" ||
+    fail "macOS's background items don't link craked to Crake.app: $btm"
 # Its windows open in front of the app that's in front.
 sh "$(dirname "$0")/macos-front-test.sh" || fail "Settings opened behind"
 first=$(pid)
