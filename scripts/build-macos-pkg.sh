@@ -3,9 +3,13 @@
 # Crake.app in /Applications (the menu bar app), craked as a launchd daemon
 # (/usr/local/sbin, /Library/LaunchDaemons), the hook and the uninstaller in
 # /usr/local/libexec/crake (the system's /usr is sealed). Apple Silicon only
-# for now. Not signed or notarized yet (that needs the user's Apple
-# Developer account): the app is signed ad hoc, as the linker signs every
-# binary on Apple Silicon. openconnect isn't bundled: Homebrew's is used.
+# for now. openconnect isn't bundled: Homebrew's is used.
+# Signed with the Developer ID when a keychain holds it
+# (scripts/macos-signing.sh setup; CRAKE_KEYCHAIN names that keychain):
+# every binary with the hardened runtime and a secure timestamp, as
+# notarization requires, and the package with the installer certificate.
+# Without one, ad hoc (as the linker signs every binary on Apple Silicon).
+# Notarizing is a step of its own (scripts/macos-signing.sh notarize).
 # Writes target/macos/Crake-<version>.pkg. CRAKE_PROFILE=dev packs the
 # development build instead (CI: the one its tests just built, so the
 # package costs a minute, not a second, optimised build of everything).
@@ -25,9 +29,21 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$ROOT/usr/local/sbin" 
 cp "$BIN/crake" "$APP/Contents/MacOS/crake"
 cp assets/icons/app/crake.icns "$APP/Contents/Resources/Crake.icns"
 sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$APP/Contents/Info.plist"
-codesign --force --sign - "$APP"
 cp "$BIN/craked" "$ROOT/usr/local/sbin/craked"
 cp "$BIN/crake-hook" "$ROOT/usr/local/libexec/crake/hook"
+if [ -n "${CRAKE_KEYCHAIN:-}" ]; then
+  sign() {
+    codesign --force --options runtime --timestamp --keychain "$CRAKE_KEYCHAIN" \
+      --sign "Developer ID Application" "$@"
+  }
+  sign --identifier software.dorhawk.craked "$ROOT/usr/local/sbin/craked"
+  sign --identifier software.dorhawk.crake-hook "$ROOT/usr/local/libexec/crake/hook"
+  sign "$APP"
+  set -- --sign "Developer ID Installer" --keychain "$CRAKE_KEYCHAIN" --timestamp
+else
+  codesign --force --sign - "$APP"
+  set --
+fi
 cp packaging/macos/uninstall.sh "$ROOT/usr/local/libexec/crake/uninstall"
 cp packaging/macos/software.dorhawk.craked.plist "$ROOT/Library/LaunchDaemons/"
 # Installed where it says, never "relocated" to another copy of Crake.app
@@ -39,5 +55,5 @@ pkgbuild --root "$ROOT" --component-plist "$OUT/components.plist" \
   --version "$VERSION" --install-location / "$OUT/crake.pkg"
 sed "s/@VERSION@/$VERSION/g" packaging/macos/distribution.xml > "$OUT/distribution.xml"
 productbuild --distribution "$OUT/distribution.xml" --resources packaging/macos/resources \
-  --package-path "$OUT" "$OUT/Crake-$VERSION.pkg"
+  --package-path "$OUT" "$@" "$OUT/Crake-$VERSION.pkg"
 echo "$OUT/Crake-$VERSION.pkg"

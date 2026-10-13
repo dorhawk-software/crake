@@ -1173,8 +1173,25 @@ launchd plist, the hook and the uninstaller
 `postinstall` bootstraps craked, an upgrade leaving the handover flag
 first (tunnels stay signed in). Apple Silicon only; openconnect from
 Homebrew (the app says `brew install openconnect` when it's missing), not
-bundled yet. Unsigned (the app ad hoc): signing and notarizing need the
-user's Apple Developer account (ask for its details then).
+bundled yet. **Signing (set up with the user, 2026-10-13):** the user's
+personal Apple Developer account (team 5CTH49SXZ6): a Developer ID
+Application certificate (Crake.app, craked, the hook: hardened runtime,
+secure timestamp) and a Developer ID Installer certificate (the .pkg),
+both made from signing requests created here (no Mac needed), and an App
+Store Connect API key with Developer access for notarization (its own,
+not the account's Admin key used for another app). The keys, .p12
+bundles and the .p8 are in `~/.config/crake-signing/` on the user's
+machine and in their password manager; CI has them as the secrets
+MACOS_APP_P12(_PASSWORD), MACOS_INSTALLER_P12(_PASSWORD), APPLE_API_KEY,
+APPLE_API_KEY_ID, APPLE_API_ISSUER_ID, only in the steps that use them
+(never in a build: crates' build scripts run there).
+`scripts/macos-signing.sh setup` makes a keychain of its own on the
+runner; `build-macos-pkg.sh` signs when CRAKE_KEYCHAIN names it (ad hoc
+otherwise); `macos-signing.sh notarize` submits the package, staples
+the ticket and checks Gatekeeper accepts it: on tags and runs started
+by hand only (it takes minutes). Every main push signs. Never revoke
+the certificates unless a key leaked: revoking makes macOS refuse every
+Crake already signed with them.
 `scripts/macos-pkg-test.sh` (CI job macos) installs it on the runner,
 checks craked serves /var/run/crake.sock under launchd, installs again
 over it (craked restarted) and uninstalls (nothing left); CI uploads the

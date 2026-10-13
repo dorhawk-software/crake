@@ -28,9 +28,24 @@ pid() {
     sudo launchctl print "system/$LABEL" | sed -n 's/^[[:space:]]*pid = //p'
 }
 
+# Signed with the Developer ID when CI had the certificates
+# (CRAKE_KEYCHAIN), ad hoc otherwise.
+if [ -n "${CRAKE_KEYCHAIN:-}" ]; then
+    pkgutil --check-signature "$PKG" | grep -q "Developer ID Installer" ||
+        fail "the package isn't signed with the Developer ID"
+fi
+
 sudo installer -pkg "$PKG" -target /
 serving
 APP=/Applications/Crake.app
+if [ -n "${CRAKE_KEYCHAIN:-}" ]; then
+    for f in "$APP" /usr/local/sbin/craked /usr/local/libexec/crake/hook; do
+        codesign -dv --verbose=2 "$f" 2>&1 | grep -q "Authority=Developer ID Application" ||
+            fail "$f isn't signed with the Developer ID"
+        codesign -dv --verbose=2 "$f" 2>&1 | grep -q "runtime" ||
+            fail "$f lacks the hardened runtime"
+    done
+fi
 test -x "$APP/Contents/MacOS/crake" || fail "no Crake.app"
 plutil -lint "$APP/Contents/Info.plist" >/dev/null || fail "Info.plist"
 codesign --verify --deep "$APP" || fail "Crake.app's signature"
