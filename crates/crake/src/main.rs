@@ -150,15 +150,17 @@ pub enum Request {
     RemoveTunnel(String),
     /// Keep these hosts or networks on a tunnel (the gateway's suggestions).
     Pin(String, Vec<String>),
-    /// OpenVPN 3: the session connected (its device and DNS, and its
-    /// control: `Reply::Cancel` disconnects it).
+    /// OpenVPN 3: the session (its openvpn3 path) connected (its device
+    /// and DNS, and its control: `Reply::Cancel` disconnects it).
     Attach(
+        String,
         String,
         std::collections::HashMap<String, String>,
         async_channel::Sender<signin::Reply>,
     ),
-    /// OpenVPN 3: the session ended (why, if it dropped).
-    Detached(String, Option<String>),
+    /// OpenVPN 3: the session (its openvpn3 path) ended (why, if it
+    /// dropped).
+    Detached(String, String, Option<String>),
     /// Open tunnel detail for this tunnel (or bring it to the front).
     OpenDetail(String),
     /// Tunnel detail: ask craked for the tunnel's hosts and traffic again.
@@ -198,8 +200,9 @@ struct Shell {
     adding: Option<Option<Vec<u8>>>,
     /// The New tunnel window, while it's open.
     new_tunnel: Option<AnyWindowHandle>,
-    /// OpenVPN 3 sessions this app runs: their controls, by tunnel.
-    sessions: std::collections::HashMap<String, async_channel::Sender<signin::Reply>>,
+    /// OpenVPN 3 sessions this app runs, by tunnel: each one's openvpn3
+    /// path and its control. One per tunnel: a newer one replaces it.
+    sessions: std::collections::HashMap<String, (String, async_channel::Sender<signin::Reply>)>,
     /// OpenVPN 3 sessions started outside Crake, being taken over.
     adopting: std::collections::HashSet<String>,
     /// The tray state last shown, and the animation running for it.

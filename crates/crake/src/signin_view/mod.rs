@@ -349,13 +349,14 @@ impl SignIn {
                     session,
                 ));
             }
-            Event::Attached(fields) => {
+            Event::Attached(path, fields) => {
                 self.handed_over = true;
                 // (Still "signing in" until the app has the session: then
                 // nothing else takes it over meanwhile.)
                 // The session stays the app's; its control goes with it.
                 let _ = self.requests.send_blocking(Request::Attach(
                     self.spec.tunnel.clone(),
+                    path,
                     fields,
                     self.replies.clone(),
                 ));

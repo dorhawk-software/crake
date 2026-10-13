@@ -20,7 +20,7 @@ pub(super) fn on_update(update: client::Update, cx: &mut App) {
     // craked refused an OpenVPN 3 session (it clashes with a tunnel that's
     // up; the log says which): end it, so it doesn't stay up unrouted.
     if let client::Update::AttachRefused(t) = &update
-        && let Some(control) = cx.global_mut::<Shell>().sessions.remove(t)
+        && let Some((_, control)) = cx.global_mut::<Shell>().sessions.remove(t)
     {
         control.send_blocking(signin::Reply::Cancel).ok();
     }

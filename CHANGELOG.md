@@ -11,6 +11,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **OpenVPN 3: a second session for the same tunnel no longer stops both.** When a new session turns
+  up (openvpn3's indicator reconnecting, say) it takes over from the old one, and the old one
+  ending can't take the new one down.
 - **"Start when you log in" works on macOS and Windows** (it did nothing there): a LaunchAgent on
   macOS, the user's Run key on Windows, as each system expects.
 - **A tunnel that stops by itself says so, and why.** A notification tells you, with **Switch on**

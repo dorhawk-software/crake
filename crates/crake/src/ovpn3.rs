@@ -318,7 +318,7 @@ async fn run(
     }
 
     let fields = attached(&conn, &path).await?;
-    let _ = events.send(Event::Attached(fields)).await;
+    let _ = events.send(Event::Attached(path.clone(), fields)).await;
     follow(&conn, &path, tunnel, signals, replies, requests).await;
     Ok(())
 }
@@ -350,7 +350,12 @@ pub fn adopt(tunnel: String, path: String, requests: async_channel::Sender<Reque
                 };
                 let (control, replies) = async_channel::unbounded();
                 let _ = requests
-                    .send(Request::Attach(tunnel.clone(), fields, control))
+                    .send(Request::Attach(
+                        tunnel.clone(),
+                        path.clone(),
+                        fields,
+                        control,
+                    ))
                     .await;
                 follow(&conn, &path, &tunnel, signals, &replies, &requests).await;
             });
@@ -481,19 +486,24 @@ async fn follow(
         tokio::select! {
             msg = signals.next() => {
                 let Some(Ok(msg)) = msg else {
-                    let _ = requests.send(Request::Detached(tunnel.to_owned(), Some("OpenVPN 3 went quiet.".into()))).await;
+                    let _ = requests.send(Request::Detached(tunnel.to_owned(), path.to_owned(), Some("OpenVPN 3 went quiet.".into()))).await;
                     return;
                 };
                 expired |= says_expired(&msg);
             }
             _ = tick.tick() => {}
-            r = replies.recv() => {
-                if !matches!(r, Ok(Reply::Answer { .. })) {
-                    // Switched off in the app.
+            r = replies.recv() => match r {
+                // Switched off in the app.
+                Ok(Reply::Cancel) => {
                     disconnect(conn, path).await;
-                    let _ = requests.send(Request::Detached(tunnel.to_owned(), None)).await;
+                    let _ = requests.send(Request::Detached(tunnel.to_owned(), path.to_owned(), None)).await;
                     return;
                 }
+                // No one holds this session's control any more (another
+                // follower has it): stop following, touch nothing. Losing
+                // the channel never ends a session.
+                Err(_) => return,
+                Ok(_) => {}
             }
         }
         let ended = match status(conn, path).await {
@@ -520,7 +530,7 @@ async fn follow(
             };
             disconnect(conn, path).await;
             let _ = requests
-                .send(Request::Detached(tunnel.to_owned(), why))
+                .send(Request::Detached(tunnel.to_owned(), path.to_owned(), why))
                 .await;
             return;
         }

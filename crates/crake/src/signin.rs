@@ -82,8 +82,9 @@ pub enum Event {
     Prompt(Prompt),
     Done(Session),
     Failed(String),
-    /// OpenVPN 3: connected; the device and DNS for craked (`ovpn3`).
-    Attached(std::collections::HashMap<String, String>),
+    /// OpenVPN 3: connected: the session (its openvpn3 path) and its
+    /// device and DNS for craked (`ovpn3`).
+    Attached(String, std::collections::HashMap<String, String>),
 }
 
 #[derive(Clone, Debug)]

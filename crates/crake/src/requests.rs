@@ -150,7 +150,7 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
                 .iter()
                 .any(|x| x.name == t && x.protocol == "openvpn3");
             match cx.global::<Shell>().sessions.get(&t) {
-                Some(control) => {
+                Some((_, control)) => {
                     control.send_blocking(signin::Reply::Cancel).ok();
                 }
                 // Started before this app did: at least stop routing it.
@@ -206,9 +206,14 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
         }
         Request::Unpin(t, x) => send(Command::Unpin(t, x)),
         Request::Forget(t, x) => send(Command::Forget(t, x)),
-        Request::Attach(t, fields, control) => {
+        Request::Attach(t, path, fields, control) => {
             let shell = cx.global_mut::<Shell>();
-            shell.sessions.insert(t.clone(), control);
+            // One session per tunnel: a newer one (openvpn3's indicator
+            // reconnecting, say) replaces the one followed so far, which
+            // ends; when its follower says so, that changes nothing here.
+            if let Some(old) = follow_session(&mut shell.sessions, &t, path, control) {
+                old.send_blocking(signin::Reply::Cancel).ok();
+            }
             shell.adopting.remove(&t);
             // craked's state takes over from the sign-in's "connecting".
             let model = shell.model.clone();
@@ -218,9 +223,13 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
             });
             send(Command::Attach(t, fields));
         }
-        Request::Detached(t, why) => {
+        Request::Detached(t, path, why) => {
             let shell = cx.global_mut::<Shell>();
-            shell.sessions.remove(&t);
+            // Only the session the tunnel has now: one a newer session
+            // replaced ended on its own, and must not take that one down.
+            if !session_ended(&mut shell.sessions, &t, &path) {
+                return;
+            }
             shell.adopting.remove(&t);
             send(Command::Detach(t, why.unwrap_or_default()));
         }
@@ -257,5 +266,63 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
             send(Command::RemoveTunnel(name));
         }
         Request::Quit => cx.quit(),
+    }
+}
+
+/// Each tunnel's OpenVPN 3 session: its openvpn3 path and its control.
+type Sessions = std::collections::HashMap<String, (String, async_channel::Sender<signin::Reply>)>;
+
+/// `tunnel`'s session is now the one at `path`. A different one it had
+/// before (openvpn3's indicator reconnecting, say) is to be ended: its
+/// control is returned for that. The same session again just changes
+/// hands: the earlier follower, its channel gone, stops quietly.
+fn follow_session(
+    sessions: &mut Sessions,
+    tunnel: &str,
+    path: String,
+    control: async_channel::Sender<signin::Reply>,
+) -> Option<async_channel::Sender<signin::Reply>> {
+    let new = path.clone();
+    let (old, old_control) = sessions.insert(tunnel.to_owned(), (path, control))?;
+    (old != new).then_some(old_control)
+}
+
+/// The session at `path` ended: whether it was `tunnel`'s current one (and
+/// so the tunnel is down). One a newer session replaced changes nothing.
+fn session_ended(sessions: &mut Sessions, tunnel: &str, path: &str) -> bool {
+    if sessions.get(tunnel).is_some_and(|(p, _)| p != path) {
+        return false;
+    }
+    sessions.remove(tunnel);
+    true
+}
+
+#[cfg(test)]
+mod session_tests {
+    use super::*;
+
+    #[test]
+    fn a_replaced_session_cannot_take_its_successor_down() {
+        let mut sessions = Sessions::new();
+        let (first, _a) = async_channel::unbounded();
+        let (second, _b) = async_channel::unbounded();
+        assert!(follow_session(&mut sessions, "initech", "/s/1".into(), first).is_none());
+        // A newer session: the older one is handed back, to be ended.
+        assert!(follow_session(&mut sessions, "initech", "/s/2".into(), second).is_some());
+        // The older one's end changes nothing; the current one's does.
+        assert!(!session_ended(&mut sessions, "initech", "/s/1"));
+        assert_eq!(sessions["initech"].0, "/s/2");
+        assert!(session_ended(&mut sessions, "initech", "/s/2"));
+        assert!(sessions.is_empty());
+    }
+
+    #[test]
+    fn the_same_session_again_only_changes_hands() {
+        let mut sessions = Sessions::new();
+        let (first, _a) = async_channel::unbounded();
+        let (again, _b) = async_channel::unbounded();
+        follow_session(&mut sessions, "initech", "/s/1".into(), first);
+        assert!(follow_session(&mut sessions, "initech", "/s/1".into(), again).is_none());
+        assert_eq!(sessions["initech"].0, "/s/1");
     }
 }
