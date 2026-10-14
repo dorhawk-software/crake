@@ -19,7 +19,7 @@ use self::days::local_time;
 pub use self::days::{Day, Row, Show};
 #[cfg(test)]
 pub use self::demo::demo_log_whole_day;
-pub use self::demo::{demo, demo_detail, demo_log};
+pub use self::demo::{demo, demo_detail, demo_expired, demo_log};
 
 /// How long the tray shows the "routed" shape after a decision.
 const ROUTED_SHAPE_FOR: Duration = Duration::from_secs(4);
@@ -261,6 +261,12 @@ pub fn human_bytes(bytes: u64) -> String {
     }
 }
 
+/// A tunnel in trouble: why, in a few words, when Crake recognises the
+/// reason (design/proposals/trouble-reason.html, option A).
+pub fn trouble_words(t: &Tunnel) -> &'static str {
+    crake_proto::trouble::label(&t.why).unwrap_or("Couldn\u{2019}t stay connected")
+}
+
 /// "Connected · 4 hosts", "Off", ...
 pub fn tunnel_state(t: &Tunnel) -> String {
     match t.state.as_str() {
@@ -268,7 +274,7 @@ pub fn tunnel_state(t: &Tunnel) -> String {
         "connected" if t.hosts == 1 => "Connected · 1 host".into(),
         "connected" => format!("Connected · {} hosts", t.hosts),
         "connecting" => "Connecting…".into(),
-        "trouble" => "Couldn't stay connected".into(),
+        "trouble" => trouble_words(t).into(),
         _ => "Off".into(),
     }
 }
@@ -694,6 +700,28 @@ mod tests {
             ..Default::default()
         }]));
         assert_eq!(m.shape(), Shape::Listening);
+    }
+
+    /// A tunnel in trouble names why, when it's a reason Crake recognises
+    /// (design/proposals/trouble-reason.html, option A).
+    #[test]
+    fn trouble_names_the_reason_it_knows() {
+        let trouble = |why: &str| Tunnel {
+            state: "trouble".into(),
+            why: why.into(),
+            ..Default::default()
+        };
+        let expired = format!(
+            "{}: the server ends sessions after a while (this one after 54 minutes). {}",
+            crake_proto::trouble::EXPIRED,
+            crake_proto::trouble::SIGN_IN_AGAIN
+        );
+        assert_eq!(tunnel_state(&trouble(&expired)), "Session expired");
+        assert_eq!(
+            tunnel_state(&trouble("openconnect exited with exit status: 1.")),
+            "Couldn\u{2019}t stay connected"
+        );
+        assert_eq!(tunnel_state(&trouble("")), "Couldn\u{2019}t stay connected");
     }
 
     /// Seen after a session expired: switching the tunnel on to sign in

@@ -302,11 +302,9 @@ async fn run(
             SESS_AUTH_URL => open_once(&text, &mut opened),
             CONN_AUTH_FAILED => {
                 disconnect(&conn, &path).await;
-                return Err(
-                    format!("The gateway didn\u{2019}t accept the sign-in. {text}")
-                        .trim()
-                        .to_owned(),
-                );
+                return Err(format!("{}. {text}", crake_proto::trouble::SIGN_IN_REFUSED)
+                    .trim()
+                    .to_owned());
             }
             CONN_FAILED | CONN_DISCONNECTED | CONN_DONE | SESS_REMOVED => {
                 disconnect(&conn, &path).await;
@@ -484,11 +482,16 @@ async fn follow(
                 unseen += 1;
                 (unseen >= GONE_AFTER).then(|| Some("The OpenVPN 3 session is gone.".to_owned()))
             }
+            Some((CONN_AUTH_FAILED, text)) => Some(Some(
+                format!("{}. {text}", crake_proto::trouble::SIGN_IN_REFUSED)
+                    .trim()
+                    .to_owned(),
+            )),
             Some((minor, text)) => {
                 unseen = 0;
                 matches!(
                     minor,
-                    CONN_FAILED | CONN_DISCONNECTED | CONN_DONE | SESS_REMOVED | CONN_AUTH_FAILED
+                    CONN_FAILED | CONN_DISCONNECTED | CONN_DONE | SESS_REMOVED
                 )
                 .then(|| (!text.is_empty()).then_some(text))
             }
@@ -549,7 +552,9 @@ fn expired_said(lasted: Option<Duration>) -> String {
         })
         .unwrap_or_default();
     format!(
-        "Its session expired: the server ends sessions after a while{after}. Switch it on to sign in again."
+        "{}: the server ends sessions after a while{after}. {}",
+        crake_proto::trouble::EXPIRED,
+        crake_proto::trouble::SIGN_IN_AGAIN
     )
 }
 

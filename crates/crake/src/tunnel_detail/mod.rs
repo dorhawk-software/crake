@@ -28,7 +28,7 @@ mod tests;
 const MERGE_PX: f32 = 12.;
 
 use self::chart::{now_minutes, today};
-use self::facts::{facts, policy, title_row};
+use self::facts::{facts, policy, title_row, why};
 
 pub const WIDTH: f32 = 900.;
 
@@ -197,6 +197,7 @@ impl Render for TunnelDetail {
             .pt(px(24.))
             .px(px(28.))
             .child(title_row(&tunnel, &t))
+            .child(why(&tunnel, &t))
             .child(facts(&tunnel, &t))
             .child(policy(&tunnel, &t))
             .child(self.chart(&tunnel, marks, &traffic, &t, cx));

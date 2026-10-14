@@ -192,6 +192,33 @@ async fn the_app_and_craked_work_together_over_dbus() {
         m.log.iter().any(|e| e.message == "Switched Initech off.")
     })
     .await;
+
+    // Up again, then its session expires: the app learns why, and the
+    // panel says it.
+    app.send(Command::Attach(
+        "initech".into(),
+        fields(&[("device", "tun0"), ("dns", "10.8.0.1")]),
+    ));
+    app.until("Initech connected again", |m| {
+        m.tunnels
+            .iter()
+            .any(|t| t.name == "initech" && t.state == "connected")
+    })
+    .await;
+    let expired = format!(
+        "{}: the server ends sessions after a while. {}",
+        crake_proto::trouble::EXPIRED,
+        crake_proto::trouble::SIGN_IN_AGAIN
+    );
+    app.send(Command::Detach("initech".into(), expired));
+    app.until("Initech's session expired", |m| {
+        m.tunnels.iter().any(|t| {
+            t.name == "initech"
+                && t.state == "trouble"
+                && crate::model::tunnel_state(t) == "Session expired"
+        })
+    })
+    .await;
     app.send(Command::RemoveTunnel("initech".into()));
     app.until("Initech gone", |m| {
         !m.tunnels.iter().any(|t| t.name == "initech")

@@ -61,6 +61,7 @@ impl Manager {
                     refused: false,
                     handover: false,
                     attached: None,
+                    why: None,
                 },
             );
         }

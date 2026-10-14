@@ -33,6 +33,7 @@ impl Manager {
             e.stop = Some(tx);
             e.running = true;
             e.state = TunnelState::Connecting;
+            e.why = None;
             e.info = None;
             // A new sign-in replaces the kept one; none given, resume the kept one.
             if session.is_some() {
@@ -77,6 +78,7 @@ impl Manager {
             // Trouble or Off: nothing is running; just settle to Off.
             None => {
                 e.state = TunnelState::Off;
+                e.why = None;
                 drop(map);
                 let _ = self.changes.send(name.to_owned());
                 Ok(())
@@ -315,7 +317,9 @@ impl Manager {
                     Ok(s) if s.success() => (TunnelState::Off, None),
                     Ok(s) => {
                         let tail = last_line.lock().unwrap().clone();
-                        (TunnelState::Trouble, Some(format!("openconnect exited with {s}. {tail}").trim().to_owned()))
+                        let why = crake_proto::trouble::from_openconnect(&tail)
+                            .unwrap_or_else(|| format!("openconnect exited with {s}. {tail}").trim().to_owned());
+                        (TunnelState::Trouble, Some(why))
                     }
                     Err(e) => (TunnelState::Trouble, Some(e.to_string())),
                 },
@@ -399,7 +403,11 @@ impl Manager {
             self.set_state(name, TunnelState::Off, true);
             return;
         }
-        self.set_state(name, state, true);
+        if state == TunnelState::Trouble {
+            self.set_trouble(name, reason.clone());
+        } else {
+            self.set_state(name, state, true);
+        }
         let msg = match state {
             TunnelState::Trouble => crake_proto::stopped_unexpectedly(label),
             _ => format!("Switched {label} off."),

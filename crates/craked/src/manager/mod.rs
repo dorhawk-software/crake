@@ -61,6 +61,8 @@ pub struct Snapshot {
     pub since: Option<u64>,
     /// How its packets travel: DTLS, ESP, TLS (TCP only), UDP or TCP.
     pub transport: Option<String>,
+    /// In trouble: why, as the log says it (crake_proto::trouble).
+    pub why: Option<String>,
 }
 
 /// How to stop openconnect.
@@ -117,6 +119,8 @@ struct Entry {
     handover: bool,
     /// OpenVPN 3: what the app attached it with, for a handover.
     attached: Option<HashMap<String, String>>,
+    /// In trouble: why (cleared when it leaves trouble).
+    why: Option<String>,
 }
 
 /// A UDP conversation's first datagram, and when it was copied.
@@ -253,6 +257,7 @@ fn snapshot(e: &Entry) -> Snapshot {
         clash: None,
         since: e.up_since,
         transport: None,
+        why: e.why.clone(),
     }
 }
 
@@ -284,6 +289,7 @@ impl Manager {
                     refused: false,
                     handover: false,
                     attached: None,
+                    why: None,
                 };
                 (t.name.clone(), e)
             })
@@ -565,6 +571,9 @@ impl Manager {
     fn set_state(&self, name: &str, state: TunnelState, clear_info: bool) {
         if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
             e.state = state;
+            if state != TunnelState::Trouble {
+                e.why = None;
+            }
             if clear_info {
                 if let Some(info) = e.info.take() {
                     self.traffic.untrack(&info.device);
@@ -573,6 +582,14 @@ impl Manager {
             }
         }
         let _ = self.changes.send(name.to_owned());
+    }
+
+    /// The tunnel is in trouble, and why (crake_proto::trouble).
+    fn set_trouble(&self, name: &str, why: Option<String>) {
+        if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
+            e.why = why;
+        }
+        self.set_state(name, TunnelState::Trouble, true);
     }
 
     fn entry(&self, name: &str) -> Result<(usize, String, Option<Ipv4Addr>)> {

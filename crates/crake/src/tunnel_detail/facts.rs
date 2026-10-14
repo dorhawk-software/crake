@@ -10,7 +10,7 @@ pub(super) fn title_row(tunnel: &Tunnel, t: &Theme) -> impl IntoElement {
         }
         "connected" => (t.accent, "Connected"),
         "connecting" => (t.accent, "Connecting\u{2026}"),
-        "trouble" => (t.danger, "Couldn\u{2019}t stay connected"),
+        "trouble" => (t.danger, crate::model::trouble_words(tunnel)),
         _ => (t.line_strong, "Off"),
     };
     div()
@@ -275,6 +275,16 @@ pub(super) fn duration(secs: u64) -> String {
         (1, _) => format!("1 day {h} h"),
         _ => format!("{d} days {h} h"),
     }
+}
+
+/// In trouble: the whole sentence craked logged, under the title.
+pub(super) fn why(tunnel: &Tunnel, t: &Theme) -> impl IntoElement {
+    div().when(tunnel.state == "trouble" && !tunnel.why.is_empty(), |d| {
+        d.mt(px(6.))
+            .text_size(px(13.))
+            .text_color(t.muted)
+            .child(tunnel.why.clone())
+    })
 }
 
 #[cfg(test)]

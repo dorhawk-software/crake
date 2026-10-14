@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: why a tunnel stopped</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4;
+    --accent: #2DD4BF; --track: #4A4E53; --danger: #F97066; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --ink: #1A1C1E; --muted: #5A5F64;
+    --accent: #0F766E; --track: #BDBDB8; --danger: #B42318; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 40px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 980px; margin-bottom: 18px; }
+  .intro b { color: var(--ink); }
+  .cols { display: flex; gap: 36px; flex-wrap: wrap; align-items: flex-start; }
+  .cap { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 452px; min-height: 54px; }
+  .panel { width: 452px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding-bottom: 8px; }
+  .sec { padding: 12px 18px 4px; font-size: 13px; font-weight: 600; }
+  .tun { display: flex; align-items: center; gap: 12px; padding: 9px 18px; }
+  .tun .n { font-size: 15px; font-weight: 700; }
+  .tun .n.off { color: var(--muted); }
+  .tun .s { font-size: 13px; color: var(--muted); margin-left: 8px; }
+  .tun .s.bad { color: var(--danger); }
+  .tun .p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .sw { width: 46px; height: 26px; border-radius: 13px; background: var(--track); position: relative; flex: none; margin-left: auto; }
+  .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; }
+  .sw.on { background: var(--accent); }
+  .sw.on::after { left: 23px; }
+  .why { margin: 0 18px 8px; padding: 10px 12px; background: var(--surface); border-radius: 8px; font-size: 13px; }
+  table { border-collapse: collapse; font-size: 13px; margin-top: 8px; max-width: 980px; }
+  th, td { text-align: left; padding: 7px 14px 7px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td.l { color: var(--danger); white-space: nowrap; }
+  code { font-family: 'Atkinson Hyperlegible Mono', monospace; font-size: 12px; color: var(--muted); }
+  h3 { font-size: 15px; margin: 30px 0 4px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>Why a tunnel stopped.</b> When a tunnel drops, the panel says "Couldn't stay connected", whatever
+    happened. craked often knows more: an OpenVPN 3 session that expired, a gateway that ended the session, a sign-in
+    refused. The log already has the whole sentence; the panel and the tunnel's detail don't. When the reason is one Crake
+    recognises (table below), say it; otherwise keep "Couldn't stay connected". The detail window shows the whole
+    sentence in both options.</div>
+  <div class="cols">
+    <div>
+      <div class="cap">A. The status names the reason (recommended)</div>
+      <div class="sub">The red words after the name say what happened, in two or three words. Nothing else in the panel
+        changes; the switch is the action. The whole sentence is in the tunnel's detail and the log.</div>
+      <div class="panel">
+        <div class="sec">Tunnels</div>
+        <div class="tun"><div><div><span class="n off">Initech</span><span class="s bad">Session expired</span></div>
+          <div class="p">Your profile · learning on</div></div><div class="sw"></div></div>
+        <div class="tun"><div><div><span class="n">ACME</span><span class="s">Connected · 9 hosts</span></div>
+          <div class="p">Your profile · learning on</div></div><div class="sw on"></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">B. The status, and the whole sentence under it</div>
+      <div class="sub">As A, plus the sentence craked logged, under the tunnel until it's switched on again. Says the
+        most, and costs a few lines of panel each time a session runs out.</div>
+      <div class="panel">
+        <div class="sec">Tunnels</div>
+        <div class="tun"><div><div><span class="n off">Initech</span><span class="s bad">Session expired</span></div>
+          <div class="p">Your profile · learning on</div></div><div class="sw"></div></div>
+        <div class="why">Initech's session expired: the server ends sessions after a while (this one after 54 minutes).
+          Switch it on to sign in again.</div>
+        <div class="tun"><div><div><span class="n">ACME</span><span class="s">Connected · 9 hosts</span></div>
+          <div class="p">Your profile · learning on</div></div><div class="sw on"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <h3>The reasons Crake recognises</h3>
+  <div class="intro" style="margin-bottom:0">Each from words openconnect (9.12, run with <code>LC_ALL=C</code>) or
+    openvpn3 (v27.1) really print; anything else stays "Couldn't stay connected", with openconnect's last line in the
+    detail and the log as today.</div>
+  <table>
+    <tr><th>Status</th><th>Whole sentence (detail, log)</th><th>Recognised from</th></tr>
+    <tr><td class="l">Session expired</td><td>Its session expired: the server ends sessions after a while (this one after
+      54 minutes). Switch it on to sign in again.</td><td>openvpn3 <code>SESSION_EXPIRED</code>; openconnect
+      <code>Server terminated connection (session expired)</code>, <code>VPN session expired</code>, <code>Cookie is no
+      longer valid, ending session</code></td></tr>
+    <tr><td class="l">Ended by the gateway</td><td>ACME's gateway ended the session (signed out elsewhere, or by its
+      administrators). Switch it on to sign in again.</td><td>openconnect <code>Session terminated by server; exiting.</code>,
+      <code>Cookie was rejected by server; exiting.</code></td></tr>
+    <tr><td class="l">Sign-in refused</td><td>Initech refused the sign-in. Switch it on to try again.</td><td>openvpn3
+      <code>CONN_AUTH_FAILED</code></td></tr>
+    <tr><td class="l">Ended by OpenVPN 3</td><td>OpenVPN 3 ended its session: tun0 is gone. Switch it on to connect
+      again.</td><td>craked: the session's device disappeared (today's fix)</td></tr>
+    <tr><td class="l">Couldn't stay connected</td><td>What openconnect said last, as today.</td><td>anything else</td></tr>
+  </table>
+</div>
+<script>if (location.search.includes('dark=false')) document.body.classList.add('light');</script>
+</body>
+</html>

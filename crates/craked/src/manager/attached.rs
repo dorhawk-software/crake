@@ -64,7 +64,7 @@ impl Manager {
                 .get(name)
                 .is_some_and(|e| e.info.is_some());
             if !up {
-                self.set_state(name, TunnelState::Trouble, true);
+                self.set_trouble(name, Some(why.clone()));
                 self.log.system(
                     Some(name),
                     format!("{display} couldn\u{2019}t connect."),
@@ -75,6 +75,7 @@ impl Manager {
         }
         if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
             e.state = TunnelState::Connecting;
+            e.why = None;
         }
         let list = |k: &str| -> Vec<String> {
             fields
@@ -174,7 +175,11 @@ impl Manager {
         } else {
             TunnelState::Off
         };
-        self.set_state(name, state, true);
+        if state == TunnelState::Trouble {
+            self.set_trouble(name, failed.clone());
+        } else {
+            self.set_state(name, state, true);
+        }
         self.update_hush().await;
         let msg = match state {
             TunnelState::Trouble => crake_proto::stopped_unexpectedly(&label),
@@ -203,7 +208,10 @@ impl Manager {
             if crate::net::is_tun(&device) {
                 continue;
             }
-            let why = format!("OpenVPN 3 ended its session: {device} is gone.");
+            let why = format!(
+                "{}: {device} is gone. Switch it on to connect again.",
+                crake_proto::trouble::OPENVPN3_ENDED
+            );
             if let Err(e) = self.detach(&name, Some(why)).await {
                 tracing::warn!("{name}: {e:#}");
             }

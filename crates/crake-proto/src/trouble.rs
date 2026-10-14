@@ -1,0 +1,90 @@
+//! Why a tunnel stopped (design/proposals/trouble-reason.html, option A):
+//! the sentences craked logs for the reasons Crake recognises, and the few
+//! words the panel shows for each instead of "Couldn't stay connected".
+
+/// openvpn3's SESSION_EXPIRED, or openconnect saying the session expired.
+pub const EXPIRED: &str = "Its session expired";
+/// openconnect: the gateway ended the session, or refused its cookie.
+pub const GATEWAY_ENDED: &str = "Its gateway ended the session";
+/// openvpn3: the gateway turned the sign-in down.
+pub const SIGN_IN_REFUSED: &str = "The gateway didn\u{2019}t accept the sign-in";
+/// craked: the session's device went away (openvpn3 ended it).
+pub const OPENVPN3_ENDED: &str = "OpenVPN 3 ended its session";
+/// What to do about it.
+pub const SIGN_IN_AGAIN: &str = "Switch it on to sign in again.";
+
+/// The status's few words for a reason Crake recognises.
+pub fn label(why: &str) -> Option<&'static str> {
+    [
+        (EXPIRED, "Session expired"),
+        (GATEWAY_ENDED, "Ended by the gateway"),
+        (SIGN_IN_REFUSED, "Sign-in refused"),
+        (OPENVPN3_ENDED, "Ended by OpenVPN 3"),
+    ]
+    .into_iter()
+    .find(|(start, _)| why.starts_with(start))
+    .map(|(_, words)| words)
+}
+
+/// openconnect's last words (openconnect 9.12, run with LC_ALL=C), put
+/// plainly, when they're a reason Crake recognises.
+pub fn from_openconnect(last: &str) -> Option<String> {
+    const EXPIRED_LINES: [&str; 3] = [
+        "Server terminated connection (session expired)",
+        "VPN session expired",
+        "Cookie is no longer valid, ending session",
+    ];
+    const ENDED_LINES: [&str; 2] = [
+        "Session terminated by server; exiting.",
+        "Cookie was rejected by server; exiting.",
+    ];
+    if EXPIRED_LINES.iter().any(|l| last.contains(l)) {
+        Some(format!("{EXPIRED}. {SIGN_IN_AGAIN}"))
+    } else if ENDED_LINES.iter().any(|l| last.contains(l)) {
+        Some(format!("{GATEWAY_ENDED}. {SIGN_IN_AGAIN}"))
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn openconnects_words_are_put_plainly() {
+        for line in [
+            "Server terminated connection (session expired)",
+            "VPN session expired",
+            "Cookie is no longer valid, ending session",
+        ] {
+            let why = from_openconnect(line).unwrap_or_default();
+            assert_eq!(label(&why), Some("Session expired"), "{line}: {why}");
+        }
+        for line in [
+            "Session terminated by server; exiting.",
+            "Cookie was rejected by server; exiting.",
+        ] {
+            let why = from_openconnect(line).unwrap_or_default();
+            assert_eq!(label(&why), Some("Ended by the gateway"), "{line}: {why}");
+            assert!(why.ends_with(SIGN_IN_AGAIN), "{why}");
+        }
+        assert_eq!(from_openconnect("SSL negotiation failed"), None);
+    }
+
+    #[test]
+    fn each_reason_has_its_few_words() {
+        let expired = format!("{EXPIRED}: the server ends sessions after a while. {SIGN_IN_AGAIN}");
+        assert_eq!(label(&expired), Some("Session expired"));
+        assert_eq!(
+            label(&format!("{SIGN_IN_REFUSED}. AUTH_FAILED")),
+            Some("Sign-in refused")
+        );
+        assert_eq!(
+            label(&format!("{OPENVPN3_ENDED}: tun0 is gone.")),
+            Some("Ended by OpenVPN 3")
+        );
+        assert_eq!(label("openconnect exited with exit status: 1."), None);
+        assert_eq!(label(""), None);
+    }
+}

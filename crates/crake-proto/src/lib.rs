@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+pub mod trouble;
+
 /// Where `craked` listens for the hook, unless configured otherwise.
 #[cfg(target_os = "linux")]
 pub const DEFAULT_HOOK_SOCKET: &str = "/run/crake/hook.sock";

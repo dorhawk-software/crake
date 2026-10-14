@@ -338,6 +338,15 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    last used from the refreshed timeout); Pin/Unpin/Forget; "Add a host"
    takes an address, a network (pinned) or a name (asked of the tunnel's
    DNS, `add_name`). Refreshed every 5 s while open.
+   Why a tunnel stopped (design/proposals/trouble-reason.html, option A,
+   chosen by the user): craked keeps the sentence it logged with the
+   tunnel while it's in trouble (ListTunnels `why`); the panel's status
+   names a reason Crake recognises in a few words ("Session expired",
+   "Ended by the gateway", "Sign-in refused", "Ended by OpenVPN 3";
+   `crake_proto::trouble`, from openvpn3's SESSION_EXPIRED and
+   CONN_AUTH_FAILED, openconnect 9.12's own words, and a session's device
+   gone), and tunnel detail shows the sentence under its title; anything
+   else stays "Couldn't stay connected" (`CRAKE_DEMO=expired`).
    Tunnels (Settings, first section; design/proposals/settings-tunnels.html):
    one list in the order traffic takes, drag to reorder (the try order moved
    here from Learning), full tunnels under "Everything else goes through:";

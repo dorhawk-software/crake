@@ -123,6 +123,8 @@ pub struct Tunnel {
     pub clash: String,
     /// Its DNS doesn't answer (craked answers known names from memory).
     pub dns_down: bool,
+    /// In trouble: why, as the log says it (crake_proto::trouble).
+    pub why: String,
 }
 
 pub fn start(updates: async_channel::Sender<Update>) -> async_channel::Sender<Command> {
@@ -285,6 +287,7 @@ fn tunnel(d: &HashMap<String, OwnedValue>) -> Tunnel {
         dns: strings("dns"),
         clash: text("clash"),
         dns_down: flag("dns_down"),
+        why: text("why"),
     }
 }
 

@@ -22,6 +22,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 - **Signing in to OpenVPN 3 again no longer ends in "isn't a VPN device".** openvpn3 can say a
   session is connected a moment before it names its device; Crake now waits for the name instead
   of giving up and ending the session. If Crake can't use a session, the log says why.
+- **A tunnel that stopped says why**, when Crake knows: "Session expired", "Ended by the gateway",
+  "Sign-in refused" or "Ended by OpenVPN 3" instead of "Couldn't stay connected" in the panel,
+  and the whole sentence in the tunnel's detail.
 - **The tray shows that Crake is connecting while you sign in again** to a tunnel that stopped,
   instead of keeping its red "!" until the sign-in is done.
 

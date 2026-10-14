@@ -180,6 +180,20 @@ pub fn demo() -> Model {
     }
 }
 
+/// The demo with Nordbank's session expired (CRAKE_DEMO=expired).
+pub fn demo_expired(mut m: Model) -> Model {
+    if let Some(nord) = m.tunnels.iter_mut().find(|t| t.name == "nord") {
+        nord.state = "trouble".into();
+        nord.hosts = 0;
+        nord.why = format!(
+            "{}: the server ends sessions after a while (this one after 54 minutes). {}",
+            crake_proto::trouble::EXPIRED,
+            crake_proto::trouble::SIGN_IN_AGAIN
+        );
+    }
+    m
+}
+
 // literal: the design's sample data (design/screens), for CRAKE_DEMO
 /// Tunnel detail's sample (design/screens/tunnel-detail.html), for
 /// `CRAKE_DEMO=1 CRAKE_SHOW=detail:acme`: ACME connected for 4 h 53 min,

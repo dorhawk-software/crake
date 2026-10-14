@@ -125,6 +125,38 @@ async fn unexpected_exit_is_trouble() {
     mgr.connect("acme").unwrap();
 }
 
+/// openconnect's own words for a session the gateway ended are put
+/// plainly, in the log and in what the app is told: the panel's status
+/// names the reason (design/proposals/trouble-reason.html, option A).
+#[tokio::test]
+async fn a_session_the_gateway_ended_says_so() {
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(
+        dir.path(),
+        "#!/bin/sh\necho 'Session terminated by server; exiting.' >&2\nexit 1\n",
+    );
+    let socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    let _srv = hook_server::serve(mgr.clone(), &socket).unwrap();
+
+    mgr.connect("acme").unwrap();
+    wait_for(&mgr, "acme", TunnelState::Trouble).await;
+    let why = mgr.get("acme").unwrap().why.unwrap_or_default();
+    assert_eq!(
+        crake_proto::trouble::label(&why),
+        Some("Ended by the gateway"),
+        "{why:?}"
+    );
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(
+        log.contains("ACME stopped unexpectedly.") && log.contains(&why),
+        "{log}"
+    );
+    // Switched on again: it's no longer in trouble, nor its reason.
+    mgr.connect("acme").unwrap();
+    assert_eq!(mgr.get("acme").unwrap().why, None);
+}
+
 #[tokio::test]
 async fn hook_from_a_stopped_tunnel_is_refused() {
     let dir = tempfile::tempdir().unwrap();

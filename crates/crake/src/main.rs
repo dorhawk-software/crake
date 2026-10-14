@@ -344,6 +344,13 @@ fn main() {
             } else {
                 Model::default()
             };
+            // CRAKE_DEMO=expired: Nordbank's session ran out (the panel's
+            // and tunnel detail's words for why a tunnel stopped).
+            let model = if std::env::var("CRAKE_DEMO").as_deref() == Ok("expired") {
+                model::demo_expired(model)
+            } else {
+                model
+            };
             let setup = Setup {
                 model,
                 x11,
