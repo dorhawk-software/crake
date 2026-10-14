@@ -21,6 +21,12 @@ impl Manager {
             if e.config.protocol != crate::config::Protocol::Openvpn3 {
                 bail!("{} isn't an OpenVPN 3 tunnel", e.config.display());
             }
+            if !crate::sys::ADOPTS_OPENVPN3 {
+                bail!(
+                    "OpenVPN 3 isn't available on this system: Crake can't use {} here yet.",
+                    e.config.display()
+                );
+            }
             // Already routed through this device (the app taking the
             // session back after a restart): nothing to do.
             if e.state == TunnelState::Connected
@@ -170,6 +176,44 @@ impl Manager {
             if let Err(e) = self.detach(&name, Some(why)).await {
                 tracing::warn!("{name}: {e:#}");
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Where OpenVPN 3 isn't (Windows, macOS), a session handed over is
+    /// refused saying so, not taken for a device that isn't there.
+    #[tokio::test]
+    async fn openvpn3_sessions_are_refused_where_there_is_no_openvpn3() {
+        let dir = tempfile::tempdir().unwrap();
+        let mgr = Manager::new(crate::config::Config {
+            log_path: dir.path().join("log"),
+            state_path: dir.path().join("hosts.json"),
+            managed_dir: dir.path().join("managed.d"),
+            probing: false,
+            use_resolved: false,
+            apply_network: false,
+            ..Default::default()
+        })
+        .unwrap();
+        let name = mgr
+            .add_tunnel(&HashMap::from([
+                ("display_name".to_owned(), "Initech".to_owned()),
+                ("gateway".to_owned(), "initech".to_owned()),
+                ("protocol".to_owned(), "openvpn3".to_owned()),
+            ]))
+            .unwrap();
+        let fields = HashMap::from([("device".to_owned(), "tun0".to_owned())]);
+        let attached = mgr.attach(&name, &fields).await;
+        if crate::sys::ADOPTS_OPENVPN3 {
+            attached.unwrap();
+        } else {
+            let e = format!("{:#}", attached.unwrap_err());
+            assert!(e.contains("OpenVPN 3 isn't available"), "{e}");
+            assert_eq!(mgr.get(&name).unwrap().state, TunnelState::Off);
         }
     }
 }

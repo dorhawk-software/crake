@@ -1312,6 +1312,14 @@ If Crake starts OpenVPN itself, the Linux `tun0` problem (openvpn3 names
 its own devices, so craked maps them back with `tunnel_of_device`) goes
 away: on Windows OpenVPN lets the starter name its Wintun adapter
 (`--dev-node crake-<name>`).
+**When OpenVPN comes to Windows or macOS:** today `attach` refuses OpenVPN
+3 sessions there (`sys::ADOPTS_OPENVPN3`, false on both; a test says so).
+If craked starts OpenVPN itself, it watches the process like openconnect's
+and needs none of this. If it adopts sessions it doesn't run (OpenVPN
+Connect, FortiClient as in 7f), that system needs its own
+`net::is_tun` (a stub returning false today) so `check_devices` notices
+a session that ended behind the app's back (see 7g), and then
+`ADOPTS_OPENVPN3` true.
 
 **A WFP callout driver for Windows (someday; decided with the user,
 2026-10-12: "not now, but write it down").** Two things Windows can't do

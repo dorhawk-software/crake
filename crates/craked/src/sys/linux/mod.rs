@@ -16,6 +16,10 @@ pub use host::*;
 /// openconnect names the tunnel's device as told: `crake-<name>`.
 pub const NAMES_DEVICES: bool = true;
 
+/// OpenVPN 3 sessions are handed to craked (the app runs them, craked
+/// routes through their device; `attach`).
+pub const ADOPTS_OPENVPN3: bool = true;
+
 /// The device openconnect reported is the tunnel's own.
 pub fn tunnel_device(tunnel: &str, device: &str) -> bool {
     device == crake_proto::interface_name(tunnel)

@@ -21,6 +21,10 @@ pub use host::*;
 /// the next free one, and craked goes by the one it reports.
 pub const NAMES_DEVICES: bool = false;
 
+/// OpenVPN 3 sessions are handed to craked: not here (OpenVPN 3 Linux,
+/// the service the app drives, is Linux's only).
+pub const ADOPTS_OPENVPN3: bool = false;
+
 /// The device openconnect reported is a utun device.
 pub fn tunnel_device(_tunnel: &str, device: &str) -> bool {
     device.starts_with("utun")
