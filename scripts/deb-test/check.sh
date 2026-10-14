@@ -110,8 +110,11 @@ tunnel() {
     # for all its devices, when one of its sessions reconnects): its domain
     # as a search domain, every name to it. craked puts its own back.
     check "another program rewrites ACME's DNS settings" sh -c 'resolvectl domain crake-acme acme.internal "~." && resolvectl default-route crake-acme yes'
-    for _ in $(seq 1 20); do resolvectl domain crake-acme | grep -q "~acme.internal" && break; sleep 0.5; done
-    check "craked puts its own back" sh -c 'resolvectl domain crake-acme | grep -q "): ~acme.internal\$" && resolvectl default-route crake-acme | grep -q "): no\$"'
+    # craked sets the domains and the default route in two calls: wait for
+    # both (waiting for the domains alone once caught it between them).
+    restored='resolvectl domain crake-acme | grep -q "): ~acme.internal\$" && resolvectl default-route crake-acme | grep -q "): no\$"'
+    for _ in $(seq 1 20); do sh -c "$restored" && break; sleep 0.5; done
+    check "craked puts its own back" sh -c "$restored"
     # A package upgrade (reinstalling runs the same scripts): ACME is
     # handed to the new craked, stays signed in and comes back by itself.
     if [ "$PM" = pacman ]; then
