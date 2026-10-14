@@ -358,12 +358,16 @@ impl Traffic {
         match self.tab {
             Tab::Now => match model.live.lists_connections() {
                 Some(false) => body.child(note(
-                    "Crake can\u{2019}t list connections on this system yet. The ways out above are live.",
+                    "Crake couldn\u{2019}t list the connections. The ways out above are live.",
                     t,
                 )),
                 None => body.child(note("Looking\u{2026}", t)),
                 Some(true) if now.is_empty() => body.child(note("No connections open.", t)),
-                Some(true) => body.child(tables::table(&["Destination", "Goes", "Now", "Since"], now, t)),
+                Some(true) => body.child(tables::table(
+                    &["Destination", "Goes", "Now", "Since"],
+                    now,
+                    t,
+                )),
             },
             Tab::Rules => body.child(tables::table(&["Destination", "Goes", "Why"], rules, t)),
         }

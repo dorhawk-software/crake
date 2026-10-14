@@ -1,7 +1,9 @@
 //! macOS: new TCP connections from the kernel's connection list (the
 //! `net.inet.tcp.pcblist_n` sysctl that netstat reads), looked at four
 //! times a second; what changed becomes the events Linux gets from
-//! conntrack (`flows::changes`), as on Windows.
+//! conntrack (`flows::changes`), as on Windows. The same lists give the
+//! Traffic window each connection's bytes (`open_connections`): TCP's, and
+//! UDP sockets connected to one address (`net.inet.udp.pcblist_n`).
 
 use std::collections::HashMap;
 use std::io;
@@ -58,7 +60,11 @@ pub fn delete(_flow: Flow) -> io::Result<()> {
 /// The machine's TCP connections, IPv4 and IPv6 (not listeners), and
 /// their states.
 fn table() -> io::Result<HashMap<Flow, TcpState>> {
-    let name = c"net.inet.tcp.pcblist_n";
+    Ok(parse(&list(c"net.inet.tcp.pcblist_n")?))
+}
+
+/// One of the kernel's lists, as the sysctl gives it.
+fn list(name: &std::ffi::CStr) -> io::Result<Vec<u8>> {
     let mut len = 0;
     // SAFETY: a size query (no buffer), then a buffer of that size (plus
     // room for connections opened meanwhile).
@@ -86,11 +92,12 @@ fn table() -> io::Result<HashMap<Flow, TcpState>> {
             return Err(io::Error::last_os_error());
         }
         buf.truncate(len);
-        Ok(parse(&buf))
+        Ok(buf)
     }
 }
 
 /// Record kinds (xnu's XSO_*).
+const XSO_STATS: u32 = 0x08;
 const XSO_INPCB: u32 = 0x10;
 const XSO_TCPCB: u32 = 0x20;
 /// The list starts and ends with an `xinpgen` this long.
@@ -121,6 +128,14 @@ const FADDR6_AFTER_VFLAG: usize = 4;
 const LADDR6_AFTER_VFLAG: usize = 20;
 const FADDR_AFTER_VFLAG: usize = 16;
 const LADDR_AFTER_VFLAG: usize = 32;
+/// xsockstat_n: after its length and kind, per traffic class
+/// (SO_TC_STATS_MAX of them) a `data_stats`: packets and bytes received,
+/// packets and bytes sent (u64 each).
+const STATS_AT: usize = 8;
+const TRAFFIC_CLASSES: usize = 4;
+const DATA_STATS: usize = 32;
+const RX_BYTES: usize = 8;
+const TX_BYTES: usize = 24;
 /// xtcpcb_n: t_state.
 const TCP_STATE: usize = 36;
 /// BSD's TCP states (netinet/tcp_fsm.h): closed, a SYN out, established
@@ -129,10 +144,20 @@ const TCPS_CLOSED: u32 = 0;
 const TCPS_SYN_SENT: u32 = 2;
 const TCPS_ESTABLISHED: u32 = 4;
 
-/// The list: an `xinpgen`, then per connection its records (`xinpcb_n`,
-/// the socket's, `xtcpcb_n`), each led by its length and kind and padded
-/// to 8 bytes, then another `xinpgen`.
+/// TCP's list: each connection and its state.
 pub fn parse(buf: &[u8]) -> HashMap<Flow, TcpState> {
+    records(buf, false)
+        .into_iter()
+        .filter_map(|(flow, state, _)| Some((flow, state?)))
+        .collect()
+}
+
+/// A list: an `xinpgen`, then per connection its records (`xinpcb_n`, the
+/// socket's, its two buffers', its statistics, and for TCP `xtcpcb_n`),
+/// each led by its length and kind and padded to 8 bytes, then another
+/// `xinpgen`. Each connection with its TCP state (None for UDP) and its
+/// bytes both ways.
+fn records(buf: &[u8], udp: bool) -> Vec<(Flow, Option<TcpState>, u64)> {
     let u32_at = |at: usize| {
         buf.get(at..at + size_of::<u32>())
             .map(|b| u32::from_ne_bytes(b.try_into().unwrap()))
@@ -155,8 +180,12 @@ pub fn parse(buf: &[u8]) -> HashMap<Flow, TcpState> {
             IpAddr::V6(Ipv6Addr::from(octets))
         })
     };
-    let mut found = HashMap::new();
-    let mut current: Option<Flow> = None;
+    let u64_at = |at: usize| {
+        buf.get(at..at + size_of::<u64>())
+            .map(|b| u64::from_ne_bytes(b.try_into().unwrap()))
+    };
+    let mut found = Vec::new();
+    let mut current: Option<(Flow, u64)> = None;
     let mut at = XINPGEN;
     while at + XINPGEN < buf.len() {
         let (Some(len), Some(kind)) = (u32_at(at), u32_at(at + RECORD_KIND)) else {
@@ -195,19 +224,39 @@ pub fn parse(buf: &[u8]) -> HashMap<Flow, TcpState> {
                         (u16_net(at + INP_FPORT), u16_net(at + INP_LPORT))
                     && !dst.is_unspecified()
                 {
-                    current = Some(Flow {
-                        src,
-                        dst,
-                        sport,
-                        dport,
-                        udp: false,
-                    });
+                    current = Some((
+                        Flow {
+                            src,
+                            dst,
+                            sport,
+                            dport,
+                            udp,
+                        },
+                        0,
+                    ));
+                }
+            }
+            // xsockstat_n: the bytes, summed over the traffic classes. A
+            // UDP socket's records end here.
+            XSO_STATS => {
+                if let Some((flow, bytes)) = current.as_mut() {
+                    *bytes = (0..TRAFFIC_CLASSES)
+                        .map(|c| at + STATS_AT + c * DATA_STATS)
+                        .map(|d| {
+                            u64_at(d + RX_BYTES).unwrap_or(0) + u64_at(d + TX_BYTES).unwrap_or(0)
+                        })
+                        .sum();
+                    if udp {
+                        found.push((*flow, None, *bytes));
+                        current = None;
+                    }
                 }
             }
             // xtcpcb_n: t_state at 36.
             XSO_TCPCB => {
-                if let (Some(flow), Some(state)) = (current.take(), u32_at(at + TCP_STATE)) {
-                    found.insert(flow, tcp_state(state));
+                if let (Some((flow, bytes)), Some(state)) = (current.take(), u32_at(at + TCP_STATE))
+                {
+                    found.push((flow, Some(tcp_state(state)), bytes));
                 }
             }
             _ => {}
@@ -229,15 +278,31 @@ fn tcp_state(raw: u32) -> TcpState {
     }
 }
 
-/// The open connections with their bytes, for the Traffic window: not
-/// built here yet (CLAUDE.md, Not now: the connection table has no byte
-/// counts per connection on this system). None: the window shows the ways
-/// out and their rates only, and says it can't list connections here.
+/// The open connections with their bytes both ways, for the Traffic
+/// window: TCP's (closed ones left out), and UDP sockets connected to one
+/// address (an unconnected one has no other end to show). macOS counts
+/// every socket's bytes all along: nothing to switch on.
 pub fn open_connections() -> Option<Vec<(Flow, u64)>> {
-    None
+    let tcp = match list(c"net.inet.tcp.pcblist_n") {
+        Ok(buf) => records(&buf, false),
+        Err(e) => {
+            tracing::warn!("listing connections: {e}");
+            return None;
+        }
+    };
+    let udp = list(c"net.inet.udp.pcblist_n")
+        .map(|buf| records(&buf, true))
+        .unwrap_or_default();
+    Some(
+        tcp.into_iter()
+            .filter(|(_, state, _)| *state != Some(TcpState::Close))
+            .chain(udp)
+            .map(|(flow, _, bytes)| (flow, bytes))
+            .collect(),
+    )
 }
 
-/// Nothing to switch back off here (`open_connections`).
+/// Nothing to switch back off here: macOS counts all along.
 pub fn connections_idle(_force: bool) {}
 
 #[cfg(test)]
@@ -274,11 +339,80 @@ mod tests {
         socket[0..4].copy_from_slice(&92u32.to_ne_bytes());
         socket[4..8].copy_from_slice(&1u32.to_ne_bytes());
         socket.resize(96, 0);
+        let stats = stats_record(state.into());
         let mut tcpcb = vec![0u8; 40];
         tcpcb[0..4].copy_from_slice(&40u32.to_ne_bytes());
         tcpcb[4..8].copy_from_slice(&XSO_TCPCB.to_ne_bytes());
         tcpcb[36..40].copy_from_slice(&state.to_ne_bytes());
-        [inpcb, socket, tcpcb].concat()
+        [inpcb, socket, stats, tcpcb].concat()
+    }
+
+    /// An `xsockstat_n` whose traffic classes carry `bytes` in all: half
+    /// received in class 0, half sent in class 2.
+    fn stats_record(bytes: u64) -> Vec<u8> {
+        let len = STATS_AT + TRAFFIC_CLASSES * DATA_STATS;
+        let mut r = vec![0u8; len];
+        r[0..4].copy_from_slice(&(len as u32).to_ne_bytes());
+        r[4..8].copy_from_slice(&XSO_STATS.to_ne_bytes());
+        let half = bytes / 2;
+        let at = STATS_AT + RX_BYTES;
+        r[at..at + 8].copy_from_slice(&half.to_ne_bytes());
+        let at = STATS_AT + 2 * DATA_STATS + TX_BYTES;
+        r[at..at + 8].copy_from_slice(&(bytes - half).to_ne_bytes());
+        r
+    }
+
+    #[test]
+    fn each_connection_brings_its_bytes() {
+        let gen_ = || {
+            let mut g = vec![0u8; XINPGEN];
+            g[0..4].copy_from_slice(&(XINPGEN as u32).to_ne_bytes());
+            g
+        };
+        // TCP: the state record follows the statistics (its state, here 4,
+        // doubles as the bytes in this test's records).
+        let tcp = [
+            gen_(),
+            connection(true, (&[192, 0, 2, 5], 50001), (&[198, 51, 100, 7], 443), 4),
+            gen_(),
+        ]
+        .concat();
+        let got = records(&tcp, false);
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].1, Some(TcpState::Answered));
+        assert_eq!(got[0].2, 4);
+        // UDP: the statistics end a socket's records.
+        let mut udp = connection(
+            true,
+            (&[192, 0, 2, 5], 50002),
+            (&[198, 51, 100, 9], 443),
+            1_200,
+        );
+        udp.truncate(udp.len() - 40); // no xtcpcb_n
+        let got = records(&[gen_(), udp, gen_()].concat(), true);
+        assert_eq!(got.len(), 1);
+        assert!(got[0].0.udp);
+        assert_eq!((got[0].1, got[0].2), (None, 1_200));
+    }
+
+    /// A real connection on this Mac (loopback, so nothing leaves it):
+    /// listed, its bytes counted.
+    #[test]
+    fn a_real_connection_is_listed_with_its_bytes() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let mut client = std::net::TcpStream::connect(addr).unwrap();
+        let (mut server, _) = listener.accept().unwrap();
+        client.write_all(&[7; 5000]).unwrap();
+        let mut got = [0u8; 5000];
+        server.read_exact(&mut got).unwrap();
+        let all = open_connections().expect("macOS lists connections");
+        let ours = all
+            .iter()
+            .find(|(f, _)| f.dport == addr.port() && f.sport == client.local_addr().unwrap().port())
+            .unwrap_or_else(|| panic!("not listed: {all:?}"));
+        assert!(ours.1 >= 5000, "its bytes: {}", ours.1);
     }
 
     fn v6(a: &str) -> [u8; 16] {

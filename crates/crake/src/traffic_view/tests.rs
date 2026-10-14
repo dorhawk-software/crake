@@ -139,8 +139,8 @@ fn the_tabs_list_connections_and_rules(cx: &mut TestAppContext) {
     assert!(w.view.read_with(cx, |v, _| v.tab == Tab::Now));
 }
 
-/// Where craked can't list connections (Windows, macOS for now), the ways
-/// out still show; the table says why it's empty.
+/// When craked couldn't list the connections, the ways out still show;
+/// the table says why it's empty.
 #[gpui_kit::test]
 fn without_connections_the_ways_still_show(cx: &mut TestAppContext) {
     let w = open(cx);

@@ -14,7 +14,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 - **Traffic, live.** A new window, from the panel's Traffic button, shows what goes where right
   now: this computer, each tunnel that's up and direct, the busiest places each one reaches, and
   packets ticking along every path as they go. Under it, the last five minutes, the connections
-  open right now (on Linux) and every rule Crake has. It's only asked for while the window is open,
+  open right now and every rule Crake has. On Windows only TCP connections are listed (Windows
+  doesn't say where UDP goes); a connection's bytes count from when the window first looked. It's only asked for while the window is open,
   and stays on this computer like everything Crake sees.
 ## 0.7.0 (2026-10-14)
 

@@ -16,8 +16,8 @@ pub struct Live {
     /// Bytes through each tunnel's device so far, by tunnel name.
     #[serde(default)]
     pub tunnels: BTreeMap<String, u64>,
-    /// The open connections, when this system lets craked list them with
-    /// their bytes (Linux); None where it can't yet.
+    /// The open connections with their bytes; None when craked couldn't
+    /// list them (or, in its tests, routes nothing for real).
     #[serde(default)]
     pub connections: Option<Vec<Connection>>,
 }

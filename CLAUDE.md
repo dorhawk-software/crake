@@ -371,11 +371,17 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    undone hosts from HostDetails, the never list, then everything else).
    craked's D-Bus `Live` (asked once a second while the window is open,
    polkit-guarded like changes: it says where the computer connects):
-   the physical and per-tunnel device counters (`Traffic::now`) and, on
-   Linux, the open connections from a conntrack dump with their bytes
-   (`conntrack::open_connections`; craked switches `nf_conntrack_acct`
-   on while it's asked and off a minute after, or leaves it alone if it
-   was on; AppArmor allows that one file), each with its way
+   the physical and per-tunnel device counters (`Traffic::now`) and the
+   open connections with their bytes (`conntrack::open_connections`):
+   Linux from a conntrack dump, TCP and UDP (craked switches
+   `nf_conntrack_acct` on while it's asked and off a minute after, or
+   leaves it alone if it was on; AppArmor allows that one file); Windows
+   from its TCP tables, each connection's extended statistics
+   (Get/SetPerTcp(6)ConnectionEStats) switched on when first seen and off
+   a minute after the last look; macOS from the kernel's lists
+   (`net.inet.tcp.pcblist_n` and `net.inet.udp.pcblist_n`: every
+   socket's `xsockstat_n` counts all along; UDP sockets connected to one
+   address). Each with its way
    (`owner_of`, a full tunnel, else direct) and the name it was looked up
    by; never DNS questions, loopback or connections coming in. The app
    turns two looks into rates (`crake_proto::live::Live::rates_since`,
@@ -813,12 +819,15 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
      certificates and keys kept. A "for experts" place, not in the way
      of people who just import IT's file.
 - **The Traffic window's open ends (built 2026-10-14; left for later):**
-  - *Connections on Windows and macOS:* craked lists them only on Linux
-    (conntrack with byte counts); elsewhere `open_connections` says None
-    and the window shows the ways out and their rates, and says it can't
-    list connections. Windows' TCP table has no bytes per connection
-    unless GetPerTcpConnectionEStats is switched on per connection; macOS'
-    pcblist has none: both need a way of counting.
+  - *UDP on Windows, and unconnected UDP on macOS:* Windows' UDP table
+    has local endpoints only, so UDP conversations (QUIC, HTTP/3) aren't
+    listed there; on macOS only sockets connected to one address are.
+    Their bytes still count in each way's rate. Windows would need a
+    packet-level view (ETW's network events or the WFP driver noted under
+    Other platforms).
+  - *Windows and macOS' connection lists: built 2026-10-15, tested by CI
+    only* (a loopback connection's bytes, on the runners); not yet seen
+    on a real PC or Mac (the checklist under "Tried by real people").
   - *Which app opened a connection* (the proposal's "App" column): a
     connection to its process (Linux: the socket's inode in /proc/*/fd,
     root only); not built.
@@ -867,6 +876,8 @@ daily.
 - [ ] A day of real use: sign-in, hosts learned, Undo; whether the first
   connection to a new host failing (no WFP driver) is noticed.
 - [ ] Display scale changes with Crake running (also in Not now).
+- [ ] The Traffic window: connections listed with their ways and rates
+  (extended TCP statistics switched on by the service).
 
 **Linux distributions** (a real desktop, not the package test's container):
 - [ ] Fedora with GNOME: no tray icons without the AppIndicator extension
@@ -890,6 +901,7 @@ daily.
   Crake.app, and an upgrade restarting it with tunnels kept (0.7; also in
   Not now).
 - [ ] The panel under the menu bar, placed at the icon on each display.
+- [ ] The Traffic window: connections listed with their ways and rates.
 
 **Everywhere:**
 - [ ] Importing a real .ovpn file (New tunnel's Import .ovpn…).
