@@ -648,6 +648,14 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   do with the user: connect, quit Crake, watch the session. If confirmed,
   decide what quitting means for OpenVPN 3 tunnels (say so before quitting,
   or keep the session alive another way).
+- **openvpn3 left a stopped session behind (2026-10-14, v27.1).** After
+  "Stopping VPN client" its backend (openvpn3-service-client) kept running
+  with its tun device and a second copy of the profile's routes in the
+  main table, next to the new session's; traffic Crake doesn't route
+  itself may take the dead device. Seen once, after the app ended a
+  session craked had refused. Not Crake's to clean up (openvpn3's process,
+  user `openvpn`); worth reporting to OpenVPN if it happens again, and
+  Crake could warn when two tun devices carry the same profile's routes.
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with

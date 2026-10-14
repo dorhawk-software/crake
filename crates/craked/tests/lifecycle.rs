@@ -403,6 +403,44 @@ async fn an_openvpn3_session_attaches_and_detaches() {
     );
 }
 
+/// OpenVPN 3: a session craked can't use (here openvpn3 hadn't named its
+/// device yet) is refused saying why in the log, where the user can find it
+/// again; the app then ends the session, which isn't "switched off".
+#[tokio::test]
+async fn a_refused_openvpn3_session_says_why() {
+    use std::collections::HashMap;
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(dir.path(), FAKE);
+    let mgr = Manager::new(cfg).unwrap();
+    let name = mgr
+        .add_tunnel(&HashMap::from([
+            ("display_name".to_owned(), "GitLab".to_owned()),
+            ("gateway".to_owned(), "initech".to_owned()),
+            ("protocol".to_owned(), "openvpn3".to_owned()),
+        ]))
+        .unwrap();
+    let refused = mgr
+        .attach(
+            &name,
+            &HashMap::from([("device".to_owned(), String::new())]),
+        )
+        .await
+        .unwrap_err();
+    let refused = format!("{refused:#}");
+    assert!(
+        refused.contains("didn\u{2019}t say which device"),
+        "{refused}"
+    );
+    assert_eq!(mgr.get(&name).unwrap().state, TunnelState::Trouble);
+    mgr.detach(&name, None).await.unwrap();
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(
+        log.contains("GitLab couldn\u{2019}t connect.") && log.contains("say which device"),
+        "{log}"
+    );
+    assert!(!log.contains("Switched GitLab off."), "{log}");
+}
+
 /// Two tunnels that share a DNS server can't both work: the second is
 /// refused with a sentence saying which to switch off, and craked warns
 /// before it's switched on again, until the first is off.

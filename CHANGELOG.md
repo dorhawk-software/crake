@@ -19,6 +19,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
   ended a session while Crake's window wasn't running (it does when the app that started it
   quits), the tunnel stayed "Connected · its DNS doesn't answer" for good. Crake now notices
   within seconds that the session's device is gone and says the tunnel stopped.
+- **Signing in to OpenVPN 3 again no longer ends in "isn't a VPN device".** openvpn3 can say a
+  session is connected a moment before it names its device; Crake now waits for the name instead
+  of giving up and ending the session. If Crake can't use a session, the log says why.
+- **The tray shows that Crake is connecting while you sign in again** to a tunnel that stopped,
+  instead of keeping its red "!" until the sign-in is done.
 
 ## 0.5.0 (2026-10-13)
 

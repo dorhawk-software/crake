@@ -7,7 +7,7 @@
 //! D-Bus API: /usr/share/doc/openvpn3/dbus; status codes as in the Python
 //! bindings' `openvpn3.constants`.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::time::Duration;
 
 /// OpenVPN 3's backend may still be starting: tried every READY_POLL, up
@@ -22,6 +22,9 @@ use zbus::zvariant::{OwnedObjectPath, OwnedValue};
 
 use crate::Request;
 use crate::signin::{Ask, Event, Prompt, Reply};
+
+mod attached;
+use attached::attached;
 
 const SESSIONS: &str = "net.openvpn.v3.sessions";
 const CONFIGURATION: &str = "net.openvpn.v3.configuration";
@@ -122,7 +125,7 @@ where
     reply.body().deserialize()
 }
 
-async fn property<T>(
+pub(super) async fn property<T>(
     conn: &Connection,
     dest: &str,
     path: &str,
@@ -435,36 +438,6 @@ async fn subscribe(conn: &Connection, path: &str) -> Result<zbus::MessageStream,
         .map_err(|e| e.to_string())?;
     let _ = call::<_, ()>(conn, SESSIONS, path, SESSIONS, "LogForward", &(true,)).await;
     Ok(signals)
-}
-
-/// Connected: what craked needs to route through it. (DNS and domains
-/// too, where openvpn3 lets the user read them; craked otherwise takes
-/// them from resolved.)
-async fn attached(conn: &Connection, path: &str) -> Result<HashMap<String, String>, String> {
-    let device: String = property(conn, SESSIONS, path, SESSIONS, "device_name")
-        .await
-        .map_err(|e| e.to_string())?;
-    let mut fields = HashMap::new();
-    fields.insert("device".to_owned(), device);
-    if let Ok((_, address, _)) =
-        property::<(String, String, u32)>(conn, SESSIONS, path, SESSIONS, "connected_to").await
-    {
-        fields.insert("gateway".to_owned(), address);
-    }
-    if let Ok(device_path) = property::<String>(conn, SESSIONS, path, SESSIONS, "device_path").await
-    {
-        if let Ok(dns) =
-            property::<Vec<String>>(conn, NETCFG, &device_path, NETCFG, "dns_name_servers").await
-        {
-            fields.insert("dns".to_owned(), dns.join(","));
-        }
-        if let Ok(domains) =
-            property::<Vec<String>>(conn, NETCFG, &device_path, NETCFG, "dns_search_domains").await
-        {
-            fields.insert("domains".to_owned(), domains.join(","));
-        }
-    }
-    Ok(fields)
 }
 
 /// Watch a connected session until it ends: switched off here, or dropped

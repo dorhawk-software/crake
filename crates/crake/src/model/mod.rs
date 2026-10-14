@@ -318,10 +318,13 @@ impl Model {
         }
     }
 
+    /// A tunnel being signed in to shows as connecting, even one craked
+    /// still has in trouble (its last session ended badly): signing in is
+    /// what the user is doing about it.
     fn show_signing_in(&mut self) {
         for t in &mut self.tunnels {
             if self.signing_in.contains(&t.name)
-                && !matches!(t.state.as_str(), "connected" | "connecting" | "trouble")
+                && !matches!(t.state.as_str(), "connected" | "connecting")
             {
                 t.state = "connecting".into();
                 self.shown_connecting.insert(t.name.clone());
@@ -693,6 +696,34 @@ mod tests {
         assert_eq!(m.shape(), Shape::Listening);
     }
 
+    /// Seen after a session expired: switching the tunnel on to sign in
+    /// again left the tray's red "!" up all through the sign-in.
+    #[test]
+    fn signing_in_again_after_trouble_shows_as_connecting() {
+        let trouble = || {
+            Update::Tunnels(vec![Tunnel {
+                name: "initech".into(),
+                state: "trouble".into(),
+                ..Default::default()
+            }])
+        };
+        let mut m = Model {
+            reachable: Some(true),
+            ..Default::default()
+        };
+        m.apply(trouble());
+        assert_eq!(m.shape(), Shape::Trouble);
+        m.signing_in("initech", true, false);
+        assert_eq!(m.shape(), Shape::Connecting);
+        // craked still says trouble until the session is handed over.
+        m.apply(trouble());
+        assert_eq!(m.shape(), Shape::Connecting);
+        // Cancelled: craked's word again.
+        m.signing_in("initech", false, false);
+        m.apply(trouble());
+        assert_eq!(m.shape(), Shape::Trouble);
+    }
+
     #[test]
     fn only_the_last_word_on_a_host_can_be_undone_or_redone() {
         let m = Model {
@@ -826,14 +857,19 @@ mod tests {
             ],
             ..Default::default()
         };
-        let start = m.marks();
+        // What a tick shows, without its "minutes ago": that follows the
+        // clock, which may move on between two looks.
+        let shown = |marks: Vec<Mark>| -> Vec<Mark> {
+            marks.into_iter().map(|k| Mark { ago: 0., ..k }).collect()
+        };
+        let start = shown(m.marks());
         assert_eq!(start.len(), 1, "{start:?}");
         assert_eq!((start[0].count, start[0].undone), (2, false));
         let mut secs = 500;
         let mut then = |m: &mut Model, kind: LogKind, msg: &str, host: &str| {
             secs -= 10;
             m.log.push(at(secs, kind, msg, host));
-            m.marks()
+            shown(m.marks())
         };
         let undone = then(&mut m, LogKind::Undone, "a goes direct again.", a);
         assert_eq!(undone.len(), 1, "{undone:?}");

@@ -35,18 +35,46 @@ impl Manager {
             {
                 return Ok(());
             }
-            e.state = TunnelState::Connecting;
             e.config.display().to_owned()
         };
         let device = fields.get("device").map(String::as_str).unwrap_or("");
-        // Only a real tun device of this machine.
-        if device.is_empty()
-            || !device
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        // Only a real tun device of this machine. Refused, it says why in
+        // the log too: the app's notification of it goes away.
+        let refused = if device.is_empty() {
+            Some(format!(
+                "OpenVPN 3 didn\u{2019}t say which device {display}\u{2019}s session uses."
+            ))
+        } else if !device
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
             || !crate::net::is_tun(device) && self.cfg.apply_network
         {
-            bail!("{device:?} isn't a VPN device on this machine");
+            Some(format!(
+                "{device:?} isn\u{2019}t a VPN device on this machine."
+            ))
+        } else {
+            None
+        };
+        if let Some(why) = refused {
+            // A tunnel already up on another device keeps going.
+            let up = self
+                .tunnels
+                .lock()
+                .unwrap()
+                .get(name)
+                .is_some_and(|e| e.info.is_some());
+            if !up {
+                self.set_state(name, TunnelState::Trouble, true);
+                self.log.system(
+                    Some(name),
+                    format!("{display} couldn\u{2019}t connect."),
+                    Some(why.clone()),
+                );
+            }
+            bail!(why);
+        }
+        if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
+            e.state = TunnelState::Connecting;
         }
         let list = |k: &str| -> Vec<String> {
             fields
@@ -86,7 +114,12 @@ impl Manager {
                 .unwrap()
                 .insert(name.to_owned(), how.to_ascii_uppercase());
         }
-        let own = crate::probe::ipv4_of(device);
+        // (Not this machine's devices when told to touch nothing: tests.)
+        let own = if self.cfg.apply_network {
+            crate::probe::ipv4_of(device)
+        } else {
+            None
+        };
         let servers = dns.iter().copied().map(IpAddr::V4).collect();
         let info = TunnelInfo {
             servers,
@@ -123,13 +156,11 @@ impl Manager {
             .get(name)
             .map(|e| e.config.display().to_owned())
             .ok_or_else(|| anyhow!("no tunnel named {name}"))?;
-        // Refused at attach (it clashed): it never came up, nothing to undo.
-        let never_up = self
-            .tunnels
-            .lock()
-            .unwrap()
-            .get(name)
-            .is_some_and(|e| e.state == TunnelState::Off && e.info.is_none());
+        // Refused at attach (it clashed, or its device wasn't one): it
+        // never came up, nothing to undo, and the log has said why.
+        let never_up = self.tunnels.lock().unwrap().get(name).is_some_and(|e| {
+            matches!(e.state, TunnelState::Off | TunnelState::Trouble) && e.info.is_none()
+        });
         if never_up {
             return Ok(());
         }
