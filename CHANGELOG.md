@@ -11,6 +11,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **The panel no longer blinks and jumps when it changes size,** e.g. after Undo or Redo with a
+  bar at the bottom of the screen: it grows and shrinks in place instead of opening again.
+
 - **The sign-in window goes behind other windows** when you click elsewhere, like any window. It
   stayed above everything, even over the browser page of a web sign-in.
 

@@ -720,6 +720,15 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   for desktop apps. Crake could notice craked is newer than itself and say
   "Crake was updated. Restart it to finish." in the panel, with a button,
   as Firefox and Chrome do. Offered, not decided.
+- **All unsafe code behind one safe layer (asked for by the user,
+  2026-10-14).** About 100 unsafe uses today (craked 68 in 13 files, the
+  app 32 in 7), nearly all in the `sys/` modules (system calls, netlink,
+  the Windows and macOS APIs), plus clearing WAYLAND_DISPLAY in the app's
+  main. Plan: a crate of its own (e.g. `crake-os`) holding every unsafe
+  call behind safe functions, each with its `// SAFETY:` reasoning and
+  tests; `#![forbid(unsafe_code)]` in crake, craked, crake-proto and
+  lint-literals (forbid can't be allowed again further down), and a lint
+  gate check that `unsafe` appears nowhere else. Mechanical but sizeable.
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with

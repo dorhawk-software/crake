@@ -75,6 +75,52 @@ fn in_logical_pixels(mut list: Vec<(bool, Rect)>, scale: f32) -> Vec<Rect> {
         .collect()
 }
 
+/// The panel opening upward, at `height` (logical pixels, the whole
+/// window): resized and moved in one step, its bottom staying at the bar,
+/// on X11 (where Crake's panel runs, through XWayland). False when it
+/// can't (Wayland): the panel is opened again at the new size instead.
+pub fn resize_upward(window: &gpui_kit::Window, height: f32) -> bool {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    use x11rb::connection::Connection;
+    use x11rb::protocol::xproto::{ConfigureWindowAux, ConnectionExt};
+    let Ok(handle) = HasWindowHandle::window_handle(window) else {
+        return false;
+    };
+    let id = match handle.as_raw() {
+        RawWindowHandle::Xcb(h) => h.window.get(),
+        RawWindowHandle::Xlib(h) => match u32::try_from(h.window) {
+            Ok(id) => id,
+            Err(_) => return false,
+        },
+        _ => return false,
+    };
+    let Ok((conn, screen)) = x11rb::connect(None) else {
+        return false;
+    };
+    let Some(root) = conn.setup().roots.get(screen).map(|s| s.root) else {
+        return false;
+    };
+    let size = conn.get_geometry(id).ok().and_then(|c| c.reply().ok());
+    let at = conn
+        .translate_coordinates(id, root, 0, 0)
+        .ok()
+        .and_then(|c| c.reply().ok());
+    let (Some(size), Some(at)) = (size, at) else {
+        return false;
+    };
+    let new_height = (height * window.scale_factor()).round().max(1.) as u32;
+    let top =
+        crate::place::top_keeping_bottom(i32::from(at.dst_y), u32::from(size.height), new_height);
+    let moved = conn.configure_window(
+        id,
+        &ConfigureWindowAux::new()
+            .x(i32::from(at.dst_x))
+            .y(top)
+            .height(new_height),
+    );
+    moved.is_ok() && conn.flush().is_ok()
+}
+
 /// A folder only this user can read, for files that live as long as a
 /// sign-in ($XDG_RUNTIME_DIR/crake, on tmpfs).
 pub fn private_dir() -> Result<PathBuf, String> {

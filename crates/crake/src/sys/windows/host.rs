@@ -111,6 +111,50 @@ pub fn rounded_frame(window: &gpui_kit::Window, border: gpui_kit::Rgba) {
     frame(window, DWMWCP_ROUND, color);
 }
 
+/// The panel opening upward from the taskbar, at `height` (logical
+/// pixels): resized and moved in one step, its bottom staying at the
+/// taskbar, instead of being opened again at the new size (which blinked).
+pub fn resize_upward(window: &gpui_kit::Window, height: f32) -> bool {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    use windows_sys::Win32::Foundation::RECT;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetWindowRect, SWP_NOACTIVATE, SWP_NOZORDER, SetWindowPos,
+    };
+    let Ok(handle) = HasWindowHandle::window_handle(window) else {
+        return false;
+    };
+    let RawWindowHandle::Win32(win32) = handle.as_raw() else {
+        return false;
+    };
+    let hwnd = win32.hwnd.get() as windows_sys::Win32::Foundation::HWND;
+    let mut rect = RECT {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
+    // SAFETY: a live window of this process, a RECT to fill.
+    if unsafe { GetWindowRect(hwnd, &mut rect) } == 0 {
+        return false;
+    }
+    let new_height = (height * window.scale_factor()).round().max(1.) as u32;
+    let old_height = u32::try_from(rect.bottom - rect.top).unwrap_or(0);
+    let top = crate::place::top_keeping_bottom(rect.top, old_height, new_height);
+    let width = rect.right - rect.left;
+    // SAFETY: a live window of this process; position and size in pixels.
+    unsafe {
+        SetWindowPos(
+            hwnd,
+            std::ptr::null_mut(),
+            rect.left,
+            top,
+            width,
+            i32::try_from(new_height).unwrap_or(i32::MAX),
+            SWP_NOZORDER | SWP_NOACTIVATE,
+        ) != 0
+    }
+}
+
 fn frame(window: &gpui_kit::Window, corners: i32, border: u32) {
     use raw_window_handle::{HasWindowHandle, RawWindowHandle};
     use windows_sys::Win32::Graphics::Dwm::{

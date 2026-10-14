@@ -35,6 +35,8 @@ ksni = { version = "0.3", features = ["blocking"] }
 oo7 = { version = "0.6", default-features = false, features = ["async-std", "native_crypto"] }
 # The real monitors (GPUI's X11 backend reports one screen spanning them all).
 x11rb = { version = "0.14", features = ["randr", "resource_manager"] }
+# The panel's X11 window, resized and moved in one step (`sys::resize_upward`).
+raw-window-handle = "0.6"
 
 # The notification area's (Windows) or menu bar's (macOS) icon and its menu.
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]

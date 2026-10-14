@@ -197,8 +197,29 @@ pub fn place_at_bar(
     Some(Placement { x, y, upward })
 }
 
+/// A panel that opens upward, its height changed: where its top goes so
+/// its bottom stays at the bar (in the window system's pixels).
+pub fn top_keeping_bottom(top: i32, height: u32, new_height: u32) -> i32 {
+    let grown = i64::from(new_height) - i64::from(height);
+    i32::try_from(i64::from(top) - grown).unwrap_or(top)
+}
+
 #[cfg(test)]
 mod tests {
+    /// Undo or Redo adds a row to "What Crake did": the panel grows, and
+    /// opening upward it grows up, its bottom staying at the bar (it was
+    /// closed and opened again at the new size, which blinked and jumped).
+    #[test]
+    fn a_panel_opening_upward_grows_up() {
+        assert_eq!(super::top_keeping_bottom(600, 400, 440), 560);
+        assert_eq!(
+            super::top_keeping_bottom(600, 400, 360),
+            640,
+            "shrinks down"
+        );
+        assert_eq!(super::top_keeping_bottom(600, 400, 400), 600);
+    }
+
     use super::*;
 
     const SCREEN: Rect = Rect {

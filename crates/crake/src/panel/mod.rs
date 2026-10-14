@@ -333,10 +333,13 @@ fn fit_window(upward: bool) -> impl IntoElement {
             let have = window.viewport_size();
             if (f32::from(have.height) - f32::from(want.height)).abs() > crate::windows::FIT_SLACK {
                 window.on_next_frame(move |window, cx| {
-                    if upward {
-                        crate::refit_panel(height, cx);
-                    } else {
+                    if !upward {
                         window.resize(want);
+                    } else if crate::sys::resize_upward(window, f32::from(want.height)) {
+                        // The height is kept for the next time it opens.
+                        crate::windows::panel_height(height, cx);
+                    } else {
+                        crate::refit_panel(height, cx);
                     }
                 });
             }

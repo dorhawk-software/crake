@@ -39,6 +39,12 @@ pub fn panel_blurred(window: AnyWindowHandle, cx: &mut App) {
     }
 }
 
+/// The panel's height, kept for the next time it opens (it fitted its
+/// window to it in place).
+pub fn panel_height(height: f32, cx: &mut App) {
+    cx.global_mut::<Shell>().panel_height = Some(height);
+}
+
 /// The panel measured itself at a different height than it was opened with.
 /// Opening upward its bottom edge must stay put, so it reopens at the right
 /// size (once; the height is kept for next time).

@@ -129,3 +129,9 @@ pub fn tray_icon_size() -> u32 {
     const RETINA_18_POINTS: u32 = 36;
     RETINA_18_POINTS
 }
+
+/// The panel opening upward: never here (it hangs from the menu bar), so
+/// a plain resize keeps its top.
+pub fn resize_upward(_window: &gpui_kit::Window, _height: f32) -> bool {
+    false
+}
