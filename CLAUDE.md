@@ -725,15 +725,15 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   Crake.app, and an upgrade's restart of a registered craked
   (`launchctl kickstart -k`, the tunnels handed over) are tried on a real
   Mac only: the colleague's, first with 0.7.
-- **NixOS CI rebuilds its dependencies when any dependency changes
-  (~45 min),** even one only macOS or Windows builds (2026-10-14: the
-  SMAppService bindings): Cargo.lock is the dependency builds' input.
-  A new direct dependency in a crate's Cargo.toml does the same (crane's
-  dependency builds are made from the Cargo.tomls' dependency lists too):
-  3ff0271 added raw-window-handle and nixos took 48 min.
-  Giving them a Cargo.lock trimmed to the crates Linux builds would spare
-  those runs; fiddly (which crates are platform-only), so left while it's
-  about one slow run a week (Dependabot's).
+- **The journey's first connection reset once in the NixOS VM
+  (2026-10-14, CI run 38620915461 on 6e8149c, a commit that changed only
+  CI files).** Step 2's GET of 10.40.1.10 failed with "Connection reset by
+  peer" (journey_tests.rs, `get`), where the first-SYN race should hold
+  the SYN until ACME takes the host; the same journey passed on f5a4efc
+  and on every distribution's package test. Not reproduced. If it comes
+  back: craked's log around the race (`race_held`: did direct "answer"
+  with a reset from the gateway VM, which is also the client's default
+  route?), and whether the app saw a reset or a refused connect.
 - **All unsafe code behind one safe layer (asked for by the user,
   2026-10-14).** About 100 unsafe uses today (craked 68 in 13 files, the
   app 32 in 7), nearly all in the `sys/` modules (system calls, netlink,
@@ -1028,7 +1028,28 @@ The user doesn't want development builds installed on their machine.
   the cleaned Cargo.tomls drop it, the dummy source gets a Cargo.lock at
   0.0.0, made at evaluation, since a derivation is hashed by its inputs),
   and `scripts/nix-deps-check.sh` (first step of the nixos job) fails if
-  they would change with it. Merging the two deps derivations was considered and left
+  they would change with it. **Two layers (asked by the user,
+  2026-10-14):** a dependency change no longer rebuilds them all. Each
+  dependency build has a base, the dependencies of an earlier commit
+  (flake input `crake-base`, pinned in flake.lock; `crake-base-deps`,
+  `crake-journey-base-deps`), and the current ones built on top of it
+  (crane's mkCargoDerivation with the base as `cargoArtifacts`: its
+  buildDepsOnly always starts empty), so cargo recompiles only the crates
+  that changed and what depends on them. Measured locally: the rustls
+  update on a base from before it recompiled rustls and Crake's dummy
+  crate, 12 s instead of ~6 min (both cargo passes), where the first
+  attempt recompiled all 687 crates: cargo keeps a build only while its
+  sources' path is the same ("PathToSourceChanged"), and crane's vendored
+  sources are a store path named after the whole Cargo.lock, so every
+  Crake build (`postConfigure` in package.nix) reads them through a link
+  at `$NIX_BUILD_TOP/vendor-cargo-deps` (/build in Nix's sandbox, as in
+  CI; outside a sandbox the build folder's name is random and nothing is
+  reused). Moving the base forward (`scripts/nix-base.sh [COMMIT]`,
+  default main's latest; commit flake.lock) costs one full build (~45 min)
+  and is worth it when the layer on top has grown. This covers what a
+  Cargo.lock trimmed to Linux's crates was meant to (not possible: Cargo
+  resolves the lock for every platform at once, so a lock without
+  Windows' crates fails `--locked`). Merging the two deps derivations was considered and left
   (2026-10-13): the journey's build turns on GPUI's test-support, so GPUI
   compiles twice either way; only small shared crates would be saved.
 - Daily use, nothing installed: `sudo ./target/debug/craked --config dev/<yours>.toml --dev`

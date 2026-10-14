@@ -1,8 +1,11 @@
-# Crake built by Nix with crane: its crates.io dependencies in a derivation
-# of their own (unchanged while Cargo.lock is, so CI keeps it cached), then
-# Crake itself on top.
+# Crake built by Nix with crane: its crates.io dependencies in derivations
+# of their own, then Crake itself on top. The dependencies come in two
+# layers: those of an earlier commit (`base`, flake input crake-base: built
+# once, kept in Cachix), and the current ones built on top of them, so a
+# changed Cargo.lock recompiles only the crates that changed and what
+# depends on them, not all of them (~45 min in CI before).
 { lib, craneLib, pkg-config, cmake, jq, libxcb, libxkbcommon, fontconfig
-, freetype, wayland, vulkan-loader, libGL }:
+, freetype, wayland, vulkan-loader, libGL, base }:
 
 let
   commonArgs = {
@@ -21,6 +24,15 @@ let
     doCheck = false;
     nativeBuildInputs = [ pkg-config cmake ];
     buildInputs = [ libxcb libxkbcommon fontconfig freetype wayland ];
+    # Cargo keeps a build only while its sources' path stays the same, and
+    # crane's vendored sources are a store path named after the whole
+    # Cargo.lock: the layer on top of the base (below) would rebuild every
+    # crate ("PathToSourceChanged"). So every build reads them through a
+    # link at the same place in its build folder (/build in Nix's sandbox).
+    postConfigure = ''
+      ln -s "$cargoVendorDir" "$NIX_BUILD_TOP/vendor-cargo-deps"
+      sed -i "s|$cargoVendorDir|$NIX_BUILD_TOP/vendor-cargo-deps|g" "$CARGO_HOME/config.toml"
+    '';
   };
   # The dependencies don't change with Crake's version, so their builds
   # mustn't see it: a release (which bumps it) then reuses them instead of
@@ -29,36 +41,71 @@ let
   # out before any is made: the cleaned Cargo.tomls leave it out (Cargo then
   # says 0.0.0), and the dummy source gets a Cargo.lock that says so too.
   depsVersion = "0.0.0";
-  lockText = builtins.readFile ../../Cargo.lock;
-  crakeVersion = (builtins.fromTOML (builtins.readFile ../../Cargo.toml)).workspace.package.version;
-  # Crake's own crates: the entries without a source, at Crake's version
-  # (the vendored GPUI crate keeps its own).
-  own = builtins.filter (p: !(p ? source) && p.version == crakeVersion)
-    (builtins.fromTOML lockText).package;
-  entry = v: p: "name = \"${p.name}\"\nversion = \"${v}\"";
-  depsLock = builtins.toFile "Cargo.lock"
-    (builtins.replaceStrings (map (entry crakeVersion) own) (map (entry depsVersion) own) lockText);
-  dummySrc = craneLib.mkDummySrc {
-    src = lib.fileset.toSource {
-      root = ../..;
-      # Not Cargo.lock: it says Crake's version (depsLock below doesn't).
-      fileset = lib.fileset.unions [ ../../Cargo.toml ../../crates ../../vendor ];
+  # A tree's dependencies only (crane's dummy source): its Cargo.tomls
+  # without the version, its Cargo.lock with Crake's own crates at 0.0.0
+  # (the entries without a source, at Crake's version; the vendored GPUI
+  # crate keeps its own), and the vendored GPUI X11 backend whole: it's a
+  # dependency, not Crake's own code (vendor/gpui-pre-linux/CRAKE-PATCH.md).
+  # Built in a directory of the same name whatever the tree, so the layer
+  # on top finds the base's builds of it.
+  # `src` is the tree's files (the base, a flake input, comes whole: only
+  # its Cargo files are kept anyway).
+  dummyFor = root: src:
+    let
+      # A path stays a path: "${root}/…" would copy the whole tree to the
+      # store, and the dependencies would change with any file in it.
+      file = name: if builtins.isPath root then root + "/${name}" else "${root}/${name}";
+      lockText = builtins.readFile (file "Cargo.lock");
+      version = (builtins.fromTOML (builtins.readFile (file "Cargo.toml"))).workspace.package.version;
+      own = builtins.filter (p: !(p ? source) && p.version == version)
+        (builtins.fromTOML lockText).package;
+      entry = v: p: "name = \"${p.name}\"\nversion = \"${v}\"";
+    in craneLib.mkDummySrc {
+      inherit src;
+      cargoLock = builtins.toFile "Cargo.lock"
+        (builtins.replaceStrings (map (entry version) own) (map (entry depsVersion) own) lockText);
+      cleanCargoTomlFilter = path:
+        path != [ "package" "version" ] && path != [ "workspace" "package" "version" ]
+        && craneLib.filters.cargoTomlDefault path;
+      extraDummyScript = ''
+        rm -rf $out/vendor
+        cp -r ${file "vendor"} $out/vendor
+      '';
     };
-    cargoLock = depsLock;
-    cleanCargoTomlFilter = path:
-      path != [ "package" "version" ] && path != [ "workspace" "package" "version" ]
-      && craneLib.filters.cargoTomlDefault path;
-    # The vendored, patched GPUI X11 backend is a dependency, not Crake's
-    # own code: whole, not a dummy (vendor/gpui-pre-linux/CRAKE-PATCH.md).
-    extraDummyScript = ''
-      rm -rf $out/vendor
-      cp -r ${../../vendor} $out/vendor
-    '';
-  };
-  cargoArtifacts = craneLib.buildDepsOnly (removeAttrs commonArgs [ "src" ] // {
-    inherit dummySrc;
-    version = depsVersion;
+  dummySrc = dummyFor ../.. (lib.fileset.toSource {
+    root = ../..;
+    # Not Cargo.lock: it says Crake's version (dummyFor's doesn't).
+    fileset = lib.fileset.unions [ ../../Cargo.toml ../../crates ../../vendor ];
   });
+  # The dependencies, in two layers: the base's from scratch (crane's
+  # buildDepsOnly), then the current ones on top of them (the same cargo
+  # commands, crane's buildDepsOnly can't start from earlier artifacts).
+  # `cargo check` too, as buildDepsOnly runs it.
+  depsLayers = args:
+    let
+      baseDeps = craneLib.buildDepsOnly (removeAttrs args [ "src" ] // {
+        pname = "${args.pname}-base";
+        dummySrc = dummyFor base base;
+        version = depsVersion;
+      });
+      doCheck = args.doCheck or true;
+    in craneLib.mkCargoDerivation (removeAttrs args [ "src" "cargoTestExtraArgs" ] // {
+      src = dummySrc;
+      pnameSuffix = "-deps";
+      version = depsVersion;
+      cargoArtifacts = baseDeps;
+      cargoVendorDir = craneLib.vendorCargoDeps { src = dummySrc; };
+      env = (args.env or { }) // { CRANE_BUILD_DEPS_ONLY = 1; };
+      buildPhaseCargoCommand = ''
+        cargoWithProfile check ${args.cargoExtraArgs} ${lib.optionalString doCheck "--all-targets"}
+        cargoWithProfile build ${args.cargoExtraArgs}
+      '';
+      checkPhaseCargoCommand = ''
+        cargoWithProfile test ${args.cargoExtraArgs} ${args.cargoTestExtraArgs or "--no-run"}
+      '';
+      doInstallCargoArtifacts = true;
+    });
+  cargoArtifacts = depsLayers commonArgs;
 
   # The journey's test binary (crates/crake/src/journey_tests.rs), for the
   # NixOS VM test: the app crate's tests, built and not run, on dependencies
@@ -68,9 +115,7 @@ let
     cargoExtraArgs = "--locked -p crake";
   };
   journey = craneLib.mkCargoDerivation (journeyArgs // {
-    cargoArtifacts = craneLib.buildDepsOnly (removeAttrs journeyArgs [ "src" ] // {
-      inherit dummySrc;
-      version = depsVersion;
+    cargoArtifacts = depsLayers (journeyArgs // {
       doCheck = true;
       cargoTestExtraArgs = "--no-run";
     });

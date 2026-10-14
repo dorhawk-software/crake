@@ -5,8 +5,16 @@
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   # Builds the crates.io dependencies on their own, so they're cached.
   inputs.crane.url = "github:ipetkov/crane";
+  # The base layer of the dependency builds (packaging/nix/package.nix): an
+  # earlier commit of Crake's, pinned in flake.lock. Moved forward with
+  # `scripts/nix-base.sh` when the layer on top has grown (one full rebuild,
+  # then quick ones again).
+  inputs.crake-base = {
+    url = "github:dorhawk-software/crake";
+    flake = false;
+  };
 
-  outputs = { self, nixpkgs, crane }:
+  outputs = { self, nixpkgs, crane, crake-base }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
@@ -14,6 +22,7 @@
       packages.${system} = rec {
         crake = pkgs.callPackage ./packaging/nix/package.nix {
           craneLib = crane.mkLib pkgs;
+          base = crake-base;
         };
         default = crake;
         # The journey's test binary, for the NixOS VM test.

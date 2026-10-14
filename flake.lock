@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "crake-base": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1792004810,
+        "narHash": "sha256-WCKBVco0uRzhyIxCxDM8F2W5dqRyzAC3ozxO2pDLgNw=",
+        "owner": "dorhawk-software",
+        "repo": "crake",
+        "rev": "6e8149c5887e40b19133cf8c3d35a54dd96a6698",
+        "type": "github"
+      },
+      "original": {
+        "owner": "dorhawk-software",
+        "repo": "crake",
+        "type": "github"
+      }
+    },
     "crane": {
       "locked": {
         "lastModified": 1790899423,
@@ -33,6 +49,7 @@
     },
     "root": {
       "inputs": {
+        "crake-base": "crake-base",
         "crane": "crane",
         "nixpkgs": "nixpkgs"
       }

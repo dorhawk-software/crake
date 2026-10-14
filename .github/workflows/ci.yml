@@ -209,7 +209,8 @@ jobs:
           name: crake
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           # Only what the next run can reuse: the crates.io dependencies
-          # (crane's crake-deps, crake-journey-deps). Crake itself, the
+          # (crane's crake-deps, crake-journey-deps, and the base layer
+          # under them, crake-base-deps and crake-journey-base-deps). Crake itself, the
           # journey binary, the filtered source and the VM test's machines
           # change with every commit; pushed, they only filled the free
           # 5 GB (Cachix then evicts the least used, the deps included).
