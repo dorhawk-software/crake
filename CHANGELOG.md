@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.6.1 (2026-10-14)
+
 - **Crake no longer gets in the way of another VPN client signed in to the same company.** With
   "Keep internal names private" on, Crake refused a company's names while its own tunnel was off,
   even when AnyConnect or openconnect was connected there: every internal name failed (seen on a
