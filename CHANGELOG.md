@@ -11,6 +11,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **The sign-in window goes behind other windows** when you click elsewhere, like any window. It
+  stayed above everything, even over the browser page of a web sign-in.
+
 - **Forget all in a tunnel's detail.** One button empties what Crake learned for a tunnel, and
   what you sent direct with Undo, so it learns again from scratch as you use things. It asks first;
   pinned hosts stay.

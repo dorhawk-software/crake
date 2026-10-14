@@ -409,33 +409,19 @@ pub(super) fn open_sign_in(tunnel: client::Tunnel, cx: &mut App) {
         openconnect: None,
     };
     let bounds = centered(signin_view::WIDTH, SIGNIN_HEIGHT, cx);
-    // A plain transparent window: the card draws its own rounded frame, as
-    // in sign-in.html (gpui-kit's frame is square). A pop-up, because it
-    // answers the user's own click: in front and above.
-    let opened = cx.open_window(
-        WindowOptions {
-            window_bounds: Some(WindowBounds::Windowed(bounds)),
-            titlebar: None,
-            window_decorations: Some(WindowDecorations::Client),
-            window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
-            kind: WindowKind::PopUp,
-            app_id: Some("crake".into()),
-            is_resizable: false,
-            is_minimizable: false,
-            ..Default::default()
-        },
-        move |window, cx| {
-            crate::sys::plain_frame(window);
-            window.set_client_inset(px(0.));
-            let view = cx.new(|cx| signin_view::SignIn::new(spec, model, requests, window, cx));
-            let handle = window.window_handle();
-            cx.subscribe(&view, move |_, _: &signin_view::Close, cx| {
-                let _ = handle.update(cx, |_, window, _| window.remove_window());
-            })
-            .detach();
-            view
-        },
-    );
+    let title = format!("Sign in to {}", tunnel.display);
+    let opened = cx.open_window(signin_options(bounds), move |window, cx| {
+        window.set_window_title(&title);
+        crate::sys::plain_frame(window);
+        window.set_client_inset(px(0.));
+        let view = cx.new(|cx| signin_view::SignIn::new(spec, model, requests, window, cx));
+        let handle = window.window_handle();
+        cx.subscribe(&view, move |_, _: &signin_view::Close, cx| {
+            let _ = handle.update(cx, |_, window, _| window.remove_window());
+        })
+        .detach();
+        view
+    });
     match opened {
         Ok(handle) => {
             let _ = handle.update(cx, |_, window, _| window.activate_window());
@@ -507,11 +493,41 @@ pub(super) fn open_log(cx: &mut App) {
     }
 }
 
+/// The sign-in window: a plain transparent window (the card draws its own
+/// rounded frame, as in sign-in.html; gpui-kit's frame is square). A normal
+/// window, opened in front so it's noticed, that goes behind others like
+/// any window when the user clicks elsewhere: a web sign-in happens in the
+/// browser, which a window kept above everything covered.
+fn signin_options(bounds: Bounds<gpui_kit::Pixels>) -> WindowOptions {
+    WindowOptions {
+        window_bounds: Some(WindowBounds::Windowed(bounds)),
+        titlebar: None,
+        window_decorations: Some(WindowDecorations::Client),
+        window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
+        kind: WindowKind::Normal,
+        app_id: Some("crake".into()),
+        is_resizable: false,
+        is_minimizable: true,
+        ..Default::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use gpui_kit::TestAppContext;
 
     use super::*;
+
+    /// Seen during a web sign-in: the window stayed above every other one,
+    /// over the very browser page the user had to sign in on, and couldn't
+    /// be sent behind or minimized.
+    #[test]
+    fn sign_in_goes_behind_other_windows_like_any_window() {
+        let o = signin_options(Bounds::default());
+        assert!(matches!(o.kind, WindowKind::Normal), "a pop-up stays above");
+        assert!(o.is_minimizable);
+        assert!(o.focus && o.show, "it opens in front, to be noticed");
+    }
 
     /// The app shell as main() starts it, in demo mode (no craked, no tray).
     fn start_app(cx: &mut TestAppContext) {
