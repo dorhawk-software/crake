@@ -78,19 +78,23 @@ if [ -n "${CRAKE_KEYCHAIN:-}" ]; then
 fi
 # Its windows open in front of the app that's in front (and the app has run).
 sh "$(dirname "$0")/macos-front-test.sh" || fail "Settings opened behind"
-# Registered from inside the app: macOS's record of craked names the
-# launchd file in Crake.app (System Settings lists it under Crake).
+# Registered from inside the app: Crake, started as it starts for a user
+# (the window check above ran it in demo mode, which touches nothing),
+# registers craked, and macOS's record of it names the launchd file in
+# Crake.app (System Settings lists it under Crake).
+pkill -x crake 2>/dev/null || true
+open -g "$APP"
 registered=no
 for _ in $(seq 30); do
-    btm=$(sudo sfltool dumpbtm 2>/dev/null | grep -B8 -A10 "Crake.app/Contents/Library/LaunchDaemons/$LABEL.plist" || true)
-    if [ -n "$btm" ]; then
+    if sudo sfltool dumpbtm 2>/dev/null | grep -q "Crake.app/Contents/Library/LaunchDaemons/$LABEL.plist"; then
         registered=yes
         break
     fi
     sleep 1
 done
-echo "macOS's record of craked:"
-echo "$btm"
+pkill -x crake 2>/dev/null || true
+echo "macOS's records of Crake's items:"
+sudo sfltool dumpbtm 2>/dev/null | grep -B4 -A14 -i "dorhawk\|Crake.app" || true
 [ "$registered" = yes ] || fail "Crake didn't register its service from inside the app"
 # craked from inside the app serves the app's socket (launchd starts it
 # there once the user switches it on; here it's started by hand).
