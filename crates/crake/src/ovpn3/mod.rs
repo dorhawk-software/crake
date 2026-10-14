@@ -318,7 +318,14 @@ async fn run(
         }
     }
 
-    let fields = attached(&conn, &path).await?;
+    // Crake can't take it over: end it, rather than leave it up unrouted.
+    let fields = match attached(&conn, &path).await {
+        Ok(fields) => fields,
+        Err(e) => {
+            disconnect(&conn, &path).await;
+            return Err(e);
+        }
+    };
     let _ = events.send(Event::Attached(path.clone(), fields)).await;
     follow(&conn, &path, tunnel, signals, replies, requests).await;
     Ok(())

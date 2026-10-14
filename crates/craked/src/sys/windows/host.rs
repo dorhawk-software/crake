@@ -358,3 +358,9 @@ pub fn counters(
     }
     (physical, tunnels, each)
 }
+
+/// The tun device a process holds open: OpenVPN 3 sessions are handed to
+/// craked on Linux only (`ADOPTS_OPENVPN3`).
+pub fn tun_of_process(_pid: u32) -> Option<String> {
+    None
+}

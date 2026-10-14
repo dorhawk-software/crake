@@ -602,6 +602,91 @@ async fn an_openvpn3_tunnel_whose_device_is_gone_is_down() {
     mgr.shutdown().await;
 }
 
+/// A tun device named `name`, held open by this process, as openvpn3's
+/// backend holds its session's.
+fn hold_tun(name: &str) -> std::fs::File {
+    use std::os::fd::AsRawFd;
+    const IFREQ: usize = 40;
+    const FLAGS_AT: usize = 16;
+    let tun = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open("/dev/net/tun")
+        .unwrap();
+    let mut req = [0u8; IFREQ];
+    req[..name.len()].copy_from_slice(name.as_bytes());
+    let flags = (libc::IFF_TUN | libc::IFF_NO_PI) as i16;
+    req[FLAGS_AT..FLAGS_AT + 2].copy_from_slice(&flags.to_ne_bytes());
+    // SAFETY: TUNSETIFF with a struct ifreq-sized buffer we own.
+    let r = unsafe { libc::ioctl(tun.as_raw_fd(), libc::TUNSETIFF, req.as_mut_ptr()) };
+    assert_eq!(r, 0, "TUNSETIFF: {}", std::io::Error::last_os_error());
+    tun
+}
+
+/// OpenVPN 3 doesn't always name a session's device (seen with an Azure
+/// gateway's profile: device_name "", device_path "/", while it was
+/// connected). The process running the session holds the device open:
+/// craked finds it from that process.
+#[tokio::test]
+async fn an_openvpn3_session_with_no_device_name_is_found_by_its_process() {
+    use std::collections::HashMap;
+    if !enabled() {
+        eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = Config {
+        hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
+        hook_socket: dir.path().join("hook.sock"),
+        openconnect: dir.path().join("openconnect"),
+        log_path: dir.path().join("log"),
+        state_path: dir.path().join("hosts.json"),
+        learned_expiry_days: 7,
+        probing: false,
+        race_first_syn: false,
+        probe_wait_secs: 3,
+        never: vec![],
+        use_resolved: false,
+        apply_network: true,
+        managed_dir: dir.path().join("managed.d"),
+        tunnels: vec![],
+    };
+    let mgr = Manager::new(cfg).unwrap();
+    mgr.init().await.unwrap();
+    let _tun = hold_tun("tun9");
+    sh("ip link set tun9 up && ip addr add 10.8.0.6/24 dev tun9");
+    let name = mgr
+        .add_tunnel(&HashMap::from([
+            ("display_name".to_owned(), "Initech".to_owned()),
+            ("gateway".to_owned(), "initech".to_owned()),
+            ("protocol".to_owned(), "openvpn3".to_owned()),
+        ]))
+        .unwrap();
+    let fields = HashMap::from([
+        ("device".to_owned(), String::new()),
+        // This process as /proc knows it (the container numbers its
+        // processes differently; craked and openvpn3 share one numbering).
+        (
+            "backend_pid".to_owned(),
+            std::fs::read_link("/proc/self")
+                .unwrap()
+                .display()
+                .to_string(),
+        ),
+        ("dns".to_owned(), "10.8.0.1".to_owned()),
+    ]);
+    mgr.attach(&name, &fields).await.unwrap();
+    let snap = mgr.get(&name).unwrap();
+    assert_eq!(snap.state, TunnelState::Connected);
+    assert_eq!(snap.info.unwrap().device, "tun9");
+    // The app hands it over again (it takes connected sessions over every
+    // few seconds): nothing new.
+    mgr.attach(&name, &fields).await.unwrap();
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert_eq!(log.matches("Initech is up.").count(), 1, "{log}");
+    mgr.shutdown().await;
+}
+
 /// rp_filter=1 everywhere, as Fedora has it (scripts/netns-test.sh starts
 /// the namespace so): a reply arriving on an interface the main table
 /// wouldn't use to reach its sender is dropped, unless craked loosens it

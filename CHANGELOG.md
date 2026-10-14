@@ -11,6 +11,12 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **OpenVPN 3 profiles whose sessions don't name their device can be used.** For some profiles
+  (seen with an Azure VPN gateway's) openvpn3 never says which device a session uses; Crake now
+  finds it from the process running the session, where it said "didn't say which device the
+  session uses". If Crake still can't take a session over, it ends it rather than leave it up
+  unrouted.
+
 ## 0.6.0 (2026-10-14)
 
 - **Crake keeps its size when a monitor with another scale is plugged in.** On Linux, a laptop

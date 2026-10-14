@@ -108,3 +108,9 @@ pub fn counters(devices: &HashMap<String, String>) -> (u64, u64, HashMap<String,
 pub fn system_dns() -> Vec<std::net::IpAddr> {
     super::primary_dns::upstream()
 }
+
+/// The tun device a process holds open: OpenVPN 3 sessions are handed to
+/// craked on Linux only (`ADOPTS_OPENVPN3`).
+pub fn tun_of_process(_pid: u32) -> Option<String> {
+    None
+}

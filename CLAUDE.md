@@ -565,6 +565,13 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    profiles and takes them over (`ovpn3::adopt`, `watch_openvpn3`);
    switching off in Crake then ends them. craked's Attach on a tunnel
    already up on that device is a no-op.
+   openvpn3 doesn't always name a session's device: device_name "" for
+   a moment after CONN_CONNECTED, or for good (an Azure VPN gateway's
+   profile, 2026-10-14: device_name "", device_path "/", connected_to
+   empty, while connected on tun1). The app sends the session's
+   `backend_pid` with the attach, and craked takes the one tun device
+   that process holds open (/proc/<pid>/fdinfo "iff:", root only;
+   netns-tested); a handover the app can't make ends the session.
    A session that ends with no one to tell craked (seen 2026-10-14 with
    openvpn3 v27.1: quitting the app ended the session it had started,
    though the app doesn't disconnect on quit) left the tunnel "Connected ·

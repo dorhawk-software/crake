@@ -55,3 +55,37 @@ pub fn counters(
     }
     (physical, tunnels, each)
 }
+
+/// The tun device a process holds open (Linux shows it in the fd's info as
+/// "iff:\t<name>"): how an OpenVPN 3 session's device is found when
+/// openvpn3 doesn't name it. Only when it holds exactly one.
+pub fn tun_of_process(pid: u32) -> Option<String> {
+    let dir = std::fs::read_dir(format!("/proc/{pid}/fdinfo")).ok()?;
+    let mut found: Vec<String> = dir
+        .flatten()
+        .filter_map(|e| std::fs::read_to_string(e.path()).ok())
+        .filter_map(|info| iff(&info).map(str::to_owned))
+        .collect();
+    found.dedup();
+    (found.len() == 1).then(|| found.remove(0))
+}
+
+/// The interface named in a tun fd's info.
+fn iff(fdinfo: &str) -> Option<&str> {
+    fdinfo
+        .lines()
+        .find_map(|l| l.strip_prefix("iff:"))
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_tun_fds_info_names_its_interface() {
+        // As the kernel wrote it for an openvpn3 session's backend.
+        let info = "pos:\t0\nflags:\t02\nmnt_id:\t26\nino:\t1061\niff:\ttun1\n";
+        assert_eq!(super::iff(info), Some("tun1"));
+        assert_eq!(super::iff("pos:\t0\nflags:\t02\n"), None);
+    }
+}

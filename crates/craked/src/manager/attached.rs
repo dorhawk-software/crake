@@ -13,6 +13,20 @@ impl Manager {
     /// profile) and hands over its device and DNS. Routing works as for
     /// openconnect tunnels from here.
     pub async fn attach(&self, name: &str, fields: &HashMap<String, String>) -> Result<()> {
+        // openvpn3 doesn't always name the session's device (seen with an
+        // Azure gateway's profile): the process running the session, which
+        // the app names too, holds it open.
+        let named = fields.get("device").map(String::as_str).unwrap_or("");
+        let device = if named.is_empty() {
+            fields
+                .get("backend_pid")
+                .and_then(|p| p.parse().ok())
+                .and_then(crate::sys::tun_of_process)
+                .unwrap_or_default()
+        } else {
+            named.to_owned()
+        };
+        let device = device.as_str();
         let display = {
             let mut map = self.tunnels.lock().unwrap();
             let e = map
@@ -30,14 +44,12 @@ impl Manager {
             // Already routed through this device (the app taking the
             // session back after a restart): nothing to do.
             if e.state == TunnelState::Connected
-                && e.info.as_ref().map(|i| i.device.as_str())
-                    == fields.get("device").map(String::as_str)
+                && e.info.as_ref().map(|i| i.device.as_str()) == Some(device)
             {
                 return Ok(());
             }
             e.config.display().to_owned()
         };
-        let device = fields.get("device").map(String::as_str).unwrap_or("");
         // Only a real tun device of this machine. Refused, it says why in
         // the log too: the app's notification of it goes away.
         let refused = if device.is_empty() {
@@ -143,7 +155,9 @@ impl Manager {
         };
         self.tunnel_up(name, &display, info, true).await?;
         if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
-            e.attached = Some(fields.clone());
+            let mut fields = fields.clone();
+            fields.insert("device".to_owned(), device.to_owned());
+            e.attached = Some(fields);
         }
         Ok(())
     }
