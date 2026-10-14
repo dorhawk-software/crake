@@ -761,29 +761,35 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   made again (`~/.cache/crake-vms/make-vm.sh`) or a real machine.
 - **Performance: never measured.** Believed negligible (NFQUEUE holds
   only DNS answers and racing SYNs); measure before claiming numbers.
-- **A power user's requests (a colleague who runs OpenVPN 3 profiles
-  daily, 2026-10-14).** Asked for, not designed or decided yet:
-  1. *See the traffic, animated* ("packets ticking by"), his first and
+- **A colleague's requests (they run OpenVPN 3 profiles daily,
+  2026-10-14).** For every user, not only experts, except where said:
+  1. *See the traffic, animated* ("packets ticking by"), their first and
      main wish: a live graph of what goes direct and what through each
-     tunnel, with tables of hosts and connections only as the detail
-     (design/proposals/traffic-window.html, being redrawn around the
-     graph).
+     tunnel, with tables of hosts and connections only as the detail.
+     **Decided: to be built** (the user and the colleague liked
+     design/proposals/traffic-window.html: "we will implement this").
+     The colleague found the first dots too fast and distracting; the
+     proposal now moves them as fast as each path's traffic (a trickle
+     crawls, a big download about twice as fast) and sends one per
+     ~250 KB, between one every four seconds and two a second.
   2. *See the split as a whole*: every rule in one place (learned,
-     pinned, never, direct by Undo, everything else), the "tree" he'd
-     otherwise keep in a config file (that proposal's table).
-  3. *Edit an OpenVPN 3 profile in Crake*: view the imported profile's
-     text, change a value (remote, a route, a dhcp-option, a
-     certificate), save and reconnect, without opening an editor,
-     exporting and importing again ("too many clicks"; quicker debugging
-     of a config). openvpn3 has no in-place edit: Crake would Fetch the
-     text (refused when the profile is `locked_down`), import the edited
-     text and remove the old one under the same name, keeping Crake's
-     tunnel on it, inline certificates and keys kept. A "for experts"
-     place, not in the way of people who just import IT's file.
-  4. *"How is it secured, can it break my traffic?"*: answered in chat
+     pinned, never, direct by Undo, everything else), the "tree" they'd
+     otherwise keep in a config file (that proposal's "Where things go"
+     table, built with it).
+  3. *"How is it secured, can it break my traffic?"*: answered in chat
      (nothing leaves the computer, there's no server); belongs in the
      explainers below, with what happens when craked stops (its routes
      and rules go, traffic goes direct as without Crake).
+  4. **The power user feature:** *edit an OpenVPN 3 profile in Crake*
+     (not decided): view the imported profile's text, change a value
+     (remote, a route, a dhcp-option, a certificate), save and
+     reconnect, without opening an editor, exporting and importing again
+     ("too many clicks"; quicker debugging of a config). openvpn3 has no
+     in-place edit: Crake would Fetch the text (refused when the profile
+     is `locked_down`), import the edited text and remove the old one
+     under the same name, keeping Crake's tunnel on it, inline
+     certificates and keys kept. A "for experts" place, not in the way
+     of people who just import IT's file.
 - **The explainers** (docs/explainers.md): written down, not yet drawn or
   published anywhere.
 - **The website's version number** (dorhawk-website): visitors get the
