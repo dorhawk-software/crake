@@ -700,16 +700,11 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   (2026-10-14). Linux and macOS leave a domain another program serves to
   it (`served_elsewhere`); Windows returns nothing yet. To do: read other
   clients' NRPT rules and adapters' DNS suffixes there.
-- **macOS background items say "ONDŘEJ ŠIMON", not "Crake" (2026-10-14).**
-  A launchd plist a package installs in /Library/LaunchDaemons is listed
-  under its signing certificate's name (Docker Inc, Google LLC show the
-  same); `AssociatedBundleIdentifiers` brought Crake's icon, not its name.
-  Apps listed by their own name (Cisco AnyConnect) register their service
-  from inside the app with `SMAppService` (plist in
-  Crake.app/Contents/Library/LaunchDaemons, the user approves once). The
-  same API would fix "Start at login" on macOS (Releases' known gap). A
-  change to how Crake installs on a Mac (postinstall, uninstaller, the
-  upgrade handover, the CI Mac checks), not a quick fix.
+- **macOS: what CI can't check of craked registered by the app.** The
+  user's approval (no runner can click it), so craked under launchd from
+  Crake.app, and an upgrade's restart of a registered craked
+  (`launchctl kickstart -k`, the tunnels handed over) are tried on a real
+  Mac only: the colleague's, first with 0.7.
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with
@@ -986,9 +981,9 @@ checksum; pushed to ssh://aur@aur.archlinux.org/crake.git with the secret
 AUR_SSH_KEY; `--dry-run` pushes nothing). Skipped while there's no secret:
 AUR registration was closed that day (bot sign-ups); once the user has an
 account with the key, publish the current release by hand with the
-script, then releases keep it current. Known
-gap on macOS: "Start at login" writes ~/.config/autostart, which macOS
-ignores (needs a LaunchAgent or SMAppService).
+script, then releases keep it current. "Start at login" on macOS is
+the app's own login agent, registered with SMAppService (from 0.7; a
+LaunchAgent in ~/Library/LaunchAgents before).
 
 ## Packaging and dependencies (decided with the user)
 
@@ -1369,11 +1364,25 @@ The installer (2026-10-13): `scripts/build-macos-pkg.sh` makes
 target/macos/Crake-<version>.pkg on a Mac: Crake.app in /Applications
 (packaging/macos/Info.plist: a menu bar app, LSUIElement; the icon
 `assets/icons/app/crake.icns`, from `scripts/make-icons.sh` at 824 of
-1024 points as macOS' icons are), craked in /usr/local/sbin with its
-launchd plist, the hook and the uninstaller
-(`sudo /usr/local/libexec/crake/uninstall`) in /usr/local/libexec/crake;
-`postinstall` bootstraps craked, an upgrade leaving the handover flag
-first (tunnels stay signed in). Universal (Apple Silicon and Intel:
+1024 points as macOS' icons are), the hook and the uninstaller
+(`sudo /usr/local/libexec/crake/uninstall`) in /usr/local/libexec/crake.
+**craked is Crake.app's own service (asked for by the user 2026-10-14,
+from 0.7):** `Crake.app/Contents/MacOS/craked`, its launchd file in
+`Contents/Library/LaunchDaemons` (`BundleProgram`), registered by the app
+with SMAppService (`sys/macos/service.rs`, each start), so System
+Settings lists it under Crake: a daemon a package puts in
+/Library/LaunchDaemons is listed under the signing certificate's name
+("ONDŘEJ ŠIMON"; macOS curates names only for known vendors, Cisco's
+included, as a colleague's `sfltool dumpbtm` showed). macOS has the user
+switch it on once (Login Items & Extensions); until then the panel says
+"Crake's service needs your OK." with Open Login Items
+(design/proposals/macos-service-approval.html, option A; "switched off"
+once it had run, `Prefs::service_was_on`). "Start at login" is the app's
+login agent in `Contents/Library/LaunchAgents` (with `--autostart`),
+registered the same way. `postinstall`: an older craked (its own daemon,
+0.6 and before) hands its tunnels over and goes with its files; a
+registered one hands over and is restarted (`kickstart -k`); then Crake
+opens for the user at the screen, which registers it. Universal (Apple Silicon and Intel:
 `CRAKE_UNIVERSAL=1` joins both builds with lipo; releases and CI runs
 started by hand build it, pushes only Apple Silicon); openconnect from
 Homebrew (the app says `brew install openconnect` when it's missing), not

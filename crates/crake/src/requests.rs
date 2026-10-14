@@ -265,6 +265,7 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
             remember_on(&name, false, cx);
             send(Command::RemoveTunnel(name));
         }
+        Request::OpenServiceSettings => crate::sys::service::open_settings(),
         Request::Quit => cx.quit(),
     }
 }

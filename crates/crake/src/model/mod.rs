@@ -41,6 +41,9 @@ pub const FAILURE_SHOWN: Duration = Duration::from_secs(8);
 pub struct Model {
     /// `None` until the first attempt to reach craked has settled.
     pub reachable: Option<bool>,
+    /// What the user has to do for craked to run (macOS: switch it on in
+    /// System Settings), when anything.
+    pub service: Option<crate::service::Wanted>,
     pub tunnels: Vec<Tunnel>,
     /// Oldest first.
     pub log: Vec<LogEntry>,

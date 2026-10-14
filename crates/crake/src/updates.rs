@@ -10,6 +10,8 @@ use super::*;
 const AFTER_TUNNELS: Duration = Duration::from_millis(400);
 const ROUTED_SHOWN: Duration = Duration::from_secs(5);
 const OPENVPN3_LOOK: Duration = Duration::from_secs(3);
+/// How often macOS is asked whether Crake's service may run.
+const SERVICE_LOOK: Duration = Duration::from_secs(2);
 const FRAME_MS: u64 = 70;
 /// After a change, how long until the bar is told about the icon again
 /// (`tray::Handle::settle`): well past GNOME's tray extension's 30 ms
@@ -88,6 +90,41 @@ pub(super) fn on_update(update: client::Update, cx: &mut App) {
     }
     start_left_on(cx);
     refresh_tray(cx);
+}
+
+/// macOS: whether Crake's service is registered and switched on (the app
+/// registers it, SMAppService; macOS asks the user to switch it on once):
+/// looked at every SERVICE_LOOK, and the panel told what to ask of the user.
+/// Elsewhere the package runs it.
+pub(super) fn watch_service(cx: &mut App) {
+    if !cfg!(target_os = "macos") || cx.global::<Shell>().demo {
+        return;
+    }
+    cx.spawn(async move |cx| {
+        loop {
+            let on = cx
+                .background_executor()
+                .spawn(async { crate::sys::service::on() })
+                .await;
+            cx.update(|cx| {
+                if on == Some(true) && !cx.global::<prefs::Prefs>().service_was_on {
+                    cx.global_mut::<prefs::Prefs>().service_was_on = true;
+                    cx.global::<prefs::Prefs>().save();
+                }
+                let was_on = cx.global::<prefs::Prefs>().service_was_on;
+                let wanted = crate::service::wanted(on, was_on);
+                let model = cx.global::<Shell>().model.clone();
+                model.update(cx, |m, cx| {
+                    if m.service != wanted {
+                        m.service = wanted;
+                        cx.notify();
+                    }
+                });
+            });
+            cx.background_executor().timer(SERVICE_LOOK).await;
+        }
+    })
+    .detach();
 }
 
 /// OpenVPN 3 sessions of Crake's tunnels that were started elsewhere

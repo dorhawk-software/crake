@@ -240,7 +240,8 @@ The repository is signed with the key `B17A 7118 E977 36C2 02AD 5EAF F1D1 52DA 1
 (dorhawk.software packages).
 
 **macOS on Apple Silicon and Intel (preview):** `brew install --cask dorhawk-software/tap/crake`, which brings
-openconnect along. The installer is signed and notarized.
+openconnect along. The installer is signed and notarized. Crake opens when it's installed and asks you to switch its
+service on once: in System Settings, under Login Items & Extensions, where it's listed as Crake.
 
 **Windows 11 (preview):** the installer from [Releases](https://github.com/dorhawk-software/crake/releases),
 openconnect included. It isn't code-signed yet, so Windows asks before running it.

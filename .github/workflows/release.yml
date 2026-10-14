@@ -141,7 +141,13 @@ jobs:
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: sh scripts/macos-signing.sh notarize target/macos/Crake-*.pkg
       - name: It installs, runs craked, upgrades and uninstalls
-        run: sh scripts/macos-pkg-test.sh target/macos/Crake-*.pkg
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Over the newest release (craked was its own launchd daemon up to
+        # 0.6): installing stops it and takes its files away.
+        run: |
+          gh release download -R "$GITHUB_REPOSITORY" -p 'Crake-*.pkg' -D "$RUNNER_TEMP/previous"
+          CRAKE_PREVIOUS_PKG=$(ls "$RUNNER_TEMP"/previous/Crake-*.pkg) sh scripts/macos-pkg-test.sh target/macos/Crake-*.pkg
       - uses: actions/upload-artifact@v7
         with:
           name: macos

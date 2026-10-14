@@ -48,3 +48,32 @@ fn craked_appears_as_crake_in_background_items() {
         app[0]
     );
 }
+
+/// Registered by Crake.app itself (SMAppService), from inside the app:
+/// craked's launchd file names its program by its place in the bundle, so
+/// macOS lists it under Crake, not under the signing certificate's name.
+#[test]
+fn craked_runs_from_inside_crake_app() {
+    let daemon = plist("software.dorhawk.craked.plist");
+    assert_eq!(strings(&daemon, "Label"), ["software.dorhawk.craked"]);
+    assert_eq!(strings(&daemon, "BundleProgram"), ["Contents/MacOS/craked"]);
+    assert!(
+        strings(&daemon, "ProgramArguments").is_empty() && strings(&daemon, "Program").is_empty(),
+        "no path outside the app: {daemon}"
+    );
+}
+
+/// "Start when you log in", registered by Crake.app (SMAppService) too: it
+/// starts Crake from inside the app, with the flag that switches on the
+/// tunnels left on, in the user's graphical session.
+#[test]
+fn the_login_agent_starts_crake_from_inside_the_app() {
+    let agent = plist("software.dorhawk.crake.plist");
+    assert_eq!(strings(&agent, "Label"), ["software.dorhawk.crake"]);
+    assert_eq!(strings(&agent, "BundleProgram"), ["Contents/MacOS/crake"]);
+    assert_eq!(
+        strings(&agent, "ProgramArguments"),
+        ["crake", crate::autostart::FLAG]
+    );
+    assert_eq!(strings(&agent, "LimitLoadToSessionType"), ["Aqua"]);
+}

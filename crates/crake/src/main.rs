@@ -52,6 +52,8 @@ mod place;
 
 mod prefs;
 
+mod service;
+
 mod settings_view;
 
 mod signin;
@@ -96,7 +98,7 @@ mod windows_tests;
 
 // What the parts of the app call on each other.
 use requests::{keep_certificate, on_request, start_left_on};
-use updates::{on_update, refresh_tray, watch_openvpn3};
+use updates::{on_update, refresh_tray, watch_openvpn3, watch_service};
 use windows::{
     open_detail, open_log, open_new_tunnel, open_settings, open_sign_in, panel_blurred,
     refit_panel, toggle_panel,
@@ -174,6 +176,9 @@ pub enum Request {
     Detail(String),
     Unpin(String, String),
     Forget(String, String),
+    /// macOS: System Settings' Login Items & Extensions, where Crake's
+    /// service is switched on (`service`).
+    OpenServiceSettings,
     Quit,
 }
 
@@ -535,6 +540,7 @@ pub(crate) fn start(cx: &mut App, setup: Setup) -> bool {
     cx.observe(&model, |_, cx| refresh_tray(cx)).detach();
     if openvpn3 {
         watch_openvpn3(cx);
+        watch_service(cx);
     }
 
     cx.spawn(async move |cx| {

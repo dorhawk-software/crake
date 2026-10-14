@@ -258,3 +258,21 @@ fn the_browser_notice_names_the_browsers_not_dismissed() {
         "no tunnel up"
     );
 }
+
+/// On a Mac, craked waits for the user to switch it on in System Settings
+/// (it's registered by the app, SMAppService): the panel says so, and its
+/// button asks the app to open that page.
+#[gpui_kit::test]
+fn the_service_waiting_for_approval_takes_the_user_there(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    w.model.update(cx, |m, cx| {
+        m.reachable = Some(false);
+        m.service = Some(crate::service::Wanted::Approval);
+        cx.notify();
+    });
+    cx.run_until_parked();
+    assert!(matches!(
+        w.click("open-login-items", cx),
+        Request::OpenServiceSettings
+    ));
+}

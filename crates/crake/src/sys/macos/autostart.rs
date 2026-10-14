@@ -1,78 +1,56 @@
-//! "Start when you log in" on macOS: a LaunchAgent of the user's,
-//! `~/Library/LaunchAgents/software.dorhawk.crake.plist`, which launchd
-//! loads at every login and which starts this very binary (Crake.app's).
-//! (Linux writes an autostart entry; macOS ignores those.)
+//! "Start when you log in" on macOS: Crake.app's login agent (its launchd
+//! file inside the app, Contents/Library/LaunchAgents;
+//! packaging/macos/software.dorhawk.crake.plist), registered by the app
+//! itself with SMAppService, so System Settings lists it under Crake, not
+//! under the signing certificate's name. It starts Crake with the flag that
+//! switches on the tunnels left on (the plist names it).
+//! Crakes before 0.7 wrote ~/Library/LaunchAgents/software.dorhawk.crake.plist
+//! themselves: taken away, and the app's agent registered instead
+//! (`autostart::refresh` at each start).
 
 use std::path::{Path, PathBuf};
 
-const LABEL: &str = "software.dorhawk.crake";
-/// Crake.app's bundle identifier (packaging/macos/Info.plist): System
-/// Settings shows the agent as Crake, with its icon, not under the name on
-/// the signing certificate.
-const APP: &str = "software.dorhawk.Crake";
+use objc2::rc::Retained;
+use objc2_foundation::NSString;
+use objc2_service_management::{SMAppService, SMAppServiceStatus};
 
-fn path() -> Option<PathBuf> {
+const AGENT: &str = "software.dorhawk.crake.plist";
+
+fn agent() -> Retained<SMAppService> {
+    // SAFETY: a constructor taking a valid string.
+    unsafe { SMAppService::agentServiceWithPlistName(&NSString::from_str(AGENT)) }
+}
+
+/// What an older Crake wrote.
+fn older() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
-    Some(PathBuf::from(home).join(format!("Library/LaunchAgents/{LABEL}.plist")))
+    Some(PathBuf::from(home).join("Library/LaunchAgents").join(AGENT))
 }
 
 pub fn enabled() -> bool {
-    path().is_some_and(|p| p.exists())
+    // SAFETY: a plain call on a valid service object.
+    older().is_some_and(|p| p.exists())
+        || unsafe { agent().status() } == SMAppServiceStatus::Enabled
 }
 
-pub fn set(on: bool, exe: &Path, flag: &str) {
-    let Some(p) = path() else { return };
-    if !on {
+/// On or off. The agent names its program and flag itself (`_exe`, `_flag`:
+/// the other systems' way).
+pub fn set(on: bool, _exe: &Path, _flag: &str) {
+    // An older Crake's file goes; the job it loaded at this login stays
+    // (it may be this very Crake) and is gone at the next.
+    if let Some(p) = older().filter(|p| p.exists()) {
         let _ = std::fs::remove_file(p);
-        return;
     }
-    if let Some(dir) = p.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    let _ = std::fs::write(&p, agent(&exe.display().to_string(), flag));
-}
-
-/// Text in a plist's XML.
-fn escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-}
-
-fn agent(exe: &str, flag: &str) -> String {
-    format!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
-         <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
-         <plist version=\"1.0\">\n<dict>\n\
-         \t<key>Label</key>\n\t<string>{LABEL}</string>\n\
-         \t<key>AssociatedBundleIdentifiers</key>\n\t<array>\n\t\t<string>{APP}</string>\n\t</array>\n\
-         \t<key>ProgramArguments</key>\n\t<array>\n\t\t<string>{}</string>\n\t\t<string>{}</string>\n\t</array>\n\
-         \t<key>RunAtLoad</key>\n\t<true/>\n\
-         \t<key>LimitLoadToSessionType</key>\n\t<string>Aqua</string>\n\
-         \t<key>ProcessType</key>\n\t<string>Interactive</string>\n\
-         </dict>\n</plist>\n",
-        escape(exe),
-        escape(flag)
-    )
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn the_agent_starts_this_binary_at_login() {
-        let a = super::agent(
-            "/Applications/Crake & Co.app/Contents/MacOS/crake",
-            "--autostart",
-        );
-        assert!(
-            a.contains("<string>/Applications/Crake &amp; Co.app/Contents/MacOS/crake</string>"),
-            "{a}"
-        );
-        assert!(a.contains("<string>--autostart</string>"));
-        assert!(a.contains("<key>RunAtLoad</key>\n\t<true/>"));
-        assert!(a.contains("<string>software.dorhawk.crake</string>"));
-        assert!(a.contains(
-            "<key>AssociatedBundleIdentifiers</key>\n\t<array>\n\t\t<string>software.dorhawk.Crake</string>"
-        ));
+    let agent = agent();
+    // SAFETY: plain calls on a valid service object.
+    let done = unsafe {
+        if on {
+            agent.registerAndReturnError()
+        } else {
+            agent.unregisterAndReturnError()
+        }
+    };
+    if let Err(e) = done {
+        eprintln!("start at login: {e:?}");
     }
 }

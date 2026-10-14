@@ -2,7 +2,10 @@
 # Crake taken off this Mac: sudo /usr/local/libexec/crake/uninstall
 # craked stops first (switching every tunnel off takes its routes, DNS
 # settings and pf rules with it), then its files go, its state and log in
-# /var/db/crake too. The app's own settings in your home folder stay.
+# /var/db/crake too; with Crake.app gone, macOS drops its background items
+# (craked and "Start at login", both registered by the app). An older
+# Crake's own launchd daemon goes too. The app's own settings in your home
+# folder stay.
 set -u
 if [ "$(id -u)" != 0 ]; then
     echo "Run it with sudo: sudo $0" >&2
@@ -10,6 +13,12 @@ if [ "$(id -u)" != 0 ]; then
 fi
 LABEL=software.dorhawk.craked
 launchctl bootout "system/$LABEL" 2>/dev/null
+user=$(stat -f %Su /dev/console 2>/dev/null)
+if [ -n "$user" ] && [ "$user" != root ]; then
+    uid=$(id -u "$user")
+    pkill -x -U "$uid" crake 2>/dev/null
+    launchctl bootout "gui/$uid/software.dorhawk.crake" 2>/dev/null
+fi
 rm -rf /Applications/Crake.app /usr/local/libexec/crake /var/db/crake /var/run/crake
 rm -f "/Library/LaunchDaemons/$LABEL.plist" /usr/local/sbin/craked \
     /var/log/craked.log /var/run/crake.sock

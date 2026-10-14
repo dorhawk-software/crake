@@ -33,6 +33,10 @@ pub struct Prefs {
     /// At login, switch on the tunnels left on (off: Crake only starts).
     #[serde(default)]
     pub reconnect: bool,
+    /// macOS: Crake's service has run on this Mac (so "needs your OK" now
+    /// means it was switched off: `service::wanted`).
+    #[serde(default)]
+    pub service_was_on: bool,
     /// Not written (demo mode): nothing real is remembered.
     #[serde(skip)]
     pub scratch: bool,
@@ -51,6 +55,7 @@ impl Default for Prefs {
             show_bird: true,
             left_on: Default::default(),
             reconnect: false,
+            service_was_on: false,
             scratch: false,
         }
     }

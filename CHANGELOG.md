@@ -11,6 +11,12 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **On a Mac, System Settings lists Crake by its name.** Its service and "Start when you log in"
+  are now registered by Crake itself, so Login Items & Extensions shows them as Crake, not under
+  the name on its developer certificate. macOS asks you to switch the service on once: Crake opens
+  after installing, and its panel says so, with a button to the right page. Nothing is routed
+  until then.
+
 ## 0.6.1 (2026-10-14)
 
 - **Crake no longer gets in the way of another VPN client signed in to the same company.** With

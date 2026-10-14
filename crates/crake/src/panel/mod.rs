@@ -156,7 +156,7 @@ impl Render for Panel {
                 .child(self.tunnels(model, &t, cx))
                 .child(self.footer(model, &t, cx));
         } else {
-            panel = panel.child(not_running(model, &t));
+            panel = panel.child(not_running(model, &t, cx));
         }
         if let Some((text, at)) = &model.failed
             && at.elapsed() < crate::model::FAILURE_SHOWN
@@ -185,15 +185,24 @@ impl Render for Panel {
     }
 }
 
-fn not_running(model: &Model, t: &Theme) -> impl IntoElement {
-    let (title, detail) = if model.reachable.is_none() {
-        ("Looking for Crake's service…", "")
-    } else {
-        (
+/// Crake's service isn't there: still being looked for, not running, or
+/// (macOS) waiting for the user to switch it on in System Settings, with a
+/// button to that page (design/proposals/macos-service-approval.html, A).
+fn not_running(model: &Model, t: &Theme, cx: &mut Context<Panel>) -> impl IntoElement {
+    const APPROVE: &str = "macOS asks once: switch Crake on in System Settings, under Login Items & Extensions. Nothing is routed until then.";
+    const SWITCH_ON: &str = "Switch Crake on in System Settings, under Login Items & Extensions. Nothing is routed until then.";
+    let (title, detail) = match (model.reachable, model.service) {
+        (None, _) => ("Looking for Crake's service…", ""),
+        (_, Some(crate::service::Wanted::Approval)) => ("Crake's service needs your OK.", APPROVE),
+        (_, Some(crate::service::Wanted::SwitchedOff)) => {
+            ("Crake's service is switched off.", SWITCH_ON)
+        }
+        _ => (
             "Crake's service isn't running.",
             "Nothing is routed. This panel fills in by itself once it's back.",
-        )
+        ),
     };
+    let ask = model.reachable.is_some() && model.service.is_some();
     div()
         .px(px(18.))
         .pt(px(8.))
@@ -214,6 +223,28 @@ fn not_running(model: &Model, t: &Theme) -> impl IntoElement {
                 .text_color(t.muted)
                 .child(detail),
         )
+        .when(ask, |d| {
+            d.child(
+                div()
+                    .id("open-login-items")
+                    .mt(px(14.))
+                    .px(px(14.))
+                    .h(px(34.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .w(px(160.))
+                    .rounded(px(6.))
+                    .bg(t.accent)
+                    .text_color(t.accent_ink)
+                    .text_size(px(13.))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .cursor_pointer()
+                    .child("Open Login Items")
+                    .on_click(cx.listener(|this, _, _, _| this.send(Request::OpenServiceSettings)))
+                    .test_support(),
+            )
+        })
 }
 
 /// A titled group under a hairline.

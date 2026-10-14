@@ -1,5 +1,5 @@
 //! "Start when you log in" (Settings, General), each system its own way
-//! (`sys::autostart`: Linux's autostart entry, macOS' LaunchAgent,
+//! (`sys::autostart`: Linux's autostart entry, macOS' login agent in Crake.app,
 //! Windows' Run key), for this very binary. Written when the user
 //! switches it on, and again at each start while it's on (`refresh`).
 
@@ -19,10 +19,9 @@ pub fn set(on: bool) {
 }
 
 /// At start, while "Start when you log in" is on: the entry written again,
-/// as this Crake writes it. One an older Crake wrote may lack what's new
-/// (macOS' agent gained its link to Crake.app, without which System
-/// Settings lists it under the signer's name), or name a binary that has
-/// moved since.
+/// as this Crake writes it. One an older Crake wrote may name a binary that
+/// has moved since, or be done another way now (macOS: an older Crake's own
+/// agent file gives way to the app's registered agent, listed under Crake).
 pub fn refresh() {
     refresh_with(enabled, || set(true));
 }

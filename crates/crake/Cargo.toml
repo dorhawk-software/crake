@@ -45,6 +45,11 @@ tray-icon = "0.26"
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "3"
 objc2-core-graphics = { version = "0.3", default-features = false, features = ["std", "CGDirectDisplay", "CGError"] }
+# craked and "Start at login" registered by the app (SMAppService), so
+# System Settings lists them under Crake.
+objc2 = { version = "0.6", default-features = false, features = ["std"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSError"] }
+objc2-service-management = { version = "0.3", default-features = false, features = ["std", "SMAppService", "objc2", "objc2-foundation"] }
 
 [target.'cfg(windows)'.dependencies]
 # Credential Manager, the monitors, the taskbar's theme.

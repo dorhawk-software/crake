@@ -1,21 +1,37 @@
 #!/bin/sh
-# After the files are in place: craked (re)started by launchd. An upgrade
-# over a running craked leaves the handover flag first, so it hands its
-# tunnels to the new one signed in (craked's manager/handover.rs), as the
-# Linux packages do.
+# After the files are in place. craked is Crake.app's own service: the app
+# registers it (SMAppService) when it runs, and the user switches it on
+# once in System Settings (Login Items & Extensions), where it's listed
+# under Crake. Here:
+# - an older Crake's craked (a launchd daemon of its own, in
+#   /Library/LaunchDaemons) hands its tunnels over and goes, with its files;
+# - a craked the app registered, if it runs, hands its tunnels over and
+#   starts again on the new binary;
+# - Crake opens for whoever is at the screen, so it registers its service
+#   (macOS asks then), quitting an older Crake still running first.
+# The tunnels come back signed in (craked's manager/handover.rs) when the
+# new craked starts within two minutes: at once on an upgrade, once the
+# user switches the service on when coming from an older Crake.
 LABEL=software.dorhawk.craked
-PLIST=/Library/LaunchDaemons/$LABEL.plist
-chown root:wheel "$PLIST"
-chmod 644 "$PLIST"
-if launchctl print "system/$LABEL" >/dev/null 2>&1; then
+OLD=/Library/LaunchDaemons/$LABEL.plist
+handover() {
     mkdir -p /var/run/crake
     : > /var/run/crake/handover
-    launchctl bootout "system/$LABEL" 2>/dev/null || true
+}
+if [ -e "$OLD" ]; then
+    if launchctl print "system/$LABEL" >/dev/null 2>&1; then
+        handover
+        launchctl bootout "system/$LABEL" 2>/dev/null || true
+    fi
+    rm -f "$OLD" /usr/local/sbin/craked
+elif launchctl print "system/$LABEL" >/dev/null 2>&1; then
+    handover
+    launchctl kickstart -k "system/$LABEL" || true
 fi
-# bootout returns before launchd has quite let go of the job.
-for _ in 1 2 3 4 5 6 7 8 9 10; do
-    launchctl bootstrap system "$PLIST" 2>/dev/null && exit 0
-    sleep 1
-done
-echo "craked didn't start: launchctl bootstrap system $PLIST" >&2
-exit 1
+user=$(stat -f %Su /dev/console 2>/dev/null)
+if [ -n "$user" ] && [ "$user" != root ] && [ "$user" != loginwindow ]; then
+    uid=$(id -u "$user")
+    pkill -x -U "$uid" crake 2>/dev/null && sleep 1
+    launchctl asuser "$uid" sudo -u "$user" open -a /Applications/Crake.app || true
+fi
+exit 0

@@ -29,3 +29,16 @@ pub use windows::*;
 mod macos;
 #[cfg(target_os = "macos")]
 pub use macos::*;
+
+// Crake's service as the system runs it (`crate::service`): on a Mac the
+// app registers it (SMAppService, `macos::service`); elsewhere the package
+// runs it, and there's nothing to ask.
+#[cfg(not(target_os = "macos"))]
+pub mod service {
+    /// Whether the system lets craked run: not this system's way.
+    pub fn on() -> Option<bool> {
+        None
+    }
+
+    pub fn open_settings() {}
+}
