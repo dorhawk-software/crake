@@ -8,6 +8,9 @@
 # Interrupted while waiting for CI, or after pushing a fix CI asked for,
 # run it again with the same VERSION: it waits for CI on main's latest
 # commit and tags that one.
+# The version is committed only on a commit CI has passed: a release
+# commit pushed earlier cancels the run still going, so what's being
+# released was never seen green on Windows and macOS (0.7.0, 2026-10-14).
 #   scripts/release.sh VERSION            e.g. scripts/release.sh 0.3.0
 #   scripts/release.sh --dry-run VERSION  the changes made here and shown;
 #                                         nothing committed or pushed
@@ -23,6 +26,9 @@ fail() {
     echo "release: $*" >&2
     exit 1
 }
+# "VERSION --dry-run" released for real once (2026-10-14): nothing else
+# is taken after the version.
+[ $# -eq 1 ] || fail "usage: scripts/release.sh [--dry-run] VERSION (--dry-run goes first)"
 echo "$V" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "$V isn't a version like 0.3.0"
 git rev-parse -q --verify "refs/tags/v$V" >/dev/null && fail "v$V is tagged already"
 [ "$(git branch --show-current)" = main ] || fail "not on main"
@@ -36,6 +42,12 @@ if [ "$current" = "$V" ]; then
 else
     [ -z "$(git status --porcelain)" ] || fail "uncommitted changes"
     [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || fail "main isn't the same as origin/main"
+    # CI has passed on what's released, before the version is committed.
+    head=$(git rev-parse HEAD)
+    passed=$(gh run list --workflow ci.yml --commit "$head" --json status,conclusion \
+        --jq '.[0] | "\(.status) \(.conclusion)"')
+    [ "$passed" = "completed success" ] ||
+        fail "CI hasn't passed on $head (${passed:-no run}): wait for it, or fix it, first"
     # What "Unreleased" says: the release's text. Refused when empty.
     notes=$(awk '/^## Unreleased/ { on = 1; next } on && /^## / { exit } on { print }' CHANGELOG.md)
     [ -n "$(printf '%s' "$notes" | tr -d '[:space:]')" ] ||
