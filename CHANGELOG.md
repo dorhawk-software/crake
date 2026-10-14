@@ -11,6 +11,12 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Crake says when it was updated and needs a restart:** after a package update the panel says
+  "Crake was updated to X. Restart it to finish.", and Restart does it with your tunnels kept up.
+- **Crake tells you when a new version is out,** where nothing else updates it (a Mac without
+  Homebrew, Windows, a .deb or .rpm installed from a file): once a day it asks dorhawk.software for
+  the newest version's number and the panel links its download page. Settings → General switches
+  it off.
 - **The panel no longer blinks and jumps when it changes size,** e.g. after Undo or Redo with a
   bar at the bottom of the screen: it grows and shrinks in place instead of opening again.
 

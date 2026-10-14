@@ -12,6 +12,11 @@ fn pipe() -> String {
     format!(r"\\.\pipe\crake-ui-{user}")
 }
 
+/// Another Crake owns the pipe (asking it nothing).
+pub fn taken() -> bool {
+    std::fs::OpenOptions::new().write(true).open(pipe()).is_ok()
+}
+
 /// If Crake already runs, ask it to open and return true (this one then
 /// exits). Otherwise listen, calling `open` whenever another start asks.
 pub fn claim(open: impl Fn() + Send + 'static) -> bool {

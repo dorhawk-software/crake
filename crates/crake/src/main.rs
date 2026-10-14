@@ -70,6 +70,8 @@ mod tray;
 
 mod units;
 
+mod versions;
+
 /// CRAKE_DEMO=arrive: a decision this often, for hosts 1 to LAST_HOST.
 const ARRIVE_EVERY: Duration = Duration::from_secs(8);
 const LAST_HOST: u8 = 250;
@@ -98,7 +100,11 @@ mod windows_tests;
 
 // What the parts of the app call on each other.
 use requests::{keep_certificate, on_request, start_left_on};
-use updates::{on_update, refresh_tray, watch_openvpn3, watch_service};
+use updates::{on_update, refresh_tray, watch_openvpn3, watch_service, watch_versions};
+
+/// How long a restarted Crake waits for the old one to quit.
+const RESTART_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
+const RESTART_POLL: std::time::Duration = std::time::Duration::from_millis(100);
 use windows::{
     open_detail, open_log, open_new_tunnel, open_settings, open_sign_in, panel_blurred,
     refit_panel, toggle_panel,
@@ -181,6 +187,10 @@ pub enum Request {
     /// macOS: System Settings' Login Items & Extensions, where Crake's
     /// service is switched on (`service`).
     OpenServiceSettings,
+    /// Start the updated Crake in this one's place (`versions`).
+    Restart,
+    /// Open a page in the browser (a new version's download page).
+    OpenUrl(String),
     Quit,
 }
 
@@ -495,6 +505,13 @@ pub(crate) fn start(cx: &mut App, setup: Setup) -> bool {
     // One Crake per session (not in demo mode, so a demo can run
     // beside the real one): a second start opens this one's panel.
     if single_instance {
+        // Started by Restart: the old Crake is quitting; wait for it.
+        if std::env::var_os(versions::RESTARTING).is_some() {
+            let since = std::time::Instant::now();
+            while single::taken() && since.elapsed() < RESTART_WAIT {
+                std::thread::sleep(RESTART_POLL);
+            }
+        }
         let again = requests.clone();
         if single::claim(move || {
             again.send_blocking(Request::Panel(None)).ok();
@@ -543,6 +560,7 @@ pub(crate) fn start(cx: &mut App, setup: Setup) -> bool {
     if openvpn3 {
         watch_openvpn3(cx);
         watch_service(cx);
+        watch_versions(cx);
     }
 
     cx.spawn(async move |cx| {

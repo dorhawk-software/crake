@@ -9,6 +9,11 @@ impl Settings {
     pub(super) fn general(&self, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {
         let prefs = cx.global::<Prefs>().clone();
         let starts = crate::autostart::enabled();
+        // Only where nothing else updates Crake (a package manager does).
+        let asks = !crate::versions::updated_elsewhere(
+            &std::env::current_exe().unwrap_or_default(),
+            |p| std::path::Path::new(p).exists(),
+        );
         let notify = select(
             self,
             "notify",
@@ -98,7 +103,20 @@ impl Settings {
                         notify,
                         true,
                         t,
-                    )),
+                    ))
+                    .when(asks, |g| {
+                        g.child(row(
+                            self.title("Tell me when there\u{2019}s a new version", t, cx),
+                            Some("Once a day Crake asks dorhawk.software which version is the newest."),
+                            toggle("versions", prefs.check_versions, t)
+                                .on_click(cx.listener(move |_, _, _, cx| {
+                                    Self::pref(cx, |p| p.check_versions = !prefs.check_versions);
+                                }))
+                                .test_support(),
+                            true,
+                            t,
+                        ))
+                    }),
             )
             .child(group(t).mt(px(16.)).child(row(
                 self.title("Appearance", t, cx),

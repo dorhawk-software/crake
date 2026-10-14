@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: a host's whole name</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+    --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8;
+    --ink: #1A1C1E; --muted: #5A5F64; --accent: #0F766E; }
+  body { margin: 0; background: var(--desk); color: var(--ink);
+    font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  .page { padding: 32px 40px 48px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 900px; }
+  .intro b { color: var(--ink); }
+  .cap { font-size: 15px; font-weight: 700; margin: 28px 0 2px; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 860px; }
+  .win { width: 820px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px 28px 90px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); position: relative; }
+  .mark { width: 18px; flex: none; color: var(--accent); font-weight: 700; }
+  .txt { flex: 1; min-width: 0; }
+  .host { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .host.hov { text-decoration: underline dotted var(--lineStrong); text-underline-offset: 3px; cursor: pointer; }
+  .how { font-size: 13px; color: var(--muted); }
+  .used { width: 120px; flex: none; font-size: 13px; color: var(--muted); }
+  .btn { border: 1px solid var(--line); border-radius: 6px; padding: 5px 12px; font-weight: 600; font-size: 13px; }
+  .btns { display: flex; gap: 6px; }
+  .tip { position: absolute; left: 30px; top: 40px; z-index: 2; background: var(--surface); border: 1px solid var(--lineStrong);
+    border-radius: 6px; padding: 7px 10px; box-shadow: 0 6px 18px rgba(0,0,0,.35); max-width: 760px; }
+  .tip .full { font-size: 13px; word-break: break-all; }
+  .tip .hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .tip .hint.ok { color: var(--accent); }
+  .copy { display: inline-block; margin-left: 6px; color: var(--muted); font-size: 13px; vertical-align: 1px; }
+  .q { margin-top: 28px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; max-width: 860px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>A host's whole name.</b> In tunnel detail a long name is cut with "…" (it has to fit). Pointing
+    at it shows the whole name, and it can be copied whole, not just what's visible. The same for the rows under
+    "From the gateway".</div>
+
+  <div class="cap">A. Point to read it, click to copy it (recommended)</div>
+  <div class="sub">Every name in the list works the same way, long or short. At rest none is underlined. The one under
+    the pointer gets a dotted underline and a hand cursor (shown here with the pointer on the long name), and after a
+    short pause a small card under it shows the whole name and "Click to copy". A click copies the whole name, and the
+    card says "Copied".</div>
+  <div class="win" id="a"></div>
+
+  <div class="cap">A, after the click</div>
+  <div class="win" id="a2"></div>
+
+  <div class="cap">A, pointing at a name that fits</div>
+  <div class="sub">The same underline and the same card. There's nothing hidden to reveal, so the card only says "Click
+    to copy".</div>
+  <div class="win" id="a3"></div>
+
+  <div class="cap">B. A copy icon on the row</div>
+  <div class="sub">The card shows the whole name only; a copy icon appears after the name while the row is pointed at,
+    and copies it. One more thing on the row, and it lands on top of the name when the name is cut.</div>
+  <div class="win" id="b"></div>
+
+  <div class="q"><b>To decide:</b> A or B. In both, every name behaves alike: any name can be copied, and the cue appears
+    on the name being pointed at, never on just the long ones.</div>
+</div>
+<script>
+if (location.search.includes('dark=false')) document.body.classList.add('light');
+const long = 'aks-cluster-nonprod.nonprod.privatelink.germanywestcentral.azmk8s.io';
+const short = 'test.postgres.nonprod.acme.internal';
+const shortTip = `<div class="tip" style="top:40px"><div class="hint" style="margin:0">Click to copy</div></div>`;
+const rows = (hover, tip, icon, onShort) => `
+  <div class="row"><span class="mark mono">ı|</span><div class="txt"><div class="host mono${onShort ? ' hov' : ''}" style="display:inline-block;max-width:100%">${short}</div>
+    <div class="how">Learned at 14:37 · added by you</div></div><div class="used">Used now</div>
+    <div class="btns"><span class="btn">Pin</span><span class="btn">Forget</span></div>${onShort ? shortTip : ''}</div>
+  <div class="row"><span class="mark mono">ı|</span><div class="txt"><div class="host mono${hover ? ' hov' : ''}" style="max-width:${icon ? 470 : 500}px">${long}</div>
+    <div class="how">Learned at 13:40 · name only exists inside</div></div>${icon ? '<span class="copy">⧉</span>' : ''}<div class="used">Used now</div>
+    <div class="btns"><span class="btn">Pin</span><span class="btn">Forget</span></div>${tip}</div>`;
+const tip = hint => `<div class="tip"><div class="full mono">${long}</div>${hint}</div>`;
+document.getElementById('a').innerHTML = rows(true, tip('<div class="hint">Click to copy</div>'));
+document.getElementById('a2').innerHTML = rows(true, tip('<div class="hint ok">Copied</div>'));
+document.getElementById('a3').innerHTML = rows(false, '', false, true);
+document.getElementById('b').innerHTML = rows(false, tip(''), true);
+</script>
+</body>
+</html>

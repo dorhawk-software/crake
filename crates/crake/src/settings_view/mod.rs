@@ -319,6 +319,9 @@ impl Render for Settings {
 /// "?" next to its name. Paragraphs are separated by a blank line.
 fn help(label: &str) -> Option<&'static str> {
     Some(match label {
+        "Tell me when there\u{2019}s a new version" => {
+            "Once a day Crake asks dorhawk.software which version is the newest. It sends nothing about you, this computer or your tunnels; the site sees an address asking, as with any web page.\n\nWhen a newer Crake is out, the panel says so, with its download page.\n\nOff: nothing is asked; check the website yourself."
+        }
         "Start when you log in" => {
             "When you log in to your computer, Crake starts by itself: the bird is there, ready. It doesn't connect anything on its own unless you also switch on the setting below it."
         }

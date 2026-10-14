@@ -268,6 +268,23 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
         }
         Request::OpenServiceSettings => crate::sys::service::open_settings(),
         Request::Quit => cx.quit(),
+        Request::Restart => restart(cx),
+        Request::OpenUrl(url) => cx.open_url(&url),
+    }
+}
+
+/// Restart: the updated binary is started (told to wait for this one),
+/// then this one quits. Tunnels stay up: craked keeps them, and OpenVPN 3
+/// sessions are taken over again (`watch_openvpn3`).
+fn restart(cx: &mut App) {
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    let mut cmd = std::process::Command::new(crate::versions::running_exe(exe));
+    cmd.env(crate::versions::RESTARTING, "1");
+    crate::sys::no_console(&mut cmd);
+    if cmd.spawn().is_ok() {
+        cx.quit();
     }
 }
 

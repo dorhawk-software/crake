@@ -54,6 +54,8 @@ pub enum Command {
 pub enum Update {
     /// craked can be reached (or not).
     Reachable(bool),
+    /// craked's version, as it starts serving ("" when it doesn't say).
+    ServiceVersion(String),
     Tunnels(Vec<Tunnel>),
     /// The recent log, oldest first (on every new connection).
     Log(Vec<LogEntry>),
@@ -227,6 +229,23 @@ impl Api {
         Ok(raw.iter().map(tunnel).collect())
     }
 
+    /// craked's version (its `Version` property).
+    async fn version(&self) -> zbus::Result<String> {
+        let dest = (!self.p2p).then_some(BUS_NAME);
+        let reply = self
+            .conn
+            .call_method(
+                dest,
+                BUS_PATH,
+                Some("org.freedesktop.DBus.Properties"),
+                "Get",
+                &(BUS_NAME, "Version"),
+            )
+            .await?;
+        let value: OwnedValue = reply.body().deserialize()?;
+        String::try_from(value).map_err(zbus::Error::Variant)
+    }
+
     async fn log(&self, count: u32) -> zbus::Result<Vec<LogEntry>> {
         let raw: Vec<String> = self.call("RecentLog", &(count,)).await?;
         Ok(raw
@@ -319,8 +338,10 @@ async fn session(
         .call::<_, HashMap<String, String>>("Settings", &())
         .await
         .unwrap_or_default();
+    let version = api.version().await.unwrap_or_default();
     *reachable = Some(true);
     if !(send(Update::Reachable(true)).await
+        && send(Update::ServiceVersion(version)).await
         && send(Update::Tunnels(tunnels)).await
         && send(Update::Log(log)).await
         && send(Update::Settings(settings)).await)

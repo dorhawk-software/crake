@@ -659,6 +659,23 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
      Names never seen before can't be helped.
 8. **Someday: other platforms** (see below). Not before Linux is solid.
 
+## A newer Crake (built 2026-10-14; design/proposals/new-version.html)
+
+`versions.rs`. (1) craked's D-Bus `Version` is newer than the app (a
+package updated it): the panel says "Crake was updated to X. Restart it to
+finish."; Restart starts the new binary (Linux: the path without
+" (deleted)") with `CRAKE_RESTARTING`, which waits up to 10 s for the old
+one's single-instance socket or pipe to go (`single::taken`), and quits.
+(2) Where nothing else updates Crake (`updated_elsewhere`: not the
+dorhawk apt/dnf repository, pacman, the Nix store, Homebrew's cask),
+once a day (looked at hourly, the time in app.json) the app asks
+https://packages.dorhawk.software/versions.json with the system's curl and
+says "Crake X is out. You have Y." with Download (the release page) and
+Not now (`version:X`, so the next version is said again). On by default
+(decided by the user: "automatic updates are amazing"); Settings → General
+"Tell me when there's a new version" switches it off and is only shown
+where it applies.
+
 ## Not now (written down to come back to)
 
 **The rule (the user, 2026-10-14): whatever we decide not to do right now
@@ -711,15 +728,12 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
 - **NixOS CI rebuilds its dependencies when any dependency changes
   (~45 min),** even one only macOS or Windows builds (2026-10-14: the
   SMAppService bindings): Cargo.lock is the dependency builds' input.
+  A new direct dependency in a crate's Cargo.toml does the same (crane's
+  dependency builds are made from the Cargo.tomls' dependency lists too):
+  3ff0271 added raw-window-handle and nixos took 48 min.
   Giving them a Cargo.lock trimmed to the crates Linux builds would spare
   those runs; fiddly (which crates are platform-only), so left while it's
   about one slow run a week (Dependabot's).
-- **Telling the user to restart Crake after an update (2026-10-14).**
-  Packages restart craked (it hands its tunnels over) but not the app,
-  which keeps running the old version until it's restarted, as is usual
-  for desktop apps. Crake could notice craked is newer than itself and say
-  "Crake was updated. Restart it to finish." in the panel, with a button,
-  as Firefox and Chrome do. Offered, not decided.
 - **All unsafe code behind one safe layer (asked for by the user,
   2026-10-14).** About 100 unsafe uses today (craked 68 in 13 files, the
   app 32 in 7), nearly all in the `sys/` modules (system calls, netlink,
@@ -733,9 +747,10 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with
   another scale on either.
-- **Telling macOS and Windows users about a new version.** apt, dnf,
-  Homebrew and the AUR update Crake; a .pkg or .exe installed by hand
-  doesn't. An in-app "Crake X is out" notice, and winget for Windows.
+- **winget for Windows.** The in-app "Crake X is out" notice is built
+  (`versions.rs`); Windows users would rather be updated by winget, like
+  Homebrew's cask on a Mac. Then `versions::updated_elsewhere` should
+  know a winget install.
 - **Undo in macOS notifications.** notify-rust has no actions there, so
   "Use Nordbank" / Undo exist only in the panel on a Mac.
 - **Untried on real systems:** the macOS panel under the menu bar (also
@@ -746,6 +761,29 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   made again (`~/.cache/crake-vms/make-vm.sh`) or a real machine.
 - **Performance: never measured.** Believed negligible (NFQUEUE holds
   only DNS answers and racing SYNs); measure before claiming numbers.
+- **A power user's requests (a colleague who runs OpenVPN 3 profiles
+  daily, 2026-10-14).** Asked for, not designed or decided yet:
+  1. *See the traffic, animated* ("packets ticking by"), his first and
+     main wish: a live graph of what goes direct and what through each
+     tunnel, with tables of hosts and connections only as the detail
+     (design/proposals/traffic-window.html, being redrawn around the
+     graph).
+  2. *See the split as a whole*: every rule in one place (learned,
+     pinned, never, direct by Undo, everything else), the "tree" he'd
+     otherwise keep in a config file (that proposal's table).
+  3. *Edit an OpenVPN 3 profile in Crake*: view the imported profile's
+     text, change a value (remote, a route, a dhcp-option, a
+     certificate), save and reconnect, without opening an editor,
+     exporting and importing again ("too many clicks"; quicker debugging
+     of a config). openvpn3 has no in-place edit: Crake would Fetch the
+     text (refused when the profile is `locked_down`), import the edited
+     text and remove the old one under the same name, keeping Crake's
+     tunnel on it, inline certificates and keys kept. A "for experts"
+     place, not in the way of people who just import IT's file.
+  4. *"How is it secured, can it break my traffic?"*: answered in chat
+     (nothing leaves the computer, there's no server); belongs in the
+     explainers below, with what happens when craked stops (its routes
+     and rules go, traffic goes direct as without Crake).
 - **The explainers** (docs/explainers.md): written down, not yet drawn or
   published anywhere.
 - **The website's version number** (dorhawk-website): visitors get the

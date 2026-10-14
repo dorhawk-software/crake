@@ -127,6 +127,62 @@ pub(super) fn watch_service(cx: &mut App) {
     .detach();
 }
 
+/// The newest Crake, asked of dorhawk.software once a day (`versions`),
+/// where nothing else updates this install and the user hasn't switched
+/// it off; what it said last is kept, so the notice outlives a restart.
+pub(super) fn watch_versions(cx: &mut App) {
+    if cx.global::<Shell>().demo {
+        return;
+    }
+    let exe = std::env::current_exe().unwrap_or_default();
+    if crate::versions::updated_elsewhere(&exe, |p| std::path::Path::new(p).exists()) {
+        return;
+    }
+    cx.spawn(async move |cx| {
+        loop {
+            let (on, at, known) = cx.update(|cx| {
+                let p = cx.global::<prefs::Prefs>();
+                (
+                    p.check_versions,
+                    p.versions_checked_at,
+                    p.newest_version.clone(),
+                )
+            });
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs());
+            let mut newest = known;
+            if on && now.saturating_sub(at) >= crate::versions::EVERY {
+                let asked = cx
+                    .background_executor()
+                    .spawn(async { crate::versions::fetch() })
+                    .await;
+                // Not answered (offline): asked again in an hour.
+                if asked.is_some() {
+                    newest = asked;
+                    cx.update(|cx| {
+                        let p = cx.global_mut::<prefs::Prefs>();
+                        p.versions_checked_at = now;
+                        p.newest_version.clone_from(&newest);
+                        p.save();
+                    });
+                }
+            }
+            cx.update(|cx| {
+                let model = cx.global::<Shell>().model.clone();
+                model.update(cx, |m, cx| {
+                    if m.newest != newest {
+                        m.newest.clone_from(&newest);
+                        cx.notify();
+                    }
+                });
+            });
+            cx.background_executor().timer(crate::versions::LOOK).await;
+        }
+    })
+    .detach();
+}
+
 /// OpenVPN 3 sessions of Crake's tunnels that were started elsewhere
 /// (openvpn3's indicator or command line, or Crake before a restart): once
 /// connected, Crake takes them over, routes through them, and switching

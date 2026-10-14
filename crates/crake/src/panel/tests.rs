@@ -276,3 +276,51 @@ fn the_service_waiting_for_approval_takes_the_user_there(cx: &mut TestAppContext
         Request::OpenServiceSettings
     ));
 }
+
+impl Opened {
+    fn shows(&self, id: &'static str, cx: &mut TestAppContext) -> bool {
+        cx.update_window(self.window, |_, window, cx| {
+            window.render_frame(cx);
+            window.try_find(id).is_some()
+        })
+        .unwrap()
+    }
+}
+
+/// A package updated Crake: craked (restarted by the package) is newer
+/// than this app, which asks to be restarted (design/proposals/new-version.html).
+#[gpui_kit::test]
+fn an_updated_service_asks_for_a_restart(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    assert!(!w.shows("version", cx), "nothing to say yet");
+    w.model.update(cx, |m, cx| {
+        m.service_version = Some("99.0.0".into());
+        cx.notify();
+    });
+    assert!(matches!(w.click("Restart", cx), Request::Restart));
+}
+
+/// A new version is out (asked of dorhawk.software): Download opens its
+/// page; Not now remembers that version; switched off in Settings, it's
+/// not said.
+#[gpui_kit::test]
+fn a_new_version_links_its_page_until_not_now(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    w.model.update(cx, |m, cx| {
+        m.newest = Some("99.1.0".into());
+        cx.notify();
+    });
+    match w.click("Download", cx) {
+        Request::OpenUrl(url) => assert_eq!(
+            url,
+            "https://github.com/dorhawk-software/crake/releases/tag/v99.1.0"
+        ),
+        other => panic!("{other:?}"),
+    }
+    match w.click("Not now", cx) {
+        Request::Dismiss(key) => assert_eq!(key, "version:99.1.0"),
+        other => panic!("{other:?}"),
+    }
+    cx.update(|cx| cx.global_mut::<Prefs>().check_versions = false);
+    assert!(!w.shows("version", cx), "switched off");
+}

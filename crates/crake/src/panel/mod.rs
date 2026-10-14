@@ -21,6 +21,7 @@ mod chart;
 mod decisions;
 mod first_run;
 mod tunnels;
+mod version;
 
 #[cfg(test)]
 mod tests;
@@ -151,6 +152,7 @@ impl Render for Panel {
             panel = panel.child(self.first_run(&t, window, cx));
         } else if reachable {
             panel = panel
+                .children(self.version_notice(model, &t, cx))
                 .child(self.chart(model, &t, window, cx))
                 .child(self.decisions(model, &t, window, cx))
                 .child(self.tunnels(model, &t, cx))

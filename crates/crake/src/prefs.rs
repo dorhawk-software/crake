@@ -37,6 +37,16 @@ pub struct Prefs {
     /// means it was switched off: `service::wanted`).
     #[serde(default)]
     pub service_was_on: bool,
+    /// Ask dorhawk.software once a day for the newest version (installs
+    /// nothing else updates; on by default, decided by the user).
+    #[serde(default = "yes")]
+    pub check_versions: bool,
+    /// When it was last asked (seconds since 1970).
+    #[serde(default)]
+    pub versions_checked_at: u64,
+    /// What it said: the newest version then.
+    #[serde(default)]
+    pub newest_version: Option<String>,
     /// Not written (demo mode): nothing real is remembered.
     #[serde(skip)]
     pub scratch: bool,
@@ -56,6 +66,9 @@ impl Default for Prefs {
             left_on: Default::default(),
             reconnect: false,
             service_was_on: false,
+            check_versions: true,
+            versions_checked_at: 0,
+            newest_version: None,
             scratch: false,
         }
     }

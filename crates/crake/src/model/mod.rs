@@ -44,6 +44,11 @@ pub struct Model {
     /// What the user has to do for craked to run (macOS: switch it on in
     /// System Settings), when anything.
     pub service: Option<crate::service::Wanted>,
+    /// craked's version: newer than this app's after a package updated it
+    /// (the panel then asks for a restart, `versions`).
+    pub service_version: Option<String>,
+    /// The newest Crake, when asked (`versions::fetch`).
+    pub newest: Option<String>,
     pub tunnels: Vec<Tunnel>,
     /// Oldest first.
     pub log: Vec<LogEntry>,
@@ -380,6 +385,7 @@ impl Model {
             Update::Traffic(t) => self.traffic = t,
             Update::Days(d) => self.days = d,
             Update::Settings(s) => self.settings = s,
+            Update::ServiceVersion(v) => self.service_version = (!v.is_empty()).then_some(v),
             Update::Added(_) => {}
         }
         None

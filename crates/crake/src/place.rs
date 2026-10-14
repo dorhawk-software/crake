@@ -198,7 +198,9 @@ pub fn place_at_bar(
 }
 
 /// A panel that opens upward, its height changed: where its top goes so
-/// its bottom stays at the bar (in the window system's pixels).
+/// its bottom stays at the bar (in the window system's pixels). Not on
+/// macOS, where the panel always hangs from the menu bar.
+#[cfg(any(not(target_os = "macos"), test))]
 pub fn top_keeping_bottom(top: i32, height: u32, new_height: u32) -> i32 {
     let grown = i64::from(new_height) - i64::from(height);
     i32::try_from(i64::from(top) - grown).unwrap_or(top)

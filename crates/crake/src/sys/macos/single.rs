@@ -9,6 +9,11 @@ fn socket() -> Option<PathBuf> {
     Some(super::private_dir().ok()?.join("ui.sock"))
 }
 
+/// Another Crake listens (asking it nothing).
+pub fn taken() -> bool {
+    socket().is_some_and(|path| UnixStream::connect(path).is_ok())
+}
+
 /// If Crake already runs, ask it to open and return true (this one then
 /// exits). Otherwise listen, calling `open` whenever another start asks.
 pub fn claim(open: impl Fn() + Send + 'static) -> bool {
