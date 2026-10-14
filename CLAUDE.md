@@ -625,6 +625,55 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
      Names never seen before can't be helped.
 8. **Someday: other platforms** (see below). Not before Linux is solid.
 
+## Not now (written down to come back to)
+
+**The rule (the user, 2026-10-14): whatever we decide not to do right now
+is written down, here or next to the code it concerns, in the same
+commit.** A doc comment on a stub isn't enough; prefer code that fails
+loudly over a silent stub. Done items leave this list. Others are
+recorded where they belong: the WFP driver and OpenVPN on Windows
+(Other platforms), Windows code signing, bundling openconnect on macOS,
+"Start at login" on macOS (Releases), distros without systemd-resolved,
+the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
+
+- **Zed upstream, GPUI change 3 (Xft.dpi at runtime; 2026-10-14).** The
+  branch is ready (github.com/ondrej-simon/zed, `x11-follow-xft-dpi`, one
+  commit); the user files the issue and opens the PR in their own words
+  (Zed's AI policy: no agent-written PRs or descriptions). Related, not a
+  duplicate: zed-industries/zed#21851. See CRAKE-PATCH.md.
+- **OpenVPN 3 ended its session when the app quit (2026-10-14,
+  openvpn3 v27.1).** Seen once on the user's real tunnel; the app
+  doesn't disconnect on quit, so openvpn3 did. craked now notices (7g), but the cause is
+  unproven and 7g's "sessions survive a restart" may be out of date. To
+  do with the user: connect, quit Crake, watch the session. If confirmed,
+  decide what quitting means for OpenVPN 3 tunnels (say so before quitting,
+  or keep the session alive another way).
+- **Display scale changes on Windows and macOS: not tried.** GPUI follows
+  them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
+  lists are logical; no one has docked a running Crake to a monitor with
+  another scale on either.
+- **Telling macOS and Windows users about a new version.** apt, dnf,
+  Homebrew and the AUR update Crake; a .pkg or .exe installed by hand
+  doesn't. An in-app "Crake X is out" notice, and winget for Windows.
+- **Undo in macOS notifications.** notify-rust has no actions there, so
+  "Use Nordbank" / Undo exist only in the panel on a Mac.
+- **Untried on real systems:** the macOS panel under the menu bar (also
+  noted there), importing a real .ovpn file, KDE, native Wayland
+  (`CRAKE_WAYLAND=1`), and every Beta protocol (only AnyConnect and
+  OpenVPN 3 have met a real gateway).
+- **macOS background items: "linked to Crake.app: no"** in the release's
+  Mac job; the only run that linked had installed and removed 0.3.0 first.
+  Hypothesis, unconfirmed: macOS links when it updates an existing record.
+  The colleague's upgrade to 0.5.0 will tell.
+- **Performance: never measured.** Believed negligible (NFQUEUE holds
+  only DNS answers and racing SYNs); measure before claiming numbers.
+- **The explainers** (docs/explainers.md): written down, not yet drawn or
+  published anywhere.
+- **The website's version number** (dorhawk-website): visitors get the
+  live one from versions.json; the page's fallback is bumped by hand at
+  each release. Automating it (the packages workflow updating the page, or
+  Cloudflare filling it in) was offered, not decided.
+
 ## Lints are errors
 
 Any lint stops the build; fix it and build again, never silence it.

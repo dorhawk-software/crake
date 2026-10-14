@@ -41,6 +41,8 @@ Upstream (GPUI is Zed's; gpui-pre-* are snapshots of Zed's crates, packaged
 by gpui-kit's author): change 1 is zed-industries/zed#64447 (reported by
 someone else; its fix also sets static gravity, which a window with a title
 bar needs), change 2 is zed-industries/zed#65493 (ours; this patch is the
-fix proposed there). Once upstream has both, the weekly update notices and
-drops this copy; if upstream's fix differs from this patch, the patch stops
+fix proposed there). Change 3 isn't filed yet: the user files it in their
+own words (Zed's AI policy), from the branch `x11-follow-xft-dpi` on
+github.com/ondrej-simon/zed (related: zed-industries/zed#21851). Once
+upstream has all three, the weekly update notices and drops this copy; if upstream's fix differs from this patch, the patch stops
 applying and the update opens an issue instead.
