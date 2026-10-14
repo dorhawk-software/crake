@@ -282,3 +282,19 @@ jobs:
       - run: chmod +x target/deb/journey
       - name: Install it, a tunnel through the service, the journey, an upgrade, removal
         run: scripts/deb-test.sh ${{ matrix.system }}
+
+  # Once main's jobs have saved their caches: the ones a newer cache of the
+  # same kind replaced (an older Cargo.lock's) are deleted, or they push
+  # out caches still in use (scripts/prune-caches.sh).
+  caches:
+    needs: [check, windows, macos, windows-build, packages]
+    if: ${{ always() && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Delete the caches newer ones replaced
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/prune-caches.sh

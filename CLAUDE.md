@@ -944,7 +944,13 @@ The user doesn't want development builds installed on their machine.
   whale it kept evicting) moved to **Cachix** (free for open source,
   cache `crake`): the nixos job's `cachix/cachix-action` pushes every path
   it builds and substitutes from it next time; Cachix has no 10 GB cap, so
-  GitHub's budget now holds only the five Rust caches (~9 GB). Setup (done
+  GitHub's budget now holds only the five Rust caches (~9 GB). **Replaced
+  caches are deleted (asked by the user, 2026-10-14):** after a Cargo.lock
+  change the Rust caches were saved again under the new key while the old
+  ones stayed, and together they pushed out the packages cache, so 0.7.0's
+  .deb was built from scratch (17 min instead of 7). CI's `caches` job, on
+  main after the jobs that save, runs `scripts/prune-caches.sh`: per kind
+  (the key without its trailing hashes and dates) only the newest stays. Setup (done
   with the user): a Cachix account, a public cache named `crake`, an auth
   token as the repo secret `CACHIX_AUTH_TOKEN`. Cachix's free plan holds
   5 GB and then evicts the least recently used paths (a warning email at
