@@ -675,6 +675,14 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   session craked had refused. Not Crake's to clean up (openvpn3's process,
   user `openvpn`); worth reporting to OpenVPN if it happens again, and
   Crake could warn when two tun devices carry the same profile's routes.
+- **NixOS CI rebuilds its dependencies at every release (~45 min).** The
+  version bump changes Cargo.lock, and the version reaches both crane
+  dependency derivations (`version` in packaging/nix/package.nix, and
+  Crake's own entries in the Cargo.lock copy they build from), though no
+  dependency changed. Pinning both to a placeholder for the deps builds
+  only (Crake's own build keeps the real version) would let a release's
+  CI take ~15 min like any push. Offered 2026-10-14 during 0.6.0, after
+  the release.
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with
