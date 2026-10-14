@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: when there's a newer Crake</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4;
+    --accent: #2DD4BF; --accent-ink: #0B1514; --track: #4A4E53; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --ink: #1A1C1E; --muted: #5A5F64;
+    --accent: #0F766E; --accent-ink: #FFFFFF; --track: #BDBDB8; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 40px; max-width: 1000px; }
+  .intro { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  .intro b { color: var(--ink); }
+  .cap { font-size: 15px; font-weight: 700; margin: 26px 0 2px; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 760px; }
+  .panel { width: 452px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding-bottom: 8px; }
+  .head { display: flex; align-items: center; gap: 10px; padding: 14px 18px 10px; }
+  .head .t { font-weight: 700; font-size: 16px; }
+  .head .s { color: var(--muted); font-size: 13px; }
+  .note { margin: 0 18px 10px; padding: 10px 12px; background: var(--surface); border-radius: 8px; font-size: 13px;
+    display: flex; gap: 12px; align-items: center; }
+  .note span:first-child { flex: 1; }
+  .act { flex: none; color: var(--accent); font-weight: 600; }
+  .sec { padding: 8px 18px 4px; font-size: 13px; font-weight: 600; border-top: 1px solid var(--line); }
+  .tun { display: flex; align-items: center; gap: 12px; padding: 8px 18px; }
+  .tun .n { font-weight: 700; font-size: 15px; } .tun .st { color: var(--muted); font-size: 13px; margin-left: 8px; }
+  .sw { width: 46px; height: 26px; border-radius: 13px; background: var(--accent); position: relative; margin-left: auto; flex: none; }
+  .sw::after { content: ''; position: absolute; top: 3px; left: 23px; width: 20px; height: 20px; border-radius: 50%; background: #fff; }
+  .sw.off { background: var(--track); } .sw.off::after { left: 3px; }
+  .cols { display: flex; gap: 32px; flex-wrap: wrap; }
+  .settings { width: 520px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px 24px; }
+  .settings h3 { margin: 0 0 12px; font-size: 20px; }
+  .row { display: flex; gap: 16px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--line); }
+  .row .l { font-weight: 600; } .row .d { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .q { margin-top: 26px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; max-width: 760px; font-size: 13px; }
+  .q b { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>When there's a newer Crake.</b> Two cases. (1) A package manager updated Crake: its service
+    (craked) was restarted on the new version, but the app keeps running the old one until it's restarted, as desktop
+    apps do. Crake knows, by comparing its version with craked's (nothing leaves the computer), and says so. (2) On a Mac
+    or Windows install that no package manager updates (a .pkg opened by hand, the .exe), nothing tells the user a new
+    version is out; Crake would have to ask dorhawk.software.</div>
+
+  <div class="cap">1. Updated: restart to finish (every system)</div>
+  <div class="sub">A notice at the top of the panel, while craked is newer than the app. "Restart" starts the new Crake
+    in the old one's place. No setting, nothing sent anywhere.</div>
+  <div class="panel">
+    <div class="head"><span class="t">Crake</span><span class="s">· Listening</span></div>
+    <div class="note"><span>Crake was updated to 0.7.0. Restart it to finish.</span><span class="act">Restart</span></div>
+    <div class="sec">Tunnels</div>
+    <div class="tun"><span class="n">ACME</span><span class="st">Connected · 9 hosts</span><div class="sw"></div></div>
+  </div>
+
+  <div class="cap">2. A new version is out (Mac and Windows installs without a package manager)</div>
+  <div class="sub">The same place, with the version and a link to its download page. Shown until the user updates or
+    says "Not now" (asked again with the next version).</div>
+  <div class="cols">
+    <div class="panel">
+      <div class="head"><span class="t">Crake</span><span class="s">· Listening</span></div>
+      <div class="note"><span>Crake 0.7.0 is out. You have 0.6.1.</span><span class="act">Download</span></div>
+      <div class="sec">Tunnels</div>
+      <div class="tun"><span class="n">ACME</span><span class="st">Connected · 9 hosts</span><div class="sw"></div></div>
+    </div>
+    <div class="settings">
+      <h3>General</h3>
+      <div class="row"><div><div class="l">Tell me when there's a new version</div>
+        <div class="d">Once a day Crake asks dorhawk.software which version is the newest. It sends nothing
+          about you, this computer or your tunnels; the site sees an address asking, as with any web page.</div></div>
+        <div class="sw off" style="margin-top:2px"></div></div>
+    </div>
+  </div>
+
+  <div class="q"><b>Decision for (2):</b> Crake's rule is "nothing is sent anywhere". Asking for the newest version is
+    a request to dorhawk.software, so: <b>off until the user switches it on</b> (shown here; the notice in (1) still
+    works without it), or <b>on by default</b> on Mac and Windows installs that nothing else updates, with this setting
+    to switch it off. Linux, Homebrew and winget users never need it: their package manager does it.</div>
+</div>
+<script>if (location.search.includes('dark=false')) document.body.classList.add('light');</script>
+</body>
+</html>

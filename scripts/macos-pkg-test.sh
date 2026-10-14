@@ -82,13 +82,16 @@ fi
 sh "$(dirname "$0")/macos-front-test.sh" || fail "Settings opened behind"
 # Registered from inside the app: Crake, started as it starts for a user
 # (the window check above ran it in demo mode, which touches nothing),
-# registers craked, and macOS's record of it names the launchd file in
-# Crake.app (System Settings lists it under Crake).
+# registers craked, and macOS records it as a daemon of Crake.app's (its
+# parent is the app, so System Settings lists it under Crake; the
+# certificate's name was the parent of 0.6's daemon).
+app_id=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Contents/Info.plist")
 pkill -x crake 2>/dev/null || true
 CRAKE_DEBUG=1 "$APP/Contents/MacOS/crake" >/tmp/crake-app.log 2>&1 &
 registered=no
 for _ in $(seq 30); do
-    if sudo sfltool dumpbtm 2>/dev/null | grep -q "Crake.app/Contents/Library/LaunchDaemons/$LABEL.plist"; then
+    if sudo sfltool dumpbtm 2>/dev/null | grep -A10 "Identifier: 16.$LABEL\$" |
+        grep -q "Parent Identifier: 2.$app_id\$"; then
         registered=yes
         break
     fi
