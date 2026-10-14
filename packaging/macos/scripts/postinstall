@@ -12,16 +12,19 @@
 # The tunnels come back signed in (craked's manager/handover.rs) when the
 # new craked starts within two minutes: at once on an upgrade, once the
 # user switches the service on when coming from an older Crake.
-LABEL=software.dorhawk.craked
-OLD=/Library/LaunchDaemons/$LABEL.plist
+LABEL=software.dorhawk.crake.daemon
+# 0.6 and before: craked's own launchd daemon (a label of its own: macOS
+# keeps that daemon's record, and the app's must not be taken for it).
+OLD_LABEL=software.dorhawk.craked
+OLD=/Library/LaunchDaemons/$OLD_LABEL.plist
 handover() {
     mkdir -p /var/run/crake
     : > /var/run/crake/handover
 }
 if [ -e "$OLD" ]; then
-    if launchctl print "system/$LABEL" >/dev/null 2>&1; then
+    if launchctl print "system/$OLD_LABEL" >/dev/null 2>&1; then
         handover
-        launchctl bootout "system/$LABEL" 2>/dev/null || true
+        launchctl bootout "system/$OLD_LABEL" 2>/dev/null || true
     fi
     rm -f "$OLD" /usr/local/sbin/craked
 elif launchctl print "system/$LABEL" >/dev/null 2>&1; then

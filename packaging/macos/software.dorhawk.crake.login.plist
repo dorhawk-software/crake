@@ -4,11 +4,13 @@
      session at login with the flag that switches on the tunnels left on.
      Registered by Crake.app itself (SMAppService;
      Crake.app/Contents/Library/LaunchAgents) when the user switches it on
-     in Settings, so System Settings lists it under Crake. -->
+     in Settings, so System Settings lists it under Crake. Not the label of
+     the agent file older Crakes wrote (software.dorhawk.crake), whose
+     record macOS keeps. -->
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>software.dorhawk.crake</string>
+    <string>software.dorhawk.crake.login</string>
     <key>BundleProgram</key>
     <string>Contents/MacOS/crake</string>
     <key>ProgramArguments</key>

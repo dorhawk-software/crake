@@ -1336,7 +1336,7 @@ the console or root, `Guard::ConsoleUser`); paths: hook socket in
 /var/run/crake, hook in /usr/local/libexec/crake (the system's /usr is
 sealed), state in /var/db/crake; openconnect from Homebrew
 (/opt/homebrew/bin, /usr/local/bin: launchd's and Finder apps' PATH
-lack it); `packaging/macos/software.dorhawk.craked.plist` runs craked as
+lack it); `packaging/macos/software.dorhawk.crake.daemon.plist` runs craked as
 a launchd daemon. IPv6 (2026-10-12, as on Windows): `route`/`ifconfig`
 with `-inet6` (the tunnel's address as an alias), a scoped IPv6 default
 route, IPV6_BOUND_IF, the kernel list's IPv6 rows (the address unions
@@ -1397,7 +1397,13 @@ login agent in `Contents/Library/LaunchAgents` (with `--autostart`),
 registered the same way. `postinstall`: an older craked (its own daemon,
 0.6 and before) hands its tunnels over and goes with its files; a
 registered one hands over and is restarted (`kickstart -k`); then Crake
-opens for the user at the screen, which registers it. Universal (Apple Silicon and Intel:
+opens for the user at the screen, which registers it. **Labels of their
+own:** `software.dorhawk.crake.daemon` and `software.dorhawk.crake.login`,
+not 0.6's `software.dorhawk.craked` / `software.dorhawk.crake`: macOS keeps
+its record of the old daemon after its file is gone, and SMAppService,
+asked about the same label, answered "enabled" for it and registered
+nothing (CI's Mac: craked never ran); the old record's "disallowed" would
+have carried over too. Universal (Apple Silicon and Intel:
 `CRAKE_UNIVERSAL=1` joins both builds with lipo; releases and CI runs
 started by hand build it, pushes only Apple Silicon); openconnect from
 Homebrew (the app says `brew install openconnect` when it's missing), not

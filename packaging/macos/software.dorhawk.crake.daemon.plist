@@ -8,11 +8,14 @@
      under Crake, where the user switches it on once, not under the signing
      certificate's name (a daemon a package puts in /Library/LaunchDaemons
      is listed under that name; macOS curates names only for well-known
-     vendors). -->
+     vendors). Its label isn't craked's of 0.6 and before
+     (software.dorhawk.craked): macOS keeps its record of that old daemon,
+     and SMAppService, asked about the same label, answered for it
+     ("enabled") and registered nothing. -->
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>software.dorhawk.craked</string>
+    <string>software.dorhawk.crake.daemon</string>
     <key>BundleProgram</key>
     <string>Contents/MacOS/craked</string>
     <key>AssociatedBundleIdentifiers</key>

@@ -1,6 +1,6 @@
 //! macOS: Crake's service (craked), registered by Crake.app itself from its
 //! launchd file inside the app (Contents/Library/LaunchDaemons;
-//! packaging/macos/software.dorhawk.craked.plist), with SMAppService:
+//! packaging/macos/software.dorhawk.crake.daemon.plist), with SMAppService:
 //! System Settings lists it under Crake, and macOS has the user switch it
 //! on once there (`crate::service`, the panel's "needs your OK").
 
@@ -8,7 +8,10 @@ use objc2::rc::Retained;
 use objc2_foundation::NSString;
 use objc2_service_management::{SMAppService, SMAppServiceStatus};
 
-const DAEMON: &str = "software.dorhawk.craked.plist";
+/// Not 0.6's label (software.dorhawk.craked): macOS keeps that daemon's
+/// record, and SMAppService answered for it ("enabled"), registering
+/// nothing.
+const DAEMON: &str = "software.dorhawk.crake.daemon.plist";
 
 fn daemon() -> Retained<SMAppService> {
     // SAFETY: a constructor taking a valid string.

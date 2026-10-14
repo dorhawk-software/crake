@@ -15,9 +15,11 @@
 # Usage: macos-pkg-test.sh <Crake-x.y.z.pkg>
 set -eu
 PKG=$1
-LABEL=software.dorhawk.craked
+LABEL=software.dorhawk.crake.daemon
+# 0.6 and before: craked's own launchd daemon.
+OLD_LABEL=software.dorhawk.craked
 APP=/Applications/Crake.app
-OLD=/Library/LaunchDaemons/$LABEL.plist
+OLD=/Library/LaunchDaemons/$OLD_LABEL.plist
 fail() {
     echo "FAIL: $*" >&2
     sudo cat /var/log/craked.log >&2 2>/dev/null || true
@@ -45,13 +47,13 @@ fi
 sudo installer -pkg "$PKG" -target /
 [ ! -e "$OLD" ] || fail "the older craked's launchd file is still there"
 [ ! -e /usr/local/sbin/craked ] || fail "the older craked is still there"
-if sudo launchctl print "system/$LABEL" 2>/dev/null | grep -q "$OLD"; then
+if sudo launchctl print "system/$OLD_LABEL" >/dev/null 2>&1; then
     fail "the older craked still runs"
 fi
 test -x "$APP/Contents/MacOS/crake" || fail "no Crake.app"
 test -x "$APP/Contents/MacOS/craked" || fail "no craked in Crake.app"
 for f in "$APP/Contents/Library/LaunchDaemons/$LABEL.plist" \
-    "$APP/Contents/Library/LaunchAgents/software.dorhawk.crake.plist" "$APP/Contents/Info.plist"; do
+    "$APP/Contents/Library/LaunchAgents/software.dorhawk.crake.login.plist" "$APP/Contents/Info.plist"; do
     plutil -lint "$f" >/dev/null || fail "$f"
 done
 test -x /usr/local/libexec/crake/hook || fail "no hook"
@@ -92,7 +94,6 @@ for _ in $(seq 30); do
     fi
     sleep 1
 done
-pkill -x crake 2>/dev/null || true
 echo "macOS's records of Crake's items:"
 sudo sfltool dumpbtm 2>/dev/null | grep -B4 -A14 -i "dorhawk\|Crake.app" || true
 if [ "$registered" != yes ]; then
@@ -100,15 +101,34 @@ if [ "$registered" != yes ]; then
     grep -i "smappservice\|craked" /tmp/crake-app.log | tail -20
     fail "Crake didn't register its service from inside the app"
 fi
-# craked from inside the app serves the app's socket (launchd starts it
-# there once the user switches it on; here it's started by hand).
-sudo "$APP/Contents/MacOS/craked" 2>/tmp/craked-test.log &
-serving || { cat /tmp/craked-test.log >&2; fail "craked from Crake.app isn't serving /var/run/crake.sock"; }
-sudo pkill -TERM -x craked
-for _ in $(seq 10); do pgrep -x craked >/dev/null || break; sleep 1; done
-# Installed again over itself.
-sudo installer -pkg "$PKG" -target /
-test -x "$APP/Contents/MacOS/craked" || fail "no craked after installing again"
+# Switched on (a runner's macOS allows it by itself; a user is asked):
+# launchd runs craked from Crake.app, serving the app's socket, and an
+# upgrade restarts it on the new binary. Not switched on: craked from the
+# app started by hand, to see it serve.
+pid() {
+    sudo launchctl print "system/$LABEL" 2>/dev/null | sed -n 's/^[[:space:]]*pid = //p'
+}
+if serving && [ -n "$(pid)" ]; then
+    echo "craked runs under launchd from Crake.app"
+    first=$(pid)
+    sudo installer -pkg "$PKG" -target /
+    for _ in $(seq 30); do
+        [ -n "$(pid)" ] && [ "$(pid)" != "$first" ] && break
+        sleep 1
+    done
+    [ -n "$(pid)" ] && [ "$(pid)" != "$first" ] || fail "an upgrade didn't restart craked"
+    serving || fail "craked isn't serving after the upgrade"
+else
+    echo "craked isn't switched on here: started by hand"
+    grep -i "smappservice" /tmp/crake-app.log | tail -3
+    sudo "$APP/Contents/MacOS/craked" 2>/tmp/craked-test.log &
+    serving || { cat /tmp/craked-test.log >&2; fail "craked from Crake.app isn't serving /var/run/crake.sock"; }
+    sudo pkill -TERM -x craked
+    for _ in $(seq 10); do pgrep -x craked >/dev/null || break; sleep 1; done
+    sudo installer -pkg "$PKG" -target /
+    test -x "$APP/Contents/MacOS/craked" || fail "no craked after installing again"
+fi
+pkill -x crake 2>/dev/null || true
 sudo /usr/local/libexec/crake/uninstall
 for f in "$APP" /usr/local/sbin/craked /usr/local/libexec/crake "$OLD" /var/run/crake.sock; do
     [ ! -e "$f" ] || fail "$f left behind"

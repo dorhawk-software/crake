@@ -17,7 +17,7 @@ cask "crake" do
 
   # craked stops first: switching every tunnel off takes its routes, DNS
   # settings and pf rules with it.
-  uninstall launchctl: "software.dorhawk.craked",
+  uninstall launchctl: ["software.dorhawk.crake.daemon", "software.dorhawk.craked"],
             pkgutil:   "software.dorhawk.crake",
             delete:    "/Applications/Crake.app"
 

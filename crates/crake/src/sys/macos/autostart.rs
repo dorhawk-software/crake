@@ -1,6 +1,6 @@
 //! "Start when you log in" on macOS: Crake.app's login agent (its launchd
 //! file inside the app, Contents/Library/LaunchAgents;
-//! packaging/macos/software.dorhawk.crake.plist), registered by the app
+//! packaging/macos/software.dorhawk.crake.login.plist), registered by the app
 //! itself with SMAppService, so System Settings lists it under Crake, not
 //! under the signing certificate's name. It starts Crake with the flag that
 //! switches on the tunnels left on (the plist names it).
@@ -14,7 +14,10 @@ use objc2::rc::Retained;
 use objc2_foundation::NSString;
 use objc2_service_management::{SMAppService, SMAppServiceStatus};
 
-const AGENT: &str = "software.dorhawk.crake.plist";
+const AGENT: &str = "software.dorhawk.crake.login.plist";
+/// The file older Crakes wrote (its label's record macOS keeps, so the
+/// app's agent has a label of its own).
+const OLDER: &str = "software.dorhawk.crake.plist";
 
 fn agent() -> Retained<SMAppService> {
     // SAFETY: a constructor taking a valid string.
@@ -24,7 +27,7 @@ fn agent() -> Retained<SMAppService> {
 /// What an older Crake wrote.
 fn older() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
-    Some(PathBuf::from(home).join("Library/LaunchAgents").join(AGENT))
+    Some(PathBuf::from(home).join("Library/LaunchAgents").join(OLDER))
 }
 
 pub fn enabled() -> bool {

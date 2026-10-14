@@ -39,7 +39,7 @@ fn craked_appears_as_crake_in_background_items() {
     let app = strings(&plist("Info.plist"), "CFBundleIdentifier");
     assert_eq!(app.len(), 1, "Crake.app's bundle identifier: {app:?}");
     let named = strings(
-        &plist("software.dorhawk.craked.plist"),
+        &plist("software.dorhawk.crake.daemon.plist"),
         "AssociatedBundleIdentifiers",
     );
     assert!(
@@ -54,8 +54,9 @@ fn craked_appears_as_crake_in_background_items() {
 /// macOS lists it under Crake, not under the signing certificate's name.
 #[test]
 fn craked_runs_from_inside_crake_app() {
-    let daemon = plist("software.dorhawk.craked.plist");
-    assert_eq!(strings(&daemon, "Label"), ["software.dorhawk.craked"]);
+    let daemon = plist("software.dorhawk.crake.daemon.plist");
+    // Not 0.6's label: SMAppService answered for that daemon's record.
+    assert_eq!(strings(&daemon, "Label"), ["software.dorhawk.crake.daemon"]);
     assert_eq!(strings(&daemon, "BundleProgram"), ["Contents/MacOS/craked"]);
     assert!(
         strings(&daemon, "ProgramArguments").is_empty() && strings(&daemon, "Program").is_empty(),
@@ -68,8 +69,9 @@ fn craked_runs_from_inside_crake_app() {
 /// tunnels left on, in the user's graphical session.
 #[test]
 fn the_login_agent_starts_crake_from_inside_the_app() {
-    let agent = plist("software.dorhawk.crake.plist");
-    assert_eq!(strings(&agent, "Label"), ["software.dorhawk.crake"]);
+    let agent = plist("software.dorhawk.crake.login.plist");
+    // Not the older agent file's label, whose record macOS keeps.
+    assert_eq!(strings(&agent, "Label"), ["software.dorhawk.crake.login"]);
     assert_eq!(strings(&agent, "BundleProgram"), ["Contents/MacOS/crake"]);
     assert_eq!(
         strings(&agent, "ProgramArguments"),
