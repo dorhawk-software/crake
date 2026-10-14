@@ -590,8 +590,9 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    `Resolved::link_as_set`) and puts its routing-only setup back; the
    package test rewrites ACME's link with resolvectl and expects it back.
    A session that ends with no one to tell craked (seen 2026-10-14 with
-   openvpn3 v27.1: quitting the app ended the session it had started,
-   though the app doesn't disconnect on quit) left the tunnel "Connected ·
+   openvpn3 v27.1, while openvpn3-indicator ran: the session ended as the
+   app quit; without the indicator a session outlived the app) left the
+   tunnel "Connected ·
    its DNS doesn't answer" for good. craked now looks for each attached
    tunnel's device every 2 s (`check_devices`; netlink's link kind "tun",
    which, unlike /sys, follows craked's network namespace) and takes a
@@ -674,14 +675,13 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   commit); the user files the issue and opens the PR in their own words
   (Zed's AI policy: no agent-written PRs or descriptions). Related, not a
   duplicate: zed-industries/zed#21851. See CRAKE-PATCH.md.
-- **OpenVPN 3 ended its session when the app quit (2026-10-14,
-  openvpn3 v27.1).** Seen once on the user's real tunnel; the app
-  doesn't disconnect on quit, so openvpn3 did. craked now notices (7g), but the cause is
-  unproven and 7g's "sessions survive a restart" may be out of date. To
-  do with the user: connect, quit Crake, watch the session. If confirmed,
-  decide what quitting means for OpenVPN 3 tunnels (say so before quitting,
-  or keep the session alive another way).
 - **Two sign-in tabs, and sessions stopped before sign-in (2026-10-14).**
+  Likely openvpn3-indicator, which acted on every session (Ready,
+  Connect, the sign-in page): the user removed it the same day, and a
+  session Crake 0.6.1 started then stayed up when the app quit (the
+  morning's "quitting ends the session" was probably the indicator too;
+  7g's note that sessions outlive the app holds). Left here until a
+  web sign-in without the indicator shows one tab and no early stop.
   Signing in to an OpenVPN 3 web sign-in profile often opens two browser
   tabs; probably Crake and openvpn3-indicator each opening the same
   session's page (7g). One morning four sessions in a row were stopped
