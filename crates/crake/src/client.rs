@@ -37,6 +37,8 @@ pub enum Command {
     /// Tunnel detail: its hosts and its traffic today.
     Hosts(String),
     TunnelTraffic(String),
+    /// The Traffic window: the counters right now.
+    Live,
     /// OpenVPN 3: route through a session's device (its fields) / it ended.
     Attach(String, HashMap<String, String>),
     Detach(String, String),
@@ -75,6 +77,8 @@ pub enum Update {
     Hosts(String, Vec<HashMap<String, String>>),
     /// Bytes through a tunnel per minute, two days.
     TunnelTraffic(String, Vec<(u64, u64)>),
+    /// The counters right now (the Traffic window).
+    Live(crake_proto::live::Live),
     /// craked wouldn't route through an OpenVPN 3 session (it clashes with
     /// a tunnel that's up): the app ends it.
     AttachRefused(String),
@@ -441,6 +445,14 @@ async fn session(
                     Command::Hosts(t) => match api.call::<_, Vec<HashMap<String, String>>>("HostDetails", &(t.clone(),)).await {
                         Ok(rows) => {
                             if !send(Update::Hosts(t, rows)).await { return Ok(()); }
+                            Ok(())
+                        }
+                        Err(e) => Err(e),
+                    },
+                    Command::Live => match api.call::<_, String>("Live", &()).await {
+                        Ok(json) => {
+                            let live = serde_json::from_str(&json).unwrap_or_default();
+                            if !send(Update::Live(live)).await { return Ok(()); }
                             Ok(())
                         }
                         Err(e) => Err(e),

@@ -229,6 +229,17 @@ fn tcp_state(raw: u32) -> TcpState {
     }
 }
 
+/// The open connections with their bytes, for the Traffic window: not
+/// built here yet (CLAUDE.md, Not now: the connection table has no byte
+/// counts per connection on this system). None: the window shows the ways
+/// out and their rates only, and says it can't list connections here.
+pub fn open_connections() -> Option<Vec<(Flow, u64)>> {
+    None
+}
+
+/// Nothing to switch back off here (`open_connections`).
+pub fn connections_idle(_force: bool) {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

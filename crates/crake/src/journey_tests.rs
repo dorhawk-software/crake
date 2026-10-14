@@ -193,6 +193,9 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
         .unwrap_or_default();
     assert!(copied.contains("Sent 10.40.1.10 through ACME."), "{copied}");
 
+    // 5b. Traffic, from the panel's footer.
+    traffic_window(cx);
+
     // 6. New tunnel: added in craked, listed in the app; Cancel at sign-in.
     request(cx, Request::NewTunnel(None));
     let (n, view) = wait_window::<crate::new_tunnel::NewTunnel>(cx, "New tunnel opens");
@@ -273,4 +276,41 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
         },
     );
     craked.rt.block_on(craked.mgr.shutdown());
+}
+
+/// The Traffic window, from the panel's footer: an open connection to
+/// 10.40.1.10 is listed going through ACME (craked's conntrack dump).
+fn traffic_window(cx: &mut TestAppContext) {
+    let open = std::net::TcpStream::connect_timeout(
+        &"10.40.1.10:80".parse().unwrap(),
+        Duration::from_secs(5),
+    )
+    .expect("10.40.1.10 through ACME");
+    let p = panel(cx);
+    click(cx, p, "traffic");
+    let (tr, _) = wait_window::<crate::traffic_view::Traffic>(cx, "Traffic opens");
+    // The window asks once a second; the test platform's timers don't
+    // run on their own, so the journey asks as the window would (the app's
+    // request, its client, craked's D-Bus Live), and looks.
+    let through_acme = |cx: &mut TestAppContext| {
+        model(cx).live.rates.as_ref().is_some_and(|r| {
+            r.connections.iter().any(|(c, _)| {
+                c.dst.to_string() == "10.40.1.10" && c.tunnel.as_deref() == Some("acme")
+            })
+        })
+    };
+    let end = std::time::Instant::now() + Duration::from_secs(15);
+    while !through_acme(cx) {
+        assert!(
+            std::time::Instant::now() < end,
+            "never: the connection to 10.40.1.10, through ACME (lists connections: {:?})",
+            model(cx).live.lists_connections()
+        );
+        request(cx, Request::Live);
+        cx.run_until_parked();
+        std::thread::sleep(Duration::from_millis(500));
+        cx.run_until_parked();
+    }
+    click(cx, tr, "close");
+    drop(open);
 }

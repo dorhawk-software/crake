@@ -90,6 +90,7 @@ impl Manager {
     pub async fn shutdown(&self) {
         self.traffic
             .save(&self.cfg.state_path.with_file_name("traffic.json"));
+        crate::conntrack::connections_idle(true);
         // Leaving: log every session off, unless a package upgrade asked
         // for them to be handed to the new craked.
         self.stop_all();

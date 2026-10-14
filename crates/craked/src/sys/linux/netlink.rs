@@ -70,6 +70,15 @@ pub fn request(kind: u16, body: &[u8]) -> Vec<u8> {
     msg
 }
 
+/// A dump request of type `kind` (every entry of a table), carrying `body`:
+/// the kernel answers in parts, then NLMSG_DONE.
+pub fn dump_request(kind: u16, body: &[u8]) -> Vec<u8> {
+    let mut msg = request(kind, body);
+    let flags = (libc::NLM_F_REQUEST | libc::NLM_F_DUMP) as u16;
+    msg[FLAGS..FLAGS + size_of::<u16>()].copy_from_slice(&flags.to_ne_bytes());
+    msg
+}
+
 /// The error code of an acknowledgement (0: done), if `msg` is one.
 pub fn ack_code(msg: &[u8]) -> Option<i32> {
     if ne16(msg.get(TYPE..)?) != libc::NLMSG_ERROR as u16 {

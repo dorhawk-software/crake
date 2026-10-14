@@ -89,6 +89,7 @@ mod macos_packaging_tests;
 // The app's side against a real craked: the Linux and Windows tests'.
 #[cfg(all(test, any(target_os = "linux", windows)))]
 mod test_app;
+mod traffic_view;
 mod tunnel_detail;
 #[cfg(all(test, target_os = "linux"))]
 mod wire_tests;
@@ -106,8 +107,8 @@ use updates::{on_update, refresh_tray, watch_openvpn3, watch_service, watch_vers
 const RESTART_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
 const RESTART_POLL: std::time::Duration = std::time::Duration::from_millis(100);
 use windows::{
-    open_detail, open_log, open_new_tunnel, open_settings, open_sign_in, panel_blurred,
-    refit_panel, toggle_panel,
+    open_detail, open_log, open_new_tunnel, open_settings, open_sign_in, open_traffic,
+    panel_blurred, refit_panel, toggle_panel,
 };
 
 use std::time::Duration;
@@ -133,6 +134,10 @@ pub enum Request {
     Redo(String, Vec<String>),
     /// Open the full log (or bring it to the front).
     Log,
+    /// Open the Traffic window (or bring it to the front).
+    Traffic,
+    /// The Traffic window: ask craked for the counters right now.
+    Live,
     /// Signed in for a tunnel: connect with that session.
     ConnectWithSession(String, crake_proto::Session),
     /// This gateway only let Crake in introducing itself so (gateway, user agent).
@@ -213,6 +218,8 @@ struct Shell {
     tray: Option<tray::Handle>,
     /// The log window, while it's open.
     log: Option<AnyWindowHandle>,
+    /// The Traffic window, while it's open.
+    traffic: Option<AnyWindowHandle>,
     /// The Settings window, while it's open.
     settings: Option<AnyWindowHandle>,
     /// Tunnel detail, while it's open (and for which tunnel).
@@ -399,6 +406,10 @@ fn main() {
             if std::env::var("CRAKE_SHOW").is_ok_and(|v| v.starts_with("settings")) {
                 open_settings(cx);
             }
+            // CRAKE_SHOW=traffic (development): open the Traffic window.
+            if std::env::var("CRAKE_SHOW").is_ok_and(|v| v == "traffic") {
+                open_traffic(cx);
+            }
             // CRAKE_SHOW=newtunnel[:<step>] (development): open New tunnel.
             if std::env::var("CRAKE_SHOW").is_ok_and(|v| v.starts_with("newtunnel")) {
                 open_new_tunnel(None, cx);
@@ -541,6 +552,7 @@ pub(crate) fn start(cx: &mut App, setup: Setup) -> bool {
         demo,
         tray,
         log: None,
+        traffic: None,
         settings: None,
         detail: None,
         autostart_pending: autostart,

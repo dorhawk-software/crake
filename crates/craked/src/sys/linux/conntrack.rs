@@ -1,10 +1,12 @@
 //! Connection tracking over netlink: events for new and changing TCP
-//! connections (observation only, nothing is held), and deleting one entry so
-//! the next packet of a flow is routed afresh.
+//! connections (observation only, nothing is held), deleting one entry so
+//! the next packet of a flow is routed afresh, and the open connections with
+//! their bytes for the app's Traffic window (`open_connections`).
 
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+use std::path::Path;
 
 use anyhow::{Context, Result};
 use tokio::io::unix::AsyncFd;
@@ -12,6 +14,7 @@ use tokio::io::unix::AsyncFd;
 const NETLINK_NETFILTER: i32 = 12;
 const NFNL_SUBSYS_CTNETLINK: u16 = 1;
 const IPCTNL_MSG_CT_NEW: u16 = 0;
+const IPCTNL_MSG_CT_GET: u16 = 1;
 const IPCTNL_MSG_CT_DELETE: u16 = 2;
 const NF_NETLINK_CONNTRACK_NEW: u32 = 1;
 const NF_NETLINK_CONNTRACK_UPDATE: u32 = 2;
@@ -35,6 +38,17 @@ const CTA_PROTO_SRC_PORT: u16 = 2;
 const CTA_PROTO_DST_PORT: u16 = 3;
 const CTA_PROTOINFO_TCP: u16 = 1;
 const CTA_PROTOINFO_TCP_STATE: u16 = 1;
+/// Bytes each way (struct nf_conn_counter), when accounting is on.
+const CTA_COUNTERS_ORIG: u16 = 9;
+const CTA_COUNTERS_REPLY: u16 = 10;
+const CTA_COUNTERS_BYTES: u16 = 2;
+/// One read of a dump: the kernel fills up to a page's worth of entries.
+const DUMP_BUFFER: usize = 1 << 16;
+/// Conntrack's accounting switch: per-connection bytes are counted only
+/// while it's on (from when each connection starts).
+const ACCOUNTING: &str = "/proc/sys/net/netfilter/nf_conntrack_acct";
+/// Accounting is switched back off this long after the last look.
+const ACCOUNTING_IDLE: std::time::Duration = std::time::Duration::from_secs(60);
 
 /// nfnetlink's message types: the subsystem in the high byte, its own
 /// message in the low byte.
@@ -219,6 +233,136 @@ pub fn delete(flow: Flow) -> io::Result<()> {
     Ok(())
 }
 
+/// When the window last looked, while craked has accounting switched on.
+static ACCOUNTING_ON: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+
+/// The open connections with their bytes both ways (TCP and UDP; closed
+/// ones left out), for the Traffic window. Switches conntrack's accounting
+/// on if it was off (back off by `connections_idle`): connections that
+/// began before count from 0. Blocking.
+pub fn open_connections() -> Option<Vec<(Flow, u64)>> {
+    looked(Path::new(ACCOUNTING), &mut ACCOUNTING_ON.lock().unwrap());
+    match dump() {
+        Ok(all) => Some(all),
+        Err(e) => {
+            tracing::warn!("listing connections: {e}");
+            None
+        }
+    }
+}
+
+/// Accounting back off once the window stopped looking (or now, `force`:
+/// craked stopping), when craked switched it on.
+pub fn connections_idle(force: bool) {
+    idle(
+        Path::new(ACCOUNTING),
+        &mut ACCOUNTING_ON.lock().unwrap(),
+        force,
+        ACCOUNTING_IDLE,
+    );
+}
+
+/// The window looked: accounting on if it's off (craked then owns it and
+/// remembers when), or the time of the last look moved on.
+fn looked(switch: &Path, on: &mut Option<std::time::Instant>) {
+    if on.is_some() {
+        *on = Some(std::time::Instant::now());
+        return;
+    }
+    let was = std::fs::read_to_string(switch).unwrap_or_default();
+    if was.trim() == "0" {
+        match std::fs::write(switch, "1") {
+            Ok(()) => *on = Some(std::time::Instant::now()),
+            Err(e) => tracing::warn!("conntrack accounting stays off: {e}"),
+        }
+    }
+}
+
+/// Accounting off again, if craked switched it on and the window hasn't
+/// looked for `after` (or `force`).
+fn idle(
+    switch: &Path,
+    on: &mut Option<std::time::Instant>,
+    force: bool,
+    after: std::time::Duration,
+) {
+    if on.is_some_and(|at| force || at.elapsed() > after) {
+        let _ = std::fs::write(switch, "0");
+        *on = None;
+    }
+}
+
+/// Every connection the kernel tracks, with its bytes.
+fn dump() -> io::Result<Vec<(Flow, u64)>> {
+    let fd = netlink_socket(0, false)?;
+    let body = [libc::AF_UNSPEC as u8, 0, 0, 0]; // nfgenmsg: every family
+    let msg = netlink::dump_request(
+        (NFNL_SUBSYS_CTNETLINK << SUBSYS_SHIFT) | IPCTNL_MSG_CT_GET,
+        &body,
+    );
+    let mut out = Vec::new();
+    let mut buf = vec![0u8; DUMP_BUFFER];
+    // SAFETY: send/recv on our own socket and buffers.
+    unsafe {
+        if libc::send(fd.as_raw_fd(), msg.as_ptr().cast(), msg.len(), 0) < 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    loop {
+        // SAFETY: as above.
+        let n = unsafe { libc::recv(fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len(), 0) };
+        let n = usize::try_from(n).map_err(|_| io::Error::last_os_error())?;
+        if let Some(err) = netlink::ack_code(&buf[..n])
+            && err != 0
+        {
+            return Err(io::Error::from_raw_os_error(-err));
+        }
+        let (part, done) = parse_dump(&buf[..n]);
+        out.extend(part);
+        if done || n == 0 {
+            return Ok(out);
+        }
+    }
+}
+
+/// One part of a dump: its connections, and whether it was the last.
+fn parse_dump(b: &[u8]) -> (Vec<(Flow, u64)>, bool) {
+    let mut out = Vec::new();
+    for (kind, _, body) in netlink::messages(b) {
+        if kind == libc::NLMSG_DONE as u16 {
+            return (out, true);
+        }
+        let family = body.first().map(|f| i32::from(*f));
+        if kind >> SUBSYS_SHIFT != NFNL_SUBSYS_CTNETLINK
+            || !matches!(family, Some(libc::AF_INET | libc::AF_INET6))
+        {
+            continue;
+        }
+        let Some(body) = body.get(NFGENMSG..) else {
+            continue;
+        };
+        let Some(event) = parse_event(Kind::Update, body) else {
+            continue;
+        };
+        if event.state == Some(TcpState::Close) {
+            continue;
+        }
+        let top = netlink::attrs(body);
+        let bytes = [CTA_COUNTERS_ORIG, CTA_COUNTERS_REPLY]
+            .into_iter()
+            .filter_map(|k| {
+                let c = netlink::attrs(child(&top, k)?);
+                let v = child(&c, CTA_COUNTERS_BYTES)?;
+                Some(u64::from_be_bytes(
+                    v.get(..size_of::<u64>())?.try_into().ok()?,
+                ))
+            })
+            .sum();
+        out.push((event.flow, bytes));
+    }
+    (out, false)
+}
+
 fn child<'a>(list: &[(u16, &'a [u8])], kind: u16) -> Option<&'a [u8]> {
     list.iter().find(|(k, _)| *k == kind).map(|(_, v)| *v)
 }
@@ -348,6 +492,70 @@ mod tests {
         m.extend_from_slice(&[0; 8]);
         m.extend_from_slice(&body);
         m
+    }
+
+    /// A dump's entry: an event message with its byte counters.
+    fn with_counters(mut m: Vec<u8>, orig: u64, reply: u64) -> Vec<u8> {
+        for (kind, bytes) in [(CTA_COUNTERS_ORIG, orig), (CTA_COUNTERS_REPLY, reply)] {
+            let mut c = Vec::new();
+            netlink::put_attr(&mut c, 1, &3u64.to_be_bytes()); // packets
+            netlink::put_attr(&mut c, CTA_COUNTERS_BYTES, &bytes.to_be_bytes());
+            netlink::put_attr(&mut m, kind | NLA_F_NESTED, &c);
+        }
+        let len = m.len() as u32;
+        m[..4].copy_from_slice(&len.to_ne_bytes());
+        m
+    }
+
+    #[test]
+    fn a_dump_gives_each_open_connection_with_its_bytes() {
+        let mut part = with_counters(message(IPCTNL_MSG_CT_NEW, 0, 3), 1_200, 48_000);
+        part.extend(with_counters(message6(IPCTNL_MSG_CT_NEW, 0, 3), 10, 20));
+        // A closed one is left out; one without counters counts 0.
+        part.extend(with_counters(message(IPCTNL_MSG_CT_NEW, 0, CLOSE), 5, 5));
+        part.extend(message6(IPCTNL_MSG_CT_NEW, 0, 3));
+        let (got, done) = parse_dump(&part);
+        assert!(!done, "more parts to come");
+        let bytes: Vec<u64> = got.iter().map(|(_, b)| *b).collect();
+        assert_eq!(bytes, [49_200, 30, 0]);
+        assert_eq!(got[0].0.dport, 5432);
+        assert!(got[1].0.dst.is_ipv6());
+        // The last part ends with NLMSG_DONE.
+        let mut done_msg = vec![0u8; 20];
+        done_msg[..4].copy_from_slice(&20u32.to_ne_bytes());
+        done_msg[4..6].copy_from_slice(&(libc::NLMSG_DONE as u16).to_ne_bytes());
+        let (got, done) = parse_dump(&done_msg);
+        assert!(done && got.is_empty());
+    }
+
+    #[test]
+    fn accounting_is_switched_on_for_the_window_and_off_after() {
+        let dir = tempfile::tempdir().unwrap();
+        let switch = dir.path().join("nf_conntrack_acct");
+        let read = || std::fs::read_to_string(&switch).unwrap();
+        let mut on = None;
+        std::fs::write(&switch, "0\n").unwrap();
+        looked(&switch, &mut on);
+        assert_eq!(read(), "1");
+        // Still being looked at: stays on.
+        idle(&switch, &mut on, false, std::time::Duration::from_secs(60));
+        assert_eq!(read(), "1");
+        // Not looked at for a while: off again.
+        idle(&switch, &mut on, false, std::time::Duration::ZERO);
+        assert_eq!(read(), "0");
+        assert!(on.is_none());
+        // On already (someone else's): left alone, also when craked stops.
+        std::fs::write(&switch, "1\n").unwrap();
+        looked(&switch, &mut on);
+        idle(&switch, &mut on, true, std::time::Duration::ZERO);
+        assert_eq!(read(), "1\n");
+    }
+
+    #[test]
+    fn a_dump_request_asks_for_every_entry() {
+        let m = netlink::dump_request(IPCTNL_MSG_CT_GET, &[0, 0, 0, 0]);
+        let flags = u16::from_ne_bytes([m[6], m[7]]);
+        assert_eq!(flags, (libc::NLM_F_REQUEST | libc::NLM_F_DUMP) as u16);
     }
 
     #[test]

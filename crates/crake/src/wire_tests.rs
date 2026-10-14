@@ -178,6 +178,14 @@ async fn the_app_and_craked_work_together_over_dbus() {
     })
     .await;
 
+    // The Traffic window's counters: two looks give rates; this craked
+    // stands in for routing, so it lists no connections (it says so).
+    app.send(Command::Live);
+    app.send(Command::Live);
+    app.until("the Traffic window's rates", |m| m.live.rates.is_some())
+        .await;
+    assert_eq!(app.model.live.lists_connections(), Some(false));
+
     // A setting changed in Settings comes back changed.
     app.send(Command::SetSetting("probe_wait_secs".into(), "2".into()));
     app.until("the new wait", |m| m.setting("probe_wait_secs") == "2")

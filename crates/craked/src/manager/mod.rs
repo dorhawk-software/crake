@@ -30,6 +30,7 @@ mod clash;
 mod diagnostics;
 mod handover;
 mod host_ops;
+mod live;
 mod naming;
 mod outage;
 mod probing;
@@ -388,6 +389,9 @@ impl Manager {
                     this.check_devices().await;
                     this.keep_dns_links().await;
                     this.refresh_hush().await;
+                    // The Traffic window closed a while ago: conntrack's
+                    // accounting back off, if craked switched it on.
+                    crate::conntrack::connections_idle(false);
                 }
             });
         }

@@ -20,6 +20,7 @@ use crate::theme::{Theme, fonts};
 mod chart;
 mod facts;
 mod hosts;
+pub(crate) use self::hosts::learned_how;
 
 #[cfg(test)]
 mod tests;

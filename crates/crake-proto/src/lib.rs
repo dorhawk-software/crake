@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+pub mod live;
 pub mod trouble;
 
 /// Where `craked` listens for the hook, unless configured otherwise.

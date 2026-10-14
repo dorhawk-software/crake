@@ -161,6 +161,31 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
         Request::Undo(t, hosts) => send(Command::Undo(t, hosts)),
         Request::Redo(t, hosts) => send(Command::Redo(t, hosts)),
         Request::Log => open_log(cx),
+        Request::Traffic => open_traffic(cx),
+        Request::Live => {
+            if cx.global::<Shell>().demo {
+                // No craked: the proposal's sample, moving.
+                let second = demo_clock().elapsed().as_secs() + DEMO_HEAD_START;
+                let model = cx.global::<Shell>().model.clone();
+                model.update(cx, |m, cx| {
+                    let live = std::sync::Arc::make_mut(&mut m.live);
+                    let now = std::time::Instant::now();
+                    // The strip under the graph starts full: the sample's
+                    // last five minutes, a look every few seconds.
+                    if live.history.is_empty() {
+                        for ago in (1..=DEMO_HEAD_START).rev().step_by(DEMO_LOOK_EVERY) {
+                            if let Some(at) = now.checked_sub(std::time::Duration::from_secs(ago)) {
+                                live.add(crate::model::live::demo(second - ago), at);
+                            }
+                        }
+                    }
+                    live.add(crate::model::live::demo(second), now);
+                    cx.notify();
+                });
+            } else {
+                send(Command::Live);
+            }
+        }
         Request::ActsAs(gateway, user_agent) => {
             let prefs = cx.global_mut::<prefs::Prefs>();
             prefs.user_agents.insert(gateway, user_agent);
@@ -287,6 +312,15 @@ fn restart(cx: &mut App) {
         cx.quit();
     }
 }
+
+/// CRAKE_DEMO's Traffic window: the sample's clock, started on first use,
+/// a few minutes in so the strip under the graph isn't empty.
+fn demo_clock() -> std::time::Instant {
+    static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    *START.get_or_init(std::time::Instant::now)
+}
+const DEMO_HEAD_START: u64 = 300;
+const DEMO_LOOK_EVERY: usize = 5;
 
 /// Each tunnel's OpenVPN 3 session: its openvpn3 path and its control.
 type Sessions = std::collections::HashMap<String, (String, async_channel::Sender<signin::Reply>)>;

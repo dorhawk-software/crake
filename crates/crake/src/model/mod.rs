@@ -11,6 +11,7 @@ use crate::tray::{MenuTunnel, Shape};
 mod days;
 mod demo;
 mod kept;
+pub mod live;
 // Which decisions still stand (undo, redo), for the charts.
 mod standing;
 
@@ -77,6 +78,9 @@ pub struct Model {
     pub diagnostics: Vec<String>,
     /// Browsers that look names up themselves (`browser_dns`), by name.
     pub own_dns_browsers: Vec<String>,
+    /// The Traffic window's rates, while it's open (shared: the panel
+    /// copies the model on every frame).
+    pub live: std::sync::Arc<live::LiveTraffic>,
 }
 
 /// One of a tunnel's hosts (craked's HostDetails).
@@ -378,6 +382,9 @@ impl Model {
             }
             Update::TunnelTraffic(tunnel, minutes) => {
                 self.tunnel_traffic.insert(tunnel, minutes);
+            }
+            Update::Live(live) => {
+                std::sync::Arc::make_mut(&mut self.live).add(live, Instant::now())
             }
             // Handled by the app (it ends the session).
             Update::AttachRefused(_) => {}

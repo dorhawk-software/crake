@@ -116,6 +116,18 @@ impl Traffic {
             .insert(device.to_owned(), tunnel.to_owned());
     }
 
+    /// The counters right now: bytes through the physical devices, and
+    /// through each tunnel's device by tunnel (the Traffic window's rates).
+    pub fn now(&self) -> (u64, std::collections::BTreeMap<String, u64>) {
+        let devices = self.devices.lock().unwrap().clone();
+        let (physical, _, each) = crate::sys::counters(&devices);
+        let tunnels = each
+            .into_iter()
+            .filter_map(|(device, bytes)| Some((devices.get(&device)?.clone(), bytes)))
+            .collect();
+        (physical, tunnels)
+    }
+
     pub fn untrack(&self, device: &str) {
         self.devices.lock().unwrap().remove(device);
         self.last_tunnels.lock().unwrap().remove(device);

@@ -504,7 +504,15 @@ impl Panel {
             .mt(px(6.))
             .border_t_1()
             .border_color(t.line)
-            // As in tray-panel.html: Full log, then Copy for helpdesk.
+            // As in tray-panel.html: Full log, then Copy for helpdesk; the
+            // Traffic window first (design/proposals/traffic-window.html).
+            .child(
+                button("traffic", "Traffic", t)
+                    .flex_1()
+                    .h(px(40.))
+                    .on_click(cx.listener(|this, _, _, _| this.send(Request::Traffic)))
+                    .test_support(),
+            )
             .child(
                 button("full-log", "Full log", t)
                     .flex_1()

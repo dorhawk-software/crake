@@ -499,6 +499,56 @@ pub(super) fn open_log(cx: &mut App) {
     }
 }
 
+/// The Traffic window (design/proposals/traffic-window.html), from the
+/// panel's footer. One at a time; a normal window, like the log.
+pub(super) fn open_traffic(cx: &mut App) {
+    to_front(cx);
+    if let Some(handle) = cx.global::<Shell>().traffic
+        && handle
+            .update(cx, |_, window, _| window.activate_window())
+            .is_ok()
+    {
+        return;
+    }
+    let shell = cx.global::<Shell>();
+    let (model, requests) = (shell.model.clone(), shell.requests.clone());
+    let height = place::max_window_height_or(traffic_view::HEIGHT);
+    let bounds = centered(traffic_view::WIDTH, height, cx);
+    let opened = cx.open_window(
+        WindowOptions {
+            window_bounds: Some(WindowBounds::Windowed(bounds)),
+            titlebar: Some(gpui_kit::TitlebarOptions {
+                title: Some("Crake traffic".into()),
+                appears_transparent: true,
+                traffic_light_position: crate::chrome::traffic_lights(),
+            }),
+            window_decorations: Some(WindowDecorations::Client),
+            window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
+            kind: WindowKind::Normal,
+            app_id: Some("crake".into()),
+            is_resizable: false,
+            ..Default::default()
+        },
+        move |window, cx| {
+            crate::sys::plain_frame(window);
+            window.set_client_inset(px(0.));
+            let view = cx.new(|cx| traffic_view::Traffic::new(model, requests, window, cx));
+            let handle = window.window_handle();
+            cx.subscribe(&view, move |_, _: &traffic_view::Close, cx| {
+                let _ = handle.update(cx, |_, window, _| window.remove_window());
+                cx.global_mut::<Shell>().traffic = None;
+            })
+            .detach();
+            view
+        },
+    );
+    if let Ok(handle) = opened {
+        let handle: AnyWindowHandle = handle.into();
+        let _ = handle.update(cx, |_, window, _| window.activate_window());
+        cx.global_mut::<Shell>().traffic = Some(handle);
+    }
+}
+
 /// The sign-in window: a plain transparent window (the card draws its own
 /// rounded frame, as in sign-in.html; gpui-kit's frame is square). A normal
 /// window, opened in front so it's noticed, that goes behind others like

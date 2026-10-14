@@ -446,7 +446,7 @@ pub(super) fn row_button(
 }
 
 /// "Learned at 13:21 · no answer directly".
-pub(super) fn learned_how(r: &HostRow) -> String {
+pub(crate) fn learned_how(r: &HostRow) -> String {
     let Some((at, how)) = &r.learned else {
         return "Learned earlier".to_owned();
     };

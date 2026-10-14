@@ -696,6 +696,73 @@ async fn the_first_connection_is_routed_when_the_syn_is_held() {
     responder.join().unwrap();
 }
 
+/// The Traffic window's look (Manager::live): this computer's open
+/// connections, each with its bytes (conntrack's accounting, switched on
+/// when it was off) and the way it takes; the tunnel's device counted.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_traffic_window_sees_each_connection_and_its_way() {
+    if std::env::var("CRAKE_NETNS_TEST").as_deref() != Ok("1") {
+        eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
+        return;
+    }
+    let Probe {
+        mgr,
+        stop,
+        responder,
+        _dir: dir,
+        _srv,
+        ..
+    } = start_probe(true).await;
+    // Through ACME (raced and routed), and one direct that nothing answers.
+    let (routed, _direct) = tokio::task::spawn_blocking(|| {
+        let routed = connect("10.70.0.5", 5432, Duration::from_secs(4)).0;
+        let direct = connect("198.51.100.7", 443, Duration::from_millis(300)).0;
+        (routed, direct)
+    })
+    .await
+    .unwrap();
+    let _routed = routed.expect("routed through ACME");
+    // Accounting is on here (the container sets it: /proc/sys can't be
+    // written in it; switching it on and off is a unit test of
+    // conntrack.rs). Another routed one, counted.
+    let _ = mgr.live().await;
+    let _later =
+        tokio::task::spawn_blocking(|| connect("10.70.0.5", 5433, Duration::from_secs(4)).0)
+            .await
+            .unwrap()
+            .expect("routed through ACME again");
+    let live = mgr.live().await;
+    let conns = live.connections.clone().expect("Linux lists connections");
+    let to = |ip: &str, port: u16| {
+        conns
+            .iter()
+            .find(|c| c.dst == ip.parse::<IpAddr>().unwrap() && c.dport == port)
+            .unwrap_or_else(|| panic!("{ip}:{port} not in {conns:#?}"))
+    };
+    assert_eq!(to("10.70.0.5", 5432).tunnel.as_deref(), Some("acme"));
+    assert_eq!(to("198.51.100.7", 443).tunnel, None, "direct");
+    assert!(
+        to("10.70.0.5", 5433).bytes > 0,
+        "counted with accounting on ({})",
+        sh("cat /proc/sys/net/netfilter/nf_conntrack_acct")
+    );
+    assert!(
+        conns.iter().all(|c| c.dport != 53 && !c.dst.is_loopback()),
+        "no DNS questions, nothing to itself"
+    );
+    // (The tunnel's device counters come from /sys, which is the host's
+    // here, not this namespace's: the panel's charts cover them.)
+    // On before craked looked: left on when it stops.
+    mgr.shutdown().await;
+    assert_eq!(
+        sh("cat /proc/sys/net/netfilter/nf_conntrack_acct").trim(),
+        "1"
+    );
+    stop.store(true, Ordering::Relaxed);
+    responder.join().unwrap();
+    drop(dir);
+}
+
 /// UDP: a host only the tunnel answers is tried through it with the app's
 /// own first datagram, learned, and the app's next datagram gets through.
 /// One that answers nowhere (a one-way service) is neither routed nor

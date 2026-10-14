@@ -43,6 +43,9 @@ profile craked /usr/sbin/craked flags=(attach_disconnected) {
   @{PROC}/@{pid}/net/arp r,
   /sys/class/net/ r,
   /sys/devices/**/net/** r,
+  # Per-connection bytes while the app's Traffic window is open
+  # (conntrack's accounting, switched on and back off).
+  @{PROC}/sys/net/netfilter/nf_conntrack_acct rw,
   # How many CPUs it may use (Rust's runtime, from its cgroup).
   @{PROC}/@{pid}/cgroup r,
   /sys/fs/cgroup/**/cpu.max r,

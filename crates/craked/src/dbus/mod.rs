@@ -365,6 +365,19 @@ impl Service {
             .collect())
     }
 
+    /// What goes where right now (crake_proto::live::Live as JSON): the
+    /// app's Traffic window asks once a second while it's open. The open
+    /// connections say where this computer connects, so only those who may
+    /// switch tunnels get it.
+    async fn live(
+        &self,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+    ) -> fdo::Result<String> {
+        self.authorize(&hdr, conn).await?;
+        serde_json::to_string(&self.mgr.live().await).map_err(|e| fdo::Error::Failed(e.to_string()))
+    }
+
     /// A new log entry (JSON), as it's written.
     #[zbus(signal)]
     async fn log_appended(emitter: &SignalEmitter<'_>, entry: &str) -> zbus::Result<()>;

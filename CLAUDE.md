@@ -356,6 +356,32 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    CONN_AUTH_FAILED, openconnect 9.12's own words, and a session's device
    gone), and tunnel detail shows the sentence under its title; anything
    else stays "Couldn't stay connected" (`CRAKE_DEMO=expired`).
+   Traffic (`traffic_view/`, built 2026-10-14 from
+   design/proposals/traffic-window.html, the graph first as a colleague
+   asked; `CRAKE_DEMO=1 CRAKE_SHOW=traffic`): from the panel's footer
+   ("Traffic", before Full log). This computer, the ways out (each tunnel
+   that's up in try order, then direct) with their rates, the four busiest
+   destinations of each ("and N more" past that), and packets along every
+   path: speed and frequency from the path's rate (`graph::pace`: calm, as
+   the colleague asked), a tunnel's new destination drawn in once; with
+   animations off the dots stand still and thickness says the rate. Under
+   it "Last 5 minutes" (a bar per 5 s, direct and tunnels stacked) and two
+   tabs: "Right now" (open connections, busiest first: destination, way,
+   rate, since) and "Where things go" (every tunnel's learned, pinned and
+   undone hosts from HostDetails, the never list, then everything else).
+   craked's D-Bus `Live` (asked once a second while the window is open,
+   polkit-guarded like changes: it says where the computer connects):
+   the physical and per-tunnel device counters (`Traffic::now`) and, on
+   Linux, the open connections from a conntrack dump with their bytes
+   (`conntrack::open_connections`; craked switches `nf_conntrack_acct`
+   on while it's asked and off a minute after, or leaves it alone if it
+   was on; AppArmor allows that one file), each with its way
+   (`owner_of`, a full tunnel, else direct) and the name it was looked up
+   by; never DNS questions, loopback or connections coming in. The app
+   turns two looks into rates (`crake_proto::live::Live::rates_since`,
+   `model::live`). Tested: unit, window tests, the wire test, a namespace
+   test (a routed and a direct connection, their ways and bytes) and a
+   journey step (a real connection through ACME seen in the window).
    Tunnels (Settings, first section; design/proposals/settings-tunnels.html):
    one list in the order traffic takes, drag to reorder (the try order moved
    here from Learning), full tunnels under "Everything else goes through:";
@@ -762,8 +788,8 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   1. *See the traffic, animated* ("packets ticking by"), their first and
      main wish: a live graph of what goes direct and what through each
      tunnel, with tables of hosts and connections only as the detail.
-     **Decided: to be built** (the user and the colleague liked
-     design/proposals/traffic-window.html: "we will implement this").
+     **Built 2026-10-14** (Traffic, milestone 6; the user and the
+     colleague liked design/proposals/traffic-window.html).
      The colleague found the first dots too fast and distracting; the
      proposal now moves them as fast as each path's traffic (a trickle
      crawls, a big download about twice as fast) and sends one per
@@ -771,7 +797,7 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   2. *See the split as a whole*: every rule in one place (learned,
      pinned, never, direct by Undo, everything else), the "tree" they'd
      otherwise keep in a config file (that proposal's "Where things go"
-     table, built with it).
+     table: built with it).
   3. *"How is it secured, can it break my traffic?"*: answered in chat
      (nothing leaves the computer, there's no server); belongs in the
      explainers below, with what happens when craked stops (its routes
@@ -786,6 +812,23 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
      under the same name, keeping Crake's tunnel on it, inline
      certificates and keys kept. A "for experts" place, not in the way
      of people who just import IT's file.
+- **The Traffic window's open ends (built 2026-10-14; left for later):**
+  - *Connections on Windows and macOS:* craked lists them only on Linux
+    (conntrack with byte counts); elsewhere `open_connections` says None
+    and the window shows the ways out and their rates, and says it can't
+    list connections. Windows' TCP table has no bytes per connection
+    unless GetPerTcpConnectionEStats is switched on per connection; macOS'
+    pcblist has none: both need a way of counting.
+  - *Which app opened a connection* (the proposal's "App" column): a
+    connection to its process (Linux: the socket's inode in /proc/*/fd,
+    root only); not built.
+  - *Pointing at a path or destination* to name it and its rate, and
+    clicking one to find it in the table (the proposal's notes): not built.
+  - *A destination's whole name on hover, and copying it,* as decided for
+    tunnel detail (design/proposals/host-full-name.html, option A, approved
+    2026-10-14 and not built yet either): both windows when it's built.
+  - *AppArmor:* the profile now allows `nf_conntrack_acct`; not yet run in
+    `scripts/vm-test.sh` (AppArmor enforced, KVM; not in CI).
 - **The explainers** (docs/explainers.md): written down, not yet drawn or
   published anywhere.
 - **The website's version number** (dorhawk-website): visitors get the

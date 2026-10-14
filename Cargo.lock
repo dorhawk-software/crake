@@ -1456,6 +1456,7 @@ name = "crake-proto"
 version = "0.7.0"
 dependencies = [
  "serde",
+ "serde_json",
 ]
 
 [[package]]
