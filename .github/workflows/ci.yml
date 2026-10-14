@@ -208,6 +208,10 @@ jobs:
           # change with every commit; pushed, they only filled the free
           # 5 GB (Cachix then evicts the least used, the deps included).
           pushFilter: '(-source$|-crake-[0-9]|-crake-journey-[0-9]|vm-test-run-|nixos-system-|nixos-vm|-nixos\.qcow2|-etc$|-system-path$|-closure-info$)'
+      # A release bumps the version: the dependency builds mustn't change
+      # with it, or every release rebuilds them (~45 min).
+      - name: The dependency builds don't depend on Crake's version
+        run: scripts/nix-deps-check.sh
       - name: Build Crake with Nix
         run: nix build --print-build-logs .#default
       - name: The NixOS module, end to end (a gateway and a client VM)

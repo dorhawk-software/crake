@@ -675,14 +675,6 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   session craked had refused. Not Crake's to clean up (openvpn3's process,
   user `openvpn`); worth reporting to OpenVPN if it happens again, and
   Crake could warn when two tun devices carry the same profile's routes.
-- **NixOS CI rebuilds its dependencies at every release (~45 min).** The
-  version bump changes Cargo.lock, and the version reaches both crane
-  dependency derivations (`version` in packaging/nix/package.nix, and
-  Crake's own entries in the Cargo.lock copy they build from), though no
-  dependency changed. Pinning both to a placeholder for the deps builds
-  only (Crake's own build keeps the real version) would let a release's
-  CI take ~15 min like any push. Offered 2026-10-14 during 0.6.0, after
-  the release.
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with
@@ -873,7 +865,12 @@ The user doesn't want development builds installed on their machine.
   min) is uncacheable, so nixos stays the slowest job even cached.
   When Cargo.lock changes, nixos takes ~50 min (measured on 0.2.0's
   run: crake-deps 17, crake 2½, crake-journey-deps 25, the journey 3,
-  the VM 1). Merging the two deps derivations was considered and left
+  the VM 1). Not for a release's version bump (2026-10-14): the
+  dependency builds never see Crake's version (packaging/nix/package.nix:
+  the cleaned Cargo.tomls drop it, the dummy source gets a Cargo.lock at
+  0.0.0, made at evaluation, since a derivation is hashed by its inputs),
+  and `scripts/nix-deps-check.sh` (first step of the nixos job) fails if
+  they would change with it. Merging the two deps derivations was considered and left
   (2026-10-13): the journey's build turns on GPUI's test-support, so GPUI
   compiles twice either way; only small shared crates would be saved.
 - Daily use, nothing installed: `sudo ./target/debug/craked --config dev/<yours>.toml --dev`

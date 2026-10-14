@@ -22,8 +22,32 @@ let
     nativeBuildInputs = [ pkg-config cmake ];
     buildInputs = [ libxcb libxkbcommon fontconfig freetype wayland ];
   };
+  # The dependencies don't change with Crake's version, so their builds
+  # mustn't see it: a release (which bumps it) then reuses them instead of
+  # rebuilding for ~45 min (scripts/nix-deps-check.sh, in CI, says if that
+  # breaks). A derivation is hashed by its inputs, so the version is taken
+  # out before any is made: the cleaned Cargo.tomls leave it out (Cargo then
+  # says 0.0.0), and the dummy source gets a Cargo.lock that says so too.
+  depsVersion = "0.0.0";
+  lockText = builtins.readFile ../../Cargo.lock;
+  crakeVersion = (builtins.fromTOML (builtins.readFile ../../Cargo.toml)).workspace.package.version;
+  # Crake's own crates: the entries without a source, at Crake's version
+  # (the vendored GPUI crate keeps its own).
+  own = builtins.filter (p: !(p ? source) && p.version == crakeVersion)
+    (builtins.fromTOML lockText).package;
+  entry = v: p: "name = \"${p.name}\"\nversion = \"${v}\"";
+  depsLock = builtins.toFile "Cargo.lock"
+    (builtins.replaceStrings (map (entry crakeVersion) own) (map (entry depsVersion) own) lockText);
   dummySrc = craneLib.mkDummySrc {
-    inherit (commonArgs) src;
+    src = lib.fileset.toSource {
+      root = ../..;
+      # Not Cargo.lock: it says Crake's version (depsLock below doesn't).
+      fileset = lib.fileset.unions [ ../../Cargo.toml ../../crates ../../vendor ];
+    };
+    cargoLock = depsLock;
+    cleanCargoTomlFilter = path:
+      path != [ "package" "version" ] && path != [ "workspace" "package" "version" ]
+      && craneLib.filters.cargoTomlDefault path;
     # The vendored, patched GPUI X11 backend is a dependency, not Crake's
     # own code: whole, not a dummy (vendor/gpui-pre-linux/CRAKE-PATCH.md).
     extraDummyScript = ''
@@ -33,6 +57,7 @@ let
   };
   cargoArtifacts = craneLib.buildDepsOnly (removeAttrs commonArgs [ "src" ] // {
     inherit dummySrc;
+    version = depsVersion;
   });
 
   # The journey's test binary (crates/crake/src/journey_tests.rs), for the
@@ -45,6 +70,7 @@ let
   journey = craneLib.mkCargoDerivation (journeyArgs // {
     cargoArtifacts = craneLib.buildDepsOnly (removeAttrs journeyArgs [ "src" ] // {
       inherit dummySrc;
+      version = depsVersion;
       doCheck = true;
       cargoTestExtraArgs = "--no-run";
     });
