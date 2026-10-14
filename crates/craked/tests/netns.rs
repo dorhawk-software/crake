@@ -533,6 +533,75 @@ async fn internal_names_stay_private_while_the_tunnel_is_off() {
     assert!(!sh("ip link").contains("crake-hush"), "nothing left behind");
 }
 
+/// OpenVPN 3: the session ended without the app saying so (the app quit
+/// and openvpn3 took the session down with it). Its device is gone, so the
+/// tunnel is down: not "Connected, its DNS doesn't answer" for good.
+#[tokio::test]
+async fn an_openvpn3_tunnel_whose_device_is_gone_is_down() {
+    use std::collections::HashMap;
+    if !enabled() {
+        eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = Config {
+        hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
+        hook_socket: dir.path().join("hook.sock"),
+        openconnect: dir.path().join("openconnect"),
+        log_path: dir.path().join("log"),
+        state_path: dir.path().join("hosts.json"),
+        learned_expiry_days: 7,
+        probing: false,
+        race_first_syn: false,
+        probe_wait_secs: 3,
+        never: vec![],
+        use_resolved: false,
+        apply_network: true,
+        managed_dir: dir.path().join("managed.d"),
+        tunnels: vec![],
+    };
+    let mgr = Manager::new(cfg).unwrap();
+    mgr.init().await.unwrap();
+    // What openvpn3 makes: a tun device with the session's address.
+    sh("ip tuntap add dev tun7 mode tun && ip link set tun7 up \
+        && ip addr add 10.8.0.6/24 dev tun7");
+    let name = mgr
+        .add_tunnel(&HashMap::from([
+            ("display_name".to_owned(), "Initech".to_owned()),
+            ("gateway".to_owned(), "initech".to_owned()),
+            ("protocol".to_owned(), "openvpn3".to_owned()),
+        ]))
+        .unwrap();
+    mgr.attach(
+        &name,
+        &HashMap::from([
+            ("device".to_owned(), "tun7".to_owned()),
+            ("dns".to_owned(), "10.8.0.1".to_owned()),
+            ("domains".to_owned(), "initech.internal".to_owned()),
+        ]),
+    )
+    .await
+    .unwrap();
+    mgr.check_devices().await;
+    assert_eq!(
+        mgr.get(&name).unwrap().state,
+        TunnelState::Connected,
+        "still there"
+    );
+
+    sh("ip link del tun7");
+    mgr.check_devices().await;
+    let snap = mgr.get(&name).unwrap();
+    assert_eq!(snap.state, TunnelState::Trouble);
+    assert!(snap.info.is_none());
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(
+        log.contains("Initech stopped unexpectedly.") && log.contains("tun7 is gone"),
+        "{log}"
+    );
+    mgr.shutdown().await;
+}
+
 /// rp_filter=1 everywhere, as Fedora has it (scripts/netns-test.sh starts
 /// the namespace so): a reply arriving on an interface the main table
 /// wouldn't use to reach its sender is dropped, unless craked loosens it

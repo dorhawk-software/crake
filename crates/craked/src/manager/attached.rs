@@ -38,8 +38,7 @@ impl Manager {
             || !device
                 .chars()
                 .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-            || !std::path::Path::new(&format!("/sys/class/net/{device}/tun_flags")).exists()
-                && self.cfg.apply_network
+            || !crate::net::is_tun(device) && self.cfg.apply_network
         {
             bail!("{device:?} isn't a VPN device on this machine");
         }
@@ -146,5 +145,31 @@ impl Manager {
         };
         self.log.system(Some(name), msg, failed);
         Ok(())
+    }
+
+    /// OpenVPN 3: a session that ended without the app saying so (the app
+    /// quit, and openvpn3 took the session down with it) leaves its device
+    /// gone. Such a tunnel is down, not "its DNS doesn't answer" for good.
+    pub async fn check_devices(&self) {
+        if !self.cfg.apply_network {
+            return;
+        }
+        let attached: Vec<(String, String)> = self
+            .tunnels
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, e)| e.attached.is_some())
+            .filter_map(|(n, e)| Some((n.clone(), e.info.as_ref()?.device.clone())))
+            .collect();
+        for (name, device) in attached {
+            if crate::net::is_tun(&device) {
+                continue;
+            }
+            let why = format!("OpenVPN 3 ended its session: {device} is gone.");
+            if let Err(e) = self.detach(&name, Some(why)).await {
+                tracing::warn!("{name}: {e:#}");
+            }
+        }
     }
 }

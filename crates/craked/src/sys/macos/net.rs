@@ -9,6 +9,12 @@ use anyhow::Result;
 
 use super::cmd;
 
+/// A tun device OpenVPN 3 made: OpenVPN 3 sessions are handed to craked
+/// on Linux only.
+pub fn is_tun(_dev: &str) -> bool {
+    false
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum Net {
     Ip,

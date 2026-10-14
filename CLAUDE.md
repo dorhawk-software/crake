@@ -556,6 +556,14 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    profiles and takes them over (`ovpn3::adopt`, `watch_openvpn3`);
    switching off in Crake then ends them. craked's Attach on a tunnel
    already up on that device is a no-op.
+   A session that ends with no one to tell craked (seen 2026-10-14 with
+   openvpn3 v27.1: quitting the app ended the session it had started,
+   though the app doesn't disconnect on quit) left the tunnel "Connected ·
+   its DNS doesn't answer" for good. craked now looks for each attached
+   tunnel's device every 2 s (`check_devices`; netlink's link kind "tun",
+   which, unlike /sys, follows craked's network namespace) and takes a
+   tunnel whose device is gone down as stopped unexpectedly ("OpenVPN 3
+   ended its session: tun0 is gone."; netns-tested).
    openvpn3-indicator acts on every session of the user, Crake's too: it
    calls Ready+Connect at CFG_OK and opens the web sign-in at
    SESS_AUTH_URL (22, the URL is the status message). So Ready may answer

@@ -205,6 +205,9 @@ const DNS_CHECK_WAIT: Duration = Duration::from_secs(3);
 
 const DNS_CHECK_MISSES: u8 = 2;
 
+/// How often an OpenVPN 3 tunnel's device is looked for.
+const DEVICE_CHECK_EVERY: Duration = Duration::from_secs(2);
+
 /// Why a DNS answer sent a host through a tunnel.
 #[derive(Clone, Copy)]
 enum Why {
@@ -362,6 +365,17 @@ impl Manager {
             && let Err(e) = crate::syn_queue::spawn(Arc::clone(self))
         {
             tracing::error!("the first-SYN race is off: {e:#}");
+        }
+        // OpenVPN 3 sessions that ended behind the app's back: their device
+        // is gone.
+        if self.routing.is_real() {
+            let this = Arc::clone(self);
+            tokio::spawn(async move {
+                loop {
+                    tokio::time::sleep(DEVICE_CHECK_EVERY).await;
+                    this.check_devices().await;
+                }
+            });
         }
         // Each tunnel's DNS, asked now and then whether it still answers.
         if self.routing.is_real() && self.cfg.use_resolved {

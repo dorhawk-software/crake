@@ -126,8 +126,64 @@ fn rp_filter_message(index: u32, value: u32) -> Vec<u8> {
     netlink::request(libc::RTM_SETLINK, &body)
 }
 
+/// IFLA_LINKINFO and, inside it, IFLA_INFO_KIND (linux/if_link.h).
+const IFLA_LINKINFO: u16 = 18;
+const IFLA_INFO_KIND: u16 = 1;
+/// Room for a link's description (RTM_NEWLINK; a few hundred bytes to a
+/// few kilobytes).
+const LINK_BUFFER: usize = 32 * 1024;
+
+/// `dev` is a tun device (as openvpn3 makes) in craked's own network
+/// namespace; false when there's no such device. Asked over netlink, which,
+/// unlike /sys, always speaks of the namespace craked runs in.
+pub fn is_tun(dev: &str) -> bool {
+    link_kind(dev).as_deref() == Some("tun")
+}
+
+/// What kind of link `dev` is ("tun", "dummy", ...; IFLA_INFO_KIND).
+fn link_kind(dev: &str) -> Option<String> {
+    use std::mem::offset_of;
+    let name = std::ffi::CString::new(dev).ok()?;
+    // SAFETY: a valid NUL-terminated name.
+    let index = unsafe { libc::if_nametoindex(name.as_ptr()) };
+    if index == 0 {
+        return None;
+    }
+    let mut body = vec![0u8; size_of::<libc::ifinfomsg>()];
+    let at = offset_of!(libc::ifinfomsg, ifi_index);
+    body[at..at + size_of::<i32>()].copy_from_slice(&index.to_ne_bytes());
+    let reply = exchange(&netlink::request(libc::RTM_GETLINK, &body), LINK_BUFFER).ok()?;
+    netlink::messages(&reply)
+        .into_iter()
+        .filter(|(kind, _, _)| *kind == libc::RTM_NEWLINK)
+        .find_map(|(_, _, link)| {
+            let attrs = netlink::attrs(link.get(size_of::<libc::ifinfomsg>()..)?);
+            let (_, info) = attrs.into_iter().find(|(t, _)| *t == IFLA_LINKINFO)?;
+            let (_, kind) = netlink::attrs(info)
+                .into_iter()
+                .find(|(t, _)| *t == IFLA_INFO_KIND)?;
+            Some(
+                String::from_utf8_lossy(kind)
+                    .trim_end_matches('\0')
+                    .to_owned(),
+            )
+        })
+}
+
 /// Send one rtnetlink request and read its acknowledgement.
 fn set_link(msg: &[u8]) -> Result<()> {
+    let reply = exchange(msg, netlink::ACK_BUFFER)?;
+    // NLMSG_ERROR with error 0 is the acknowledgement.
+    match netlink::ack_code(&reply) {
+        Some(0) => Ok(()),
+        Some(code) => Err(std::io::Error::from_raw_os_error(-code).into()),
+        None => bail!("no acknowledgement from the kernel"),
+    }
+}
+
+/// Send one rtnetlink request; what the kernel answers first (up to
+/// `room` bytes).
+fn exchange(msg: &[u8], room: usize) -> Result<Vec<u8>> {
     use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
     // SAFETY: plain socket(2); the descriptor is owned below.
     let fd = unsafe {
@@ -147,18 +203,14 @@ fn set_link(msg: &[u8]) -> Result<()> {
     if sent < 0 {
         return Err(std::io::Error::last_os_error().into());
     }
-    let mut buf = [0u8; netlink::ACK_BUFFER];
+    let mut buf = vec![0u8; room];
     // SAFETY: receiving into a valid buffer of the given length.
     let n = unsafe { libc::recv(sock.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len(), 0) };
     if n < 0 {
         return Err(std::io::Error::last_os_error().into());
     }
-    // NLMSG_ERROR with error 0 is the acknowledgement.
-    match netlink::ack_code(&buf[..usize::try_from(n).unwrap_or(0)]) {
-        Some(0) => Ok(()),
-        Some(code) => Err(std::io::Error::from_raw_os_error(-code).into()),
-        None => bail!("no acknowledgement from the kernel"),
-    }
+    buf.truncate(usize::try_from(n).unwrap_or(0));
+    Ok(buf)
 }
 
 async fn ip(args: &[&str]) -> Result<()> {
@@ -175,4 +227,13 @@ async fn ip(args: &[&str]) -> Result<()> {
         );
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn only_a_tun_device_is_one() {
+        assert!(!super::is_tun("lo"), "loopback");
+        assert!(!super::is_tun("crake-no-such-device"));
+    }
 }

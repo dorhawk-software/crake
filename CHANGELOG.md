@@ -15,6 +15,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
   at 100% that got a HiDPI monitor showed Crake's windows at half size until Crake was started
   again, and the panel opened away from the tray icon. Crake now follows the desktop's scale as
   it changes, and the panel opens at the icon at any scale.
+- **An OpenVPN 3 tunnel whose session ended behind Crake's back shows as down.** When openvpn3
+  ended a session while Crake's window wasn't running (it does when the app that started it
+  quits), the tunnel stayed "Connected · its DNS doesn't answer" for good. Crake now notices
+  within seconds that the session's device is gone and says the tunnel stopped.
 
 ## 0.5.0 (2026-10-13)
 
