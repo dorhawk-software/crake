@@ -11,6 +11,13 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Crake no longer gets in the way of another VPN client signed in to the same company.** With
+  "Keep internal names private" on, Crake refused a company's names while its own tunnel was off,
+  even when AnyConnect or openconnect was connected there: every internal name failed (seen on a
+  Mac). Names another VPN client serves are now left to it, and kept private again once it
+  disconnects. On a Mac, Crake's service also no longer stops when macOS briefly refuses it its
+  network settings.
+
 - **Crake keeps a tunnel's DNS to its own domains, even when another program changes it.**
   openvpn3, when one of its sessions reconnects, set another OpenVPN 3 tunnel's DNS back to its
   own: every lookup, public ones included, went to that company's DNS, and short names like

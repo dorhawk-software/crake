@@ -96,6 +96,12 @@ impl Resolved {
         true
     }
 
+    /// What other VPN clients serve (their NRPT rules and adapters'
+    /// suffixes): not looked at yet (CLAUDE.md, "Not now").
+    pub async fn served_elsewhere(&self, _ours: &[String]) -> Vec<String> {
+        Vec::new()
+    }
+
     pub async fn link(&self, _device: &str) -> Result<(Vec<Ipv4Addr>, Vec<String>)> {
         Ok((Vec::new(), Vec::new()))
     }

@@ -37,6 +37,13 @@ const SERVICE_DNS: &str = "(State|Setup):/Network/Service/[^/]+/DNS";
 const PRIMARY_KEYS: [&str; 2] = ["State:/Network/Global/IPv4", "State:/Network/Global/IPv6"];
 const PRIMARY_SERVICE: &str = "PrimaryService";
 const SERVERS: &str = "ServerAddresses";
+const SEARCH_DOMAINS: &str = "SearchDomains";
+const SUPPLEMENTAL_DOMAINS: &str = "SupplementalMatchDomains";
+const DOMAIN_NAME: &str = "DomainName";
+/// Asking macOS for a session with its dynamic store: this many times,
+/// this far apart.
+const STORE_TRIES: u32 = 10;
+const STORE_WAIT: std::time::Duration = std::time::Duration::from_millis(200);
 const SETUP: &str = "Setup:";
 const STATE: &str = "State:";
 
@@ -105,7 +112,10 @@ pub fn upstream() -> Vec<IpAddr> {
 /// for given back what it had.
 fn apply(on: bool) {
     let mut displaced = displaced();
-    let store = SCDynamicStoreBuilder::new("Crake").build();
+    let Some(store) = open_store(|| SCDynamicStoreBuilder::new("Crake").build()) else {
+        tracing::warn!("macOS's network settings can't be reached now");
+        return;
+    };
     let mut keys: Vec<String> = on
         .then(|| primary_service(&store))
         .flatten()
@@ -223,12 +233,17 @@ fn watch() {
         let started = std::thread::Builder::new()
             .name("crake-primary-dns".into())
             .spawn(|| {
-                let store = SCDynamicStoreBuilder::new("Crake")
-                    .callback_context(SCDynamicStoreCallBackContext {
-                        callout: changed,
-                        info: (),
-                    })
-                    .build();
+                let Some(store) = open_store(|| {
+                    SCDynamicStoreBuilder::new("Crake")
+                        .callback_context(SCDynamicStoreCallBackContext {
+                            callout: changed,
+                            info: (),
+                        })
+                        .build()
+                }) else {
+                    tracing::warn!("couldn't watch the system's DNS settings");
+                    return;
+                };
                 let keys: CFArray<CFString> = CFArray::from_CFTypes(&[]);
                 let patterns = CFArray::from_CFTypes(&[
                     CFString::from_static_string(GLOBAL),
@@ -251,6 +266,68 @@ fn watch() {
 
 fn changed(_store: SCDynamicStore, _keys: CFArray<CFString>, _info: &mut ()) {
     apply(WANTED.load(Ordering::Relaxed));
+}
+
+/// A session with macOS's dynamic store. macOS may refuse one (configd
+/// busy, the Mac waking up), and system-configuration then panics
+/// ("Attempted to create a NULL object") instead of saying so: craked died
+/// of it on a colleague's Mac. Asked again a few times, then given up.
+fn open_store(make: impl Fn() -> SCDynamicStore) -> Option<SCDynamicStore> {
+    without_panic(make, STORE_TRIES, STORE_WAIT)
+}
+
+/// `make`'s result, asked up to `tries` times `wait` apart while it panics.
+fn without_panic<T>(make: impl Fn() -> T, tries: u32, wait: std::time::Duration) -> Option<T> {
+    for _ in 0..tries {
+        if let Ok(made) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(&make)) {
+            return Some(made);
+        }
+        std::thread::sleep(wait);
+    }
+    None
+}
+
+/// The domains every network service's DNS names (search, supplemental,
+/// its domain name): what other programs serve (`Resolved::served_elsewhere`).
+pub fn served_domains() -> Vec<String> {
+    let Some(store) = open_store(|| SCDynamicStoreBuilder::new("Crake").build()) else {
+        return Vec::new();
+    };
+    let Some(keys) = store.get_keys(SERVICE_DNS) else {
+        return Vec::new();
+    };
+    let mut domains = Vec::new();
+    for key in keys.iter() {
+        let Some(dict) = dictionary(&store, &key.to_string()) else {
+            continue;
+        };
+        for name in [SEARCH_DOMAINS, SUPPLEMENTAL_DOMAINS, DOMAIN_NAME] {
+            domains.extend(strings_of(&dict, name));
+        }
+    }
+    domains
+}
+
+/// A dictionary's string, or list of strings, under `key`.
+fn strings_of(dict: &CFDictionary, key: &'static str) -> Vec<String> {
+    let Some(item) = value(dict, key) else {
+        return Vec::new();
+    };
+    if let Some(one) = item.downcast::<CFString>() {
+        return vec![one.to_string()];
+    }
+    item.downcast::<CFArray>()
+        .map(|list| {
+            list.iter()
+                .filter_map(|item| {
+                    // SAFETY: an element the array holds; the wrapper retains it.
+                    unsafe { CFType::wrap_under_get_rule(*item) }
+                        .downcast::<CFString>()
+                        .map(|s| s.to_string())
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// The primary network service's id (the IPv4 one's, else the IPv6 one's).
@@ -317,4 +394,33 @@ fn with_servers(base: Option<&CFDictionary>, servers: Option<&[String]>) -> CFDi
         pairs.push((name.as_CFType(), CFArray::from_CFTypes(&list).as_CFType()));
     }
     CFDictionary::from_CFType_pairs(&pairs).into_untyped()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// system-configuration panics when macOS refuses a session: that
+    /// mustn't end craked.
+    #[test]
+    fn a_session_macos_refuses_is_given_up_on() {
+        let wait = std::time::Duration::from_millis(1);
+        let refused = without_panic(
+            || -> u32 { panic!("Attempted to create a NULL object.") },
+            3,
+            wait,
+        );
+        assert_eq!(refused, None);
+        let tries = std::cell::Cell::new(0);
+        let second = without_panic(
+            || {
+                tries.set(tries.get() + 1);
+                assert!(tries.get() > 1, "refused once");
+                tries.get()
+            },
+            3,
+            wait,
+        );
+        assert_eq!(second, Some(2));
+    }
 }

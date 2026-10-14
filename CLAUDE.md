@@ -226,7 +226,13 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    dummy link `crake-hush` in resolved, whose DNS (169.254.53.53, craked)
    answers REFUSED at once (`hush.rs`; netns-tested, and verified with the
    user's systemd-resolved: looking up an internal name with its tunnel
-   off fails at once); removed on shutdown.
+   off fails at once); removed on shutdown. Not a domain another program
+   serves (2026-10-14: a colleague's AnyConnect on a Mac failed every
+   internal name while Crake refused them): `Resolved::served_elsewhere`
+   (Linux: resolved's domains on links not Crake's; macOS: every network
+   service's DNS in the system configuration, where VPN clients put
+   theirs), looked at again every 2 s (`refresh_hush`, rewritten only when
+   the list changes); the package test and tests/macos.rs check it.
    Over TCP too: a tunnel DNS answer that fits one segment (almost every A
    answer) is held like a UDP one; one spread over several segments is put
    together from them in the order they come (`dns_tcp.rs`, in the queue's
@@ -690,6 +696,10 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   session craked had refused. Not Crake's to clean up (openvpn3's process,
   user `openvpn`); worth reporting to OpenVPN if it happens again, and
   Crake could warn when two tun devices carry the same profile's routes.
+- **Windows: names another VPN client serves are still kept private**
+  (2026-10-14). Linux and macOS leave a domain another program serves to
+  it (`served_elsewhere`); Windows returns nothing yet. To do: read other
+  clients' NRPT rules and adapters' DNS suffixes there.
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with

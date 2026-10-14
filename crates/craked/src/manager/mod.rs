@@ -137,6 +137,9 @@ pub struct Manager {
     /// One hush update at a time; the REFUSED answerer runs once.
     hush: tokio::sync::Mutex<()>,
     hush_serving: std::sync::atomic::AtomicBool,
+    /// The domains kept private last (`refresh_hush` changes them only
+    /// when they differ).
+    hush_last: Mutex<Option<Vec<String>>>,
     /// Tunnels whose DNS doesn't answer (7h): tunnel -> the names already
     /// said to be answered from memory during this outage.
     dns_down: Mutex<HashMap<String, std::collections::HashSet<String>>>,
@@ -313,6 +316,7 @@ impl Manager {
             settings: Mutex::new(settings),
             hush: tokio::sync::Mutex::new(()),
             hush_serving: std::sync::atomic::AtomicBool::new(false),
+            hush_last: Mutex::new(None),
             dns_down: Mutex::new(HashMap::new()),
             dns_misses: Mutex::new(HashMap::new()),
             keep_serving: std::sync::atomic::AtomicBool::new(false),
@@ -374,7 +378,8 @@ impl Manager {
             tracing::error!("the first-SYN race is off: {e:#}");
         }
         // OpenVPN 3 sessions that ended behind the app's back (their device
-        // is gone), and tunnels' DNS settings another program rewrote.
+        // is gone), tunnels' DNS settings another program rewrote, and
+        // domains another VPN client now serves (not kept private then).
         if self.routing.is_real() {
             let this = Arc::clone(self);
             tokio::spawn(async move {
@@ -382,6 +387,7 @@ impl Manager {
                     tokio::time::sleep(DEVICE_CHECK_EVERY).await;
                     this.check_devices().await;
                     this.keep_dns_links().await;
+                    this.refresh_hush().await;
                 }
             });
         }

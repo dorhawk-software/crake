@@ -103,6 +103,17 @@ impl Resolved {
         true
     }
 
+    /// The domains other programs serve: every network service's DNS in
+    /// the system configuration (a VPN client's, AnyConnect's or
+    /// vpnc-script's, and the network's own). Crake's own are files in
+    /// /etc/resolver, not there.
+    pub async fn served_elsewhere(&self, _ours: &[String]) -> Vec<String> {
+        match self {
+            Self::Real => super::primary_dns::served_domains(),
+            Self::Noop => Vec::new(),
+        }
+    }
+
     pub async fn link(&self, _device: &str) -> Result<(Vec<Ipv4Addr>, Vec<String>)> {
         Ok((Vec::new(), Vec::new()))
     }

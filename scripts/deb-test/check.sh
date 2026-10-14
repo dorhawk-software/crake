@@ -132,6 +132,14 @@ tunnel() {
     # by craked's own DNS (port 53 on crake-hush), never asked publicly.
     check "crake-hush is up" ip link show crake-hush
     check "ACME's names are refused at once" refused_at_once wiki.acme.internal
+    # Another VPN client serving ACME's domain (AnyConnect beside Crake, as
+    # on a colleague's Mac): its names are left to it, not refused.
+    check "another VPN client serves acme.internal" sh -c 'ip link add other0 type dummy && ip link set other0 up && resolvectl dns other0 10.40.0.2 && resolvectl domain other0 "~acme.internal"'
+    for _ in $(seq 1 20); do resolvectl domain crake-hush 2>/dev/null | grep -q acme.internal || break; sleep 0.5; done
+    check "Crake leaves acme.internal to it" sh -c '! resolvectl domain crake-hush 2>/dev/null | grep -q acme.internal'
+    check "the other client goes" ip link del other0
+    for _ in $(seq 1 20); do resolvectl domain crake-hush 2>/dev/null | grep -q acme.internal && break; sleep 0.5; done
+    check "acme.internal is kept private again" sh -c 'resolvectl domain crake-hush | grep -q acme.internal'
     check "nothing went wrong in craked's journal" sh -c '! journalctl -b -u craked --no-pager -o cat | grep -E "ERROR|panicked"'
     if aa-enabled --quiet 2>/dev/null; then
         # Complain mode (scripts/vm-test.sh --complain) lists what the

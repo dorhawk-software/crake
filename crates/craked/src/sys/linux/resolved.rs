@@ -210,6 +210,32 @@ impl Resolved {
         }
     }
 
+    /// The domains other programs' links serve in resolved (search or
+    /// routing domains; the global ones too), not Crake's (`ours`, and its
+    /// own crake-* links).
+    pub async fn served_elsewhere(&self, ours: &[String]) -> Vec<String> {
+        let Ok(Some(m)) = self.manager().await else {
+            return Vec::new();
+        };
+        let Ok(all) = within(
+            "Domains",
+            WAIT,
+            m.get_property::<Vec<(i32, String, bool)>>("Domains"),
+        )
+        .await
+        else {
+            return Vec::new();
+        };
+        all.into_iter()
+            .filter(|(index, _, _)| {
+                let name = ifname(*index);
+                !name.starts_with("crake-") && !ours.contains(&name)
+            })
+            .map(|(_, domain, _)| domain)
+            .filter(|d| !d.is_empty() && d != ".")
+            .collect()
+    }
+
     /// Drop resolved's cache, so answers from before a tunnel came up (or
     /// went down) aren't reused.
     pub async fn flush(&self) {
@@ -232,6 +258,23 @@ impl Resolved {
             .await;
         }
     }
+}
+
+/// An interface's name ("" for 0, the global settings, or one that's gone).
+fn ifname(index: i32) -> String {
+    let mut buf = [0 as libc::c_char; libc::IF_NAMESIZE];
+    let Ok(index) = u32::try_from(index) else {
+        return String::new();
+    };
+    // SAFETY: a buffer of IF_NAMESIZE, as if_indextoname wants.
+    let name = unsafe { libc::if_indextoname(index, buf.as_mut_ptr()) };
+    if name.is_null() {
+        return String::new();
+    }
+    // SAFETY: if_indextoname wrote a NUL-terminated name into buf.
+    unsafe { std::ffi::CStr::from_ptr(buf.as_ptr()) }
+        .to_string_lossy()
+        .into_owned()
 }
 
 fn ifindex(device: &str) -> Result<i32> {

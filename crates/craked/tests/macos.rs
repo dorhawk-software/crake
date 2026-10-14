@@ -401,6 +401,44 @@ async fn the_connection_table_sees_a_stuck_connection() {
     connecting.abort();
 }
 
+/// Another VPN client's DNS (AnyConnect, openconnect's vpnc-script) is a
+/// network service's DNS in the system configuration: its domains are
+/// served elsewhere, so Crake doesn't keep them private (a colleague's
+/// AnyConnect failed every internal name while Crake refused them).
+#[tokio::test]
+async fn another_vpn_clients_domains_are_seen() {
+    if !enabled() {
+        return;
+    }
+    const KEY: &str = "State:/Network/Service/crake-test-other-vpn/DNS";
+    let scutil = |script: String| {
+        use std::io::Write;
+        let mut child = Command::new("scutil")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(script.as_bytes())
+            .unwrap();
+        assert!(child.wait().unwrap().success());
+    };
+    scutil(format!(
+        "d.init\nd.add SupplementalMatchDomains * other-vpn.example\nd.add SearchDomains * search.other-vpn.example\nd.add ServerAddresses * 192.0.2.53\nset {KEY}\n"
+    ));
+    let served = Resolved::new(true).served_elsewhere(&[]).await;
+    scutil(format!("remove {KEY}\n"));
+    assert!(
+        served.iter().any(|d| d == "other-vpn.example")
+            && served.iter().any(|d| d == "search.other-vpn.example"),
+        "{served:?}"
+    );
+    let gone = Resolved::new(true).served_elsewhere(&[]).await;
+    assert!(!gone.iter().any(|d| d == "other-vpn.example"), "{gone:?}");
+}
+
 /// Where 192.0.2.1 and port 9 sit in the kernel's records, for when the
 /// table can't be read: each record (offset, length, kind), and the
 /// offsets of the address and port within the one that has them.
