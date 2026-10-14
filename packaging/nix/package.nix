@@ -29,9 +29,15 @@ let
     # Cargo.lock: the layer on top of the base (below) would rebuild every
     # crate ("PathToSourceChanged"). So every build reads them through a
     # link at the same place in its build folder (/build in Nix's sandbox).
+    # Only where the build folder itself stays put: /build, in Nix's
+    # sandbox (CI turns it on). Without one (Nix 2.30 and later name each
+    # build's folder anew) the link would move every time and nothing
+    # would be reused; the store path at least stays while Cargo.lock does.
     postConfigure = ''
-      ln -s "$cargoVendorDir" "$NIX_BUILD_TOP/vendor-cargo-deps"
-      sed -i "s|$cargoVendorDir|$NIX_BUILD_TOP/vendor-cargo-deps|g" "$CARGO_HOME/config.toml"
+      if [ "$NIX_BUILD_TOP" = /build ]; then
+        ln -s "$cargoVendorDir" "$NIX_BUILD_TOP/vendor-cargo-deps"
+        sed -i "s|$cargoVendorDir|$NIX_BUILD_TOP/vendor-cargo-deps|g" "$CARGO_HOME/config.toml"
+      fi
     '';
   };
   # The dependencies don't change with Crake's version, so their builds

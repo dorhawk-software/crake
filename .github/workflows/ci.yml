@@ -195,10 +195,18 @@ jobs:
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      # Nix's sandbox: every build in /build, which the dependency layers
+      # need (packaging/nix/package.nix: cargo reuses the base's builds only
+      # from the same folder; without a sandbox each build gets a new one).
+      # Builds run as the runner's user, in user namespaces, which Ubuntu
+      # 24.04's AppArmor keeps from unprivileged users unless told.
+      - name: Let Nix build in its sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - uses: nixbuild/nix-quick-install-action@v35
         with:
           nix_conf: |
             system-features = kvm nixos-test benchmark big-parallel
+            sandbox = true
       # The Nix store, in Cachix (free for open source), not GitHub's 10 GB
       # cache: Crake's crates.io dependencies are a derivation of their own
       # (crane), rebuilt only when Cargo.lock changes. Every path built here

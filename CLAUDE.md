@@ -1085,9 +1085,15 @@ The user doesn't want development builds installed on their machine.
   sources' path is the same ("PathToSourceChanged"), and crane's vendored
   sources are a store path named after the whole Cargo.lock, so every
   Crake build (`postConfigure` in package.nix) reads them through a link
-  at `$NIX_BUILD_TOP/vendor-cargo-deps` (/build in Nix's sandbox, as in
-  CI; outside a sandbox the build folder's name is random and nothing is
-  reused). Moving the base forward (`scripts/nix-base.sh [COMMIT]`,
+  at `/build/vendor-cargo-deps`, only when the build folder is /build:
+  Nix's sandbox. Without one, Nix 2.30 and later give every build a new
+  folder (`/nix/var/nix/builds/nix-<pid>-<n>`), the link moved each time
+  and CI recompiled everything, Crake's own build included (found on
+  26bcc8f's run: 90 min); there the store path is kept, which at least
+  reuses everything while Cargo.lock is unchanged. So CI's nixos job turns
+  the sandbox on (`sandbox = true`; Ubuntu 24.04 needs
+  `kernel.apparmor_restrict_unprivileged_userns=0` for the runner's
+  user's namespaces). Moving the base forward (`scripts/nix-base.sh [COMMIT]`,
   default main's latest; commit flake.lock) costs one full build (~45 min)
   and is worth it when the layer on top has grown. This covers what a
   Cargo.lock trimmed to Linux's crates was meant to (not possible: Cargo
