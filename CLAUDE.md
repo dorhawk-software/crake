@@ -753,12 +753,8 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   know a winget install.
 - **Undo in macOS notifications.** notify-rust has no actions there, so
   "Use Nordbank" / Undo exist only in the panel on a Mac.
-- **Untried on real systems:** the macOS panel under the menu bar (also
-  noted there), importing a real .ovpn file, KDE, native Wayland
-  (`CRAKE_WAYLAND=1`), and every Beta protocol (only AnyConnect and
-  OpenVPN 3 have met a real gateway). The user's KDE and other Linux
-  desktop VMs were removed for disk space (2026-10-14); KDE needs a VM
-  made again (`~/.cache/crake-vms/make-vm.sh`) or a real machine.
+- **Untried on real systems:** see "Tried by real people" below, a
+  checklist of its own.
 - **Performance: never measured.** Believed negligible (NFQUEUE holds
   only DNS answers and racing SYNs); measure before claiming numbers.
 - **A colleague's requests (they run OpenVPN 3 profiles daily,
@@ -796,6 +792,66 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   live one from versions.json; the page's fallback is bumped by hand at
   each release. Automating it (the packages workflow updating the page, or
   Cloudflare filling it in) was offered, not decided.
+
+## Tried by real people (a checklist, ticked one by one)
+
+Asked for by the user, 2026-10-14. The tests prove the mechanics on every
+system (containers, VMs, CI's runners), but nearly every macOS fix of
+October came from a colleague using Crake on a real Mac: System Settings'
+names, the service's approval, windows behind other apps, another VPN
+client's names kept private, a panic. Windows and the other Linux
+distributions haven't met a real person yet. Each item is ticked when
+someone used Crake for it on a real machine (not a VM made for tests),
+with the date and who (a role, not a name), and what was found and fixed.
+Ubuntu 26.04 with GNOME and a bottom bar is the user's own notebook, used
+daily.
+
+**Windows** (a real PC, ideally a company laptop):
+- [ ] Installing: SmartScreen's warning for the unsigned installer, and
+  what a user has to click past (Windows code signing is undecided,
+  see Other platforms).
+- [ ] Antivirus and endpoint security: craked's service, Wintun, and the
+  routes, NRPT rules and firewall rules it writes, not blocked or flagged.
+- [ ] Another VPN client installed (AnyConnect, GlobalProtect, ...): its
+  names still resolve with "Keep internal names private" on
+  (`served_elsewhere` isn't built for Windows: Not now).
+- [ ] Group policy that owns NRPT or the firewall: Crake's rules work, or
+  it says plainly that they can't.
+- [ ] Finding the bird: Windows 11 puts new icons in the notification
+  area's overflow; what a new user sees, and whether Crake should say how.
+- [ ] The panel with a GPU: Windows' rounding and shadow (only seen in a
+  VM without one).
+- [ ] A day of real use: sign-in, hosts learned, Undo; whether the first
+  connection to a new host failing (no WFP driver) is noticed.
+- [ ] Display scale changes with Crake running (also in Not now).
+
+**Linux distributions** (a real desktop, not the package test's container):
+- [ ] Fedora with GNOME: no tray icons without the AppIndicator extension
+  installed and switched on; what a new user sees (no bird at all?), and
+  how Crake should tell them.
+- [ ] KDE Plasma, X11 and Wayland: the tray, and the panel placed at it.
+  The KDE VM was removed for disk space (2026-10-14); a VM can be made
+  again (`~/.cache/crake-vms/make-vm.sh`) or a real machine used.
+- [ ] Debian's desktop, which doesn't use systemd-resolved: installing
+  Crake brings it in; the rest of name lookup (NetworkManager, other VPNs,
+  `.local` names) still works afterwards.
+- [ ] Fedora's firewalld: its own reverse-path filter (IPv6_rpfilter, in
+  nftables) doesn't drop replies through a tunnel, as strict `rp_filter`
+  would have (handled).
+- [ ] Arch: resolved isn't enabled on install; following the install
+  message gets a working Crake.
+- [ ] Native Wayland (`CRAKE_WAYLAND=1`).
+
+**macOS** (beyond what the colleague has tried):
+- [ ] The service approved by the user, craked running under launchd from
+  Crake.app, and an upgrade restarting it with tunnels kept (0.7; also in
+  Not now).
+- [ ] The panel under the menu bar, placed at the icon on each display.
+
+**Everywhere:**
+- [ ] Importing a real .ovpn file (New tunnel's Import .ovpn…).
+- [ ] Each Beta protocol against a real gateway (only AnyConnect and
+  OpenVPN 3 have met one; the Beta tag comes off as each is ticked).
 
 ## Lints are errors
 
