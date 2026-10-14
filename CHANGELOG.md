@@ -11,6 +11,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Crake keeps a tunnel's DNS to its own domains, even when another program changes it.**
+  openvpn3, when one of its sessions reconnects, set another OpenVPN 3 tunnel's DNS back to its
+  own: every lookup, public ones included, went to that company's DNS, and short names like
+  "wpad" turned into the company's (a browser auto-detecting its proxy then hung). Crake now
+  notices within seconds and puts its own settings back.
 - **OpenVPN 3 profiles whose sessions don't name their device can be used.** For some profiles
   (seen with an Azure VPN gateway's) openvpn3 never says which device a session uses; Crake now
   finds it from the process running the session, where it said "didn't say which device the

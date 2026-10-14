@@ -209,7 +209,8 @@ const DNS_CHECK_WAIT: Duration = Duration::from_secs(3);
 
 const DNS_CHECK_MISSES: u8 = 2;
 
-/// How often an OpenVPN 3 tunnel's device is looked for.
+/// How often an OpenVPN 3 tunnel's device, and every tunnel's DNS settings
+/// in resolved, are looked at.
 const DEVICE_CHECK_EVERY: Duration = Duration::from_secs(2);
 
 /// Why a DNS answer sent a host through a tunnel.
@@ -372,14 +373,15 @@ impl Manager {
         {
             tracing::error!("the first-SYN race is off: {e:#}");
         }
-        // OpenVPN 3 sessions that ended behind the app's back: their device
-        // is gone.
+        // OpenVPN 3 sessions that ended behind the app's back (their device
+        // is gone), and tunnels' DNS settings another program rewrote.
         if self.routing.is_real() {
             let this = Arc::clone(self);
             tokio::spawn(async move {
                 loop {
                     tokio::time::sleep(DEVICE_CHECK_EVERY).await;
                     this.check_devices().await;
+                    this.keep_dns_links().await;
                 }
             });
         }

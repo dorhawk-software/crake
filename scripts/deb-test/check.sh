@@ -106,6 +106,12 @@ tunnel() {
     check "resolved asks ACME's DNS for acme.internal" sh -c 'resolvectl query wiki.acme.internal | grep -q 10.40.1.11'
     check "the name's address is routed at once" sh -c 'curl -s -m 1 http://10.40.1.11/ | grep -q crex'
     check "both learned" sh -c "nft list set inet crake learned_acme | grep -q 10.40.1.10 && nft list set inet crake learned_acme | grep -q 10.40.1.11"
+    # Another program rewriting the tunnel's DNS settings (openvpn3 does,
+    # for all its devices, when one of its sessions reconnects): its domain
+    # as a search domain, every name to it. craked puts its own back.
+    check "another program rewrites ACME's DNS settings" sh -c 'resolvectl domain crake-acme acme.internal "~." && resolvectl default-route crake-acme yes'
+    for _ in $(seq 1 20); do resolvectl domain crake-acme | grep -q "~acme.internal" && break; sleep 0.5; done
+    check "craked puts its own back" sh -c 'resolvectl domain crake-acme | grep -q "): ~acme.internal\$" && resolvectl default-route crake-acme | grep -q "): no\$"'
     # A package upgrade (reinstalling runs the same scripts): ACME is
     # handed to the new craked, stays signed in and comes back by itself.
     if [ "$PM" = pacman ]; then

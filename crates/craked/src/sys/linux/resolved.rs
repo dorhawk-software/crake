@@ -163,6 +163,53 @@ impl Resolved {
         ))
     }
 
+    /// Whether `device`'s settings in resolved are still the ones
+    /// `set_link` made (another program, openvpn3, may have rewritten
+    /// them). Can't tell: yes.
+    pub async fn link_as_set(&self, device: &str, domains: &[String], everything: bool) -> bool {
+        let Ok(Some(m)) = self.manager().await else {
+            return true;
+        };
+        let Ok(index) = ifindex(device) else {
+            return true;
+        };
+        let Ok(path) = within(
+            "GetLink",
+            WAIT,
+            m.call::<_, _, zbus::zvariant::OwnedObjectPath>("GetLink", &(index,)),
+        )
+        .await
+        else {
+            return true;
+        };
+        let Ok(link) = zbus::Proxy::new(
+            m.connection(),
+            "org.freedesktop.resolve1",
+            path,
+            "org.freedesktop.resolve1.Link",
+        )
+        .await
+        else {
+            return true;
+        };
+        let found = within(
+            "Domains",
+            WAIT,
+            link.get_property::<Vec<(String, bool)>>("Domains"),
+        )
+        .await;
+        let default_route = within(
+            "DefaultRoute",
+            WAIT,
+            link.get_property::<bool>("DefaultRoute"),
+        )
+        .await;
+        match (found, default_route) {
+            (Ok(found), Ok(default_route)) => as_set(&found, default_route, domains, everything),
+            _ => true,
+        }
+    }
+
     /// Drop resolved's cache, so answers from before a tunnel came up (or
     /// went down) aren't reused.
     pub async fn flush(&self) {
@@ -197,6 +244,30 @@ fn ifindex(device: &str) -> Result<i32> {
     Ok(i as i32)
 }
 
+/// resolved's domains for a link (name, routing only) and its default
+/// route are what `set_link` made for `domains`.
+fn as_set(
+    found: &[(String, bool)],
+    default_route: bool,
+    domains: &[String],
+    everything: bool,
+) -> bool {
+    let plain = |d: &str| {
+        let d = d.trim_end_matches('.').to_ascii_lowercase();
+        if d.is_empty() { ".".to_owned() } else { d }
+    };
+    let mut want: Vec<(String, bool)> = domains.iter().map(|d| (plain(d), true)).collect();
+    if everything {
+        want.push((".".to_owned(), true));
+    }
+    let mut found: Vec<(String, bool)> = found.iter().map(|(d, r)| (plain(d), *r)).collect();
+    want.sort();
+    want.dedup();
+    found.sort();
+    found.dedup();
+    found == want && default_route == everything
+}
+
 /// Who answers the system's DNS, for helpdesk copies (`Manager::diagnostics`).
 pub fn view() -> Vec<String> {
     vec![
@@ -208,6 +279,44 @@ pub fn view() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Seen on the user's machine: openvpn3, when another of its sessions
+    /// reconnected, set an attached tunnel's link back to its own (its
+    /// domains as search domains, "~." and the default route), undoing
+    /// Crake's routing-only setup.
+    #[test]
+    fn a_link_another_program_rewrote_isnt_as_set() {
+        let domains = [
+            "gitlab.initech.internal".to_owned(),
+            "initech.vpn".to_owned(),
+        ];
+        let ours = [
+            ("gitlab.initech.internal".to_owned(), true),
+            ("initech.vpn".to_owned(), true),
+        ];
+        assert!(as_set(&ours, false, &domains, false));
+        // In another order, or with a trailing dot or capitals: the same.
+        let same = [
+            ("INITECH.VPN.".to_owned(), true),
+            ("gitlab.initech.internal".to_owned(), true),
+        ];
+        assert!(as_set(&same, false, &domains, false));
+        let openvpn3s = [
+            ("gitlab.initech.internal".to_owned(), false),
+            ("initech.vpn".to_owned(), false),
+            (".".to_owned(), true),
+        ];
+        assert!(!as_set(&openvpn3s, true, &domains, false));
+        assert!(
+            !as_set(&ours, true, &domains, false),
+            "the default route alone"
+        );
+        assert!(!as_set(&[], false, &domains, false), "emptied");
+        // A full tunnel: every name ("~.") and the default route are ours.
+        let full = [(".".to_owned(), true)];
+        assert!(as_set(&full, true, &[], true));
+        assert!(!as_set(&full, false, &[], true));
+    }
 
     #[tokio::test]
     async fn a_resolved_that_never_answers_is_a_failure() {

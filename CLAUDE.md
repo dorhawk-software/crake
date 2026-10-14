@@ -572,6 +572,14 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    `backend_pid` with the attach, and craked takes the one tun device
    that process holds open (/proc/<pid>/fdinfo "iff:", root only;
    netns-tested); a handover the app can't make ends the session.
+   openvpn3 rewrites its devices' DNS in resolved when one of its
+   sessions reconnects (seen 2026-10-14: another session's reconnect set
+   an attached tunnel back to its domains as search domains, "~." and
+   the default route, so every name went to that company and Firefox's
+   proxy auto-detect resolved `wpad` into its domain and hung). craked
+   looks at every tunnel's link every 2 s (`keep_dns_links`,
+   `Resolved::link_as_set`) and puts its routing-only setup back; the
+   package test rewrites ACME's link with resolvectl and expects it back.
    A session that ends with no one to tell craked (seen 2026-10-14 with
    openvpn3 v27.1: quitting the app ended the session it had started,
    though the app doesn't disconnect on quit) left the tunnel "Connected ·

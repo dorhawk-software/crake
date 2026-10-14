@@ -97,6 +97,12 @@ impl Resolved {
     }
 
     /// What another program registered for the device (OpenVPN 3 on Linux).
+    /// Its own DNS server holds the tunnels' domains here: nothing else
+    /// rewrites them.
+    pub async fn link_as_set(&self, _device: &str, _domains: &[String], _everything: bool) -> bool {
+        true
+    }
+
     pub async fn link(&self, _device: &str) -> Result<(Vec<Ipv4Addr>, Vec<String>)> {
         Ok((Vec::new(), Vec::new()))
     }

@@ -78,6 +78,43 @@ impl Manager {
         Ok(pinned.len() + learned.len())
     }
 
+    /// Another program may rewrite a tunnel's DNS settings in resolved:
+    /// openvpn3 does, for all its devices, when one of its sessions
+    /// reconnects (its domains as search domains, every name to it), which
+    /// sent every name to that company and undid "routed before the first
+    /// packet". Crake's own are put back.
+    pub(super) async fn keep_dns_links(&self) {
+        let up: Vec<(String, String, TunnelInfo)> = {
+            let down = self.dns_down.lock().unwrap();
+            self.tunnels
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(n, e)| e.state == TunnelState::Connected && !down.contains_key(*n))
+                .filter_map(|(n, e)| {
+                    Some((n.clone(), e.config.display().to_owned(), e.info.clone()?))
+                })
+                .collect()
+        };
+        for (name, label, info) in up {
+            let domains = self.domains(&name);
+            let everything = self.learning(&name) == crate::policy::Learning::FullTunnel;
+            if info.servers.is_empty() || (domains.is_empty() && !everything) {
+                continue;
+            }
+            if !self
+                .resolved
+                .link_as_set(&info.device, &domains, everything)
+                .await
+            {
+                tracing::info!(
+                    "{label}: its DNS settings were changed elsewhere; Crake's are back"
+                );
+                self.register_dns(&name, &label, &info, &domains).await;
+            }
+        }
+    }
+
     /// Hand the tunnel's DNS servers and domains to systemd-resolved. Done after
     /// the routing is in place, so the first answer is already caught.
     pub(super) async fn register_dns(
