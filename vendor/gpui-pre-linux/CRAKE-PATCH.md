@@ -8,7 +8,8 @@ panel runs through XWayland, where it can. Upstream's X11 backend only offers
 an unmanaged (override-redirect) pop-up for exact placement, which never gets
 focus, so the panel couldn't close when the user clicks elsewhere.
 
-Changes, all in `src/linux/x11/window.rs`, marked `CRAKE PATCH`:
+Changes in `src/linux/x11/window.rs` (and, for 3, `client.rs`), marked
+`CRAKE PATCH`:
 
 1. `WM_NORMAL_HINTS` carries the window's position as user-specified, so the
    window manager honours the position the app asked for.
@@ -17,6 +18,15 @@ Changes, all in `src/linux/x11/window.rs`, marked `CRAKE PATCH`:
    override-redirect) and gets `_NET_WM_STATE_SKIP_TASKBAR`, `_SKIP_PAGER`
    and `_ABOVE` instead of the notification window type. Pop-ups with
    `focus: false` stay as upstream has them.
+3. The scale follows Xft.dpi while the app runs. Upstream reads it once at
+   start; GNOME publishes XWayland's scale there (the highest monitor's, with
+   xwayland-native-scaling), so a laptop at 100% that gets a HiDPI monitor
+   goes to 192, and every window opened afterwards came out half size. The
+   client watches the root window's RESOURCE_MANAGER, reads the scale again
+   and gives each window the new one, keeping its logical size (the window
+   asks for the new number of pixels; its ConfigureNotify tells GPUI).
+   Tested on a real X server: `crates/crake/tests/x11_scale.rs`
+   (`scripts/x11-test.sh`, Xvfb with a software GPU).
 
 Keeping it current: the change itself is `vendor/gpui-pre-linux.patch` (a
 diff against crates.io's pristine source). `scripts/update-gpui.sh` takes the

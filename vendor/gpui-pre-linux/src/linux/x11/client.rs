@@ -478,6 +478,16 @@ impl X11Connection {
         let resource_database = x11rb::resource_manager::new_from_default(&xcb_connection)
             .context("Failed to create resource database")?;
         let scale_factor = get_scale_factor(&xcb_connection, &resource_database, x_root_index);
+        // CRAKE PATCH: the desktop's scale can change while the app runs (a
+        // HiDPI monitor plugged in, XWayland's scale following it): watch the
+        // root window's RESOURCE_MANAGER, where Xft.dpi is published.
+        check_reply(
+            || "Failed to watch the root window's resources",
+            xcb_connection.change_window_attributes(
+                xcb_connection.setup().roots[x_root_index].root,
+                &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
+            ),
+        )?;
         let cursor_handle = cursor::Handle::new(&xcb_connection, x_root_index, &resource_database)
             .context("Failed to initialize cursor theme handler")?
             .reply()
@@ -879,6 +889,32 @@ impl X11Client {
             .map(|window_reference| window_reference.window.clone())
     }
 
+    /// CRAKE PATCH: the X resources changed. When Xft.dpi gives another
+    /// scale, every window takes it, keeping its size in logical pixels.
+    fn rescale(&self) {
+        let mut state = self.0.borrow_mut();
+        let Some(database) = x11rb::resource_manager::new_from_default(&*state.xcb_connection)
+            .context("X11: Failed to read the resources again")
+            .log_err()
+        else {
+            return;
+        };
+        let scale = get_scale_factor(&state.xcb_connection, &database, state.x_root_index);
+        state.resource_database = database;
+        if scale == state.scale_factor {
+            return;
+        }
+        state.scale_factor = scale;
+        let windows: Vec<_> = state.windows.values().map(|w| w.window.clone()).collect();
+        drop(state);
+        for window in windows {
+            window
+                .set_scale_factor(scale)
+                .context("X11: Failed to give a window the new scale")
+                .log_err();
+        }
+    }
+
     fn handle_event(&self, event: Event) -> Option<()> {
         match event {
             Event::UnmapNotify(event) => {
@@ -1051,6 +1087,13 @@ impl X11Client {
                     .log_err();
             }
             Event::PropertyNotify(event) => {
+                // CRAKE PATCH: Xft.dpi may have changed.
+                if event.atom == u32::from(AtomEnum::RESOURCE_MANAGER)
+                    && self.get_window(event.window).is_none()
+                {
+                    self.rescale();
+                    return Some(());
+                }
                 let window = self.get_window(event.window)?;
                 window
                     .property_notify(event)

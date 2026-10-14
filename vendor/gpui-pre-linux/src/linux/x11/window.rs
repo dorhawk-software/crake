@@ -1089,6 +1089,30 @@ impl X11WindowStatePtr {
         }
     }
 
+    /// CRAKE PATCH: the desktop's scale changed. The window keeps its size in
+    /// logical pixels, so it asks for the new scale's number of pixels; the
+    /// ConfigureNotify that follows tells GPUI, as any resize does
+    /// (`set_bounds`, which divides by the new scale).
+    pub fn set_scale_factor(&self, scale: f32) -> anyhow::Result<()> {
+        let size = {
+            let mut state = self.state.borrow_mut();
+            state.scale_factor = scale;
+            state.display = Rc::new(X11Display::new(&self.xcb, scale, state.x_screen_index)?);
+            state.bounds.size.to_device_pixels(scale)
+        };
+        check_reply(
+            || "X11 ConfigureWindow for a new scale failed",
+            self.xcb.configure_window(
+                self.x_window,
+                &xproto::ConfigureWindowAux::new()
+                    .width(size.width.0 as u32)
+                    .height(size.height.0 as u32),
+            ),
+        )?;
+        xcb_flush(&self.xcb);
+        Ok(())
+    }
+
     pub fn property_notify(&self, event: xproto::PropertyNotifyEvent) -> anyhow::Result<()> {
         let state = self.state.borrow_mut();
         if event.atom == state.atoms._NET_WM_STATE {

@@ -34,7 +34,7 @@ ksni = { version = "0.3", features = ["blocking"] }
 # Certificate passwords and certificates, in the GNOME keyring (Secret Service).
 oo7 = { version = "0.6", default-features = false, features = ["async-std", "native_crypto"] }
 # The real monitors (GPUI's X11 backend reports one screen spanning them all).
-x11rb = { version = "0.14", features = ["randr"] }
+x11rb = { version = "0.14", features = ["randr", "resource_manager"] }
 
 # The notification area's (Windows) or menu bar's (macOS) icon and its menu.
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]
@@ -64,3 +64,8 @@ craked = { path = "../craked" }
 tempfile = "3"
 # Headless windows and simulated clicks for the window tests.
 gpui-kit = { version = "0.7", features = ["test-support"] }
+
+# A real window on a real X server (scripts/x11-test.sh); its own main.
+[[test]]
+name = "x11_scale"
+harness = false

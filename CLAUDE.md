@@ -171,7 +171,11 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
   to it: upward from a bottom bar (the user runs Dash to Panel), downward from
   a top bar, within that monitor. It closes on focus loss. Placement needs a
   small patch to GPUI's X11 backend, vendored in `vendor/gpui-pre-linux`
-  (see its `CRAKE-PATCH.md`). Kept current (requested, 2026-10-12: no
+  (see its `CRAKE-PATCH.md`; it also makes GPUI follow Xft.dpi while
+  running, found 2026-10-14: a laptop at 100% docked to a HiDPI monitor
+  opened every window at half size; `scripts/x11-test.sh` proves it on
+  Xvfb). Crake's own XRandR monitors are divided by that scale
+  (`sys::monitors`): the tray's click comes in logical pixels. Kept current (requested, 2026-10-12: no
   stale dependencies): the patch is `vendor/gpui-pre-linux.patch`,
   `scripts/update-gpui.sh` re-applies it to the newest gpui-kit's GPUI
   (and drops the vendored copy once upstream has the change), the weekly

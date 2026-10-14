@@ -62,8 +62,9 @@ jobs:
       # real ocserv; containers without a network). They had a job of their
       # own, which spent ~11 of its 15 minutes building what this one had
       # just built (a -p build unifies dependencies' features differently).
-      - name: Tests, the coverage floors, the namespace and e2e tests
-        run: scripts/check-coverage.sh scripts/netns-test.sh scripts/e2e-test.sh
+      # The X11 test: a real GPUI window on Xvfb, following a scale change.
+      - name: Tests, the coverage floors, the namespace, e2e and X11 tests
+        run: scripts/check-coverage.sh scripts/netns-test.sh scripts/e2e-test.sh scripts/x11-test.sh
 
   windows:
     runs-on: ubuntu-24.04
