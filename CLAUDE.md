@@ -700,6 +700,16 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   (2026-10-14). Linux and macOS leave a domain another program serves to
   it (`served_elsewhere`); Windows returns nothing yet. To do: read other
   clients' NRPT rules and adapters' DNS suffixes there.
+- **macOS background items say "ONDŘEJ ŠIMON", not "Crake" (2026-10-14).**
+  A launchd plist a package installs in /Library/LaunchDaemons is listed
+  under its signing certificate's name (Docker Inc, Google LLC show the
+  same); `AssociatedBundleIdentifiers` brought Crake's icon, not its name.
+  Apps listed by their own name (Cisco AnyConnect) register their service
+  from inside the app with `SMAppService` (plist in
+  Crake.app/Contents/Library/LaunchDaemons, the user approves once). The
+  same API would fix "Start at login" on macOS (Releases' known gap). A
+  change to how Crake installs on a Mac (postinstall, uninstaller, the
+  upgrade handover, the CI Mac checks), not a quick fix.
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with
