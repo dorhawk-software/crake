@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: approving Crake's service on a Mac</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4;
+    --accent: #2DD4BF; --accent-ink: #0B1514; --track: #4A4E53; --danger: #F97066; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --ink: #1A1C1E; --muted: #5A5F64;
+    --accent: #0F766E; --accent-ink: #FFFFFF; --track: #BDBDB8; --danger: #B42318; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 40px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 980px; margin-bottom: 18px; }
+  .intro b { color: var(--ink); }
+  .cols { display: flex; gap: 36px; flex-wrap: wrap; align-items: flex-start; }
+  .cap { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 452px; min-height: 54px; }
+  .panel { width: 452px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  .head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; }
+  .head .t { font-weight: 700; font-size: 16px; }
+  .head .s { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--track); }
+  .block { padding: 20px 18px 22px; border-top: 1px solid var(--line); }
+  .block .t { font-size: 15px; font-weight: 600; }
+  .block .d { margin-top: 4px; font-size: 13px; color: var(--muted); }
+  .btn { margin-top: 14px; display: inline-block; padding: 8px 14px; border-radius: 6px; background: var(--accent); color: var(--accent-ink);
+    font-weight: 600; font-size: 13px; }
+  .foot { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
+  .foot div { flex: 1; text-align: center; padding: 9px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; font-weight: 600; }
+  .dialog { width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px; }
+  .dialog h2 { margin: 0 0 6px; font-size: 19px; }
+  .dialog p { margin: 0 0 10px; color: var(--muted); font-size: 13.5px; }
+  .row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+  .ghost { padding: 8px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+  .note { font-size: 12px; color: var(--muted); margin-top: 26px; max-width: 980px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>Approving Crake's service on a Mac.</b> With craked registered by the app itself (SMAppService),
+    System Settings lists it as Crake, not under the signing certificate's name. macOS then asks the user to switch it on
+    once, in System Settings → General → Login Items &amp; Extensions; until then nothing is routed. Crake has to say so,
+    and take the user there. The same words show if the user switches the service off later.</div>
+  <div class="cols">
+    <div>
+      <div class="cap">A. In the panel (chosen)</div>
+      <div class="sub">Where "Crake's service isn't running." is today: the reason it isn't, and a button that opens the
+        right page of System Settings. Nothing pops up; the panel shows it each time it's opened until it's done.</div>
+      <div class="panel">
+        <div class="head"><span class="t">Crake</span><span class="s"><span class="dot"></span>Not running</span></div>
+        <div class="block">
+          <div class="t">Crake's service needs your OK.</div>
+          <div class="d">macOS asks once: switch Crake on in System Settings, under Login Items &amp; Extensions. Nothing is
+            routed until then.</div>
+          <div class="btn">Open Login Items</div>
+        </div>
+        <div class="foot"><div>Full log</div><div>Copy for helpdesk</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">B. A window when Crake starts</div>
+      <div class="sub">Comes up by itself the first time (and after an upgrade from an older Crake), so it can't be
+        missed; the panel then says it as in A.</div>
+      <div class="dialog">
+        <h2>Switch on Crake's service</h2>
+        <p>Crake routes through a small service that runs in the background. macOS asks you to switch it on once, in
+          System Settings, under Login Items &amp; Extensions.</p>
+        <p>Nothing is routed until then.</p>
+        <div class="row"><span class="ghost">Later</span><span class="btn" style="margin-top:0">Open Login Items</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="note">Switched off later in System Settings: the same block, with "Crake's service is switched off." as its
+    title. "Start at login" moves to the same mechanism, so it too shows as Crake there.</div>
+</div>
+<script>if (location.search.includes('dark=false')) document.body.classList.add('light');</script>
+</body>
+</html>
