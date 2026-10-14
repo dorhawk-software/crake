@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.7.0 (2026-10-14)
+
 - **Crake says when it was updated and needs a restart:** after a package update the panel says
   "Crake was updated to X. Restart it to finish.", and Restart does it with your tunnels kept up.
 - **Crake tells you when a new version is out,** where nothing else updates it (a Mac without
