@@ -4,6 +4,8 @@
 //! System Settings lists it under Crake, and macOS has the user switch it
 //! on once there (`crate::service`, the panel's "needs your OK").
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use objc2::rc::Retained;
 use objc2_foundation::NSString;
 use objc2_service_management::{SMAppService, SMAppServiceStatus};
@@ -12,6 +14,9 @@ use objc2_service_management::{SMAppService, SMAppServiceStatus};
 /// record, and SMAppService answered for it ("enabled"), registering
 /// nothing.
 const DAEMON: &str = "software.dorhawk.crake.daemon.plist";
+
+/// Registered once this run already (or tried).
+static REGISTERED: AtomicBool = AtomicBool::new(false);
 
 fn daemon() -> Retained<SMAppService> {
     // SAFETY: a constructor taking a valid string.
@@ -26,7 +31,13 @@ pub fn on() -> Option<bool> {
     let service = daemon();
     // SAFETY: plain calls on a valid service object.
     let mut status = unsafe { service.status() };
-    if status == SMAppServiceStatus::NotRegistered {
+    // Never registered reads "not found" as well as "not registered" (CI's
+    // Mac said NotFound while the launchd file was in the app): either way
+    // it's registered, once a run; still not found then, it isn't there (a
+    // development build outside Crake.app).
+    let settled =
+        status == SMAppServiceStatus::Enabled || status == SMAppServiceStatus::RequiresApproval;
+    if !settled && !REGISTERED.swap(true, Ordering::Relaxed) {
         // "Operation not permitted" until the user switches it on; the
         // status says what's needed either way.
         // SAFETY: as above.

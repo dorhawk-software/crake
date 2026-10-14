@@ -732,11 +732,9 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
 - **Untried on real systems:** the macOS panel under the menu bar (also
   noted there), importing a real .ovpn file, KDE, native Wayland
   (`CRAKE_WAYLAND=1`), and every Beta protocol (only AnyConnect and
-  OpenVPN 3 have met a real gateway).
-- **macOS background items: "linked to Crake.app: no"** in the release's
-  Mac job; the only run that linked had installed and removed 0.3.0 first.
-  Hypothesis, unconfirmed: macOS links when it updates an existing record.
-  The colleague's upgrade to 0.5.0 will tell.
+  OpenVPN 3 have met a real gateway). The user's KDE and other Linux
+  desktop VMs were removed for disk space (2026-10-14); KDE needs a VM
+  made again (`~/.cache/crake-vms/make-vm.sh`) or a real machine.
 - **Performance: never measured.** Believed negligible (NFQUEUE holds
   only DNS answers and racing SYNs); measure before claiming numbers.
 - **The explainers** (docs/explainers.md): written down, not yet drawn or
