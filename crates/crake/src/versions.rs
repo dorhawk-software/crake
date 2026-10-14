@@ -154,8 +154,9 @@ mod tests {
         let none = |_: &str| false;
         let exe = Path::new("/usr/bin/crake");
         assert!(!updated_elsewhere(exe, none), "a .deb from a file");
+        // dorhawk.software's apt repository updates Linux installs only.
         let apt = |p: &str| p == "/etc/apt/sources.list.d/dorhawk.sources";
-        assert!(updated_elsewhere(exe, apt));
+        assert_eq!(updated_elsewhere(exe, apt), cfg!(target_os = "linux"));
         let nix = Path::new("/nix/store/abc-crake-0.6.1/bin/crake");
         assert!(updated_elsewhere(nix, none));
         let mac = Path::new("/Applications/Crake.app/Contents/MacOS/crake");
