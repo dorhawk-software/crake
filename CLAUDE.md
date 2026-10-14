@@ -657,6 +657,16 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   do with the user: connect, quit Crake, watch the session. If confirmed,
   decide what quitting means for OpenVPN 3 tunnels (say so before quitting,
   or keep the session alive another way).
+- **Two sign-in tabs, and sessions stopped before sign-in (2026-10-14).**
+  Signing in to an OpenVPN 3 web sign-in profile often opens two browser
+  tabs; probably Crake and openvpn3-indicator each opening the same
+  session's page (7g). One morning four sessions in a row were stopped
+  5 to 50 s after starting, before the sign-in finished, so the browser
+  said "login success" with no session left to take it; the logs don't
+  say who stopped them. To do with the user: watch one sign-in live
+  (sessions, their sign-in pages, who calls Disconnect), and try once
+  with openvpn3-indicator quit. If the indicator opens the page too,
+  Crake could leave it to the indicator while it runs.
 - **openvpn3 left a stopped session behind (2026-10-14, v27.1).** After
   "Stopping VPN client" its backend (openvpn3-service-client) kept running
   with its tun device and a second copy of the profile's routes in the
