@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.6.0 (2026-10-14)
+
 - **Crake keeps its size when a monitor with another scale is plugged in.** On Linux, a laptop
   at 100% that got a HiDPI monitor showed Crake's windows at half size until Crake was started
   again, and the panel opened away from the tray icon. Crake now follows the desktop's scale as
