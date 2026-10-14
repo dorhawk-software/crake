@@ -705,6 +705,12 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   Crake.app, and an upgrade's restart of a registered craked
   (`launchctl kickstart -k`, the tunnels handed over) are tried on a real
   Mac only: the colleague's, first with 0.7.
+- **NixOS CI rebuilds its dependencies when any dependency changes
+  (~45 min),** even one only macOS or Windows builds (2026-10-14: the
+  SMAppService bindings): Cargo.lock is the dependency builds' input.
+  Giving them a Cargo.lock trimmed to the crates Linux builds would spare
+  those runs; fiddly (which crates are platform-only), so left while it's
+  about one slow run a week (Dependabot's).
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with
