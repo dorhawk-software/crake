@@ -27,9 +27,14 @@ pub fn on() -> Option<bool> {
         // "Operation not permitted" until the user switches it on; the
         // status says what's needed either way.
         // SAFETY: as above.
-        let _ = unsafe { service.registerAndReturnError() };
+        let registered = unsafe { service.registerAndReturnError() };
         // SAFETY: as above.
         status = unsafe { service.status() };
+        crate::debug(&format!(
+            "craked registered with SMAppService: {registered:?}, now {status:?}"
+        ));
+    } else {
+        crate::debug(&format!("craked's SMAppService status: {status:?}"));
     }
     if status == SMAppServiceStatus::Enabled {
         Some(true)

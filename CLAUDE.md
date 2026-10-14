@@ -341,7 +341,10 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    direct) with a tick per host learned today; Learned / Pinned / From the
    gateway (its DNS servers and pushed networks) from D-Bus `HostDetails`
    (when and how each host was learned, `learned_how` in the host store;
-   last used from the refreshed timeout); Pin/Unpin/Forget; "Add a host"
+   last used from the refreshed timeout); Pin/Unpin/Forget; "Forget all…"
+   (requested 2026-10-14; design/proposals/forget-all.html) on the Learned
+   tab empties what was learned and sent direct with Undo, asked in place
+   first, pinned hosts kept (D-Bus `ForgetLearned`); "Add a host"
    takes an address, a network (pinned) or a name (asked of the tunnel's
    DNS, `add_name`). Refreshed every 5 s while open.
    Why a tunnel stopped (design/proposals/trouble-reason.html, option A,
@@ -711,6 +714,12 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   Giving them a Cargo.lock trimmed to the crates Linux builds would spare
   those runs; fiddly (which crates are platform-only), so left while it's
   about one slow run a week (Dependabot's).
+- **Telling the user to restart Crake after an update (2026-10-14).**
+  Packages restart craked (it hands its tunnels over) but not the app,
+  which keeps running the old version until it's restarted, as is usual
+  for desktop apps. Crake could notice craked is newer than itself and say
+  "Crake was updated. Restart it to finish." in the panel, with a button,
+  as Firefox and Chrome do. Offered, not decided.
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with

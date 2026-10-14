@@ -33,6 +33,7 @@ pub enum Command {
     Pin(String, Vec<String>),
     Unpin(String, String),
     Forget(String, String),
+    ForgetLearned(String),
     /// Tunnel detail: its hosts and its traffic today.
     Hosts(String),
     TunnelTraffic(String),
@@ -415,6 +416,7 @@ async fn session(
                     }
                     Command::Unpin(t, x) => api.call::<_, String>("Unpin", &(t, x)).await.map(drop),
                     Command::Forget(t, x) => api.call::<_, String>("Forget", &(t, x)).await.map(drop),
+                    Command::ForgetLearned(t) => api.call::<_, String>("ForgetLearned", &(t,)).await.map(drop),
                     Command::Hosts(t) => match api.call::<_, Vec<HashMap<String, String>>>("HostDetails", &(t.clone(),)).await {
                         Ok(rows) => {
                             if !send(Update::Hosts(t, rows)).await { return Ok(()); }

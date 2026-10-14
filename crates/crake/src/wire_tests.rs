@@ -161,6 +161,23 @@ async fn the_app_and_craked_work_together_over_dbus() {
     assert_eq!(row.kind, "learned");
     assert_eq!(row.learned.as_ref().map(|l| l.1.as_str()), Some("you"));
 
+    // Tunnel detail's "Forget all…": what was learned goes, and the list
+    // comes back without it.
+    app.send(Command::ForgetLearned("initech".into()));
+    app.until("forgotten in the log", |m| {
+        m.log
+            .iter()
+            .any(|e| e.message == "Forgot the 1 host Crake learned for Initech.")
+    })
+    .await;
+    app.send(Command::Hosts("initech".into()));
+    app.until("an empty host list", |m| {
+        m.host_rows
+            .get("initech")
+            .is_some_and(|rows| rows.iter().all(|r| r.target != "10.81.1.4"))
+    })
+    .await;
+
     // A setting changed in Settings comes back changed.
     app.send(Command::SetSetting("probe_wait_secs".into(), "2".into()));
     app.until("the new wait", |m| m.setting("probe_wait_secs") == "2")

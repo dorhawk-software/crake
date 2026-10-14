@@ -127,6 +127,23 @@ fn a_hosts_pin_and_forget(cx: &mut TestAppContext) {
     assert!(matches!(w.changed(), Request::Unpin(t, h) if t == "acme" && h == pinned[0].target));
 }
 
+/// "Forget all…" (design/proposals/forget-all.html): asked in place first;
+/// Cancel asks the app nothing, Forget all asks it to forget everything
+/// learned for the tunnel, and the list is fetched again at once.
+#[gpui_kit::test]
+fn forget_all_asks_first(cx: &mut TestAppContext) {
+    let w = open(cx);
+    w.click("forget-all", cx);
+    assert!(w.view.read_with(cx, |d, _| d.confirm_forget_all));
+    w.click("forget-all-cancel", cx);
+    assert!(!w.view.read_with(cx, |d, _| d.confirm_forget_all));
+    assert!(w.next().is_none(), "Cancel asks nothing");
+    w.click("forget-all", cx);
+    w.click("forget-all-confirm", cx);
+    assert!(matches!(w.changed(), Request::ForgetLearned(t) if t == "acme"));
+    assert!(!w.view.read_with(cx, |d, _| d.confirm_forget_all));
+}
+
 /// "Add a host": a name or an address goes through, a network is pinned.
 #[gpui_kit::test]
 fn add_a_host(cx: &mut TestAppContext) {

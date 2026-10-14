@@ -176,6 +176,8 @@ pub enum Request {
     Detail(String),
     Unpin(String, String),
     Forget(String, String),
+    /// Forget everything learned for a tunnel (tunnel detail's "Forget all…").
+    ForgetLearned(String),
     /// macOS: System Settings' Login Items & Extensions, where Crake's
     /// service is switched on (`service`).
     OpenServiceSettings,

@@ -11,6 +11,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Forget all in a tunnel's detail.** One button empties what Crake learned for a tunnel, and
+  what you sent direct with Undo, so it learns again from scratch as you use things. It asks first;
+  pinned hosts stay.
+
 - **On a Mac, System Settings lists Crake by its name.** Its service and "Start when you log in"
   are now registered by Crake itself, so Login Items & Extensions shows them as Crake, not under
   the name on its developer certificate. macOS asks you to switch the service on once: Crake opens

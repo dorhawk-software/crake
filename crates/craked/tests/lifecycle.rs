@@ -473,6 +473,30 @@ async fn a_refused_openvpn3_session_says_why() {
     assert!(!log.contains("Switched GitLab off."), "{log}");
 }
 
+/// Tunnel detail's "Forget all…": everything Crake learned for a tunnel
+/// goes, and what was sent direct with Undo, so it learns from scratch as
+/// hosts are used. Pinned hosts stay: the user put them there.
+#[tokio::test]
+async fn forgetting_all_a_tunnel_learned_keeps_what_was_pinned() {
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(dir.path(), FAKE);
+    let mgr = Manager::new(cfg).unwrap();
+    mgr.add_host("acme", "10.40.0.5").await.unwrap();
+    mgr.add_host("acme", "10.40.0.6").await.unwrap();
+    mgr.pin("acme", "10.40.0.7").await.unwrap();
+    mgr.undo("acme", &["10.40.0.6"]).await.unwrap();
+    let said = mgr.forget_learned("acme").await.unwrap();
+    assert_eq!(said, "Forgot the 1 host Crake learned for ACME.");
+    let rows = mgr.hosts("acme").await.unwrap();
+    let left: Vec<String> = rows.iter().map(|r| r.target.to_string()).collect();
+    assert_eq!(left, ["10.40.0.7"], "only what was pinned");
+    assert!(rows.iter().all(|r| r.pinned && !r.direct), "{left:?}");
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(log.contains(&said), "{log}");
+    // Nothing learned and nothing sent direct: nothing to forget.
+    assert!(mgr.forget_learned("acme").await.is_err());
+}
+
 /// Two tunnels that share a DNS server can't both work: the second is
 /// refused with a sentence saying which to switch off, and craked warns
 /// before it's switched on again, until the first is off.

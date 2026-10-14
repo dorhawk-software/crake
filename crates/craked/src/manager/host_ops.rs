@@ -442,6 +442,63 @@ impl Manager {
         Ok(msg)
     }
 
+    /// Tunnel detail's "Forget all…": everything learned for the tunnel
+    /// goes, and what was sent direct with Undo, so Crake learns from
+    /// scratch as hosts are used. Pinned hosts stay.
+    pub async fn forget_learned(&self, name: &str) -> Result<String> {
+        let _ops = self.ops.lock().await;
+        let (label, _) = self.prepare(name)?;
+        let (learned, direct) = {
+            let mut store = self.hosts.lock().unwrap();
+            let th = store.tunnel(name);
+            let pinned: Vec<IpAddr> = th
+                .pinned
+                .iter()
+                .filter(|p| p.is_host())
+                .map(|p| p.addr())
+                .collect();
+            let learned: Vec<IpAddr> = std::mem::take(&mut th.learned).into_keys().collect();
+            let direct: Vec<IpAddr> = std::mem::take(&mut th.direct).into_iter().collect();
+            for a in learned.iter().chain(&direct) {
+                if !pinned.contains(a) {
+                    th.names.remove(a);
+                    th.learned_how.remove(a);
+                }
+            }
+            store.save();
+            (learned, direct)
+        };
+        if learned.is_empty() && direct.is_empty() {
+            bail!("Crake hasn't learned anything for {label}.");
+        }
+        if self.is_routed(name) {
+            for a in &learned {
+                self.routing.remove_learned(name, *a).await?;
+            }
+        }
+        // As forgetting one does: the next visit is a first one, probed
+        // and looked up afresh, on new connections.
+        self.probed
+            .lock()
+            .unwrap()
+            .retain(|a, _| !learned.contains(a) && !direct.contains(a));
+        self.resolved.flush().await;
+        for a in &learned {
+            crate::conntrack::close_to(Target::host(*a)).await;
+        }
+        let n = learned.len();
+        let msg = format!(
+            "Forgot the {n} host{} Crake learned for {label}.",
+            if n == 1 { "" } else { "s" }
+        );
+        self.log.system(
+            Some(name),
+            msg.clone(),
+            Some("You asked for it. Crake learns them again as they're used.".into()),
+        );
+        Ok(msg)
+    }
+
     /// Pinned first, then learned hosts with time left.
     pub async fn hosts(&self, name: &str) -> Result<Vec<HostRow>> {
         let _ops = self.ops.lock().await;

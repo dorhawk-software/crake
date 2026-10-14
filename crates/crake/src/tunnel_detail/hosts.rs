@@ -77,6 +77,8 @@ impl TunnelDetail {
             );
         }
 
+        let (bar, confirm) = self.forget_all(bar, rows, &display, t, cx);
+
         let shown: Vec<AnyElement> = match self.tab {
             Tab::Learned => learned
                 .iter()
@@ -141,6 +143,7 @@ impl TunnelDetail {
             .pt(px(22.))
             .px(px(28.))
             .child(bar)
+            .children(confirm)
             .children(shown)
             .when(empty, |d| {
                 d.child(
@@ -301,6 +304,124 @@ pub(super) fn used_text(used: String, t: &Theme) -> impl IntoElement {
         .text_size(px(13.))
         .text_color(t.muted)
         .child(used)
+}
+
+impl TunnelDetail {
+    /// "Forget all…" (design/proposals/forget-all.html): on the Learned
+    /// tab, when something was learned or sent direct with Undo; asked in
+    /// place first. The tab row with the button, and the question if asked.
+    fn forget_all(
+        &mut self,
+        bar: Div,
+        rows: &[HostRow],
+        display: &str,
+        t: &Theme,
+        cx: &mut Context<Self>,
+    ) -> (Div, Option<AnyElement>) {
+        let forgettable = rows.iter().filter(|r| r.kind == "learned").count();
+        let undone = rows.iter().filter(|r| r.kind == "direct").count();
+        let can = self.tab == Tab::Learned && forgettable + undone > 0;
+        if !can {
+            self.confirm_forget_all = false;
+        }
+        let bar = bar.items_center().when(can, |b| {
+            b.child(div().flex_1()).child(
+                row_button("forget-all", "Forget all\u{2026}", t)
+                    .h(px(30.))
+                    .text_size(px(13.))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.confirm_forget_all = true;
+                        cx.notify();
+                    }))
+                    .test_support(),
+            )
+        });
+        let confirm = self
+            .confirm_forget_all
+            .then(|| self.forget_all_confirm(display, forgettable, undone, t, cx));
+        (bar, confirm)
+    }
+
+    /// "Forget the 4 hosts Crake learned for ACME?", asked in place, with
+    /// Cancel and Forget all.
+    fn forget_all_confirm(
+        &self,
+        display: &str,
+        learned: usize,
+        undone: usize,
+        t: &Theme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let hosts = if learned == 1 { "host" } else { "hosts" };
+        let mut detail =
+            "They go direct again, and Crake learns them anew as you use them.".to_owned();
+        if undone > 0 {
+            detail += &format!(" The {undone} you sent direct with Undo may be learned again.");
+        }
+        detail += " Pinned hosts stay.";
+        div()
+            .mt(px(10.))
+            .mb(px(4.))
+            .px(px(14.))
+            .py(px(12.))
+            .rounded(px(8.))
+            .bg(t.surface)
+            .child(div().font_weight(FontWeight::SEMIBOLD).child(format!(
+                "Forget the {learned} {hosts} Crake learned for {display}?"
+            )))
+            .child(
+                div()
+                    .mt(px(2.))
+                    .text_size(px(13.))
+                    .text_color(t.muted)
+                    .child(detail),
+            )
+            .child(
+                div()
+                    .mt(px(10.))
+                    .flex()
+                    .justify_end()
+                    .gap(px(10.))
+                    .child(
+                        div()
+                            .id("forget-all-cancel")
+                            .h(px(32.))
+                            .px(px(12.))
+                            .flex()
+                            .items_center()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .cursor_pointer()
+                            .child("Cancel")
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.confirm_forget_all = false;
+                                cx.notify();
+                            }))
+                            .test_support(),
+                    )
+                    .child(
+                        div()
+                            .id("forget-all-confirm")
+                            .h(px(32.))
+                            .px(px(12.))
+                            .flex()
+                            .items_center()
+                            .border_1()
+                            .border_color(t.danger)
+                            .rounded(px(6.))
+                            .text_color(t.danger)
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .cursor_pointer()
+                            .child("Forget all")
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.confirm_forget_all = false;
+                                this.send(Request::ForgetLearned(this.tunnel.clone()));
+                                cx.notify();
+                            }))
+                            .test_support(),
+                    ),
+            )
+            .into_any_element()
+    }
 }
 
 pub(super) fn row_button(

@@ -206,6 +206,7 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
         }
         Request::Unpin(t, x) => send(Command::Unpin(t, x)),
         Request::Forget(t, x) => send(Command::Forget(t, x)),
+        Request::ForgetLearned(t) => send(Command::ForgetLearned(t)),
         Request::Attach(t, path, fields, control) => {
             let shell = cx.global_mut::<Shell>();
             // One session per tunnel: a newer one (openvpn3's indicator

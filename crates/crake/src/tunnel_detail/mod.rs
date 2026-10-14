@@ -55,6 +55,8 @@ pub struct TunnelDetail {
     focus: FocusHandle,
     /// Where the pointer is on the chart (`crate::timeline`).
     chart_hover: crate::timeline::Hover,
+    /// "Forget all…" asked, waiting for Cancel or Forget all.
+    confirm_forget_all: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -312,6 +314,7 @@ impl TunnelDetail {
             max_height,
             focus: cx.focus_handle(),
             chart_hover: crate::timeline::Hover::default(),
+            confirm_forget_all: false,
             _subscriptions: subscriptions,
         }
     }

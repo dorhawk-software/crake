@@ -83,7 +83,7 @@ sh "$(dirname "$0")/macos-front-test.sh" || fail "Settings opened behind"
 # registers craked, and macOS's record of it names the launchd file in
 # Crake.app (System Settings lists it under Crake).
 pkill -x crake 2>/dev/null || true
-open -g "$APP"
+CRAKE_DEBUG=1 "$APP/Contents/MacOS/crake" >/tmp/crake-app.log 2>&1 &
 registered=no
 for _ in $(seq 30); do
     if sudo sfltool dumpbtm 2>/dev/null | grep -q "Crake.app/Contents/Library/LaunchDaemons/$LABEL.plist"; then
@@ -95,7 +95,11 @@ done
 pkill -x crake 2>/dev/null || true
 echo "macOS's records of Crake's items:"
 sudo sfltool dumpbtm 2>/dev/null | grep -B4 -A14 -i "dorhawk\|Crake.app" || true
-[ "$registered" = yes ] || fail "Crake didn't register its service from inside the app"
+if [ "$registered" != yes ]; then
+    echo "Crake's own output:"
+    grep -i "smappservice\|craked" /tmp/crake-app.log | tail -20
+    fail "Crake didn't register its service from inside the app"
+fi
 # craked from inside the app serves the app's socket (launchd starts it
 # there once the user switches it on; here it's started by hand).
 sudo "$APP/Contents/MacOS/craked" 2>/tmp/craked-test.log &

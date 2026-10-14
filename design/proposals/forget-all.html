@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: forget everything a tunnel learned</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --ink: #1A1C1E; --muted: #5A5F64;
+    --accent: #0F766E; --accent-ink: #FFFFFF; --danger: #B42318; }
+  body.dark { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4;
+    --accent: #2DD4BF; --accent-ink: #0B1514; --danger: #F97066; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 40px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 980px; margin-bottom: 18px; }
+  .intro b { color: var(--ink); }
+  .cols { display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-start; }
+  .cap { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 560px; min-height: 36px; }
+  .win { width: 560px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 22px 18px; }
+  .tabs { display: flex; align-items: flex-end; gap: 22px; border-bottom: 1px solid var(--line); }
+  .tab { padding: 0 0 8px; font-weight: 600; color: var(--muted); font-size: 13.5px; }
+  .tab.on { color: var(--ink); border-bottom: 2px solid var(--accent); }
+  .tab i { font-style: normal; font-family: 'Atkinson Hyperlegible Mono', monospace; font-size: 11px; margin-left: 4px; }
+  .grow { flex: 1; }
+  .ghost { margin-bottom: 6px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 12.5px; font-weight: 600;
+    display: inline-flex; gap: 6px; align-items: center; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .row .h { font-family: 'Atkinson Hyperlegible Mono', monospace; font-size: 13px; }
+  .row .w { color: var(--muted); font-size: 12px; }
+  .row .t { margin-left: auto; color: var(--muted); font-size: 12px; width: 70px; }
+  .b { padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 12.5px; font-weight: 600; }
+  .tick { width: 14px; }
+  .confirm { margin: 10px 0 4px; padding: 12px 14px; background: var(--surface); border-radius: 8px; }
+  .confirm .q { font-weight: 600; }
+  .confirm .d { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .confirm .r { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+  .danger { padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; border: 1px solid var(--danger); color: var(--danger); }
+  .plain { padding: 6px 12px; font-size: 13px; font-weight: 600; }
+  .note { font-size: 12px; color: var(--muted); margin-top: 22px; max-width: 980px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>Forget everything a tunnel learned.</b> Tunnel detail, Learned tab: one button that empties what
+    Crake learned for this tunnel, so it learns again from scratch as the hosts are used. Pinned hosts stay (the user put
+    them there). Hosts the user sent direct with Undo may be learned again. It can't be undone, so it asks first, in place,
+    as Remove… in Settings does.</div>
+  <div class="cols">
+    <div>
+      <div class="cap">The button, on the Learned tab</div>
+      <div class="sub">Right of the tabs, only on Learned, and only when there's something learned.</div>
+      <div class="win">
+        <div class="tabs"><span class="tab on">Learned<i>5</i></span><span class="tab">Pinned<i>1</i></span>
+          <span class="tab">From the gateway<i>2</i></span><span class="grow"></span><span class="ghost">Forget all…</span></div>
+        <div class="row"><svg class="tick" viewBox="0 0 14 14"><path d="M4 12V3M10 12V6" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/></svg>
+          <div><div class="h">git.acme.internal</div><div class="w">Learned at 11:23 · no answer directly</div></div>
+          <span class="t">Used now</span><span class="b">Pin</span><span class="b">Forget</span></div>
+        <div class="row"><svg class="tick" viewBox="0 0 14 14"><path d="M4 12V3M10 12V6" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/></svg>
+          <div><div class="h">10.62.0.18</div><div class="w">Learned at 08:49 · no answer directly</div></div>
+          <span class="t">12 min ago</span><span class="b">Pin</span><span class="b">Forget</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">Asked, in place</div>
+      <div class="sub">Under the tabs, above the list; Cancel puts the list back as it was.</div>
+      <div class="win">
+        <div class="tabs"><span class="tab on">Learned<i>5</i></span><span class="tab">Pinned<i>1</i></span>
+          <span class="tab">From the gateway<i>2</i></span><span class="grow"></span><span class="ghost">Forget all…</span></div>
+        <div class="confirm">
+          <div class="q">Forget the 4 hosts Crake learned for ACME?</div>
+          <div class="d">They go direct again, and Crake learns them anew as you use them. The 1 you sent direct with Undo
+            may be learned again. Pinned hosts stay.</div>
+          <div class="r"><span class="plain">Cancel</span><span class="danger">Forget all</span></div>
+        </div>
+        <div class="row"><svg class="tick" viewBox="0 0 14 14"><path d="M4 12V3M10 12V6" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/></svg>
+          <div><div class="h">git.acme.internal</div><div class="w">Learned at 11:23 · no answer directly</div></div>
+          <span class="t">Used now</span><span class="b">Pin</span><span class="b">Forget</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="note">Afterwards the log says "Forgot the 4 hosts Crake learned for ACME." (with "You asked for it."), the
+    tunnel's chart keeps today's ticks, and the list fills again as hosts are learned. A managed tunnel works the same: its
+    scope still decides what may be learned.</div>
+</div>
+<script>if (location.search.includes('dark=true')) document.body.classList.add('dark');</script>
+</body>
+</html>

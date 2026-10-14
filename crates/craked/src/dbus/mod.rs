@@ -145,6 +145,18 @@ impl Service {
         self.mgr.forget(tunnel, target).await.map_err(failed)
     }
 
+    /// Forget everything learned for the tunnel, and what was sent direct
+    /// with Undo (tunnel detail's "Forget all…"); pinned hosts stay.
+    async fn forget_learned(
+        &self,
+        tunnel: &str,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+    ) -> fdo::Result<String> {
+        self.authorize(&hdr, conn).await?;
+        self.mgr.forget_learned(tunnel).await.map_err(failed)
+    }
+
     /// Send learned hosts direct (one decision), and keep them direct until redone.
     async fn undo(
         &self,
