@@ -21,6 +21,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
   profile: its text opens in a window, certificates and keys folded away and kept as they are.
   "Save and reconnect" gives OpenVPN 3 the new text and reconnects the tunnel; if OpenVPN 3
   refuses it, it says why and nothing changes. For people who tune their own profiles.
+- **"Is it safe?"** Settings → About answers it in four lines: nothing leaves your computer, what
+  happens if Crake stops, what your company sees, and who can change what.
 - **Whole names.** A long host name cut short with "…" in a tunnel's details or the Traffic window
   shows whole when you point at it, and a click copies it.
 - **Dismiss a stopped tunnel.** A tunnel that stopped on its own has a Dismiss button next to why in

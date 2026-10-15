@@ -847,10 +847,11 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
      pinned, never, direct by Undo, everything else), the "tree" they'd
      otherwise keep in a config file (that proposal's "Where things go"
      table: built with it).
-  3. *"How is it secured, can it break my traffic?"*: answered in chat
-     (nothing leaves the computer, there's no server); belongs in the
-     explainers below, with what happens when craked stops (its routes
-     and rules go, traffic goes direct as without Crake).
+  3. *"How is it secured, can it break my traffic?"*: **built
+     2026-10-15** as "Is it safe?" in Settings → About
+     (design/proposals/how-secure.html, A, chosen by the user; four
+     questions and answers between the links and the coffee); the same
+     words can go on the website with the explainers below.
   4. **The power user feature:** *edit an OpenVPN 3 profile in Crake*:
      **built 2026-10-15** (design/proposals/edit-ovpn-profile.html,
      option A, chosen by the user; `profile_editor/`, `ovpn3/profile.rs`).
