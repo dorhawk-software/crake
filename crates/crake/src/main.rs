@@ -67,6 +67,8 @@ mod theme;
 
 mod full_name;
 
+mod profile_editor;
+
 mod timeline;
 mod tray;
 
@@ -109,8 +111,8 @@ use updates::{on_update, refresh_tray, watch_openvpn3, watch_service, watch_vers
 const RESTART_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
 const RESTART_POLL: std::time::Duration = std::time::Duration::from_millis(100);
 use windows::{
-    open_detail, open_log, open_new_tunnel, open_settings, open_sign_in, open_traffic,
-    panel_blurred, refit_panel, toggle_panel,
+    open_detail, open_log, open_new_tunnel, open_profile_editor, open_settings, open_sign_in,
+    open_traffic, panel_blurred, refit_panel, toggle_panel,
 };
 
 use std::time::Duration;
@@ -193,6 +195,10 @@ pub enum Request {
     ForgetLearned(String),
     /// A tunnel that stopped on its own, seen: Off (the panel's Dismiss).
     DismissTrouble(String),
+    /// Tunnel detail's "Edit…": an OpenVPN 3 tunnel's profile, as text.
+    EditProfile(String),
+    /// Off and on again if it's on (its profile changed).
+    Reconnect(String),
     /// macOS: System Settings' Login Items & Extensions, where Crake's
     /// service is switched on (`service`).
     OpenServiceSettings,
@@ -224,6 +230,8 @@ struct Shell {
     log: Option<AnyWindowHandle>,
     /// The Traffic window, while it's open.
     traffic: Option<AnyWindowHandle>,
+    /// The profile editor, with the tunnel it edits.
+    profile_editor: Option<(String, AnyWindowHandle)>,
     /// The Settings window, while it's open.
     settings: Option<AnyWindowHandle>,
     /// Tunnel detail, while it's open (and for which tunnel).
@@ -406,6 +414,13 @@ fn main() {
             {
                 open_detail(t, cx);
             }
+            // CRAKE_SHOW=profile:<tunnel> (development): its profile editor.
+            if let Some(t) = std::env::var("CRAKE_SHOW")
+                .ok()
+                .and_then(|v| v.strip_prefix("profile:").map(str::to_owned))
+            {
+                open_profile_editor(t, cx);
+            }
             // CRAKE_SHOW=settings[:<section>] (development): open Settings at start.
             if std::env::var("CRAKE_SHOW").is_ok_and(|v| v.starts_with("settings")) {
                 open_settings(cx);
@@ -557,6 +572,7 @@ pub(crate) fn start(cx: &mut App, setup: Setup) -> bool {
         tray,
         log: None,
         traffic: None,
+        profile_editor: None,
         settings: None,
         detail: None,
         autostart_pending: autostart,

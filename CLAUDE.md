@@ -851,16 +851,27 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
      (nothing leaves the computer, there's no server); belongs in the
      explainers below, with what happens when craked stops (its routes
      and rules go, traffic goes direct as without Crake).
-  4. **The power user feature:** *edit an OpenVPN 3 profile in Crake*
-     (not decided): view the imported profile's text, change a value
-     (remote, a route, a dhcp-option, a certificate), save and
-     reconnect, without opening an editor, exporting and importing again
-     ("too many clicks"; quicker debugging of a config). openvpn3 has no
-     in-place edit: Crake would Fetch the text (refused when the profile
-     is `locked_down`), import the edited text and remove the old one
-     under the same name, keeping Crake's tunnel on it, inline
-     certificates and keys kept. A "for experts" place, not in the way
-     of people who just import IT's file.
+  4. **The power user feature:** *edit an OpenVPN 3 profile in Crake*:
+     **built 2026-10-15** (design/proposals/edit-ovpn-profile.html,
+     option A, chosen by the user; `profile_editor/`, `ovpn3/profile.rs`).
+     Tunnel detail's Profile fact has "Edit…" on its label row ("Locked"
+     when openvpn3's `locked_down` hides the text; a long name is cut and
+     shown whole on hover, as the Gateway's). The editor window shows the
+     text as openvpn3's Fetch gives it, line numbers, each inline block
+     folded into a muted line ("<ca> certificate, 31 lines, kept as they
+     are </ca>", put back byte for byte; deleting the line drops the
+     block, changing it is refused before openvpn3 sees anything),
+     changed lines tinted. "Save and reconnect" imports the new text under
+     the same name (persistent as the old one), sets the old one's tags
+     and overrides on it, then removes the old one; openvpn3's refusal is
+     said under the text and nothing changes. A tunnel that's on is
+     switched off and on again (`Request::Reconnect`). GPUI's editor: the
+     folded lines are text, not chips; the tint covers a line's text, not
+     the whole line. Tests: fold/unfold units, window tests with a
+     stand-in for openvpn3, a journey step (its container has no openvpn3:
+     the window says it couldn't read the profile), and
+     `ovpn3::profile::tests` against a real openvpn3 with a throwaway
+     profile of its own (CRAKE_OPENVPN3_TEST=1; not in CI).
 - **The Traffic window's open ends (built 2026-10-14; left for later):**
   - *UDP on Windows, and unconnected UDP on macOS:* Windows' UDP table
     has local endpoints only, so UDP conversations (QUIC, HTTP/3) aren't

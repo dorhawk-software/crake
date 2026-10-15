@@ -58,6 +58,9 @@ pub struct TunnelDetail {
     chart_hover: crate::timeline::Hover,
     /// "Forget all…" asked, waiting for Cancel or Forget all.
     confirm_forget_all: bool,
+    /// An OpenVPN 3 tunnel's profile is locked in openvpn3 (no "Edit…"),
+    /// once known.
+    profile_locked: Option<bool>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -201,7 +204,7 @@ impl Render for TunnelDetail {
             .px(px(28.))
             .child(title_row(&tunnel, &t))
             .child(why(&tunnel, &t))
-            .child(facts(&tunnel, &t))
+            .child(facts(&tunnel, self.profile_locked, &t, cx))
             .child(policy(&tunnel, &t))
             .child(self.chart(&tunnel, marks, &traffic, &t, cx));
 
@@ -304,6 +307,27 @@ impl TunnelDetail {
             }
         })
         .detach();
+        // An OpenVPN 3 profile: whether openvpn3 locked it (then no "Edit…").
+        // Tests never ask this computer's openvpn3.
+        let profile = model
+            .read(cx)
+            .tunnels
+            .iter()
+            .find(|x| x.name == tunnel && x.protocol == "openvpn3")
+            .map(|x| x.gateway.clone());
+        if let Some(profile) = profile.filter(|_| !cfg!(test)) {
+            cx.spawn(async move |this, cx| {
+                let locked = cx
+                    .background_executor()
+                    .spawn(async move { crate::ovpn3::profile::locked(&profile) })
+                    .await;
+                let _ = this.update(cx, |this, cx| {
+                    this.profile_locked = locked;
+                    cx.notify();
+                });
+            })
+            .detach();
+        }
         let max_height = crate::place::max_window_height();
         Self {
             tunnel,
@@ -316,8 +340,14 @@ impl TunnelDetail {
             focus: cx.focus_handle(),
             chart_hover: crate::timeline::Hover::default(),
             confirm_forget_all: false,
+            profile_locked: None,
             _subscriptions: subscriptions,
         }
+    }
+
+    /// Ask the app for something that changes nothing here.
+    fn ask(&self, request: Request) {
+        let _ = self.requests.send_blocking(request);
     }
 
     fn send(&self, request: Request) {

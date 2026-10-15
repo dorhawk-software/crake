@@ -148,6 +148,30 @@ fn a_hosts_whole_name_is_copied(cx: &mut TestAppContext) {
     assert!(w.next().is_none(), "nothing asked of the app");
 }
 
+/// An OpenVPN 3 tunnel's Profile fact has "Edit…", which asks the app for
+/// the profile editor (design/proposals/edit-ovpn-profile.html, A); its
+/// name copies whole.
+#[gpui_kit::test]
+fn an_openvpn3_profile_can_be_edited(cx: &mut TestAppContext) {
+    let w = open(cx);
+    w.model.update(cx, |m, cx| {
+        let acme = m.tunnels.iter_mut().find(|t| t.name == "acme").unwrap();
+        acme.protocol = "openvpn3".into();
+        acme.gateway = "initech-production-eu-west-2-split".into();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    while w.next().is_some() {}
+    w.click("edit-profile", cx);
+    assert!(matches!(w.next(), Some(Request::EditProfile(t)) if t == "acme"));
+    w.click("gateway-name", cx);
+    let copied = cx.read_from_clipboard().and_then(|c| c.text());
+    assert_eq!(
+        copied.as_deref(),
+        Some("initech-production-eu-west-2-split")
+    );
+}
+
 /// "Forget all…" (design/proposals/forget-all.html): asked in place first;
 /// Cancel asks the app nothing, Forget all asks it to forget everything
 /// learned for the tunnel, and the list is fetched again at once.

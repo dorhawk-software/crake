@@ -30,6 +30,7 @@ use crate::Request;
 use crate::signin::{Ask, Event, Prompt, Reply};
 
 mod attached;
+pub mod profile;
 use attached::attached;
 
 const SESSIONS: &str = "net.openvpn.v3.sessions";

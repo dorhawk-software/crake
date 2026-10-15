@@ -17,6 +17,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
   open right now and every rule Crake has. On Windows only TCP connections are listed (Windows
   doesn't say where UDP goes); a connection's bytes count from when the window first looked. It's
   only asked for while the window is open, and stays on this computer like everything Crake sees.
+- **Edit an OpenVPN 3 profile in Crake.** An OpenVPN 3 tunnel's details have "Edit…" next to its
+  profile: its text opens in a window, certificates and keys folded away and kept as they are.
+  "Save and reconnect" gives OpenVPN 3 the new text and reconnects the tunnel; if OpenVPN 3
+  refuses it, it says why and nothing changes. For people who tune their own profiles.
 - **Whole names.** A long host name cut short with "…" in a tunnel's details or the Traffic window
   shows whole when you point at it, and a click copies it.
 - **Dismiss a stopped tunnel.** A tunnel that stopped on its own has a Dismiss button next to why in

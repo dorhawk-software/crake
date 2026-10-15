@@ -203,6 +203,9 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
     // 5b. Traffic, from the panel's footer.
     traffic_window(cx);
 
+    // 5c. The profile editor, from tunnel detail's "Edit…".
+    profile_editor(cx);
+
     // 6. New tunnel: added in craked, listed in the app; Cancel at sign-in.
     request(cx, Request::NewTunnel(None));
     let (n, view) = wait_window::<crate::new_tunnel::NewTunnel>(cx, "New tunnel opens");
@@ -286,6 +289,26 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
         },
     );
     craked.rt.block_on(craked.mgr.shutdown());
+}
+
+/// The profile editor (tunnel detail's "Edit…" on an OpenVPN 3 tunnel):
+/// the window opens and asks openvpn3, which the journey's container
+/// doesn't have, so it says it couldn't read the profile; Close closes it.
+fn profile_editor(cx: &mut TestAppContext) {
+    request(cx, Request::EditProfile("acme".into()));
+    let (e, editor) = wait_window::<crate::profile_editor::ProfileEditor>(cx, "the editor opens");
+    until(cx, "it says why", Duration::from_secs(10), |cx| {
+        editor.read_with(cx, |v, _| {
+            matches!(
+                v.stage_for_tests(),
+                crate::profile_editor::Stage::Unreadable(_)
+            )
+        })
+    });
+    click(cx, e, "close");
+    until(cx, "the editor closed", Duration::from_secs(10), |cx| {
+        window::<crate::profile_editor::ProfileEditor>(cx).is_none()
+    });
 }
 
 /// ACME on again from the panel, then its openconnect dies (a crash):

@@ -162,6 +162,8 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
         Request::Redo(t, hosts) => send(Command::Redo(t, hosts)),
         Request::Log => open_log(cx),
         Request::Traffic => open_traffic(cx),
+        Request::EditProfile(t) => open_profile_editor(t, cx),
+        Request::Reconnect(t) => reconnect(t, cx),
         Request::Live => {
             if cx.global::<Shell>().demo {
                 // No craked: the proposal's sample, moving.
@@ -350,6 +352,48 @@ fn session_ended(sessions: &mut Sessions, tunnel: &str, path: &str) -> bool {
     sessions.remove(tunnel);
     true
 }
+
+/// Off, then on again once craked says it's off: a tunnel whose profile
+/// changed (the profile editor's Save). Left alone when it isn't on.
+fn reconnect(tunnel: String, cx: &mut App) {
+    let model = cx.global::<Shell>().model.clone();
+    let state = |m: &Model| {
+        m.tunnels
+            .iter()
+            .find(|x| x.name == tunnel)
+            .map(|x| x.state.clone())
+            .unwrap_or_default()
+    };
+    if !matches!(state(model.read(cx)).as_str(), "connected" | "connecting") {
+        return;
+    }
+    let requests = cx.global::<Shell>().requests.clone();
+    let _ = requests.send_blocking(Request::Switch(tunnel.clone(), false));
+    cx.spawn(async move |cx| {
+        let end = std::time::Instant::now() + RECONNECT_WAIT;
+        while std::time::Instant::now() < end {
+            cx.background_executor().timer(RECONNECT_POLL).await;
+            let off = model.read_with(cx, |m, _| {
+                matches!(
+                    m.tunnels
+                        .iter()
+                        .find(|x| x.name == tunnel)
+                        .map(|x| x.state.as_str()),
+                    Some("off" | "trouble")
+                )
+            });
+            if off {
+                let _ = requests.send(Request::Switch(tunnel, true)).await;
+                return;
+            }
+        }
+    })
+    .detach();
+}
+
+/// How long a reconnect waits for the tunnel to go off, and how often it looks.
+const RECONNECT_WAIT: std::time::Duration = std::time::Duration::from_secs(20);
+const RECONNECT_POLL: std::time::Duration = std::time::Duration::from_millis(200);
 
 #[cfg(test)]
 mod session_tests {

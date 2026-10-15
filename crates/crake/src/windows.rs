@@ -549,6 +549,85 @@ pub(super) fn open_traffic(cx: &mut App) {
     }
 }
 
+/// The profile editor for `tunnel`'s OpenVPN 3 profile
+/// (design/proposals/edit-ovpn-profile.html): one at a time; asked again
+/// for the same tunnel, the open one comes to the front.
+pub(super) fn open_profile_editor(tunnel: String, cx: &mut App) {
+    to_front(cx);
+    if let Some((open, handle)) = cx.global::<Shell>().profile_editor.clone() {
+        if open == tunnel
+            && handle
+                .update(cx, |_, window, _| window.activate_window())
+                .is_ok()
+        {
+            return;
+        }
+        let _ = handle.update(cx, |_, window, _| window.remove_window());
+    }
+    let shell = cx.global::<Shell>();
+    let requests = shell.requests.clone();
+    let store: std::sync::Arc<dyn profile_editor::Store> = if shell.demo {
+        std::sync::Arc::new(profile_editor::Demo)
+    } else {
+        std::sync::Arc::new(profile_editor::Openvpn3)
+    };
+    let Some(t) = shell
+        .model
+        .read(cx)
+        .tunnels
+        .iter()
+        .find(|x| x.name == tunnel)
+        .cloned()
+    else {
+        return;
+    };
+    let height = place::max_window_height_or(profile_editor::HEIGHT);
+    let bounds = centered(profile_editor::WIDTH, height, cx);
+    let opened = cx.open_window(
+        WindowOptions {
+            window_bounds: Some(WindowBounds::Windowed(bounds)),
+            titlebar: Some(gpui_kit::TitlebarOptions {
+                title: Some(format!("{}\u{2019}s profile", t.display).into()),
+                appears_transparent: true,
+                traffic_light_position: crate::chrome::traffic_lights(),
+            }),
+            window_decorations: Some(WindowDecorations::Client),
+            window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
+            kind: WindowKind::Normal,
+            app_id: Some("crake".into()),
+            is_resizable: true,
+            ..Default::default()
+        },
+        move |window, cx| {
+            crate::sys::plain_frame(window);
+            window.set_client_inset(px(0.));
+            let view = cx.new(|cx| {
+                profile_editor::ProfileEditor::new(
+                    t.name.clone(),
+                    t.display.clone(),
+                    t.gateway.clone(),
+                    store,
+                    requests,
+                    window,
+                    cx,
+                )
+            });
+            let handle = window.window_handle();
+            cx.subscribe(&view, move |_, _: &profile_editor::Close, cx| {
+                let _ = handle.update(cx, |_, window, _| window.remove_window());
+                cx.global_mut::<Shell>().profile_editor = None;
+            })
+            .detach();
+            view
+        },
+    );
+    if let Ok(handle) = opened {
+        let handle: AnyWindowHandle = handle.into();
+        let _ = handle.update(cx, |_, window, _| window.activate_window());
+        cx.global_mut::<Shell>().profile_editor = Some((tunnel, handle));
+    }
+}
+
 /// The sign-in window: a plain transparent window (the card draws its own
 /// rounded frame, as in sign-in.html; gpui-kit's frame is square). A normal
 /// window, opened in front so it's noticed, that goes behind others like

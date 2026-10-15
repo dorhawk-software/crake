@@ -61,7 +61,16 @@ pub(super) fn title_row(tunnel: &Tunnel, t: &Theme) -> impl IntoElement {
 }
 
 /// Connected for, your address, protocol, gateway.
-pub(super) fn facts(tunnel: &Tunnel, t: &Theme) -> impl IntoElement {
+/// Connected for, address, protocol, and the gateway (an OpenVPN 3
+/// tunnel's profile, with "Edit…" unless openvpn3 locked it:
+/// design/proposals/edit-ovpn-profile.html, A). A long gateway or profile
+/// name is cut with "…" and shown whole on hover (`full_name`).
+pub(super) fn facts(
+    tunnel: &Tunnel,
+    profile_locked: Option<bool>,
+    t: &Theme,
+    cx: &mut Context<TunnelDetail>,
+) -> impl IntoElement {
     let up = tunnel.state == "connected";
     let since = if up && tunnel.since > 0 {
         let secs = jiff::Timestamp::now().as_second().max(0) as u64;
@@ -131,10 +140,51 @@ pub(super) fn facts(tunnel: &Tunnel, t: &Theme) -> impl IntoElement {
         .child(cell(false).child(label("Protocol")).child(strong(protocol)))
         .child(
             cell(false)
-                .child(label(if openvpn3 { "Profile" } else { "Gateway" }))
-                .child(mono(tunnel.gateway.clone())),
+                .min_w_0()
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .child(label(if openvpn3 { "Profile" } else { "Gateway" }))
+                        .child(div().flex_1())
+                        .when(openvpn3 && profile_locked == Some(true), |row| {
+                            row.child(label("Locked"))
+                        })
+                        .when(openvpn3 && profile_locked != Some(true), |row| {
+                            let name = tunnel.name.clone();
+                            row.child(
+                                div()
+                                    .id("edit-profile")
+                                    .text_size(px(12.))
+                                    .line_height(px(17.))
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(t.accent)
+                                    .cursor_pointer()
+                                    .child("Edit\u{2026}")
+                                    .on_click(cx.listener(move |this, _, _, _| {
+                                        this.ask(Request::EditProfile(name.clone()));
+                                    }))
+                                    .test_support(),
+                            )
+                        }),
+                )
+                .child(
+                    div()
+                        .mt(px(2.))
+                        .line_height(px(22.))
+                        .child(crate::full_name::host_name(
+                            "gateway-name",
+                            tunnel.gateway.clone(),
+                            GATEWAY_SIZE,
+                            t,
+                            cx,
+                        )),
+                ),
         )
 }
+
+/// The gateway's or profile's name (px), as the other monospace facts.
+const GATEWAY_SIZE: f32 = 14.;
 
 /// Who decides what goes through, in plain words.
 pub(super) fn policy(tunnel: &Tunnel, t: &Theme) -> impl IntoElement {
