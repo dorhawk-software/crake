@@ -11,6 +11,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **"Crake was updated" now appears after a package update.** The app kept running against the new
+  service without noticing it had changed, so the panel never said to restart. Now it notices within
+  a couple of seconds and offers Restart.
 - **Firefox no longer hangs when another OpenVPN 3 session reconnects.** OpenVPN 3 sends every name
   to a tunnel's company for a moment whenever any of its sessions reconnects; Crake used to put
   things back within two seconds, long enough for Firefox's proxy auto-detect to ask in that moment

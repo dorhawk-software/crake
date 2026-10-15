@@ -762,7 +762,12 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
 ## A newer Crake (built 2026-10-14; design/proposals/new-version.html)
 
 `versions.rs`. (1) craked's D-Bus `Version` is newer than the app (a
-package updated it): the panel says "Crake was updated to X. Restart it to
+package updated it; the app reads it when it connects, and on the system
+bus it watches craked's name change owner (`client::owner_changes`) and
+reads everything again: until 2026-10-15 a craked restarted by the
+package went unnoticed, since the bus connection stays up, and the notice
+never came; the tests' private socket drops, so they hadn't seen it):
+the panel says "Crake was updated to X. Restart it to
 finish."; Restart starts the new binary (Linux: the path without
 " (deleted)") with `CRAKE_RESTARTING`, which waits up to 10 s for the old
 one's single-instance socket or pipe to go (`single::taken`), and quits.

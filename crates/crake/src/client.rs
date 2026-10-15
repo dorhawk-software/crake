@@ -319,6 +319,19 @@ fn tunnel(d: &HashMap<String, OwnedValue>) -> Tunnel {
     }
 }
 
+/// craked's name changing owner on the bus: it stopped, or a new one
+/// (perhaps a newer version) took over.
+async fn owner_changes(conn: &Connection) -> zbus::Result<zbus::MessageStream> {
+    let rule = zbus::MatchRule::builder()
+        .msg_type(zbus::message::Type::Signal)
+        .sender("org.freedesktop.DBus")?
+        .interface("org.freedesktop.DBus")?
+        .member("NameOwnerChanged")?
+        .add_arg(BUS_NAME)?
+        .build();
+    zbus::MessageStream::for_match_rule(rule, conn, None).await
+}
+
 async fn session(
     socket: Option<&Path>,
     updates: &async_channel::Sender<Update>,
@@ -335,6 +348,14 @@ async fn session(
         .interface(BUS_NAME)?
         .build();
     let mut signals = zbus::MessageStream::for_match_rule(rule, &conn, None).await?;
+    // On the system bus a craked that restarts (a package update) doesn't
+    // end this connection: the session ends instead, so everything is read
+    // again from the new craked, its version included ("Crake was updated
+    // to X. Restart it to finish." never came before).
+    let mut owners = match p2p {
+        true => None,
+        false => Some(owner_changes(&conn).await?),
+    };
 
     let send = |u: Update| async { updates.send(u).await.is_ok() };
     let mut traffic_tick = tokio::time::interval(TRAFFIC_EVERY);
@@ -378,6 +399,14 @@ async fn session(
                 {
                     return Ok(());
                 }
+            }
+            Some(_) = async {
+                match owners.as_mut() {
+                    Some(o) => o.next().await,
+                    None => std::future::pending().await,
+                }
+            } => {
+                return Err(zbus::Error::Failure("craked was restarted".into()));
             }
             msg = signals.next() => {
                 let Some(Ok(msg)) = msg else {
@@ -500,5 +529,61 @@ async fn session(
                 }
             }
         }
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use super::*;
+
+    async fn wait(
+        owners: &mut zbus::MessageStream,
+        secs: u64,
+    ) -> Result<Option<zbus::Result<zbus::Message>>, tokio::time::error::Elapsed> {
+        tokio::time::timeout(Duration::from_secs(secs), owners.next()).await
+    }
+
+    /// A craked that restarts on the system bus (a package update) is
+    /// noticed: its name changes owner. On a bus of the test's own, never
+    /// this computer's.
+    #[tokio::test]
+    async fn a_restarted_craked_is_noticed() {
+        let dir = tempfile::tempdir().unwrap();
+        let socket = dir.path().join("bus");
+        let address = format!("unix:path={}", socket.display());
+        let mut daemon = std::process::Command::new("dbus-daemon")
+            .args(["--session", "--nofork", "--address", &address])
+            .spawn()
+            .expect("dbus-daemon");
+        for _ in 0..50 {
+            if socket.exists() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        let on_bus = || async {
+            zbus::connection::Builder::address(address.as_str())
+                .unwrap()
+                .build()
+                .await
+                .unwrap()
+        };
+        let app = on_bus().await;
+        let mut owners = owner_changes(&app).await.unwrap();
+        // Another program's name doesn't count.
+        let other = on_bus().await;
+        other.request_name("software.dorhawk.Other1").await.unwrap();
+        assert!(wait(&mut owners, 1).await.is_err(), "not craked's name");
+        // craked starts, stops, and a new one starts.
+        let craked = on_bus().await;
+        craked.request_name(BUS_NAME).await.unwrap();
+        assert!(matches!(wait(&mut owners, 5).await, Ok(Some(Ok(_)))));
+        drop(craked);
+        assert!(matches!(wait(&mut owners, 5).await, Ok(Some(Ok(_)))));
+        let again = on_bus().await;
+        again.request_name(BUS_NAME).await.unwrap();
+        assert!(matches!(wait(&mut owners, 5).await, Ok(Some(Ok(_)))));
+        daemon.kill().ok();
+        daemon.wait().ok();
     }
 }
