@@ -11,6 +11,12 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Traffic, live.** A new window, from the panel's Traffic button, shows what goes where right
+  now: this computer, each tunnel that's up and direct, the busiest places each one reaches, and
+  packets ticking along every path as they go. Under it, the last five minutes, the connections
+  open right now and every rule Crake has. On Windows only TCP connections are listed (Windows
+  doesn't say where UDP goes); a connection's bytes count from when the window first looked. It's
+  only asked for while the window is open, and stays on this computer like everything Crake sees.
 - **Dismiss a stopped tunnel.** A tunnel that stopped on its own has a Dismiss button next to why in
   the panel: it goes back to plain "Off" and the red badge leaves the bird. Why it stopped is still
   in its details and the log.
@@ -23,12 +29,7 @@ What's new in each Crake release, for the people using it. The newest is at the 
 - **OpenVPN 3 tunnels survive a reconnect.** When openvpn3 sets a session up again (the network
   dropped for a moment, the computer woke up), Crake says the tunnel is reconnecting and routes
   through it again once it's back. It used to call the tunnel stopped while the session carried on.
-- **Traffic, live.** A new window, from the panel's Traffic button, shows what goes where right
-  now: this computer, each tunnel that's up and direct, the busiest places each one reaches, and
-  packets ticking along every path as they go. Under it, the last five minutes, the connections
-  open right now and every rule Crake has. On Windows only TCP connections are listed (Windows
-  doesn't say where UDP goes); a connection's bytes count from when the window first looked. It's only asked for while the window is open,
-  and stays on this computer like everything Crake sees.
+
 ## 0.7.0 (2026-10-14)
 
 - **Crake says when it was updated and needs a restart:** after a package update the panel says
