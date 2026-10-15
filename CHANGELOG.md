@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.8.0 (2026-10-15)
+
 - **Traffic, live.** A new window, from the panel's Traffic button, shows what goes where right
   now: this computer, each tunnel that's up and direct, the busiest places each one reaches, and
   packets ticking along every path as they go. Under it, the last five minutes, the connections

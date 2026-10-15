@@ -3,7 +3,7 @@
 # scripts/build-arch.sh builds it from the current commit instead, and
 # scripts/deb-test.sh archlinux:latest tests it.
 pkgname=crake
-pkgver=0.7.0
+pkgver=0.8.0
 pkgrel=1
 pkgdesc="VPN client that routes only what needs the tunnel"
 arch=('x86_64')
