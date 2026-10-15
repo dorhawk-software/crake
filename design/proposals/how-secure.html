@@ -5,91 +5,115 @@
 <title>Proposal: is it safe?</title>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
 <style>
-  :root { --desk: #121314; --panel: #1E2022; --surface: #26292C; --line: #33363A; --lineStrong: #4A4E53; --ink: #ECEDEE;
-    --muted: #A9AEB4; --accent: #2DD4BF; --track: #4A4E53; }
-  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F3F3F0; --line: #E2E2DE; --lineStrong: #BDBDB8; --ink: #1A1C1E;
-    --muted: #5A5F64; --accent: #0F766E; --track: #BDBDB8; }
+  /* Crake's tokens (crates/crake/src/theme.rs). */
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53; --ink: #ECEDEE;
+    --muted: #A9AEB4; --accent: #2DD4BF; --danger: #F97066; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8; --ink: #1A1C1E;
+    --muted: #5A5F64; --accent: #0F766E; --danger: #B42318; }
   body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
-    font-size: 14px; line-height: 1.45; }
+    font-size: 14px; line-height: 20px; }
   .mono { font-family: 'Atkinson Hyperlegible Mono', monospace; }
   .page { padding: 28px 40px 40px; }
-  .intro { color: var(--muted); font-size: 13px; max-width: 1000px; margin-bottom: 18px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 1040px; margin-bottom: 18px; }
   .intro b { color: var(--ink); }
-  .cols { display: flex; gap: 36px; flex-wrap: wrap; align-items: flex-start; }
-  .cap { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
-  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 640px; min-height: 54px; }
-  .win { width: 640px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: flex; overflow: hidden; }
-  .nav { width: 170px; border-right: 1px solid var(--line); padding: 18px 10px; font-size: 13.5px; }
-  .nav div { padding: 7px 10px; border-radius: 6px; color: var(--muted); }
-  .nav div.on { background: var(--surface); color: var(--ink); font-weight: 600; }
-  .main { flex: 1; padding: 22px 26px 26px; }
-  h2 { margin: 0; font-size: 20px; }
-  .lede { color: var(--muted); margin-top: 4px; }
-  .q { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
-  .q b { display: block; margin-bottom: 2px; }
-  .q p { margin: 0; color: var(--muted); font-size: 13.5px; }
-  .ver { display: flex; gap: 14px; align-items: center; margin-top: 18px; }
-  .ver .t { font-size: 18px; font-weight: 700; }
-  .panel { width: 452px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; position: relative; }
-  .ph { display: flex; align-items: center; gap: 10px; padding: 14px 18px 10px; }
-  .ph .t { font-size: 16px; font-weight: 700; }
-  .ph .w { font-size: 13px; color: var(--muted); }
-  .help { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--muted); color: var(--muted); font-size: 11px;
-    display: inline-flex; align-items: center; justify-content: center; font-weight: 700; }
-  .card { position: absolute; left: 70px; top: 44px; width: 360px; background: var(--surface); border: 1px solid var(--lineStrong);
-    border-radius: 8px; padding: 12px 14px; box-shadow: 0 8px 24px rgba(0,0,0,.35); font-size: 13px; z-index: 2; }
-  .card b { display: block; margin-top: 8px; }
-  .card b:first-child { margin-top: 0; }
-  .card p { margin: 0; color: var(--muted); }
-  .rows { padding: 6px 18px 120px; color: var(--muted); font-size: 13px; }
+  .cap { font-size: 15px; font-weight: 700; margin: 26px 0 2px; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 1040px; }
+  .bird { position: relative; display: inline-block; flex: none; }
+  .bird svg { position: absolute; left: 0; top: 0; }
+  /* Settings, as the app draws it (settings_view: 1040 x 820 at 1x). */
+  .win { width: 1040px; height: 1000px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: flex;
+    overflow: hidden; position: relative; }
+  .nav { width: 222px; background: var(--surface); border-right: 1px solid var(--line); padding: 20px 12px; box-sizing: border-box; }
+  .nav .head { display: flex; align-items: center; gap: 8px; padding: 0 10px 14px; font-size: 17px; font-weight: 700; }
+  .nav .item { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px; border-radius: 8px; color: var(--ink);
+    margin-top: 2px; }
+  .nav .item.on { background: var(--panel); font-weight: 700; }
+  .close { position: absolute; right: 16px; top: 14px; width: 32px; height: 32px; border-radius: 50%; background: var(--surface);
+    display: flex; align-items: center; justify-content: center; color: var(--ink); font-size: 14px; }
+  .main { flex: 1; padding: 50px 36px 0 37px; }
+  h1 { margin: 0; font-size: 26px; line-height: 32px; }
+  .lede { color: var(--muted); margin-top: 6px; }
+  a { color: var(--accent); font-weight: 600; text-decoration: underline; }
+  .lede a { font-style: italic; font-weight: 400; }
+  .ver { display: flex; align-items: center; gap: 16px; margin-top: 22px; }
+  .ver .t { font-size: 20px; line-height: 28px; font-weight: 700; }
+  .ver .m { color: var(--muted); }
+  .links { display: flex; gap: 10px; margin-top: 18px; }
+  .links span { color: var(--muted); }
+  .new { outline: 2px dashed var(--accent); outline-offset: 8px; border-radius: 4px; }
+  .safe { margin-top: 30px; max-width: 640px; }
+  .safe .h { font-size: 15px; font-weight: 700; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .qa { padding: 11px 0; border-bottom: 1px solid var(--line); }
+  .qa .q { font-weight: 600; }
+  .qa .a { color: var(--muted); margin-top: 2px; }
+  .coffee { margin-top: 22px; max-width: 640px; padding: 14px 16px; border-radius: 10px; background: var(--surface); color: var(--muted); }
+  .coffee b { color: var(--ink); }
+  .btn { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; margin-top: 10px; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--panel); color: var(--ink); font-weight: 600; }
+  /* The panel's header, as the app draws it. */
+  .panel { width: 452px; height: 330px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; position: relative; }
+  .ph { display: flex; align-items: center; gap: 8px; padding: 16px 18px 10px; }
+  .ph .t { font-size: 17px; font-weight: 700; }
+  .ph .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-left: 6px; }
+  .ph .w { color: var(--muted); }
+  .ph .q { color: var(--muted); display: flex; }
+  .ph .sl { margin-left: auto; color: var(--muted); display: flex; }
+  .card { position: absolute; left: 52px; top: 48px; width: 340px; background: var(--surface); border: 1px solid var(--lineStrong);
+    border-radius: 8px; padding: 12px 14px; box-shadow: 0 8px 24px rgba(0,0,0,.3); font-size: 13px; line-height: 18px; }
+  .cq { font-weight: 600; margin-top: 8px; }
+  .cq:first-child { margin-top: 0; }
+  .ca { color: var(--muted); }
+  .ghost { padding: 4px 18px; color: var(--muted); font-size: 13px; }
 </style>
 </head>
 <body>
 <div class="page">
   <div class="intro"><b>"Is it safe? Can it break my traffic?"</b> A colleague asked before trying Crake, and the
-    answer lived only in a chat. Four short answers in Crake's voice, true on every system Crake runs on. The same
-    words can go on dorhawk.software/crake later (docs/explainers.md).</div>
-  <div class="cols">
-    <div>
-      <div class="cap">A. In Settings → About (recommended)</div>
-      <div class="sub">Where people look when they wonder what an app does. Always there, out of the way, nothing
-        new in the panel.</div>
-      <div class="win">
-        <div class="nav"><div>Tunnels</div><div>General</div><div>Learning</div><div>Names</div><div>Privacy</div>
-          <div>Managed by IT</div><div class="on">About</div></div>
-        <div class="main">
-          <h2>About</h2>
-          <div class="lede">Named after the corncrake, <i>Crex crex</i>.</div>
-          <div class="ver"><div><div class="t">Crake 0.8.0</div><div class="lede" style="margin:0">A VPN client that
-            routes only what needs routing.</div></div></div>
-          <div class="q"><b>Does anything leave this computer?</b>
-            <p>No. Crake decides everything here: there's no Crake server, no account and no telemetry. Only your
-              VPN's own sign-in talks to your company.</p></div>
-          <div class="q"><b>Can Crake break my internet?</b>
-            <p>If Crake stops, its routes and rules go with it, and your traffic goes straight out as it would
-              without Crake. A tunnel that drops takes only what went through it.</p></div>
-          <div class="q"><b>What does my company see?</b>
-            <p>Only what goes through its tunnel: the hosts that need it. Everything else goes straight out,
-              not through the company.</p></div>
-          <div class="q"><b>Who can change what?</b>
-            <p>Changes need you, at this computer. A tunnel your IT set up can be switched on and off, but its
-              rules can't be widened.</p></div>
-        </div>
-      </div>
+    answer lived only in a chat. Four short answers in Crake's voice, true on every system Crake runs on; the same
+    words can go on dorhawk.software/crake later (docs/explainers.md). Drawn on the app as it is today (Crake 0.7.0's
+    Settings → About and panel); what's new is outlined.</div>
+
+  <div class="cap">A. Settings → About, between the links and the coffee (recommended)</div>
+  <div class="sub">Where people look when they wonder what an app does. Always there, nothing new in the panel. The
+    window keeps its size; About scrolls if it must.</div>
+  <div class="win">
+    <div class="nav"><div class="head"><span class="bird" style="width:24px;height:24px"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 20.5 5.3 15M6.2 20.5l.6-3.4M17.4 20.5l-.6-3.6M20.5 20.5l-1.7-5.2"/><path d="M8.5 20.5V12a3.75 3.75 0 0 1 7.5 0"/><path d="M16 10.4l4.3 1.2-4.3 1.2"/><path d="M16 12.8c0 2.7-.9 5-2.6 7.7"/><circle cx="12.4" cy="10.6" r="0.9" fill="var(--ink)" stroke="none"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.4" stroke-linecap="round"><path d="M19.2 6.2l1.4-1.6M21 8.4l1.6-.7"/></svg>
+</span><span>Settings</span></div><div class="item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V12a8 8 0 0 1 16 0v8M8 20v-8a4 4 0 0 1 8 0v8"/></svg>
+<span>Tunnels</span></div><div class="item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6a3 3 0 1 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
+<span>General</span></div><div class="item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18V6M12 18V10M18 18V4"/></svg>
+<span>Learning</span></div><div class="item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z"/></svg>
+<span>Names</span></div><div class="item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/></svg>
+<span>Privacy &amp; log</span></div><div class="item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 11h12v10H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>
+<span>Managed by IT</span></div><div class="item on"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v6M12 7.5v.5"/></svg>
+<span>About</span></div></div>
+    <div class="close">✕</div>
+    <div class="main">
+      <h1>About</h1>
+      <div class="lede">Named after the corncrake, <a>Crex crex</a>.</div>
+      <div class="ver"><span class="bird" style="width:56px;height:56px"><svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 20.5 5.3 15M6.2 20.5l.6-3.4M17.4 20.5l-.6-3.6M20.5 20.5l-1.7-5.2"/><path d="M8.5 20.5V12a3.75 3.75 0 0 1 7.5 0"/><path d="M16 10.4l4.3 1.2-4.3 1.2"/><path d="M16 12.8c0 2.7-.9 5-2.6 7.7"/><circle cx="12.4" cy="10.6" r="0.9" fill="var(--ink)" stroke="none"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.4" stroke-linecap="round"><path d="M19.2 6.2l1.4-1.6M21 8.4l1.6-.7"/></svg>
+</span><div><div class="t">Crake 0.8.0</div>
+        <div class="m">A VPN client that routes only what needs routing. Built on openconnect.</div>
+        <div class="m">Because a VPN shouldn’t be a chore.</div></div></div>
+      <div class="links"><a>Source on GitHub</a><span>·</span><a>dorhawk.software</a></div>
+      <div class="safe new"><div class="h">Is it safe?</div><div class="qa"><div class="q">Does anything leave this computer?</div><div class="a">No. Crake decides everything here: there’s no Crake server, no account and no telemetry. Only your VPN’s own sign-in talks to your company.</div></div><div class="qa"><div class="q">Can Crake break my internet?</div><div class="a">If Crake stops, its routes and rules go with it, and your traffic goes straight out as it would without Crake. A tunnel that drops takes only what went through it.</div></div><div class="qa"><div class="q">What does my company see?</div><div class="a">Only what goes through its tunnel: the hosts that need it. Everything else goes straight out, not through the company.</div></div><div class="qa"><div class="q">Who can change what?</div><div class="a">Changes need you, at this computer. A tunnel your IT set up can be switched on and off, but its rules can’t be widened.</div></div></div>
+      <div class="coffee"><b>Crake is free and stays free:</b> no ads, no tracking, nothing locked. If it saved you a
+        headache, you can buy its developer a coffee. It’s a thank-you, not a subscription.<br><span class="btn">Buy me a coffee</span></div>
     </div>
-    <div>
-      <div class="cap">B. A "?" next to Crake in the panel</div>
-      <div class="sub">Closer to hand while something feels off, like the "?" by What Crake did. One more thing in
-        the panel's header, and the answers squeezed into a card.</div>
-      <div class="panel">
-        <div class="ph"><span class="t">Crake</span><span class="help">?</span><span class="w">· Listening</span></div>
-        <div class="card"><b>Does anything leave this computer?</b><p>No. No Crake server, no telemetry.</p>
-          <b>Can Crake break my internet?</b><p>If it stops, its routes go with it: traffic goes straight out.</p>
-          <b>What does my company see?</b><p>Only what goes through its tunnel.</p>
-          <b>Who can change what?</b><p>Only you, at this computer. IT's rules can't be widened.</p></div>
-        <div class="rows">Last hour · What Crake did · Tunnels …</div>
-      </div>
-    </div>
+  </div>
+
+  <div class="cap">B. A "?" next to Crake in the panel's header</div>
+  <div class="sub">Closer to hand while something feels off, like the "?" by What Crake did (hover opens it, a click
+    keeps it open). One more thing in the panel's header, and the answers cut to a line each.</div>
+  <div class="panel">
+    <div class="ph"><span class="bird" style="width:24px;height:24px"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 20.5 5.3 15M6.2 20.5l.6-3.4M17.4 20.5l-.6-3.6M20.5 20.5l-1.7-5.2"/><path d="M8.5 20.5V12a3.75 3.75 0 0 1 7.5 0"/><path d="M16 10.4l4.3 1.2-4.3 1.2"/><path d="M16 12.8c0 2.7-.9 5-2.6 7.7"/><circle cx="12.4" cy="10.6" r="0.9" fill="var(--ink)" stroke="none"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.4" stroke-linecap="round"><path d="M19.2 6.2l1.4-1.6M21 8.4l1.6-.7"/></svg>
+</span><span class="t">Crake</span><span class="q new"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+</span><span class="dot"></span><span class="w">Listening</span><span class="sl"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></svg>
+</span></div>
+    <div class="card new"><div class="cq">Does anything leave this computer?</div><div class="ca">No: no Crake server, no account, no telemetry.</div><div class="cq">Can Crake break my internet?</div><div class="ca">If Crake stops, its routes and rules go with it, and your traffic goes straight out as it would without Crake.</div><div class="cq">What does my company see?</div><div class="ca">Only what goes through its tunnel: the hosts that need it.</div><div class="cq">Who can change what?</div><div class="ca">Changes need you, at this computer.</div></div>
+    <div class="ghost">Last hour</div>
   </div>
 </div>
 <script>if (location.search.includes('dark=false')) document.body.classList.add('light');</script>
