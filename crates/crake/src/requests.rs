@@ -234,7 +234,8 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
         Request::Unpin(t, x) => send(Command::Unpin(t, x)),
         Request::Forget(t, x) => send(Command::Forget(t, x)),
         Request::ForgetLearned(t) => send(Command::ForgetLearned(t)),
-        Request::DismissTrouble(t) => send(Command::DismissTrouble(t)),
+        Request::DismissTrouble(t) => dismiss_trouble(t, cx),
+        Request::Reattach(t, fields) => send(Command::Attach(t, fields)),
         Request::Attach(t, path, fields, control) => {
             let shell = cx.global_mut::<Shell>();
             // One session per tunnel: a newer one (openvpn3's indicator
@@ -351,6 +352,25 @@ fn session_ended(sessions: &mut Sessions, tunnel: &str, path: &str) -> bool {
     }
     sessions.remove(tunnel);
     true
+}
+
+/// A tunnel that stopped on its own, seen: Off, its reason kept.
+fn dismiss_trouble(tunnel: String, cx: &mut App) {
+    if cx.global::<Shell>().demo {
+        // No craked in demo mode: the tunnel is just Off.
+        let model = cx.global::<Shell>().model.clone();
+        model.update(cx, |m, cx| {
+            if let Some(x) = m.tunnels.iter_mut().find(|x| x.name == tunnel) {
+                x.state = "off".into();
+            }
+            cx.notify();
+        });
+    } else {
+        let _ = cx
+            .global::<Shell>()
+            .commands
+            .send_blocking(Command::DismissTrouble(tunnel));
+    }
 }
 
 /// Off, then on again once craked says it's off: a tunnel whose profile

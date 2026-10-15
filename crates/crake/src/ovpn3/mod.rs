@@ -429,6 +429,10 @@ async fn follow(
     // openvpn3 says so in its log when the server ends the session.
     let mut expired = false;
     let created = created(conn, path).await;
+    // Connected as last looked: back to connected after a reconnect, the
+    // session is handed over again (its device may have a new name, which
+    // only openvpn3 can tell; craked can't look into openvpn3's process).
+    let mut connected = true;
     loop {
         tokio::select! {
             msg = signals.next() => {
@@ -465,6 +469,16 @@ async fn follow(
             )),
             Some((minor, text)) => {
                 unseen = 0;
+                let now = minor == CONN_CONNECTED;
+                if now
+                    && !connected
+                    && let Ok(fields) = attached(conn, path).await
+                {
+                    let _ = requests
+                        .send(Request::Reattach(tunnel.to_owned(), fields))
+                        .await;
+                }
+                connected = now;
                 matches!(
                     minor,
                     CONN_FAILED | CONN_DISCONNECTED | CONN_DONE | SESS_REMOVED

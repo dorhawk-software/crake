@@ -229,41 +229,51 @@ impl Manager {
             .collect();
         for (name, fields, up) in attached {
             let device = fields.get("device").cloned().unwrap_or_default();
-            let pid = fields.get("backend_pid").and_then(|p| p.parse().ok());
-            let now = match pid {
-                Some(pid) if crate::sys::process_alive(pid) => {
-                    let Some(now) = crate::sys::tun_of_process(pid) else {
-                        if up {
-                            self.reconnecting(&name).await;
-                        }
-                        continue;
-                    };
-                    Some(now)
-                }
-                // The session's process has ended: so has the session.
-                Some(_) => None,
-                None => Some(device.clone()),
-            };
-            let index = now.as_deref().and_then(crate::net::tun_index);
-            let Some(index) = index else {
-                let why = format!(
-                    "{}: {device} is gone. Switch it on to connect again.",
-                    crake_proto::trouble::OPENVPN3_ENDED
-                );
-                if let Err(e) = self.detach(&name, Some(why)).await {
-                    tracing::warn!("{name}: {e:#}");
-                }
-                continue;
-            };
-            let now = now.unwrap_or_default();
-            let same = now == device && fields.get("index").is_none_or(|i| *i == index.to_string());
-            if up && same {
+            let had = fields.get("index").and_then(|i| i.parse::<u32>().ok());
+            let index = crate::net::tun_index(&device);
+            // The device it was handed is still there: up, whatever craked
+            // can see of the session's process. (As the package runs it,
+            // craked can't look into openvpn3's process, which runs as
+            // another user: 0.8.0 took that for a session reconnecting and
+            // pulled every OpenVPN 3 tunnel's routes, 2026-10-15.)
+            if up && index.is_some() && (had.is_none() || had == index) {
                 continue;
             }
-            let mut fields = fields;
-            fields.insert("device".to_owned(), now);
-            fields.remove("index");
-            self.attach_again(&name, &fields).await;
+            // The same name as a new device (the kernel took the old one's
+            // routes with it), or back after a reconnect: routed again.
+            if index.is_some() {
+                let mut fields = fields;
+                fields.remove("index");
+                self.attach_again(&name, &fields).await;
+                continue;
+            }
+            // Gone. While the session's process runs, so does the session:
+            // its new device, where craked can see it, or wait (the app
+            // hands the session over again once openvpn3 has it back).
+            let pid = fields
+                .get("backend_pid")
+                .and_then(|p| p.parse().ok())
+                .filter(|p| crate::sys::process_alive(*p));
+            if let Some(pid) = pid {
+                match crate::sys::tun_of_process(pid) {
+                    Some(now) if crate::net::tun_index(&now).is_some() => {
+                        let mut fields = fields;
+                        fields.insert("device".to_owned(), now);
+                        fields.remove("index");
+                        self.attach_again(&name, &fields).await;
+                    }
+                    _ if up => self.reconnecting(&name).await,
+                    _ => {}
+                }
+                continue;
+            }
+            let why = format!(
+                "{}: {device} is gone. Switch it on to connect again.",
+                crake_proto::trouble::OPENVPN3_ENDED
+            );
+            if let Err(e) = self.detach(&name, Some(why)).await {
+                tracing::warn!("{name}: {e:#}");
+            }
         }
     }
 

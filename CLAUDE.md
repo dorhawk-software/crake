@@ -664,6 +664,19 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    which, unlike /sys, follows craked's network namespace) and takes a
    tunnel whose device is gone down as stopped unexpectedly ("OpenVPN 3
    ended its session: tun0 is gone."; netns-tested).
+   **0.8.0's regression (2026-10-15):** the packaged craked can't look
+   into openvpn3's process (it runs as `_openvpn`; the service has no
+   CAP_SYS_PTRACE, AppArmor allows no other process's fdinfo), so
+   `tun_of_process` found nothing, craked took every attached session for
+   reconnecting and pulled its routes a second after it came up. Now the
+   device craked was handed (same name and index) settles it first; a
+   device made again under the same name is followed by its name; only a
+   device that's gone asks the process, and the app hands a session over
+   again (`Request::Reattach`) when openvpn3 says it's connected after a
+   reconnect, with the device openvpn3 names. netns-tested with a process
+   craked can't see into. The no-device-name case (Azure's profile, 7g)
+   needs the process too: it works with craked run by hand, not under the
+   package (Not now).
    Unless the session's process (`backend_pid`) still runs: openvpn3
    makes a session's device again when it reconnects it (seen 2026-10-15:
    the Wi-Fi dropped for a minute at night, a session's tun1 came back as tun0,
@@ -828,6 +841,14 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   know a winget install.
 - **Undo in macOS notifications.** notify-rust has no actions there, so
   "Use Nordbank" / Undo exist only in the panel on a Mac.
+- **OpenVPN 3 sessions whose device openvpn3 doesn't name, under the
+  package (2026-10-15).** craked finds such a device from the session's
+  process (`/proc/<pid>/fdinfo`), which the packaged service can't read
+  (openvpn3 runs as `_openvpn`; no CAP_SYS_PTRACE, and AppArmor would need
+  a rule). Seen only with an Azure gateway's profile, which the user's
+  company is dropping. Options if it matters: the capability and an
+  AppArmor rule (a wide permission for one case), or matching the
+  session's address to a tun device's.
 - **Untried on real systems:** see "Tried by real people" below, a
   checklist of its own.
 - **Performance: never measured.** Believed negligible (NFQUEUE holds

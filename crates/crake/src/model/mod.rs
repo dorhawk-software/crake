@@ -20,7 +20,7 @@ use self::days::local_time;
 pub use self::days::{Day, Row, Show};
 #[cfg(test)]
 pub use self::demo::demo_log_whole_day;
-pub use self::demo::{demo, demo_detail, demo_expired, demo_log};
+pub use self::demo::{demo, demo_detail, demo_expired, demo_log, demo_openvpn3};
 
 /// How long the tray shows the "routed" shape after a decision.
 const ROUTED_SHAPE_FOR: Duration = Duration::from_secs(4);

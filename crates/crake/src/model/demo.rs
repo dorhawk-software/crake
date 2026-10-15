@@ -194,6 +194,17 @@ pub fn demo_expired(mut m: Model) -> Model {
     m
 }
 
+/// The demo with Nordbank an OpenVPN 3 tunnel whose profile's name is too
+/// long for its fact (CRAKE_DEMO=openvpn3): tunnel detail's "Edit…" and a
+/// name cut with "…" (design/proposals/edit-ovpn-profile.html).
+pub fn demo_openvpn3(mut m: Model) -> Model {
+    if let Some(nord) = m.tunnels.iter_mut().find(|t| t.name == "nord") {
+        nord.protocol = "openvpn3".into();
+        nord.gateway = "nordbank-production-eu-west-2-split".into();
+    }
+    m
+}
+
 // literal: the design's sample data (design/screens), for CRAKE_DEMO
 /// Tunnel detail's sample (design/screens/tunnel-detail.html), for
 /// `CRAKE_DEMO=1 CRAKE_SHOW=detail:acme`: ACME connected for 4 h 53 min,

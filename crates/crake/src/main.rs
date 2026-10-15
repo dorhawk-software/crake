@@ -199,6 +199,9 @@ pub enum Request {
     EditProfile(String),
     /// Off and on again if it's on (its profile changed).
     Reconnect(String),
+    /// An OpenVPN 3 session followed here is connected again after
+    /// reconnecting: hand it to craked again (its device, as now).
+    Reattach(String, std::collections::HashMap<String, String>),
     /// macOS: System Settings' Login Items & Extensions, where Crake's
     /// service is switched on (`service`).
     OpenServiceSettings,
@@ -382,10 +385,12 @@ fn main() {
             };
             // CRAKE_DEMO=expired: Nordbank's session ran out (the panel's
             // and tunnel detail's words for why a tunnel stopped).
-            let model = if std::env::var("CRAKE_DEMO").as_deref() == Ok("expired") {
-                model::demo_expired(model)
-            } else {
-                model
+            // CRAKE_DEMO=openvpn3: Nordbank is an OpenVPN 3 tunnel (its profile
+            // editor's "Edit…" in tunnel detail).
+            let model = match std::env::var("CRAKE_DEMO").as_deref() {
+                Ok("expired") => model::demo_expired(model),
+                Ok("openvpn3") => model::demo_openvpn3(model),
+                _ => model,
             };
             let setup = Setup {
                 model,
