@@ -158,7 +158,7 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
                 None => send(Command::Disconnect(t)),
             }
         }
-        Request::Undo(t, hosts) => send(Command::Undo(t, hosts)),
+        Request::Undo(t, hosts) => undo(t, hosts, cx),
         Request::Redo(t, hosts) => send(Command::Redo(t, hosts)),
         Request::Log => open_log(cx),
         Request::Traffic => open_traffic(cx),
@@ -352,6 +352,46 @@ fn session_ended(sessions: &mut Sessions, tunnel: &str, path: &str) -> bool {
     }
     sessions.remove(tunnel);
     true
+}
+
+/// Send hosts direct and keep them so (the panel's Undo).
+fn undo(tunnel: String, hosts: Vec<String>, cx: &mut App) {
+    if !cx.global::<Shell>().demo {
+        let _ = cx
+            .global::<Shell>()
+            .commands
+            .send_blocking(Command::Undo(tunnel, hosts));
+        return;
+    }
+    // No craked in demo mode: the decision it would log, as it says it.
+    let model = cx.global::<Shell>().model.clone();
+    model.update(cx, |m, cx| {
+        let name = m
+            .log
+            .iter()
+            .rev()
+            .find(|e| e.hosts == hosts)
+            .and_then(|e| {
+                e.message
+                    .strip_prefix("Sent ")?
+                    .split(" through ")
+                    .next()
+                    .map(str::to_owned)
+            })
+            .unwrap_or_else(|| hosts.join(", "));
+        m.apply(crate::client::Update::Appended(crake_proto::LogEntry {
+            ts: jiff::Timestamp::now().to_string(),
+            kind: crake_proto::LogKind::Undone,
+            tunnel: Some(tunnel),
+            message: format!("{name} goes direct again."),
+            reason: Some(
+                "You undid the route. Crake won\u{2019}t learn this host again on its own.".into(),
+            ),
+            hosts,
+            others: Vec::new(),
+        }));
+        cx.notify();
+    });
 }
 
 /// A tunnel that stopped on its own, seen: Off, its reason kept.

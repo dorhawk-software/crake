@@ -67,7 +67,7 @@ impl Store for Demo {
             format!("<{tag}>\n{body}</{tag}>\n")
         };
         Ok(Fetched::Text(format!(
-            "client\ndev tun\nproto udp\nremote vpn.initech.example 1194\nresolv-retry infinite\nnobind\nremote-cert-tls server\nroute 10.20.0.0 255.255.0.0\ndhcp-option DNS 10.8.0.1\ndhcp-option DOMAIN initech.internal\n{}{}{}{}verb 3\n",
+            "client\ndev tun\nproto udp\nremote vpn.nordbank.example 1194\nresolv-retry infinite\nnobind\nremote-cert-tls server\nroute 10.20.0.0 255.255.0.0\ndhcp-option DNS 10.8.0.1\ndhcp-option DOMAIN nordbank.internal\n{}{}{}{}verb 3\n",
             block("ca", 31),
             block("cert", 27),
             block("key", 28),

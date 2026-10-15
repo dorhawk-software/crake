@@ -1203,6 +1203,13 @@ The user doesn't want development builds installed on their machine.
 - Looking at a window without flashing the screen: `scripts/xwin.py
   <window id> out.png` reads the crake window's own pixels over X11
   (find the id with `xwininfo -root -tree | grep '("crake" "crake")'`).
+- Filming the app (the brag video, the website's images; 2026-10-15): demo
+  mode answers Undo and Dismiss itself (no craked), `CRAKE_DEMO=openvpn3`
+  makes Nordbank an OpenVPN 3 tunnel (tunnel detail's "Edit…", a long
+  profile name), `CRAKE_SHOW=profile:<tunnel>` opens its profile editor
+  (a sample profile in demo mode), `CRAKE_APPEARANCE=dark|light` pins the
+  theme. Rendered headless on Xvfb (`GPUI_X11_SCALE_FACTOR=2`), each window
+  cut into sections with its rounded corners made transparent.
 - Motion: `CRAKE_SHOW=panel` opens the panel at start; `CRAKE_DEMO=arrive`
   adds a decision and flips the last switch every 8 s; `CRAKE_MOTION=slow`
   runs every animation ten times slower, `=off` turns them off (as GNOME's

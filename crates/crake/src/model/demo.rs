@@ -201,6 +201,10 @@ pub fn demo_openvpn3(mut m: Model) -> Model {
     if let Some(nord) = m.tunnels.iter_mut().find(|t| t.name == "nord") {
         nord.protocol = "openvpn3".into();
         nord.gateway = "nordbank-production-eu-west-2-split".into();
+        // literal: the demo's sample (up for 1 h 12 min, on the address its server gave it)
+        nord.address = "10.8.0.6".into();
+        // literal: the demo's sample (up for 1 h 12 min)
+        nord.since = jiff::Timestamp::now().as_second().max(0).unsigned_abs() - 72 * 60;
     }
     m
 }
