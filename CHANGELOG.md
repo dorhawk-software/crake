@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.8.1 (2026-10-15)
+
 - **OpenVPN 3 tunnels work again.** 0.8.0 lost an OpenVPN 3 tunnel's routing a second after it came
   up and left it "connecting": a sign-in through the browser looked stuck. Fixed: while the
   session's device is there, the tunnel stays up, and a session that reconnects is handed over
