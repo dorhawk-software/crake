@@ -4,17 +4,17 @@
 <style>
   /* Crake's tokens (crates/crake/src/theme.rs). */
   .light { --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8; --ink: #1A1C1E; --muted: #5A5F64;
-    --danger: #B42318; --onDanger: #FFFFFF; --deeper: #FFFFFF; }
+    --danger: #B42318; --onDanger: #FFFFFF; --deeper: #FFFFFF; --halfway: #F9F9F7; }
   .dark { --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53; --ink: #ECEDEE; --muted: #A9AEB4;
-    --danger: #F97066; --onDanger: #0B1514; --deeper: #141617; }
+    --danger: #F97066; --onDanger: #0B1514; --deeper: #141617; --halfway: #242729; }
   body { margin: 0; background: #888; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; }
   .page { padding: 24px 32px; display: flex; flex-direction: column; gap: 18px; }
   .intro { color: #111; font-size: 13px; max-width: 980px; }
   .box { background: var(--panel); color: var(--ink); border-radius: 12px; padding: 18px 22px; width: 940px; }
   .t { font-weight: 700; margin-bottom: 12px; }
   .row { display: flex; gap: 30px; align-items: flex-start; }
-  .closes { display: flex; gap: 22px; }
-  .opt { width: 120px; }
+  .closes { display: flex; gap: 12px; }
+  .opt { width: 92px; }
   .lab { font-size: 12px; color: var(--muted); margin-bottom: 10px; min-height: 32px; }
   .cl { width: 32px; height: 32px; border-radius: 50%; background: var(--surface); display: flex; align-items: center;
     justify-content: center; color: var(--ink); box-sizing: border-box; }
@@ -26,33 +26,44 @@
   .item { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px; border-radius: 6px; margin-bottom: 2px; font-weight: 500; }
   .item.on { background: var(--panel); font-weight: 700; }
   .item.hover { background: var(--line); }
+  .navb .item.hover { background: var(--halfway); }
+  .navs { display: flex; gap: 14px; margin-left: auto; }
+  .navs .nav { margin-left: 0; width: 200px; }
+  .navlab { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
 </style></head><body><div class="page">
 <div class="intro"><b>Hover on the round × and on Settings' sections</b> (asked for). Three ways for the ×, side by side
   with it at rest: A darkens its circle a step in light and lightens it in dark (towards the text colour); B goes the other way, away from the
   text (white in light, nearly black in dark), with a hairline so it doesn't vanish into the window; C turns it red, each
   theme's danger colour, as many systems' close buttons do. Every window's × alike: Log, Settings, tunnel detail,
-  Traffic, New tunnel and the profile editor. Settings' sections (right): the one pointed at (General) gets a soft
-  background, the current one (About) keeps the window's colour.</div>
+  Traffic, New tunnel and the profile editor. Settings' sections (right), General pointed at: A gives it a soft background a step darker (light) or lighter (dark); B goes the other way, halfway to the current section's colour (About keeps the window's own, so the two never look alike), and never red.</div>
 <div class="light box">
   <div class="t">Light</div>
   <div class="row"><div class="closes"><div class="opt"><div class="lab">At rest</div><div class="cl rest"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg>
 </div></div><div class="opt"><div class="lab">A. Darker in light, lighter in dark</div><div class="cl a"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg>
 </div></div><div class="opt"><div class="lab">B. Lighter in light, darker in dark</div><div class="cl b"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg>
 </div></div><div class="opt"><div class="lab">C. Red</div><div class="cl c"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg>
-</div></div></div><div class="nav"><div class="item rest"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V12a8 8 0 0 1 16 0v8M8 20v-8a4 4 0 0 1 8 0v8"/></svg>
+</div></div></div><div class="navs"><div><div class="navlab">Sections A: darker in light, lighter in dark</div><div class="nav"><div class="item rest"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V12a8 8 0 0 1 16 0v8M8 20v-8a4 4 0 0 1 8 0v8"/></svg>
 <span>Tunnels</span></div><div class="item hover"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6a3 3 0 1 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
 <span>General</span></div><div class="item rest"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18V6M12 18V10M18 18V4"/></svg>
 <span>Learning</span></div><div class="item on"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v6M12 7.5v.5"/></svg>
-<span>About</span></div></div></div></div>
+<span>About</span></div></div></div><div><div class="navlab">Sections B: lighter in light, darker in dark</div><div class="nav navb"><div class="item rest"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V12a8 8 0 0 1 16 0v8M8 20v-8a4 4 0 0 1 8 0v8"/></svg>
+<span>Tunnels</span></div><div class="item hover"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6a3 3 0 1 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
+<span>General</span></div><div class="item rest"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18V6M12 18V10M18 18V4"/></svg>
+<span>Learning</span></div><div class="item on"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v6M12 7.5v.5"/></svg>
+<span>About</span></div></div></div></div></div></div>
 <div class="dark box">
   <div class="t">Dark</div>
   <div class="row"><div class="closes"><div class="opt"><div class="lab">At rest</div><div class="cl rest"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg>
 </div></div><div class="opt"><div class="lab">A. Darker in light, lighter in dark</div><div class="cl a"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg>
 </div></div><div class="opt"><div class="lab">B. Lighter in light, darker in dark</div><div class="cl b"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg>
 </div></div><div class="opt"><div class="lab">C. Red</div><div class="cl c"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg>
-</div></div></div><div class="nav"><div class="item rest"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V12a8 8 0 0 1 16 0v8M8 20v-8a4 4 0 0 1 8 0v8"/></svg>
+</div></div></div><div class="navs"><div><div class="navlab">Sections A: darker in light, lighter in dark</div><div class="nav"><div class="item rest"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V12a8 8 0 0 1 16 0v8M8 20v-8a4 4 0 0 1 8 0v8"/></svg>
 <span>Tunnels</span></div><div class="item hover"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6a3 3 0 1 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
 <span>General</span></div><div class="item rest"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18V6M12 18V10M18 18V4"/></svg>
 <span>Learning</span></div><div class="item on"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v6M12 7.5v.5"/></svg>
-<span>About</span></div></div></div></div>
+<span>About</span></div></div></div><div><div class="navlab">Sections B: lighter in light, darker in dark</div><div class="nav navb"><div class="item rest"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V12a8 8 0 0 1 16 0v8M8 20v-8a4 4 0 0 1 8 0v8"/></svg>
+<span>Tunnels</span></div><div class="item hover"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6a3 3 0 1 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
+<span>General</span></div><div class="item rest"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18V6M12 18V10M18 18V4"/></svg>
+<span>Learning</span></div><div class="item on"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v6M12 7.5v.5"/></svg>
+<span>About</span></div></div></div></div></div></div>
 </div></body></html>
