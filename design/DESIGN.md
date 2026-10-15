@@ -36,6 +36,10 @@ Don't drift back into these. Each was tried and dropped for a reason.
 - **Breathing or pulsing status dots** (the `breath` animation in
   tray-panel.html). Reads as an AI-made-UI tell. Status is said in words;
   motion is kept for things that happen.
+- **A coloured edge down one side of a box** (a 3 px amber line on a
+  notice's left, design/proposals/leftover-warning.html, 2). An AI-made-UI
+  tell, like the breathing dots: a notice says what it is with its words,
+  its icon and, when it needs you, its whole surface.
 - **Tray marks above the head** (design/proposals/tray-marks-above.html).
   The bar icon is a fixed square: room above the head shrinks the bird.
   The call marks stay off the beak and the "!" on the back of the head.
@@ -56,7 +60,13 @@ Don't drift back into these. Each was tried and dropped for a reason.
 
 ## Colour
 
-One accent. Teal means **"Crake made a decision"**, nothing else.
+One accent. Teal means **"Crake made a decision"**, nothing else. Two status
+colours, each with one meaning too: red, **something stopped or failed**;
+amber, **it needs you, nothing has broken yet** (relaxed 2026-10-15, asked for
+by the user: "it must be tasteful, but maybe some colour, and an icon here
+and there"; design/proposals/leftover-warning.html). Amber colours a whole
+notice (its tint, its hairline) and its icon, the bird's head with an amber
+triangle; never an edge on one side of a box, never decoration.
 
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |
@@ -73,9 +83,14 @@ One accent. Teal means **"Crake made a decision"**, nothing else.
 | accentSoft | `#E2F1EF` | `#17332F` | selected row background |
 | danger | `#B42318` | `#F97066` | destructive actions, failed step; a window's × pointed at |
 | onDanger | `#FFFFFF` | `#0B1514` | the × on danger |
+| warning | `#E39A1B` | `#F5B740` | the triangle on the bird's head: needs you |
+| warningSoft | `#FCF4E4` | `#2C2618` | a notice that needs you: its tint |
+| warningLine | `#EFD9AE` | `#5C4A22` | its hairline, and the border of a field in it |
+| onWarning | `#1A1C1E` | `#1A1408` | the "!" on the triangle |
 | navHover | `#F9F9F7` | `#242729` | a Settings section pointed at: halfway from the sidebar to the current section |
 
-Follow the system light/dark setting. Never add a second accent. Tunnels are
+Follow the system light/dark setting. Never add a second accent, or another
+status colour without one meaning of its own. Tunnels are
 told apart by name, not colour.
 
 ## Type
@@ -174,9 +189,10 @@ square so it fills the slot. White; the states:
 | listening | eye open |
 | routed (a few seconds) | the two call marks over the corner, **teal** |
 | trouble | a **red** badge with "!" over the corner of the head as it would be without it: asleep when nothing is up, dashed while another tunnel connects, awake while one is up (design/proposals/dismiss-trouble.html) |
+| needs you | an **amber** triangle with "!" in the same corner, on the head as it is (`tray-head-warning.svg`, `-off-`, `-connecting-`): an OpenVPN 3 process left running, until it ends or "Got it" (design/proposals/leftover-warning.html). Red wins: a tunnel that stopped shows trouble's badge instead |
 
-The head changes shape, never colour; only the two state marks are coloured
-(dark-mode accent and danger, the bar is dark), with a gap cut into the head
+The head changes shape, never colour; only the state marks are coloured
+(dark-mode accent, danger and warning, the bar is dark), with a gap cut into the head
 around them so they read on any bar colour. The whole bird with grass
 (`crake-*-symbolic.svg`) stays for places with room; `CRAKE_TRAY=bird` shows
 it in the bar.

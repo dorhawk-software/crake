@@ -89,6 +89,19 @@ struct Seen {
 }
 
 impl Leftovers {
+    /// The processes said to have outlived their sessions that still run:
+    /// (pid, when it started, its session's profile).
+    pub fn running(&self) -> Vec<(u32, u64, String)> {
+        let mut all: Vec<_> = self
+            .seen
+            .iter()
+            .filter(|(_, s)| s.said)
+            .map(|(pid, s)| (*pid, s.started, s.profile.clone()))
+            .collect();
+        all.sort_unstable();
+        all
+    }
+
     /// One look: the sessions' processes now (`backends`), and when a
     /// process started (`started`). Returns each process to say, once:
     /// (pid, its session's profile).
@@ -160,6 +173,10 @@ mod tests {
             l.look(minute + OUTLIVED, &[], processes(&running))
                 .is_empty()
         );
+        assert_eq!(l.running(), vec![(4242, 100, "globex".to_owned())]);
+        // Ended: no longer running.
+        l.look(minute + OUTLIVED, &[], processes(&[]));
+        assert!(l.running().is_empty());
     }
 
     #[test]

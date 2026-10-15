@@ -275,7 +275,7 @@ async fn the_app_and_craked_work_together_over_dbus() {
                 && e.tunnel.as_deref() == Some("initech")
                 && e.reason
                     .as_deref()
-                    .is_some_and(|r| r.ends_with("sudo kill 4242"))
+                    .is_some_and(|r| r.ends_with("sudo kill -9 4242"))
         })
     })
     .await;

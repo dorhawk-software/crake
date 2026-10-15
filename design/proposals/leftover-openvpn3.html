@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: OpenVPN 3 left a connection running</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4;
+    --accent: #2DD4BF; --accent-ink: #0B1514; --track: #4A4E53; --danger: #F97066; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --ink: #1A1C1E; --muted: #5A5F64;
+    --accent: #0F766E; --accent-ink: #FFFFFF; --track: #BDBDB8; --danger: #C4372C; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 40px; max-width: 1040px; }
+  .intro { color: var(--muted); font-size: 13px; margin-bottom: 18px; max-width: 900px; }
+  .intro b { color: var(--ink); }
+  .cap { font-size: 15px; font-weight: 700; margin: 26px 0 2px; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 900px; }
+  .cols { display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-start; }
+  .panel { width: 452px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding-bottom: 8px; }
+  .head { display: flex; align-items: center; gap: 10px; padding: 14px 18px 10px; }
+  .head .t { font-weight: 700; font-size: 16px; }
+  .head .s { color: var(--muted); font-size: 13px; }
+  .note { margin: 0 18px 10px; padding: 10px 12px; background: var(--surface); border-radius: 8px; font-size: 13px; }
+  .note .top { display: flex; gap: 12px; align-items: baseline; }
+  .note .top span:first-child { flex: 1; font-weight: 600; }
+  .note .why { color: var(--muted); margin-top: 3px; }
+  .note .cmd { margin-top: 8px; display: flex; align-items: center; gap: 10px; }
+  .note code { flex: 1; font-family: 'Atkinson Hyperlegible Mono', monospace; font-size: 12.5px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+  .act { flex: none; color: var(--accent); font-weight: 600; }
+  .quiet { flex: none; color: var(--muted); font-weight: 600; }
+  .note .acts { display: flex; gap: 16px; justify-content: flex-end; margin-top: 8px; }
+  .sec { padding: 8px 18px 4px; font-size: 13px; font-weight: 600; border-top: 1px solid var(--line); }
+  .tun { display: flex; align-items: center; gap: 12px; padding: 8px 18px; }
+  .tun .n { font-weight: 700; font-size: 15px; } .tun .st { color: var(--muted); font-size: 13px; margin-left: 8px; }
+  .sw { width: 46px; height: 26px; border-radius: 13px; background: var(--accent); position: relative; margin-left: auto; flex: none; }
+  .sw::after { content: ''; position: absolute; top: 3px; left: 23px; width: 20px; height: 20px; border-radius: 50%; background: #fff; }
+  .sw.off { background: var(--track); } .sw.off::after { left: 3px; }
+  .after { width: 452px; }
+  .after .row { font-size: 13px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  .after .row .m { font-weight: 600; } .after .row .r { color: var(--muted); }
+  .q { margin-top: 26px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; max-width: 900px; font-size: 13px; }
+  .q b { color: var(--ink); }
+  ul { margin: 6px 0 0 18px; padding: 0; } li { margin: 2px 0; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>OpenVPN 3 left a connection running.</b> OpenVPN 3 can lose track of a session's process:
+    the session ends, the process doesn't, and it keeps reconnecting on its own, changing the other tunnels' DNS
+    each time (every name went to one company for a moment; Firefox hung). Crake already notices it (a minute after
+    the session went) and says so in the log and a notification. This puts it in the panel, where it stays until
+    it's dealt with. The process is OpenVPN 3's (its own user), so the app can't stop it; craked can, with a wider
+    permission. Two ways:</div>
+
+  <div class="cap">A. Say how, with the command to copy (chosen)</div>
+  <div class="sub">Nothing new is allowed. The command ends it at once (<code>-9</code>: these processes hang, and a
+    plain kill didn't stop the ones seen). "Got it" hides it; it goes by itself once the process has ended. "Got it"
+    no longer takes a line of its own: two places for it.</div>
+  <div class="cols">
+  <div>
+  <div class="sub" style="margin:0 0 8px"><b style="color:var(--ink)">A1.</b> On the title's line, where "Stop it" was
+    in B and "Restart" is in the update notice.</div>
+  <div class="panel">
+    <div class="head"><span class="t">Crake</span><span class="s">· Listening</span></div>
+    <div class="note">
+      <div class="top"><span>OpenVPN 3 left a connection running.</span><span class="quiet">Got it</span></div>
+      <div class="why">Its Globex session ended, but the process kept going: it reconnects on its own and changes
+        your other tunnels' DNS. Stop it in a terminal:</div>
+      <div class="cmd"><code>sudo kill -9 2415678</code><span class="act">Copy</span></div>
+    </div>
+    <div class="sec">Tunnels</div>
+    <div class="tun"><span class="n">Initech</span><span class="st">Connected · 4 hosts</span><div class="sw"></div></div>
+    <div class="tun"><span class="n">Globex</span><span class="st">Off</span><div class="sw off"></div></div>
+  </div>
+  </div>
+  <div>
+  <div class="sub" style="margin:0 0 8px"><b style="color:var(--ink)">A2.</b> After Copy, on the command's line:
+    both things to do with it in one place.</div>
+  <div class="panel">
+    <div class="head"><span class="t">Crake</span><span class="s">· Listening</span></div>
+    <div class="note">
+      <div class="top"><span>OpenVPN 3 left a connection running.</span></div>
+      <div class="why">Its Globex session ended, but the process kept going: it reconnects on its own and changes
+        your other tunnels' DNS. Stop it in a terminal:</div>
+      <div class="cmd"><code>sudo kill -9 2415678</code><span class="act">Copy</span><span class="quiet">Got it</span></div>
+    </div>
+    <div class="sec">Tunnels</div>
+    <div class="tun"><span class="n">Initech</span><span class="st">Connected · 4 hosts</span><div class="sw"></div></div>
+    <div class="tun"><span class="n">Globex</span><span class="st">Off</span><div class="sw off"></div></div>
+  </div>
+  </div>
+  </div>
+
+  <div class="cap">B. Stop it from the panel (not chosen: Crake shouldn't end another program's process)</div>
+  <div class="sub">One click: craked ends the process, and logs it. Before it does, craked checks the number is still
+    OpenVPN 3's session process (its program and its start time, as the app saw it) and nothing else.</div>
+  <div class="cols">
+    <div class="panel">
+      <div class="head"><span class="t">Crake</span><span class="s">· Listening</span></div>
+      <div class="note">
+        <div class="top"><span>OpenVPN 3 left a connection running.</span><span class="act">Stop it</span></div>
+        <div class="why">Its Globex session ended, but the process kept going: it reconnects on its own and changes
+          your other tunnels' DNS.</div>
+      </div>
+      <div class="sec">Tunnels</div>
+      <div class="tun"><span class="n">Initech</span><span class="st">Connected · 4 hosts</span><div class="sw"></div></div>
+      <div class="tun"><span class="n">Globex</span><span class="st">Off</span><div class="sw off"></div></div>
+    </div>
+    <div class="after">
+      <div class="sub" style="margin:0 0 8px">Afterwards, in the log:</div>
+      <div class="row"><div class="m">Stopped what OpenVPN 3 left running.</div>
+        <div class="r">Its Globex session had ended; the process (2415678) kept reconnecting on its own.</div></div>
+    </div>
+  </div>
+
+  <div class="q"><b>The trade-off.</b> A needs nothing new, but asks for a terminal and sudo. B is one click, but
+    craked's AppArmor profile, which today lets it signal only its own processes (openconnect), would have to allow
+    ending processes outside it:
+    <ul>
+      <li>craked would check the program is <code>/usr/libexec/openvpn3-linux/openvpn3-service-client</code> and the
+        start time is the one the app saw, so a wrong or reused number stops nothing;</li>
+      <li>but it can't see whose session it was: the app sees only your sessions, so on a computer shared with
+        another user, it trusts your app that the session ended (polkit asks as for any change);</li>
+      <li>Fedora and the other systems without AppArmor need no rule; macOS and Windows don't run OpenVPN 3 sessions.</li>
+    </ul>
+    Either way the log and the notification stay as they are.</div>
+</div>
+<script>if (location.search.includes('dark=false')) document.body.classList.add('light');</script>
+</body>
+</html>

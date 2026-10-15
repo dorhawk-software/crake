@@ -231,6 +231,31 @@ pub(super) fn watch_openvpn3(cx: &mut App) {
                 &backends,
                 ovpn3::leftover::started,
             );
+            let running = leftovers.running();
+            cx.update(|cx| {
+                let model = cx.global::<Shell>().model.clone();
+                let dismissed = cx.global::<prefs::Prefs>().dismissed.clone();
+                model.update(cx, |m, cx| {
+                    let now: Vec<model::Leftover> = running
+                        .iter()
+                        .map(|(pid, started, profile)| model::Leftover {
+                            pid: *pid,
+                            started: *started,
+                            session: m
+                                .tunnels
+                                .iter()
+                                .find(|t| t.protocol == "openvpn3" && t.gateway == *profile)
+                                .map_or_else(|| profile.clone(), |t| t.display.clone()),
+                        })
+                        // Seen ("Got it"): not said again, in the panel or the tray.
+                        .filter(|l| !dismissed.contains(&l.dismiss_key()))
+                        .collect();
+                    if m.leftovers != now {
+                        m.leftovers = now;
+                        cx.notify();
+                    }
+                });
+            });
             if !said.is_empty() {
                 let commands = cx.update(|cx| cx.global::<Shell>().commands.clone());
                 for (pid, profile) in said {

@@ -155,7 +155,7 @@ pub fn left_running_reason(profile: &str, pid: u32) -> String {
     format!(
         "Its session for the profile {profile} ended, but the process behind it \
          ({pid}) didn\u{2019}t: it reconnects on its own and can change your other \
-         tunnels\u{2019} DNS. Stop it with: sudo kill {pid}"
+         tunnels\u{2019} DNS. Stop it with: sudo kill -9 {pid}"
     )
 }
 
@@ -339,7 +339,7 @@ mod tests {
             Some(
                 "Its session for the profile globex ended, but the process behind it (4242) \
                  didn\u{2019}t: it reconnects on its own and can change your other tunnels\u{2019} \
-                 DNS. Stop it with: sudo kill 4242"
+                 DNS. Stop it with: sudo kill -9 4242"
             )
         );
     }

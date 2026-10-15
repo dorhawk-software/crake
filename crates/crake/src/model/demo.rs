@@ -194,6 +194,18 @@ pub fn demo_expired(mut m: Model) -> Model {
     m
 }
 
+/// The demo with a process OpenVPN 3 left running (CRAKE_DEMO=leftover;
+/// design/proposals/leftover-warning.html).
+pub fn demo_leftover(mut m: Model) -> Model {
+    m.leftovers.push(Leftover {
+        // literal: the demo's sample (a process number, as the user saw one)
+        pid: 2_415_678,
+        started: 1,
+        session: "Globex".into(),
+    });
+    m
+}
+
 /// The demo with Nordbank an OpenVPN 3 tunnel whose profile's name is too
 /// long for its fact (CRAKE_DEMO=openvpn3): tunnel detail's "Edit…" and a
 /// name cut with "…" (design/proposals/edit-ovpn-profile.html).

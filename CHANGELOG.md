@@ -11,6 +11,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **A process OpenVPN 3 left running is shown in the panel, with the command that stops it.** The
+  notice is tinted amber and has Copy and Got it beside the command; it goes by itself once the
+  process has ended. The bird in the bar wears a small amber triangle meanwhile (a red badge, for a
+  tunnel that stopped, takes its place). Crake doesn't end another program's process itself.
+
 ## 0.8.3 (2026-10-15)
 
 - **Traffic names things better and stays still when nothing flows.** Many names can share one

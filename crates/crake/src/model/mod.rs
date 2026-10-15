@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use crake_proto::{LogEntry, LogKind};
 
 use crate::client::{Tunnel, Update};
-use crate::tray::{MenuTunnel, Shape};
+use crate::tray::{Badge, MenuTunnel, Shape};
 
 mod days;
 mod demo;
@@ -20,7 +20,7 @@ use self::days::local_time;
 pub use self::days::{Day, Row, Show};
 #[cfg(test)]
 pub use self::demo::demo_log_whole_day;
-pub use self::demo::{demo, demo_detail, demo_expired, demo_log, demo_openvpn3};
+pub use self::demo::{demo, demo_detail, demo_expired, demo_leftover, demo_log, demo_openvpn3};
 
 /// How long the tray shows the "routed" shape after a decision.
 const ROUTED_SHAPE_FOR: Duration = Duration::from_secs(4);
@@ -38,6 +38,24 @@ const HELPDESK_DECISIONS: usize = 20;
 /// How long a failed command's sentence stays on screen.
 pub const FAILURE_SHOWN: Duration = Duration::from_secs(8);
 
+/// An OpenVPN 3 process that outlived its session.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Leftover {
+    pub pid: u32,
+    /// When it started (ticks since boot): tells it from a later process
+    /// with the same number.
+    pub started: u64,
+    /// Its session, as the panel names it: its tunnel, else its profile.
+    pub session: String,
+}
+
+impl Leftover {
+    /// What "Got it" remembers: this process, not its number alone.
+    pub fn dismiss_key(&self) -> String {
+        format!("leftover:{}:{}", self.pid, self.started)
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct Model {
     /// `None` until the first attempt to reach craked has settled.
@@ -51,6 +69,9 @@ pub struct Model {
     /// The newest Crake, when asked (`versions::fetch`).
     pub newest: Option<String>,
     pub tunnels: Vec<Tunnel>,
+    /// OpenVPN 3 processes that outlived their sessions and still run
+    /// (`ovpn3::leftover`): the panel says how to stop each.
+    pub leftovers: Vec<Leftover>,
     /// Oldest first.
     pub log: Vec<LogEntry>,
     pub routed_at: Option<Instant>,
@@ -436,18 +457,22 @@ impl Model {
         v
     }
 
-    /// The tray's shape: what the tunnels are doing, with the red badge on
-    /// it when one stopped on its own (asleep, dashed or awake as the head
-    /// would be without it; design/proposals/dismiss-trouble.html).
+    /// The tray's shape: what the tunnels are doing, with a badge on the
+    /// head as it would be without one (asleep, dashed or awake): red when a
+    /// tunnel stopped on its own (design/proposals/dismiss-trouble.html),
+    /// else amber when something needs you (an OpenVPN 3 process left
+    /// running; design/proposals/leftover-warning.html). Red wins.
     pub fn shape(&self) -> Shape {
         let shape = self.shape_untroubled();
-        if self.reachable != Some(true) || !self.tunnels.iter().any(|t| t.state == "trouble") {
+        if self.reachable != Some(true) {
             return shape;
         }
-        match shape {
-            Shape::Off => Shape::OffTrouble,
-            Shape::Connecting => Shape::ConnectingTrouble,
-            _ => Shape::Trouble,
+        if self.tunnels.iter().any(|t| t.state == "trouble") {
+            shape.with(Badge::Trouble)
+        } else if !self.leftovers.is_empty() {
+            shape.with(Badge::Warning)
+        } else {
+            shape
         }
     }
 
@@ -476,10 +501,12 @@ impl Model {
         match (self.reachable, self.shape()) {
             (None, _) => "Starting",
             (Some(false), _) => "Not running",
-            (_, Shape::Trouble | Shape::OffTrouble | Shape::ConnectingTrouble) => "Trouble",
-            (_, Shape::Connecting) => "Connecting",
-            (_, Shape::Listening | Shape::Routed) => "Listening",
-            (_, Shape::Off) => "Off",
+            (_, shape) => match shape.badged() {
+                (_, Some(Badge::Trouble)) => "Trouble",
+                (Shape::Connecting, _) => "Connecting",
+                (Shape::Listening | Shape::Routed, _) => "Listening",
+                _ => "Off",
+            },
         }
     }
 
@@ -1027,5 +1054,28 @@ mod tests {
             copy.contains("Firefox and Chrome look names up themselves (DNS over HTTPS)"),
             "{copy}"
         );
+    }
+
+    /// Something needs you (an OpenVPN 3 process left running): the amber
+    /// badge on the head as it is; a tunnel that stopped: red, which wins.
+    #[test]
+    fn red_trouble_wins_over_amber_needs_you() {
+        let mut m = demo();
+        m.routed_at = None;
+        let (plain, badge) = m.shape().badged();
+        assert_eq!(badge, None, "the sample needs nothing");
+        let status = m.status();
+        m.leftovers.push(Leftover {
+            pid: 4242,
+            started: 1,
+            session: "Globex".into(),
+        });
+        assert_eq!(m.shape(), plain.with(Badge::Warning));
+        assert_eq!(m.status(), status, "the header's word stays");
+        m.tunnels[0].state = "trouble".into();
+        assert_eq!(m.shape().badged().1, Some(Badge::Trouble));
+        // Nothing up: asleep, with its amber badge.
+        m.tunnels.iter_mut().for_each(|t| t.state = "off".into());
+        assert_eq!(m.shape(), Shape::OffWarning);
     }
 }

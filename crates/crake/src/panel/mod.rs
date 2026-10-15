@@ -20,6 +20,7 @@ use crate::theme::{Theme, fonts};
 mod chart;
 mod decisions;
 mod first_run;
+mod leftover;
 mod tunnels;
 mod version;
 
@@ -120,6 +121,8 @@ pub struct Panel {
     help_open: bool,
     /// No tunnel yet: the bird peeking out of the grass (`first_run`).
     peek: first_run::Peek,
+    /// The leftover OpenVPN 3 process whose command was copied, and when.
+    leftover_copied: Option<(u32, Instant)>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -153,6 +156,7 @@ impl Render for Panel {
         } else if reachable {
             panel = panel
                 .children(self.version_notice(model, &t, cx))
+                .children(self.leftover_notices(model, &t, cx))
                 .child(self.chart(model, &t, window, cx))
                 .child(self.decisions(model, &t, window, cx))
                 .child(self.tunnels(model, &t, cx))
@@ -394,6 +398,7 @@ impl Panel {
             },
             help_open: false,
             peek: first_run::Peek::new(),
+            leftover_copied: None,
             _subscriptions: subscriptions,
         }
     }

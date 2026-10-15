@@ -295,6 +295,15 @@ fn the_service_waiting_for_approval_takes_the_user_there(cx: &mut TestAppContext
 }
 
 impl Opened {
+    fn shows_element(&self, id: impl Into<gpui_kit::ElementId>, cx: &mut TestAppContext) -> bool {
+        let id = id.into();
+        cx.update_window(self.window, |_, window, cx| {
+            window.render_frame(cx);
+            window.try_find(id).is_some()
+        })
+        .unwrap()
+    }
+
     fn shows(&self, id: &'static str, cx: &mut TestAppContext) -> bool {
         cx.update_window(self.window, |_, window, cx| {
             window.render_frame(cx);
@@ -340,4 +349,55 @@ fn a_new_version_links_its_page_until_not_now(cx: &mut TestAppContext) {
     }
     cx.update(|cx| cx.global_mut::<Prefs>().check_versions = false);
     assert!(!w.shows("version", cx), "switched off");
+}
+
+/// OpenVPN 3 left a connection running (design/proposals/leftover-warning.html):
+/// the panel says how to stop it, Copy puts the command on the clipboard,
+/// Got it remembers this process; a process that ended isn't said.
+#[gpui_kit::test]
+fn a_leftover_process_says_how_to_stop_it(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    assert!(
+        !w.shows_element(("leftover", 0usize), cx),
+        "nothing left running"
+    );
+    let leftover = crate::model::Leftover {
+        pid: 4242,
+        started: 100,
+        session: "Globex".into(),
+    };
+    w.model.update(cx, |m, cx| {
+        m.leftovers = vec![leftover.clone()];
+        cx.notify();
+    });
+    assert!(w.shows_element(("leftover", 0usize), cx), "said");
+    cx.update_window(w.window, |_, window, cx| {
+        window.render_frame(cx);
+        window.click(("leftover-copy", 0usize), cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert_eq!(
+        cx.read_from_clipboard().and_then(|c| c.text()).as_deref(),
+        Some("sudo kill -9 4242")
+    );
+    match w.click(("leftover-got-it", 0usize), cx) {
+        Request::Dismiss(key) => {
+            assert_eq!(key, "leftover:4242:100");
+            cx.update(|cx| {
+                cx.global_mut::<Prefs>().dismissed.insert(key);
+            });
+        }
+        other => panic!("{other:?}"),
+    }
+    assert!(!w.shows_element(("leftover", 0usize), cx), "seen: hidden");
+    // Another process left running later is said again.
+    w.model.update(cx, |m, cx| {
+        m.leftovers = vec![crate::model::Leftover {
+            pid: 5151,
+            ..leftover
+        }];
+        cx.notify();
+    });
+    assert!(w.shows_element(("leftover", 0usize), cx));
 }

@@ -1,4 +1,5 @@
-//! Tokens from design/DESIGN.md. One accent: teal means "Crake made a decision".
+//! Tokens from design/DESIGN.md. One accent: teal means "Crake made a decision";
+//! red, what stopped or failed; amber, what needs you.
 
 use gpui_kit::{App, Rgba, rgb};
 
@@ -22,6 +23,12 @@ pub struct Theme {
     /// A Settings section pointed at: halfway from the sidebar's colour to
     /// the current section's (design/proposals/hover-close-and-sections.html).
     pub nav_hover: Rgba,
+    /// Needs you, nothing has broken yet (design/proposals/leftover-warning.html):
+    /// the warning triangle, a notice's tint and hairline, the "!" on it.
+    pub warning: Rgba,
+    pub warning_soft: Rgba,
+    pub warning_line: Rgba,
+    pub on_warning: Rgba,
     /// Chart volume bars.
     pub bars: Rgba,
     /// The switch's track when off.
@@ -44,6 +51,10 @@ impl Theme {
             danger: rgb(0xB42318),
             on_danger: rgb(0xFFFFFF),
             nav_hover: rgb(0xF9F9F7),
+            warning: rgb(0xE39A1B),
+            warning_soft: rgb(0xFCF4E4),
+            warning_line: rgb(0xEFD9AE),
+            on_warning: rgb(0x1A1C1E),
             bars: rgb(0xD8D9D5),
             track: rgb(0xBDBDB8),
         }
@@ -64,6 +75,10 @@ impl Theme {
             danger: rgb(0xF97066),
             on_danger: rgb(0x0B1514),
             nav_hover: rgb(0x242729),
+            warning: rgb(0xF5B740),
+            warning_soft: rgb(0x2C2618),
+            warning_line: rgb(0x5C4A22),
+            on_warning: rgb(0x1A1408),
             bars: rgb(0x3E4246),
             track: rgb(0x4A4E53),
         }

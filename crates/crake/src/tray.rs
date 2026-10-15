@@ -1,6 +1,7 @@
 //! The top-bar icon. States change shape, never colour (design/DESIGN.md):
-//! off, connecting, listening, routed (a few seconds), and trouble's red
-//! badge on the head as it is (asleep, dashed or awake). A click opens
+//! off, connecting, listening, routed (a few seconds), and a badge on the
+//! head as it is (asleep, dashed or awake): trouble's red one, or an amber
+//! triangle when something needs the user (red wins). A click opens
 //! the panel; the menu is the plain fallback: tunnels with check marks, Open
 //! Crake, Quit. What it shows and how it's drawn lives here; each system's
 //! tray shows it (`sys::tray`).
@@ -21,6 +22,20 @@ pub enum Shape {
     OffTrouble,
     /// The badge on the dashed head: a tunnel stopped, another connects.
     ConnectingTrouble,
+    /// The amber triangle on the head awake: something needs you (an
+    /// OpenVPN 3 process left running), a tunnel is up.
+    Warning,
+    /// The amber triangle on the head asleep.
+    OffWarning,
+    /// The amber triangle on the dashed head.
+    ConnectingWarning,
+}
+
+/// A badge on the head: red, something stopped; amber, it needs you.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Badge {
+    Trouble,
+    Warning,
 }
 
 impl Shape {
@@ -28,13 +43,29 @@ impl Shape {
         self as usize
     }
 
-    /// The shape without trouble's badge, and whether it has one.
-    pub fn badged(self) -> (Shape, bool) {
+    /// The shape without its badge, and the badge.
+    pub fn badged(self) -> (Shape, Option<Badge>) {
         match self {
-            Shape::Trouble => (Shape::Listening, true),
-            Shape::OffTrouble => (Shape::Off, true),
-            Shape::ConnectingTrouble => (Shape::Connecting, true),
-            other => (other, false),
+            Shape::Trouble => (Shape::Listening, Some(Badge::Trouble)),
+            Shape::OffTrouble => (Shape::Off, Some(Badge::Trouble)),
+            Shape::ConnectingTrouble => (Shape::Connecting, Some(Badge::Trouble)),
+            Shape::Warning => (Shape::Listening, Some(Badge::Warning)),
+            Shape::OffWarning => (Shape::Off, Some(Badge::Warning)),
+            Shape::ConnectingWarning => (Shape::Connecting, Some(Badge::Warning)),
+            other => (other, None),
+        }
+    }
+
+    /// This shape with `badge` on the head as it is (a routed head shows
+    /// the badge instead of its marks).
+    pub fn with(self, badge: Badge) -> Shape {
+        match (badge, self.badged().0) {
+            (Badge::Trouble, Shape::Off) => Shape::OffTrouble,
+            (Badge::Trouble, Shape::Connecting) => Shape::ConnectingTrouble,
+            (Badge::Trouble, _) => Shape::Trouble,
+            (Badge::Warning, Shape::Off) => Shape::OffWarning,
+            (Badge::Warning, Shape::Connecting) => Shape::ConnectingWarning,
+            (Badge::Warning, _) => Shape::Warning,
         }
     }
 }
@@ -97,7 +128,7 @@ const SIZE: u32 = 64;
 /// 36 (macOS' menu bar on a Retina screen).
 const SMALL: [u32; 9] = [16, 20, 22, 24, 28, 32, 36, 40, 48];
 
-static ICONS: LazyLock<[Icon; 7]> = LazyLock::new(|| {
+static ICONS: LazyLock<[Icon; 10]> = LazyLock::new(|| {
     // The head alone, solid with the eye cut out: it holds its own next to app
     // icons in a small bar (DESIGN.md, Tray icon). CRAKE_TRAY=bird: the whole
     // bird, as in design/icons/crake-*-symbolic.svg.
@@ -118,26 +149,37 @@ static ICONS: LazyLock<[Icon; 7]> = LazyLock::new(|| {
             draw_as_is(include_str!(
                 "../../../assets/icons/tray-head-connecting-trouble.svg"
             )),
+            // The amber triangle: drawn as the motion draws it.
+            rest(Shape::Warning).icon(),
+            rest(Shape::OffWarning).icon(),
+            rest(Shape::ConnectingWarning).icon(),
         ];
     }
-    // The whole bird has one trouble drawing, the head with "!".
+    // The whole bird has one trouble drawing, the head with "!", and no
+    // warning drawing (the plain bird; CRAKE_TRAY=bird is a fallback).
     let trouble = draw(include_str!(
         "../../../assets/icons/crake-trouble-symbolic.svg"
     ));
+    let off = draw(include_str!("../../../assets/icons/crake-off-symbolic.svg"));
+    let connecting = draw(include_str!(
+        "../../../assets/icons/crake-connecting-symbolic.svg"
+    ));
+    let listening = draw(include_str!(
+        "../../../assets/icons/crake-listening-symbolic.svg"
+    ));
     [
-        draw(include_str!("../../../assets/icons/crake-off-symbolic.svg")),
-        draw(include_str!(
-            "../../../assets/icons/crake-connecting-symbolic.svg"
-        )),
-        draw(include_str!(
-            "../../../assets/icons/crake-listening-symbolic.svg"
-        )),
+        off.clone(),
+        connecting.clone(),
+        listening.clone(),
         draw(include_str!(
             "../../../assets/icons/crake-routed-symbolic.svg"
         )),
         trouble.clone(),
         trouble.clone(),
         trouble,
+        listening,
+        off,
+        connecting,
     ]
 });
 
@@ -208,8 +250,10 @@ pub struct Art {
     pub eye: f32,
     /// The two call marks: how far each is drawn (0–1), and their opacity.
     pub calls: Option<(f32, f32, f32)>,
-    /// The trouble badge's size (0–1), or none.
+    /// The badge's size (0–1), or none.
     pub badge: Option<f32>,
+    /// The badge is the amber triangle (needs you), not the red circle.
+    pub warning: bool,
     /// Asleep (0–1): the head tips down and shrinks a little, so off reads
     /// at a glance (design/proposals/tray-off-vs-on.html, D).
     pub tuck: f32,
@@ -241,6 +285,9 @@ const SIL_LENGTH: f32 = 44.;
 const MARK_1: &str = "M17.95 9.65l1.6-1.8";
 const MARK_2: &str = "M19.2 11.25l1.9-.8";
 const MARK_LENGTH: f32 = 2.45;
+/// The warning badge: an amber triangle where trouble's circle sits, inside
+/// the bar's square.
+const TRIANGLE: &str = "M19 7.55L21.35 11.7H16.65Z";
 /// The connecting icon's dashes (assets/icons/tray-head-connecting.svg), and
 /// one dash and gap.
 const DASHES: &str = "2.4 1.9";
@@ -279,7 +326,23 @@ impl Art {
                 }
             }
         }
-        if let Some(size) = self.badge {
+        if let Some(size) = self.badge
+            && self.warning
+        {
+            // About the triangle's middle, so it grows from there.
+            let grow = format!(
+                r##"transform="translate(19 10.3) scale({size:.3}) translate(-19 -10.3)""##
+            );
+            corner += &format!(
+                r##"<path d="{TRIANGLE}" fill="#000" stroke="#000" stroke-width="2.5" stroke-linejoin="round" {grow}/>"##
+            );
+            over += &format!(
+                r##"<path d="{TRIANGLE}" fill="#F5B740" stroke="#F5B740" stroke-width="1" stroke-linejoin="round" {grow}/>"##
+            );
+            if size > 0.8 {
+                over += r##"<path d="M19 9.05v1.25" fill="none" stroke="#1a1408" stroke-width="0.95" stroke-linecap="round"/><circle cx="19" cy="11" r="0.48" fill="#1a1408"/>"##;
+            }
+        } else if let Some(size) = self.badge {
             corner += &format!(
                 r##"<circle cx="19.2" cy="9.75" r="{:.3}" fill="#000"/>"##,
                 3.45 * size
@@ -320,13 +383,13 @@ impl Art {
 fn rest(shape: Shape) -> Art {
     let (shape, badge) = shape.badged();
     let art = rest_unbadged(shape);
-    if badge {
-        Art {
+    match badge {
+        Some(b) => Art {
             badge: Some(1.),
+            warning: b == Badge::Warning,
             ..art
-        }
-    } else {
-        art
+        },
+        None => art,
     }
 }
 
@@ -353,28 +416,38 @@ fn rest_unbadged(shape: Shape) -> Art {
             calls: Some((1., 1., 1.)),
             ..head
         },
-        Shape::Trouble | Shape::OffTrouble | Shape::ConnectingTrouble => {
-            rest_unbadged(shape.badged().0)
-        }
+        Shape::Trouble
+        | Shape::OffTrouble
+        | Shape::ConnectingTrouble
+        | Shape::Warning
+        | Shape::OffWarning
+        | Shape::ConnectingWarning => rest_unbadged(shape.badged().0),
     }
 }
 
 /// The frames from one state to the next (every ~70 ms), ending at the
 /// resting look of `to`. Connecting has its own loop (`connecting_loop`).
-/// Trouble's badge stays on through the motion, or appears once after it.
+/// A badge stays on through the motion, or appears once after it (a red
+/// one in an amber one's place too).
 pub fn transition(from: Shape, to: Shape) -> Vec<Art> {
     let ((from, had), (to, has)) = (from.badged(), to.badged());
     let mut v = transition_unbadged(from, to);
-    if has && had {
-        for art in &mut v {
-            art.badge = Some(1.);
+    match (had, has) {
+        (Some(a), Some(b)) if a == b => {
+            for art in &mut v {
+                art.badge = Some(1.);
+                art.warning = b == Badge::Warning;
+            }
         }
-    } else if has {
-        let rest = rest(to);
-        v.extend(steps(BADGE_STEPS).map(|s| Art {
-            badge: Some(s),
-            ..rest
-        }));
+        (_, Some(b)) => {
+            let rest = rest(to);
+            v.extend(steps(BADGE_STEPS).map(|s| Art {
+                badge: Some(s),
+                warning: b == Badge::Warning,
+                ..rest
+            }));
+        }
+        _ => {}
     }
     v
 }
@@ -481,13 +554,14 @@ fn transition_unbadged(from: Shape, to: Shape) -> Vec<Art> {
 /// (design/proposals/tray-connecting.html). Every frame is the whole head,
 /// so a frame the bar misses only makes the dashes jump a little; a line
 /// drawing itself read as blinking there.
-/// With `badge`, trouble's badge stays on it.
-pub fn connecting_loop(badge: bool) -> Vec<Art> {
+/// With `badge`, that badge stays on it.
+pub fn connecting_loop(badge: Option<Badge>) -> Vec<Art> {
     const STEPS: u8 = 10;
     (0..STEPS)
         .map(|i| Art {
             dashes: Some(f32::from(i) / f32::from(STEPS)),
-            badge: badge.then_some(1.),
+            badge: badge.map(|_| 1.),
+            warning: badge == Some(Badge::Warning),
             ..Art::default()
         })
         .collect()
@@ -529,6 +603,14 @@ mod tests {
                 "{shape:?}"
             );
         }
+        // Needs you: an amber triangle in the same corner.
+        for shape in [Shape::Warning, Shape::OffWarning, Shape::ConnectingWarning] {
+            assert_eq!(
+                px(&ICONS[shape.index()], 18., 11.2)[1..],
+                [0xF5, 0xB7, 0x40],
+                "{shape:?}"
+            );
+        }
     }
 
     #[test]
@@ -552,17 +634,32 @@ mod tests {
             (Shape::Off, Shape::OffTrouble),
             (Shape::Connecting, Shape::ConnectingTrouble),
             (Shape::OffTrouble, Shape::Trouble),
+            (Shape::Listening, Shape::Warning),
+            (Shape::Off, Shape::OffWarning),
+            (Shape::Connecting, Shape::ConnectingWarning),
+            (Shape::OffWarning, Shape::Warning),
+            // A tunnel stops while something needs you: red takes its place.
+            (Shape::Warning, Shape::Trouble),
+            (Shape::OffWarning, Shape::OffTrouble),
         ] {
             let last = transition(from, to).last().unwrap().icon();
             assert!(close(&last, &ICONS[to.index()]), "{from:?} -> {to:?}");
         }
         // Connecting goes round from the dashed head at rest, every frame
         // the whole head, its dashes moved on.
-        let frames: Vec<Icon> = connecting_loop(false).iter().map(Art::icon).collect();
+        let frames: Vec<Icon> = connecting_loop(None).iter().map(Art::icon).collect();
         assert!(close(&frames[0], &ICONS[Shape::Connecting.index()]));
         assert!(frames.windows(2).all(|w| w[0] != w[1]));
-        let frames: Vec<Icon> = connecting_loop(true).iter().map(Art::icon).collect();
+        let frames: Vec<Icon> = connecting_loop(Some(Badge::Trouble))
+            .iter()
+            .map(Art::icon)
+            .collect();
         assert!(close(&frames[0], &ICONS[Shape::ConnectingTrouble.index()]));
+        let frames: Vec<Icon> = connecting_loop(Some(Badge::Warning))
+            .iter()
+            .map(Art::icon)
+            .collect();
+        assert!(close(&frames[0], &ICONS[Shape::ConnectingWarning.index()]));
         // Dismissed: the badge just goes.
         assert!(transition(Shape::OffTrouble, Shape::Off).is_empty());
     }
@@ -575,6 +672,9 @@ mod tests {
             Shape::Trouble,
             Shape::OffTrouble,
             Shape::ConnectingTrouble,
+            Shape::Warning,
+            Shape::OffWarning,
+            Shape::ConnectingWarning,
         ] {
             let icon = &ICONS[shape.index()];
             // Coloured: drawn, and not the white head (which may touch the
@@ -632,5 +732,21 @@ mod tests {
                 assert_ne!(a.data, b.data, "shapes differ");
             }
         }
+    }
+
+    #[test]
+    fn red_wins_over_amber() {
+        // A badge on the head as it is; trouble's replaces a warning's.
+        assert_eq!(Shape::Off.with(Badge::Warning), Shape::OffWarning);
+        assert_eq!(
+            Shape::Connecting.with(Badge::Warning),
+            Shape::ConnectingWarning
+        );
+        assert_eq!(Shape::Routed.with(Badge::Warning), Shape::Warning);
+        assert_eq!(Shape::OffWarning.with(Badge::Trouble), Shape::OffTrouble);
+        assert_eq!(
+            Shape::Warning.badged(),
+            (Shape::Listening, Some(Badge::Warning))
+        );
     }
 }

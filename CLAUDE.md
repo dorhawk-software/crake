@@ -832,7 +832,14 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   ends a session it started whenever it can't follow it; the app notices a
   process it saw belong to one of the user's sessions running a minute
   after its session went (`ovpn3/leftover.rs`) and craked logs it with
-  `sudo kill <pid>` (D-Bus `LeftRunning`, a notification too). Not now: a
+  `sudo kill -9 <pid>` (D-Bus `LeftRunning`, a notification too), and the
+  panel shows it until the process ends or "Got it"
+  (design/proposals/leftover-openvpn3.html, A2: the command with Copy and
+  Got it on its line; leftover-warning.html, 3: tinted amber, the bird's
+  head with an amber triangle, also on the tray's head, where a red trouble
+  badge wins; `panel/leftover.rs`, `tray::Badge`; `CRAKE_DEMO=leftover`).
+  Crake doesn't end the process itself (the user: not Crake's to kill;
+  craked could, with an AppArmor rule to signal outside its profile). Not now: a
   process left from before the app started isn't recognised (telling it
   from another user's session needs root: craked can't see the user's
   sessions, the app can't see others'); worth reporting to OpenVPN (a

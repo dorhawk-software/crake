@@ -284,6 +284,9 @@ impl gpui_kit::AssetSource for Assets {
             "bird-grass.svg",
             "bird-alone.svg",
             "call.svg",
+            "head-warning.svg",
+            "warning-triangle.svg",
+            "warning-mark.svg",
             "mark-routed.svg",
             "mark-left-alone.svg",
             "mark-undone.svg",
@@ -390,6 +393,7 @@ fn main() {
             let model = match std::env::var("CRAKE_DEMO").as_deref() {
                 Ok("expired") => model::demo_expired(model),
                 Ok("openvpn3") => model::demo_openvpn3(model),
+                Ok("leftover") => model::demo_leftover(model),
                 _ => model,
             };
             let setup = Setup {

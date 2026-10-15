@@ -193,11 +193,7 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
             prefs.user_agents.insert(gateway, user_agent);
             prefs.save();
         }
-        Request::Dismiss(key) => {
-            let prefs = cx.global_mut::<prefs::Prefs>();
-            prefs.dismissed.insert(key);
-            prefs.save();
-        }
+        Request::Dismiss(key) => dismiss(key, cx),
         Request::Settings => open_settings(cx),
         Request::Setting(key, value) => {
             if cx.global::<Shell>().demo {
@@ -390,6 +386,19 @@ fn undo(tunnel: String, hosts: Vec<String>, cx: &mut App) {
             hosts,
             others: Vec::new(),
         }));
+        cx.notify();
+    });
+}
+
+/// A notice seen ("Got it", "Not now"): remembered, and a leftover OpenVPN 3
+/// process's amber badge goes from the tray at once.
+fn dismiss(key: String, cx: &mut App) {
+    let prefs = cx.global_mut::<prefs::Prefs>();
+    prefs.dismissed.insert(key.clone());
+    prefs.save();
+    let model = cx.global::<Shell>().model.clone();
+    model.update(cx, |m, cx| {
+        m.leftovers.retain(|l| l.dismiss_key() != key);
         cx.notify();
     });
 }
