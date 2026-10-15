@@ -238,10 +238,18 @@ async fn a_tunnel_on_a_utun_device() {
     let file = std::fs::read_to_string("/etc/resolver/acme.internal").unwrap();
     assert!(file.contains(&format!("for {dev}")), "{file}");
     resolved.flush().await;
-    let found = sh(
-        "dscacheutil",
-        &["-q", "host", "-a", "name", "git.acme.internal"],
-    );
+    // macOS picks a new /etc/resolver file up within a moment, not at once
+    // (seen on CI's runner 2026-10-15: the first ask found nothing).
+    let found = asked_until(
+        || {
+            sh(
+                "dscacheutil",
+                &["-q", "host", "-a", "name", "git.acme.internal"],
+            )
+        },
+        "10.40.1.10",
+    )
+    .await;
     assert!(
         found.contains("10.40.1.10"),
         "macOS asked craked's server: {found}"
@@ -256,10 +264,16 @@ async fn a_tunnel_on_a_utun_device() {
         !upstream.is_empty() && !upstream.contains(&IpAddr::V4(craked::dns_queue::ADDR)),
         "the servers it stands in for: {upstream:?}"
     );
-    let found = sh(
-        "dscacheutil",
-        &["-q", "host", "-a", "name", "www.globex.example"],
-    );
+    let found = asked_until(
+        || {
+            sh(
+                "dscacheutil",
+                &["-q", "host", "-a", "name", "www.globex.example"],
+            )
+        },
+        "10.40.1.10",
+    )
+    .await;
     assert!(
         found.contains("10.40.1.10"),
         "macOS asked craked's server for a public name: {found}\n{}",
@@ -490,4 +504,18 @@ fn layout() -> String {
         at += rec_len.next_multiple_of(8);
     }
     out
+}
+
+/// Ask until the answer contains `want`, for up to 5 s: the system takes
+/// a moment to follow a changed resolver file.
+async fn asked_until(ask: impl Fn() -> String, want: &str) -> String {
+    let mut found = String::new();
+    for _ in 0..20 {
+        found = ask();
+        if found.contains(want) {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    }
+    found
 }
