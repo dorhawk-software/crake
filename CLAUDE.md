@@ -413,6 +413,15 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    `model::live`). Tested: unit, window tests, the wire test, a namespace
    test (a routed and a direct connection, their ways and bytes) and a
    journey step (a real connection through ACME seen in the window).
+   A host's whole name (design/proposals/host-full-name.html, option A;
+   `full_name.rs`), in tunnel detail's rows and the Traffic window's
+   destinations: pointing at a name underlines it, after a moment a card
+   shows it whole (only "Click to copy" when it fits: the box's drawn
+   width against the text's), a click copies it and "Copied" shows after
+   it for 3 s. GPUI draws no dotted underline (a thin solid one) and
+   closes a card when the button goes down (so "Copied" is beside the
+   name, not in the card). A name in a content-sized flex row lost its
+   "…"; it takes the row's leftover room instead.
    Tunnels (Settings, first section; design/proposals/settings-tunnels.html):
    one list in the order traffic takes, drag to reorder (the try order moved
    here from Learning), full tunnels under "Everything else goes through:";
@@ -867,9 +876,6 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
     root only); not built.
   - *Pointing at a path or destination* to name it and its rate, and
     clicking one to find it in the table (the proposal's notes): not built.
-  - *A destination's whole name on hover, and copying it,* as decided for
-    tunnel detail (design/proposals/host-full-name.html, option A, approved
-    2026-10-14 and not built yet either): both windows when it's built.
   - *AppArmor:* the profile now allows `nf_conntrack_acct`; not yet run in
     `scripts/vm-test.sh` (AppArmor enforced, KVM; not in CI).
 - **The explainers** (docs/explainers.md): written down, not yet drawn or

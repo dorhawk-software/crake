@@ -182,6 +182,13 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
             .unwrap()
             .contains("crex")
     );
+    // A host's name copies whole on a click (design/proposals/host-full-name.html).
+    click(cx, d, ("host-name", 0usize));
+    let copied = cx
+        .read_from_clipboard()
+        .and_then(|c| c.text())
+        .unwrap_or_default();
+    assert!(copied.starts_with("10.40.1.1"), "copied {copied:?}");
 
     // 5. The log, and Copy for helpdesk.
     request(cx, Request::Log);

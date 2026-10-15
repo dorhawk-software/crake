@@ -21,6 +21,8 @@ const WAY_COL: f32 = 160.;
 const WHY_COL: f32 = 340.;
 const NUMBER_COL: f32 = 90.;
 const HOUR: u64 = 60 * MINUTE;
+/// A destination's name in a row (px).
+const DEST_SIZE: f32 = 13.;
 
 /// A row: destination (and the address under a name), the way, and the
 /// two right-hand columns.
@@ -137,7 +139,7 @@ pub fn since(d: Duration) -> String {
 
 /// The table: a header line, then the rows (up to MOST_ROWS, then how
 /// many more).
-pub fn table(heads: &[&'static str], rows: &[Row], t: &Theme) -> Div {
+pub fn table(heads: &[&'static str], rows: &[Row], t: &Theme, cx: &gpui_kit::App) -> Div {
     let cell = |w: f32| div().w(px(w)).flex_none().min_w_0();
     let right_cols = heads.len().saturating_sub(2);
     let head = heads.iter().enumerate().fold(
@@ -162,7 +164,7 @@ pub fn table(heads: &[&'static str], rows: &[Row], t: &Theme) -> Div {
         },
     );
     let mut body = div().flex().flex_col().child(head);
-    for r in rows.iter().take(MOST_ROWS) {
+    for (i, r) in rows.iter().take(MOST_ROWS).enumerate() {
         let dot = if r.tunnel.is_some() {
             t.accent
         } else {
@@ -179,14 +181,13 @@ pub fn table(heads: &[&'static str], rows: &[Row], t: &Theme) -> Div {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .child(
-                        div()
-                            .font_family(fonts::MONO)
-                            .overflow_hidden()
-                            .text_ellipsis()
-                            .whitespace_nowrap()
-                            .child(r.dest.clone()),
-                    )
+                    .child(crate::full_name::host_name(
+                        ("dest", i),
+                        r.dest.clone(),
+                        DEST_SIZE,
+                        t,
+                        cx,
+                    ))
                     .when_some(r.under.clone(), |d, under| {
                         d.child(div().text_size(px(12.)).text_color(t.muted).child(under))
                     }),

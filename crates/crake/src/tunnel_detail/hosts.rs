@@ -4,6 +4,8 @@
 use super::*;
 use crate::units::{SECS_PER_DAY as DAY, SECS_PER_HOUR as HOUR, SECS_PER_MINUTE as MINUTE};
 
+/// A host's name in a row (px).
+const HOST_SIZE: f32 = 14.;
 /// Used within this many seconds: "now".
 const JUST_NOW: u64 = 90;
 
@@ -92,10 +94,11 @@ impl TunnelDetail {
                 .collect(),
             Tab::Gateway => gateway
                 .iter()
-                .map(|(host, how, used)| {
+                .enumerate()
+                .map(|(i, (host, how, used))| {
                     row_frame(t)
                         .child(icon("crake/mark-gateway.svg", t.muted))
-                        .child(host_text(host.clone(), how.clone(), t))
+                        .child(host_text(i, host.clone(), how.clone(), t, cx))
                         .child(used_text(used.clone(), t))
                         .child(
                             div()
@@ -237,7 +240,7 @@ impl TunnelDetail {
         let (target, pin_target) = (r.target.clone(), r.target.clone());
         row_frame(t)
             .child(icon(icon_path, color))
-            .child(host_text(host, how, t))
+            .child(host_text(i, host, how, t, cx))
             .child(used_text(used, t))
             .child(
                 div()
@@ -281,19 +284,25 @@ pub(super) fn icon(path: &'static str, color: gpui_kit::Rgba) -> impl IntoElemen
     svg().path(path).size(px(18.)).flex_none().text_color(color)
 }
 
-pub(super) fn host_text(host: String, how: String, t: &Theme) -> impl IntoElement {
+/// A row's host (its whole name on hover, copied on a click:
+/// `full_name`) and how it got there. `i`: the row's place in its tab.
+pub(super) fn host_text(
+    i: usize,
+    host: String,
+    how: String,
+    t: &Theme,
+    cx: &gpui_kit::App,
+) -> impl IntoElement {
     div()
         .flex_1()
         .min_w_0()
-        .child(
-            div()
-                .font_family(fonts::MONO)
-                .text_size(px(14.))
-                .overflow_hidden()
-                .text_ellipsis()
-                .whitespace_nowrap()
-                .child(host),
-        )
+        .child(crate::full_name::host_name(
+            ("host-name", i),
+            host,
+            HOST_SIZE,
+            t,
+            cx,
+        ))
         .child(div().text_size(px(13.)).text_color(t.muted).child(how))
 }
 

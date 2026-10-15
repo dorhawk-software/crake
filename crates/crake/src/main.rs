@@ -65,6 +65,8 @@ use sys::single;
 
 mod theme;
 
+mod full_name;
+
 mod timeline;
 mod tray;
 

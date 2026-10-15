@@ -127,6 +127,27 @@ fn a_hosts_pin_and_forget(cx: &mut TestAppContext) {
     assert!(matches!(w.changed(), Request::Unpin(t, h) if t == "acme" && h == pinned[0].target));
 }
 
+/// A host's name copies whole on a click, however it's cut short on screen
+/// (design/proposals/host-full-name.html, A); it asks the app nothing.
+#[gpui_kit::test]
+fn a_hosts_whole_name_is_copied(cx: &mut TestAppContext) {
+    let w = open(cx);
+    let shown = learned(&w.rows(cx));
+    let i = shown
+        .iter()
+        .position(|r| r.name.is_some())
+        .expect("a named host in the sample");
+    w.click(("host-name", i), cx);
+    let copied = cx.read_from_clipboard().and_then(|c| c.text());
+    assert_eq!(copied, shown[i].name.clone());
+    let name = shown[i].name.clone().unwrap_or_default().into();
+    assert!(
+        cx.read(|cx| crate::full_name::just_copied(&name, cx)),
+        "\u{201c}Copied\u{201d} shows after it"
+    );
+    assert!(w.next().is_none(), "nothing asked of the app");
+}
+
 /// "Forget all…" (design/proposals/forget-all.html): asked in place first;
 /// Cancel asks the app nothing, Forget all asks it to forget everything
 /// learned for the tunnel, and the list is fetched again at once.

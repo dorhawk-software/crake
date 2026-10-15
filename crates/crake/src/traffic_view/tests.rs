@@ -139,6 +139,19 @@ fn the_tabs_list_connections_and_rules(cx: &mut TestAppContext) {
     assert!(w.view.read_with(cx, |v, _| v.tab == Tab::Now));
 }
 
+/// A destination copies whole on a click (design/proposals/host-full-name.html, A).
+#[gpui_kit::test]
+fn a_destination_is_copied_whole(cx: &mut TestAppContext) {
+    let w = open(cx);
+    w.feed(cx);
+    let rows = w
+        .model
+        .read_with(cx, |m, _| tables::right_now(m, Instant::now()));
+    w.click(("dest", 0usize), cx);
+    let copied = cx.read_from_clipboard().and_then(|c| c.text());
+    assert_eq!(copied.as_deref(), Some(rows[0].dest.as_str()));
+}
+
 /// When craked couldn't list the connections, the ways out still show;
 /// the table says why it's empty.
 #[gpui_kit::test]

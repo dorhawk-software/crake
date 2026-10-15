@@ -353,7 +353,14 @@ impl Traffic {
             )
     }
 
-    fn detail(&self, model: &Model, now: &[tables::Row], rules: &[tables::Row], t: &Theme) -> Div {
+    fn detail(
+        &self,
+        model: &Model,
+        now: &[tables::Row],
+        rules: &[tables::Row],
+        t: &Theme,
+        cx: &gpui_kit::App,
+    ) -> Div {
         let body = div().px(px(SIDE)).pb(px(20.));
         match self.tab {
             Tab::Now => match model.live.lists_connections() {
@@ -367,9 +374,10 @@ impl Traffic {
                     &["Destination", "Goes", "Now", "Since"],
                     now,
                     t,
+                    cx,
                 )),
             },
-            Tab::Rules => body.child(tables::table(&["Destination", "Goes", "Why"], rules, t)),
+            Tab::Rules => body.child(tables::table(&["Destination", "Goes", "Why"], rules, t, cx)),
         }
     }
 }
@@ -437,7 +445,7 @@ impl Render for Traffic {
             .child(graph)
             .child(self.strip(&model, &t))
             .child(self.tabs(&now_rows, &rule_rows, &t, cx))
-            .child(self.detail(&model, &now_rows, &rule_rows, &t));
+            .child(self.detail(&model, &now_rows, &rule_rows, &t, cx));
         div()
             .id("traffic")
             .track_focus(&self.focus)
