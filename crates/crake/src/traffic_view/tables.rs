@@ -35,13 +35,20 @@ pub struct Row {
     pub cols: Vec<String>,
 }
 
-/// "Right now": each open connection, busiest first.
+/// "Right now": each open connection, busiest first (over the last twenty
+/// seconds or so: rows don't trade places every second).
 pub fn right_now(model: &Model, now: Instant) -> Vec<Row> {
     let Some(rates) = model.live.rates.as_ref() else {
         return Vec::new();
     };
     let mut conns: Vec<_> = rates.connections.iter().collect();
-    conns.sort_by(|a, b| b.1.total_cmp(&a.1));
+    conns.sort_by(|a, b| {
+        model
+            .live
+            .standing(&b.0)
+            .total_cmp(&model.live.standing(&a.0))
+            .then_with(|| a.0.key().cmp(&b.0.key()))
+    });
     conns
         .into_iter()
         .map(|(c, r)| Row {

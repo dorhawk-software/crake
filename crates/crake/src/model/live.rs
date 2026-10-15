@@ -15,6 +15,14 @@ pub const HISTORY: Duration = Duration::from_secs(5 * 60);
 /// A connection's identity across looks (`Connection::key`).
 type Key = (IpAddr, u16, IpAddr, u16, bool);
 
+/// Rates as shown (the numbers, the dots' pace) follow the traffic over
+/// about this many seconds, not each second's ups and downs; lists are
+/// ordered by an average over about STANDING_OVER, so places change only
+/// when the traffic really shifts (asked for: the first window reshuffled
+/// every second).
+const SHOWN_OVER: f64 = 3.;
+const STANDING_OVER: f64 = 20.;
+
 #[derive(Clone, Debug, Default)]
 pub struct LiveTraffic {
     /// The last look, and when it came.
@@ -26,6 +34,44 @@ pub struct LiveTraffic {
     pub history: VecDeque<(Instant, f64, f64)>,
     /// When each open connection was first seen (its "Since").
     pub first_seen: HashMap<Key, Instant>,
+    /// Each open connection's slow average (bytes/s): what lists go by.
+    standing: HashMap<Key, f64>,
+}
+
+/// How far an average moves towards a new value after `secs`, for one
+/// that follows over about `over` seconds.
+fn weight(secs: f64, over: f64) -> f64 {
+    1. - (-secs / over).exp()
+}
+
+fn towards(old: Option<f64>, new: f64, w: f64) -> f64 {
+    old.map_or(new, |o| o + w * (new - o))
+}
+
+/// `raw`, followed from `old` (the rates shown before) over SHOWN_OVER.
+fn smoothed(old: Option<&Rates>, raw: Rates, secs: f64) -> Rates {
+    let Some(old) = old else { return raw };
+    let w = weight(secs, SHOWN_OVER);
+    let before: HashMap<Key, f64> = old.connections.iter().map(|(c, r)| (c.key(), *r)).collect();
+    Rates {
+        direct: towards(Some(old.direct), raw.direct, w),
+        tunnels: raw
+            .tunnels
+            .into_iter()
+            .map(|(t, r)| {
+                let o = old.tunnels.get(&t).copied();
+                (t, towards(o, r, w))
+            })
+            .collect(),
+        connections: raw
+            .connections
+            .into_iter()
+            .map(|(c, r)| {
+                let o = before.get(&c.key()).copied();
+                (c, towards(o, r, w))
+            })
+            .collect(),
+    }
 }
 
 impl LiveTraffic {
@@ -33,10 +79,20 @@ impl LiveTraffic {
     pub fn add(&mut self, live: Live, at: Instant) {
         if let Some((then, before)) = &self.last {
             let secs = at.duration_since(*then).as_secs_f64();
-            let rates = live.rates_since(before, secs);
-            let through = rates.tunnels.values().sum();
-            self.history.push_back((at, rates.direct, through));
-            self.rates = Some(rates);
+            let raw = live.rates_since(before, secs);
+            let through = raw.tunnels.values().sum();
+            self.history.push_back((at, raw.direct, through));
+            let w = weight(secs, STANDING_OVER);
+            self.standing = raw
+                .connections
+                .iter()
+                .map(|(c, r)| {
+                    let k = c.key();
+                    let o = self.standing.get(&k).copied();
+                    (k, towards(o, *r, w))
+                })
+                .collect();
+            self.rates = Some(smoothed(self.rates.as_ref(), raw, secs));
         }
         while self
             .history
@@ -61,6 +117,11 @@ impl LiveTraffic {
     /// Whether craked lists connections on this system (None: not asked yet).
     pub fn lists_connections(&self) -> Option<bool> {
         self.last.as_ref().map(|(_, l)| l.connections.is_some())
+    }
+
+    /// What lists order `c` by: its rate over the last twenty seconds or so.
+    pub fn standing(&self, c: &Connection) -> f64 {
+        self.standing.get(&c.key()).copied().unwrap_or(0.)
     }
 
     /// How long ago `c` was first seen.
@@ -181,9 +242,57 @@ mod tests {
             "open since it was first seen"
         );
         // A system that doesn't list connections.
+        // (Smoothing: see the next test.)
         let mut none = LiveTraffic::default();
         none.add(Live::default(), t0);
         assert_eq!(none.lists_connections(), Some(false));
         assert_eq!(LiveTraffic::default().lists_connections(), None);
+    }
+
+    /// One look's worth: a connection to 192.0.2.7 that has sent `bytes`.
+    fn look(bytes: u64) -> Live {
+        let c = Connection {
+            src: "192.0.2.1".parse().unwrap(),
+            sport: 50000,
+            dst: "192.0.2.7".parse().unwrap(),
+            dport: 443,
+            udp: false,
+            tunnel: None,
+            name: None,
+            bytes,
+        };
+        Live {
+            connections: Some(vec![c]),
+            ..Live::default()
+        }
+    }
+
+    #[test]
+    fn a_seconds_spike_moves_the_shown_rate_a_little_and_the_order_less() {
+        let mut l = LiveTraffic::default();
+        let t0 = Instant::now();
+        let mut sent = 0;
+        l.add(look(sent), t0);
+        // 100 KB/s, steady for ten seconds.
+        for s in 1..=10 {
+            sent += 100_000;
+            l.add(look(sent), t0 + Duration::from_secs(s));
+        }
+        let rate = |l: &LiveTraffic| l.rates.as_ref().unwrap().connections[0].1;
+        assert!((rate(&l) - 100_000.).abs() < 1., "{}", rate(&l));
+        // One second at 1 MB/s.
+        sent += 1_000_000;
+        l.add(look(sent), t0 + Duration::from_secs(11));
+        let c = l.rates.as_ref().unwrap().connections[0].0.clone();
+        assert!(
+            (300_000. ..450_000.).contains(&rate(&l)),
+            "shown follows over seconds: {}",
+            rate(&l)
+        );
+        assert!(
+            (100_000. ..200_000.).contains(&l.standing(&c)),
+            "lists go by the longer run: {}",
+            l.standing(&c)
+        );
     }
 }

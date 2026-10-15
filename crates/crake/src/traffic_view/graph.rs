@@ -106,11 +106,13 @@ pub fn ways(model: &Model) -> Vec<Way> {
         hosts: Vec::new(),
     });
     for way in &mut ways {
-        let mut by_dest: HashMap<String, f64> = HashMap::new();
+        let mut by_dest: HashMap<String, (f64, f64)> = HashMap::new();
         for (c, rate) in &rates.connections {
             if c.tunnel == way.tunnel {
                 let label = c.name.clone().unwrap_or_else(|| c.dst.to_string());
-                *by_dest.entry(label).or_default() += rate;
+                let d = by_dest.entry(label).or_default();
+                d.0 += rate;
+                d.1 += model.live.standing(c);
             }
         }
         way.hosts = busiest(by_dest);
@@ -118,22 +120,30 @@ pub fn ways(model: &Model) -> Vec<Way> {
     ways
 }
 
-/// The busiest destinations first (by name when equal); past
-/// HOSTS_PER_WAY, the last line stands for the rest.
-fn busiest(by_dest: HashMap<String, f64>) -> Vec<Dest> {
-    let mut all: Vec<Dest> = by_dest
+/// The busiest destinations first, by their rate over the last twenty
+/// seconds or so (by name when equal), so they don't trade places every
+/// second; past HOSTS_PER_WAY, the last line stands for the rest. Each
+/// destination's (rate shown, rate it's ordered by).
+fn busiest(by_dest: HashMap<String, (f64, f64)>) -> Vec<Dest> {
+    let mut all: Vec<(Dest, f64)> = by_dest
         .into_iter()
-        .map(|(label, rate)| Dest {
-            label,
-            rate,
-            more: false,
+        .map(|(label, (rate, standing))| {
+            (
+                Dest {
+                    label,
+                    rate,
+                    more: false,
+                },
+                standing,
+            )
         })
         .collect();
-    all.sort_by(|a, b| {
-        b.rate
-            .total_cmp(&a.rate)
+    all.sort_by(|(a, a_standing), (b, b_standing)| {
+        b_standing
+            .total_cmp(a_standing)
             .then_with(|| a.label.cmp(&b.label))
     });
+    let mut all: Vec<Dest> = all.into_iter().map(|(d, _)| d).collect();
     if all.len() <= HOSTS_PER_WAY {
         return all;
     }
@@ -373,12 +383,9 @@ pub fn paint(
         .map(|p| p.path.rate)
         .fold(0., f64::max)
         .max(1.);
-    for Painted {
-        path: p,
-        dots,
-        drawn,
-    } in painted
-    {
+    // Every line first, then every dot: a path drawn later crosses the
+    // ones before it, and its line went over their dots.
+    for Painted { path: p, drawn, .. } in painted {
         let drawn = *drawn;
         if still {
             let w = LINE + STILL_EXTRA * (p.rate / busiest) as f32;
@@ -395,6 +402,11 @@ pub fn paint(
         {
             window.paint_path(path, accent);
         }
+    }
+    if still {
+        return;
+    }
+    for Painted { path: p, dots, .. } in painted {
         for d in dots {
             let (x, y) = p.curve.at(*d);
             let r = DOT_RADIUS;
@@ -446,11 +458,19 @@ mod tests {
 
     #[test]
     fn the_busiest_come_first_and_the_rest_is_one_line() {
-        let few: HashMap<String, f64> =
-            [("b".into(), 5.), ("a".into(), 5.), ("c".into(), 9.)].into();
+        // "d" is busier this second, "c" over the last twenty: "c" first.
+        let few: HashMap<String, (f64, f64)> = [
+            ("b".into(), (5., 5.)),
+            ("a".into(), (5., 5.)),
+            ("c".into(), (9., 9.)),
+            ("d".into(), (20., 6.)),
+        ]
+        .into();
         let labels: Vec<String> = busiest(few).into_iter().map(|d| d.label).collect();
-        assert_eq!(labels, ["c", "a", "b"]);
-        let many: HashMap<String, f64> = (0..10).map(|i| (format!("h{i}"), f64::from(i))).collect();
+        assert_eq!(labels, ["c", "d", "a", "b"]);
+        let many: HashMap<String, (f64, f64)> = (0..10)
+            .map(|i| (format!("h{i}"), (f64::from(i), f64::from(i))))
+            .collect();
         let shown = busiest(many);
         assert_eq!(shown.len(), HOSTS_PER_WAY);
         assert_eq!(shown[0].label, "h9");
