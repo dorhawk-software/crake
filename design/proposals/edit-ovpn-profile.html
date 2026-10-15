@@ -18,12 +18,20 @@
   .cap { font-size: 15px; font-weight: 700; margin: 26px 0 2px; }
   .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 1040px; }
   .facts { display: flex; border: 1px solid var(--line); border-radius: 8px; width: 820px; background: var(--panel); }
-  .facts > div { flex: 1; padding: 12px 14px; border-right: 1px solid var(--line); }
+  .facts > div { flex: 1; min-width: 0; padding: 12px 14px; border-right: 1px solid var(--line); }
   .facts > div:last-child { border-right: 0; }
   .facts .k { font-size: 12px; color: var(--muted); }
   .facts .v { font-weight: 700; margin-top: 2px; }
-  .facts .v.mono { font-weight: 400; }
-  .link { color: var(--accent); font-weight: 600; font-size: 13px; margin-left: 8px; }
+  .facts .v.mono { font-weight: 400; font-family: 'Atkinson Hyperlegible Mono', monospace; font-size: 14px; }
+  .link { color: var(--accent); font-weight: 600; font-size: 12px; margin-left: 8px; }
+  .cut { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hov { text-decoration: underline; text-decoration-color: var(--muted); text-underline-offset: 3px; }
+  .tipc { position: absolute; left: 30px; top: 58px; z-index: 2; background: var(--surface); border: 1px solid var(--lineStrong);
+    border-radius: 6px; padding: 7px 10px; box-shadow: 0 6px 18px rgba(0,0,0,.35); font-size: 13px; white-space: nowrap; }
+  .hdr { display: flex; align-items: center; gap: 8px; width: 820px; padding: 10px 0 14px; }
+  .hdr .back { font-weight: 600; }
+  .hdr .x { margin-left: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--surface); display: flex; align-items: center;
+    justify-content: center; color: var(--muted); }
   .win { width: 820px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
   .bar { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
   .bar .t { font-size: 17px; font-weight: 700; }
@@ -57,16 +65,37 @@
     one, and reconnect. Out of the way of people who just import IT's file: it's reached from the tunnel's
     details only.</div>
 
-  <div class="cap">1. Where it starts: tunnel detail, an OpenVPN 3 tunnel's Profile</div>
-  <div class="sub">The fact that names the profile gets "Edit…". Only for OpenVPN 3 tunnels, and only when openvpn3
-    shows the profile's text (see 4).</div>
+  <div class="cap">1. Where it starts: tunnel detail, an OpenVPN 3 tunnel</div>
+  <div class="sub">Each fact's box is about 200 px wide at the window's usual size: some 19 characters of a profile's name.
+    Today a longer name just runs out of its box. In both options below, a name (or a gateway) that doesn't fit is cut
+    with "…", and pointing at it shows it whole, a click copies it, as host names do.</div>
+  <div class="cap" style="font-size:14px;margin-top:14px">A. "Edit…" in the Profile box's label row (recommended)</div>
+  <div class="sub">On the label's line, right-aligned: the name keeps the box's whole width. Small and where the
+    profile is, out of the way of everyone else.</div>
   <div class="facts">
-    <div><div class="k">Connected for</div><div class="v">1 h 12 min</div></div>
+    <div><div class="k">Connected for</div><div class="v">18 min</div></div>
     <div><div class="k">Your address</div><div class="v mono">10.8.0.6</div></div>
-    <div><div class="k">Protocol</div><div class="v">OpenVPN 3 · UDP</div></div>
-    <div><div class="k">Profile</div><div class="v mono">initech<span class="link">Edit…</span></div></div>
+    <div><div class="k">Protocol</div><div class="v">OpenVPN 3</div></div>
+    <div style="position:relative"><div class="k" style="display:flex">Profile<span class="link" style="margin-left:auto">Edit…</span></div><div class="v mono cut">initech</div></div>
   </div>
-
+  <div style="height:14px"></div>
+  <div class="facts">
+    <div><div class="k">Connected for</div><div class="v">18 min</div></div>
+    <div><div class="k">Your address</div><div class="v mono">10.8.0.6</div></div>
+    <div><div class="k">Protocol</div><div class="v">OpenVPN 3</div></div>
+    <div style="position:relative"><div class="k" style="display:flex">Profile<span class="link" style="margin-left:auto">Edit…</span></div><div class="v mono cut hov">initech-production-eu-w…</div><div class="tipc"><div class="mono">initech-production-eu-west-2-split</div><div class="k" style="margin-top:2px">Click to copy</div></div></div>
+  </div>
+  <div style="height:70px"></div>
+  <div class="cap" style="font-size:14px;margin-top:14px">B. "Edit profile…" in the window's header</div>
+  <div class="sub">A button next to Disconnect: easy to find, nothing in the facts. More prominent than an experts'
+    tool needs to be, and a second button in a header that has one.</div>
+  <div class="hdr"><span class="back">‹ Tunnels</span><span class="btn" style="margin-left:auto">Edit profile…</span><span class="btn">Disconnect</span><span class="x">✕</span></div>
+  <div class="facts">
+    <div><div class="k">Connected for</div><div class="v">18 min</div></div>
+    <div><div class="k">Your address</div><div class="v mono">10.8.0.6</div></div>
+    <div><div class="k">Protocol</div><div class="v">OpenVPN 3</div></div>
+    <div style="position:relative"><div class="k" style="display:flex">Profile</div><div class="v mono cut">initech-production-eu-w…</div></div>
+  </div>
   <div class="cap">2. The profile's text</div>
   <div class="sub">A window of its own: the text as openvpn3 holds it, line numbers, plain monospace editing. The
     certificates and keys inside (&lt;ca&gt;, &lt;cert&gt;, &lt;key&gt;, &lt;tls-crypt&gt;, …) are folded into one
