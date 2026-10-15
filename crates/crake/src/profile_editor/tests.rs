@@ -41,6 +41,10 @@ struct Opened {
 fn open(cx: &mut TestAppContext, fetched: Fetched, refuse: Option<&str>) -> Opened {
     cx.update(|cx| {
         gpui_kit::init(cx);
+        // Crake's own ×, as on Linux and Windows (macOS draws its own).
+        cx.set_global(crate::chrome::Chrome {
+            system_buttons: false,
+        });
         cx.set_global(crate::prefs::Prefs {
             scratch: true,
             ..Default::default()
