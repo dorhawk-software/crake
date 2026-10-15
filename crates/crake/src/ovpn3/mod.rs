@@ -25,6 +25,8 @@ use crate::signin::{Ask, Event, Prompt, Reply};
 
 mod attached;
 mod bus;
+mod connect;
+pub mod leftover;
 pub mod profile;
 
 use attached::attached;
@@ -190,8 +192,28 @@ async fn run(
             session.as_str().to_owned()
         }
     };
+    let result = drive(&conn, &path, adopted, tunnel, events, replies, requests).await;
+    // A session Crake started and can't follow is ended, never left
+    // running on its own (see connect.rs).
+    if result.is_err() && !adopted {
+        disconnect(&conn, &path).await;
+    }
+    result
+}
+
+/// From a session Crake has (started or taken over) to connected and
+/// handed to craked, then followed until it ends.
+async fn drive(
+    conn: &Connection,
+    path: &str,
+    adopted: bool,
+    tunnel: &str,
+    events: &async_channel::Sender<Event>,
+    replies: &async_channel::Receiver<Reply>,
+    requests: &async_channel::Sender<Request>,
+) -> Result<(), String> {
     let _ = events.send(Event::Reached).await;
-    let mut signals = subscribe(&conn, &path).await?;
+    let mut signals = subscribe(conn, path).await?;
 
     // Web sign-in pages opened so far (each once).
     let mut opened = HashSet::new();
@@ -202,25 +224,25 @@ async fn run(
         // Ready? If not, it wants answers first; then connect.
         let mut attempts = 0;
         loop {
-            match call::<_, ()>(&conn, SESSIONS, &path, SESSIONS, "Ready", &()).await {
+            match call::<_, ()>(conn, SESSIONS, path, SESSIONS, "Ready", &()).await {
                 Ok(()) => break,
                 Err(zbus::Error::MethodError(_, Some(text), _))
                     if text.contains("web authentication") =>
                 {
-                    answer(&conn, &path, events, replies, &mut opened).await?;
+                    answer(conn, path, events, replies, &mut opened).await?;
                     connect = false;
                     break;
                 }
                 Err(zbus::Error::MethodError(_, Some(text), _))
                     if text.contains("credentials") || text.contains("input") =>
                 {
-                    answer(&conn, &path, events, replies, &mut opened).await?;
+                    answer(conn, path, events, replies, &mut opened).await?;
                 }
                 Err(e) => {
                     // The backend may still be starting.
                     attempts += 1;
                     if attempts > READY_ATTEMPTS {
-                        disconnect(&conn, &path).await;
+                        disconnect(conn, path).await;
                         return Err(format!("OpenVPN 3 wasn\u{2019}t ready: {e}"));
                     }
                     tokio::time::sleep(READY_POLL).await;
@@ -229,13 +251,7 @@ async fn run(
         }
     }
     if connect {
-        match call::<_, ()>(&conn, SESSIONS, &path, SESSIONS, "Connect", &()).await {
-            Ok(()) => {}
-            // Connected meanwhile by another front-end: wait for it as well.
-            Err(zbus::Error::MethodError(_, Some(text), _))
-                if text.contains("already") || text.contains("web authentication") => {}
-            Err(e) => return Err(format!("OpenVPN 3 couldn\u{2019}t connect: {e}")),
-        }
+        connect::connect(conn, path).await?;
     }
 
     // Until it's connected (or not), answering what it asks on the way
@@ -247,18 +263,18 @@ async fn run(
             msg = signals.next() => {
                 let Some(Ok(msg)) = msg else { return Err("OpenVPN 3 went quiet.".into()) };
                 if !adopted && msg.header().member().map(|m| m.as_str()) == Some("AttentionRequired") {
-                    answer(&conn, &path, events, replies, &mut opened).await?;
+                    answer(conn, path, events, replies, &mut opened).await?;
                 }
             }
             _ = tick.tick() => {}
             r = replies.recv() => {
                 if !matches!(r, Ok(Reply::Answer { .. })) {
-                    disconnect(&conn, &path).await;
+                    disconnect(conn, path).await;
                     return Err("Cancelled.".into());
                 }
             }
         }
-        let Some((minor, text)) = status(&conn, &path).await else {
+        let Some((minor, text)) = status(conn, path).await else {
             unseen += 1;
             if unseen >= GONE_AFTER {
                 return Err("The OpenVPN 3 session is gone.".into());
@@ -270,13 +286,13 @@ async fn run(
             CONN_CONNECTED => break,
             SESS_AUTH_URL => open_once(&text, &mut opened),
             CONN_AUTH_FAILED => {
-                disconnect(&conn, &path).await;
+                disconnect(conn, path).await;
                 return Err(format!("{}. {text}", crake_proto::trouble::SIGN_IN_REFUSED)
                     .trim()
                     .to_owned());
             }
             CONN_FAILED | CONN_DISCONNECTED | CONN_DONE | SESS_REMOVED => {
-                disconnect(&conn, &path).await;
+                disconnect(conn, path).await;
                 return Err(if text.is_empty() {
                     "The connection failed.".into()
                 } else {
@@ -288,15 +304,15 @@ async fn run(
     }
 
     // Crake can't take it over: end it, rather than leave it up unrouted.
-    let fields = match attached(&conn, &path).await {
+    let fields = match attached(conn, path).await {
         Ok(fields) => fields,
         Err(e) => {
-            disconnect(&conn, &path).await;
+            disconnect(conn, path).await;
             return Err(e);
         }
     };
-    let _ = events.send(Event::Attached(path.clone(), fields)).await;
-    follow(&conn, &path, tunnel, signals, replies, requests).await;
+    let _ = events.send(Event::Attached(path.to_owned(), fields)).await;
+    follow(conn, path, tunnel, signals, replies, requests).await;
     Ok(())
 }
 

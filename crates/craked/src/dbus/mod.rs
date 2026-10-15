@@ -169,6 +169,22 @@ impl Service {
         self.mgr.dismiss_trouble(tunnel).map_err(failed)
     }
 
+    /// The app found an OpenVPN 3 session's process still running after its
+    /// session ended (the profile's Crake tunnel, or ""): logged, with how
+    /// to stop it.
+    async fn left_running(
+        &self,
+        tunnel: &str,
+        profile: &str,
+        pid: u32,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+    ) -> fdo::Result<()> {
+        self.authorize(&hdr, conn).await?;
+        self.mgr.left_running(tunnel, profile, pid);
+        Ok(())
+    }
+
     /// Send learned hosts direct (one decision), and keep them direct until redone.
     async fn undo(
         &self,

@@ -13,7 +13,7 @@ use crate::Request;
 // macOS: notify-rust shows plain notifications there (no actions, no
 // urgency); the panel offers what the buttons would.
 #[cfg(target_os = "macos")]
-pub use plain::{also_answered, asked, routed, stopped};
+pub use plain::{also_answered, asked, left_running, routed, stopped};
 
 /// Crake decided it, not you.
 pub fn worth_telling(entry: &LogEntry) -> bool {
@@ -144,6 +144,16 @@ pub fn stopped(entry: &LogEntry, requests: async_channel::Sender<Request>) {
     });
 }
 
+/// An OpenVPN 3 process left running (`LogEntry::is_left_running`): stays
+/// until dismissed, since only the user can stop it (the reason has how).
+#[cfg(not(target_os = "macos"))]
+pub fn left_running(entry: &LogEntry) {
+    let n = note(entry, Urgency::Normal, STOPPED_SHOWN);
+    std::thread::spawn(move || {
+        let _ = n.show();
+    });
+}
+
 #[cfg(target_os = "macos")]
 mod plain {
     use super::{LogEntry, Notification, Request};
@@ -175,6 +185,10 @@ mod plain {
     }
 
     pub fn stopped(entry: &LogEntry, _requests: async_channel::Sender<Request>) {
+        show(entry);
+    }
+
+    pub fn left_running(entry: &LogEntry) {
         show(entry);
     }
 }

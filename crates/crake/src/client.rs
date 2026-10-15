@@ -35,6 +35,9 @@ pub enum Command {
     Forget(String, String),
     ForgetLearned(String),
     DismissTrouble(String),
+    /// An OpenVPN 3 session's process outlived its session (tunnel or "",
+    /// profile, process).
+    LeftRunning(String, String, u32),
     /// Tunnel detail: its hosts and its traffic today.
     Hosts(String),
     TunnelTraffic(String),
@@ -444,6 +447,7 @@ async fn session(
                     Command::Forget(t, x) => api.call::<_, String>("Forget", &(t, x)).await.map(drop),
                     Command::ForgetLearned(t) => api.call::<_, String>("ForgetLearned", &(t,)).await.map(drop),
                     Command::DismissTrouble(t) => api.call::<_, ()>("DismissTrouble", &(t,)).await,
+                    Command::LeftRunning(t, profile, pid) => api.call::<_, ()>("LeftRunning", &(t, profile, pid)).await,
                     Command::Hosts(t) => match api.call::<_, Vec<HashMap<String, String>>>("HostDetails", &(t.clone(),)).await {
                         Ok(rows) => {
                             if !send(Update::Hosts(t, rows)).await { return Ok(()); }

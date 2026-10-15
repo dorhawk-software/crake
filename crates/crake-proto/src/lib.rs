@@ -143,6 +143,22 @@ pub fn stopped_unexpectedly(label: &str) -> String {
 
 const STOPPED: &str = " stopped unexpectedly.";
 
+/// How the log says an OpenVPN 3 session's process outlived its session
+/// (the app finds it, craked logs it; the app notifies on it). openvpn3
+/// has kept such a process reconnecting on its own for days, and each
+/// reconnect rewrote the other tunnels' DNS.
+pub const LEFT_RUNNING: &str = "OpenVPN 3 left a connection running.";
+
+/// The reason under `LEFT_RUNNING`: what it does and how to stop it
+/// (Crake can't: the process is openvpn3's).
+pub fn left_running_reason(profile: &str, pid: u32) -> String {
+    format!(
+        "Its session for the profile {profile} ended, but the process behind it \
+         ({pid}) didn\u{2019}t: it reconnects on its own and can change your other \
+         tunnels\u{2019} DNS. Stop it with: sudo kill {pid}"
+    )
+}
+
 /// One line of the append-only JSON log.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogEntry {
@@ -169,6 +185,11 @@ impl LogEntry {
     /// A tunnel stopped without being asked to (`stopped_unexpectedly`).
     pub fn is_unexpected_stop(&self) -> bool {
         self.kind == LogKind::System && self.tunnel.is_some() && self.message.ends_with(STOPPED)
+    }
+
+    /// An OpenVPN 3 session's process outlived its session (`LEFT_RUNNING`).
+    pub fn is_left_running(&self) -> bool {
+        self.kind == LogKind::System && self.message == LEFT_RUNNING
     }
 }
 
@@ -298,6 +319,29 @@ mod tests {
         assert!(!valid_tunnel_name("a b"));
         assert_eq!(interface_name("acme").len(), 10);
         assert!(interface_name("abcdefghi").len() <= 15);
+    }
+
+    #[test]
+    fn a_process_left_running_says_how_to_stop_it() {
+        let entry = LogEntry {
+            ts: String::new(),
+            kind: LogKind::System,
+            tunnel: None,
+            message: LEFT_RUNNING.into(),
+            reason: Some(left_running_reason("globex", 4242)),
+            hosts: Vec::new(),
+            others: Vec::new(),
+        };
+        assert!(entry.is_left_running());
+        assert!(!entry.is_unexpected_stop());
+        assert_eq!(
+            entry.reason.as_deref(),
+            Some(
+                "Its session for the profile globex ended, but the process behind it (4242) \
+                 didn\u{2019}t: it reconnects on its own and can change your other tunnels\u{2019} \
+                 DNS. Stop it with: sudo kill 4242"
+            )
+        );
     }
 
     #[test]

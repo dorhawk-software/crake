@@ -103,6 +103,17 @@ impl Manager {
         Ok(())
     }
 
+    /// An OpenVPN 3 session's process outlived its session (the app finds
+    /// it: it sees the user's sessions, craked doesn't): said in the log.
+    pub fn left_running(&self, tunnel: &str, profile: &str, pid: u32) {
+        let known = self.tunnels.lock().unwrap().contains_key(tunnel);
+        self.log.system(
+            known.then_some(tunnel),
+            crake_proto::LEFT_RUNNING,
+            Some(crake_proto::left_running_reason(profile, pid)),
+        );
+    }
+
     /// Stop every running tunnel and wait for them to finish (daemon shutdown).
     pub async fn shutdown(&self) {
         self.traffic

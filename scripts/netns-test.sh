@@ -22,10 +22,12 @@ trap 'rm -rf "$WORK"' EXIT
 for BIN in $BINS; do
   echo "== $(basename "$BIN")"
   # Strict reverse-path filtering, as on Fedora (the tests check it's on).
+  # /host/run is the container's own: this computer's /run holds its system
+  # bus (openvpn3, resolved), which a test running as root must never reach.
   docker run --rm --network none --cap-add NET_ADMIN --device /dev/net/tun \
     --sysctl net.ipv4.conf.all.rp_filter=1 --sysctl net.ipv4.conf.default.rp_filter=1 \
     --sysctl net.netfilter.nf_conntrack_acct=1 \
-    -v /:/host:ro -v "$WORK:/host/mnt" \
+    -v /:/host:ro -v "$WORK:/host/mnt" --tmpfs /host/run \
     -e CRAKE_NETNS_TEST=1 -e TMPDIR=/mnt -e LLVM_PROFILE_FILE=/dev/null \
     alpine:3 chroot /host "$BIN" --test-threads=1 "$@"
 done

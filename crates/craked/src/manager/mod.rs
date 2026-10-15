@@ -223,9 +223,14 @@ const DNS_CHECK_WAIT: Duration = Duration::from_secs(3);
 
 const DNS_CHECK_MISSES: u8 = 2;
 
-/// How often an OpenVPN 3 tunnel's device, and every tunnel's DNS settings
-/// in resolved, are looked at.
+/// How often an OpenVPN 3 tunnel's device is looked at.
 const DEVICE_CHECK_EVERY: Duration = Duration::from_secs(2);
+
+/// How often every tunnel's DNS settings in resolved are looked at: openvpn3
+/// rewrites them when any of its sessions reconnects, and an app that looks
+/// a name up in that moment (Firefox's proxy auto-detect, right after the
+/// network change) sends it to the company. One property read per tunnel.
+const DNS_LINKS_EVERY: Duration = Duration::from_millis(200);
 
 /// Why a DNS answer sent a host through a tunnel.
 #[derive(Clone, Copy)]
@@ -390,15 +395,22 @@ impl Manager {
             tracing::error!("the first-SYN race is off: {e:#}");
         }
         // OpenVPN 3 sessions that ended behind the app's back (their device
-        // is gone), tunnels' DNS settings another program rewrote, and
-        // domains another VPN client now serves (not kept private then).
+        // is gone), and domains another VPN client now serves (not kept
+        // private then). Tunnels' DNS settings another program rewrote, at
+        // once.
         if self.routing.is_real() {
+            let this = Arc::clone(self);
+            tokio::spawn(async move {
+                loop {
+                    tokio::time::sleep(DNS_LINKS_EVERY).await;
+                    this.keep_dns_links().await;
+                }
+            });
             let this = Arc::clone(self);
             tokio::spawn(async move {
                 loop {
                     tokio::time::sleep(DEVICE_CHECK_EVERY).await;
                     this.check_devices().await;
-                    this.keep_dns_links().await;
                     this.refresh_hush().await;
                     // The Traffic window closed a while ago: conntrack's
                     // accounting back off, if craked switched it on.

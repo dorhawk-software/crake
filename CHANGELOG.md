@@ -11,6 +11,21 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Firefox no longer hangs when another OpenVPN 3 session reconnects.** OpenVPN 3 sends every name
+  to a tunnel's company for a moment whenever any of its sessions reconnects; Crake used to put
+  things back within two seconds, long enough for Firefox's proxy auto-detect to ask in that moment
+  and hang. Now it's put back at once.
+- **Crake tells you when OpenVPN 3 leaves a connection running.** OpenVPN 3 can lose track of a
+  session's process: the session ends, the process doesn't, and it keeps reconnecting on its own
+  for days, changing your other tunnels' DNS each time. When Crake sees that happen to one of your
+  sessions, it says so in the log and a notification, with the command that stops it.
+- **Crake no longer leaves an OpenVPN 3 session it can't follow.** A session Crake started is ended
+  if anything goes wrong before it's connected, and Crake doesn't tell a session to connect when
+  something else already has (two at once were how OpenVPN 3 lost those processes).
+- **Traffic is calmer.** The rates follow the traffic over a few seconds instead of jumping every
+  second, the busiest places and the connections keep their places unless the traffic really
+  shifts, and packets are drawn above every path instead of disappearing under the one crossing it.
+
 ## 0.8.1 (2026-10-15)
 
 - **OpenVPN 3 tunnels work again.** 0.8.0 lost an OpenVPN 3 tunnel's routing a second after it came

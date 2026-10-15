@@ -29,7 +29,9 @@ trap 'docker rm -f "$GW" >/dev/null 2>&1 || true; rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/link" "$WORK/tmp"
 docker run -d --rm --name "$GW" --network none --cap-add NET_ADMIN --device /dev/net/tun \
   -v "$WORK/link:/link" crake-e2e-gateway >/dev/null
+# /host/run is the container's own: this computer's /run holds its system
+# bus (openvpn3, resolved), which a test running as root must never reach.
 docker run --rm --network none --cap-add NET_ADMIN --device /dev/net/tun \
-  -v /:/host:ro -v "$WORK/tmp:/host/mnt" -v "$WORK/link:/link" \
+  -v /:/host:ro -v "$WORK/tmp:/host/mnt" -v "$WORK/link:/link" --tmpfs /host/run \
   crake-e2e-gateway sh /client.sh env CRAKE_E2E_HOOK="$HOOK" LLVM_PROFILE_FILE=/dev/null \
   env ${CRAKE_JOURNEY_DEBUG:+CRAKE_JOURNEY_DEBUG=$CRAKE_JOURNEY_DEBUG} ${CRAKE_DEBUG:+CRAKE_DEBUG=$CRAKE_DEBUG} "$BIN" e2e_tests journey_tests --test-threads=1 --nocapture "$@"

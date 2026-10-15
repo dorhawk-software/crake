@@ -392,7 +392,10 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    animations off the dots stand still and thickness says the rate. Under
    it "Last 5 minutes" (a bar per 5 s, direct and tunnels stacked) and two
    tabs: "Right now" (open connections, busiest first: destination, way,
-   rate, since) and "Where things go" (every tunnel's learned, pinned and
+   rate, since; the rates shown follow the traffic over ~3 s, and the
+   busiest places and the rows are ordered by a ~20 s average,
+   `model::live` SHOWN_OVER/STANDING_OVER: the first window reshuffled
+   every second, the user called it chaotic) and "Where things go" (every tunnel's learned, pinned and
    undone hosts from HostDetails, the never list, then everything else).
    craked's D-Bus `Live` (asked once a second while the window is open,
    polkit-guarded like changes: it says where the computer connects):
@@ -652,7 +655,10 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    an attached tunnel back to its domains as search domains, "~." and
    the default route, so every name went to that company and Firefox's
    proxy auto-detect resolved `wpad` into its domain and hung). craked
-   looks at every tunnel's link every 2 s (`keep_dns_links`,
+   looks at every tunnel's link 5 times a second (`keep_dns_links`,
+   `DNS_LINKS_EVERY`; every 2 s until 2026-10-15, when a leftover openvpn3
+   process (Not now) reconnected every minute or two and Firefox, reacting
+   to each network change, asked for wpad inside the 2 s;
    `Resolved::link_as_set`) and puts its routing-only setup back; the
    package test rewrites ACME's link with resolvectl and expects it back.
    A session that ends with no one to tell craked (seen 2026-10-14 with
@@ -802,14 +808,34 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   (sessions, their sign-in pages, who calls Disconnect), and try once
   with openvpn3-indicator quit. If the indicator opens the page too,
   Crake could leave it to the indicator while it runs.
-- **openvpn3 left a stopped session behind (2026-10-14, v27.1).** After
-  "Stopping VPN client" its backend (openvpn3-service-client) kept running
-  with its tun device and a second copy of the profile's routes in the
-  main table, next to the new session's; traffic Crake doesn't route
-  itself may take the dead device. Seen once, after the app ended a
-  session craked had refused. Not Crake's to clean up (openvpn3's process,
-  user `openvpn`); worth reporting to OpenVPN if it happens again, and
-  Crake could warn when two tun devices carry the same profile's routes.
+- **openvpn3 leaves a session's process running (2026-10-14/15, v27.1).**
+  Cause found: openvpn3's session manager gives a new session's process
+  5 s to answer Connect; when two front-ends told the same new session to
+  connect at once (Crake and openvpn3-indicator, which acts on every
+  session), the call ran out ("Async call failed … Connect … Timeout was
+  reached" in the journal), openvpn3 later stopped and dropped the
+  session, and the process (openvpn3-service-client, user `_openvpn`)
+  kept running: invisible to `sessions-list`, reconnecting on its own for
+  days, each reconnect rewriting the other tunnels' DNS ("~." and the
+  default route). Of 25 sessions in two days, exactly the two with that
+  timeout were left over; none since the indicator was removed. Built
+  (2026-10-15): Crake doesn't send Connect to a session already under way
+  (`ovpn3/connect.rs`), waits out the timeout instead of giving up, and
+  ends a session it started whenever it can't follow it; the app notices a
+  process it saw belong to one of the user's sessions running a minute
+  after its session went (`ovpn3/leftover.rs`) and craked logs it with
+  `sudo kill <pid>` (D-Bus `LeftRunning`, a notification too). Not now: a
+  process left from before the app started isn't recognised (telling it
+  from another user's session needs root: craked can't see the user's
+  sessions, the app can't see others'); worth reporting to OpenVPN (a
+  Connect that times out shouldn't orphan the process).
+- **Public hosts 0.7 learned stay learned (2026-10-15).** 0.8.0's guards
+  (a network in trouble, a public address tried directly once more) stop
+  new mistakes, but an upgrade doesn't forget what an older Crake learned
+  by mistake: connectivity-check.ubuntu.com, learned through a company's
+  tunnel during a hiccup, is used every few minutes, so it never expires.
+  The user forgets it in tunnel detail. Could do: on upgrade, try each
+  learned public address directly once and forget those that answer.
 - **Windows: names another VPN client serves are still kept private**
   (2026-10-14). Linux and macOS leave a domain another program serves to
   it (`served_elsewhere`); Windows returns nothing yet. To do: read other
@@ -1085,7 +1111,10 @@ The user doesn't want development builds installed on their machine.
   (`dns_links::owner` now prefers the tunnel). Still to do: macOS
   (GitHub's runners; no gateway there).
 - `scripts/netns-test.sh`: real nftables and policy routing inside a
-  disposable container with no network (host filesystem read-only).
+  disposable container with no network (host filesystem read-only, with a
+  `/run` of its own: until 2026-10-15 the container saw this computer's
+  /run, so a test running as root reached its system bus, the user's real
+  openvpn3 and systemd-resolved; the e2e containers too).
 - `scripts/e2e-test.sh` (`crates/crake/src/e2e_tests.rs`, skipped unless
   `CRAKE_E2E=1`): a real gateway. ocserv in one container (`scripts/e2e/`:
   user alice, password hunter2, a self-signed certificate; ACME's network

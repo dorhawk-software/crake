@@ -62,6 +62,10 @@ pub(super) fn on_update(update: client::Update, cx: &mut App) {
         if entry.is_unexpected_stop() && how != "none" {
             notify::stopped(&entry, requests.clone());
         }
+        // An OpenVPN 3 process left running: it needs the user (sudo).
+        if entry.is_left_running() && how != "none" {
+            notify::left_running(&entry);
+        }
         // "Ask me first": the user decides (with the call, if they like).
         if entry.kind == crake_proto::LogKind::Asked {
             let display = model.read(cx).display_of(entry.tunnel.as_deref());
@@ -189,23 +193,58 @@ pub(super) fn watch_versions(cx: &mut App) {
 /// the tunnel off ends them.
 pub(super) fn watch_openvpn3(cx: &mut App) {
     cx.spawn(async move |cx| {
+        let mut leftovers = ovpn3::leftover::Leftovers::default();
         loop {
             cx.background_executor().timer(OPENVPN3_LOOK).await;
-            // Crake's OpenVPN 3 tunnels it isn't already following.
-            let wanted = cx.update(|cx| {
+            // Crake's OpenVPN 3 tunnels (name, profile), and those it isn't
+            // already following.
+            let (ours, wanted) = cx.update(|cx| {
                 let shell = cx.global::<Shell>();
                 let m = shell.model.read(cx);
-                m.tunnels
+                let ours = m
+                    .tunnels
                     .iter()
                     .filter(|t| t.protocol == "openvpn3")
-                    .filter(|t| {
-                        !shell.sessions.contains_key(&t.name)
-                            && !shell.adopting.contains(&t.name)
-                            && !m.signing_in.contains(&t.name)
-                    })
                     .map(|t| (t.name.clone(), t.gateway.clone()))
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<_>>();
+                let wanted = ours
+                    .iter()
+                    .filter(|(name, _)| {
+                        !shell.sessions.contains_key(name)
+                            && !shell.adopting.contains(name)
+                            && !m.signing_in.contains(name)
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+                (ours, wanted)
             });
+            if ours.is_empty() {
+                continue;
+            }
+            // A session's process that outlived its session (leftover.rs).
+            let backends = cx
+                .background_executor()
+                .spawn(async { ovpn3::leftover::backends() })
+                .await;
+            let said = leftovers.look(
+                std::time::Instant::now(),
+                &backends,
+                ovpn3::leftover::started,
+            );
+            if !said.is_empty() {
+                let commands = cx.update(|cx| cx.global::<Shell>().commands.clone());
+                for (pid, profile) in said {
+                    let tunnel = ours
+                        .iter()
+                        .find(|(_, p)| *p == profile)
+                        .map(|(name, _)| name.clone())
+                        .unwrap_or_default();
+                    commands
+                        .send(Command::LeftRunning(tunnel, profile, pid))
+                        .await
+                        .ok();
+                }
+            }
             if wanted.is_empty() {
                 continue;
             }

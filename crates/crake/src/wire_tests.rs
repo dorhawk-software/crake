@@ -262,6 +262,23 @@ async fn the_app_and_craked_work_together_over_dbus() {
     .await;
     app.settle(std::time::Duration::from_millis(300)).await;
     assert_eq!(app.model.log.len(), lines, "nothing logged");
+    // An OpenVPN 3 session's process that outlived its session: said in
+    // the log, under its tunnel, with how to stop it.
+    app.send(Command::LeftRunning(
+        "initech".into(),
+        "initech".into(),
+        4242,
+    ));
+    app.until("the leftover process, logged", |m| {
+        m.log.iter().any(|e| {
+            e.is_left_running()
+                && e.tunnel.as_deref() == Some("initech")
+                && e.reason
+                    .as_deref()
+                    .is_some_and(|r| r.ends_with("sudo kill 4242"))
+        })
+    })
+    .await;
     app.send(Command::RemoveTunnel("initech".into()));
     app.until("Initech gone", |m| {
         !m.tunnels.iter().any(|t| t.name == "initech")
