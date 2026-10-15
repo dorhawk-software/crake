@@ -281,6 +281,14 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    unreachable, policy, reject route; never "port unreachable") starts
    the probe at once, and the first-SYN race holds IPv6 SYNs (all
    netns-tested).
+   A network in trouble (2026-10-15: a wake from sleep, a flaky minute,
+   and calendar.google.com "didn't answer directly. Through Globex it
+   answered in 14 ms." went through a company's gateway for a week):
+   while 2 other hosts answered neither directly nor through a tunnel in
+   the last 30 s (`down_everywhere`), a public address isn't learned
+   ("Left X alone." saying the network seems to be in trouble) and is
+   tried again after a minute; private addresses are learned as before
+   (netns-tested, fails without it).
    UDP (Linux): with no handshake to try, a UDP host is tried with the
    app's own first datagram. The race chain copies a new UDP
    conversation's first datagram to the same addresses as the race
@@ -859,15 +867,6 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
     `scripts/vm-test.sh` (AppArmor enforced, KVM; not in CI).
 - **The explainers** (docs/explainers.md): written down, not yet drawn or
   published anywhere.
-- **A public host learned through a company tunnel in a bad minute
-  (2026-10-15).** 20 minutes after a wake from sleep, api.anthropic.com
-  and api.beacondb.net answered neither way, and calendar.google.com
-  "didn't answer directly. Through Globex it answered in 14 ms.": a flaky
-  minute of the local network, and a public Google address went through
-  a company's Azure gateway for a week. Ideas, none decided: don't learn
-  while several unrelated hosts fail directly at once (the network, not
-  the host, is down), or try direct once more before learning a public
-  address.
 - **The website's version number** (dorhawk-website): visitors get the
   live one from versions.json; the page's fallback is bumped by hand at
   each release. Automating it (the packages workflow updating the page, or

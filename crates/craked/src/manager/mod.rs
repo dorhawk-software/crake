@@ -174,6 +174,9 @@ pub struct Manager {
     no_split: Mutex<HashMap<(String, RecordType), Instant>>,
     /// Hosts probed lately (or being probed): not probed again for a while.
     probed: Mutex<HashMap<IpAddr, Instant>>,
+    /// Hosts lately that answered neither directly nor through a tunnel:
+    /// several at once mean the network is in trouble (`network_trouble`).
+    down_everywhere: Mutex<HashMap<IpAddr, Instant>>,
     /// New UDP conversations' first datagrams (copied as they left), to try
     /// their hosts through the tunnels with (`probe::udp_first`).
     datagrams: Mutex<HashMap<crate::flows::Flow, Datagram>>,
@@ -187,6 +190,13 @@ const UNKNOWN_FOR: Duration = Duration::from_secs(300);
 
 /// How long a probed host stays unprobed.
 const PROBED_FOR: Duration = Duration::from_secs(600);
+
+/// A network in trouble: this many other hosts answering nowhere within
+/// `TROUBLE_WINDOW`. A public host is then tried again after `TROUBLE_RETRY`
+/// instead of `PROBED_FOR`.
+const TROUBLE_HOSTS: usize = 2;
+const TROUBLE_WINDOW: Duration = Duration::from_secs(30);
+const TROUBLE_RETRY: Duration = Duration::from_secs(60);
 
 /// How long a probe through one tunnel may take.
 const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
@@ -335,6 +345,7 @@ impl Manager {
             asked: Mutex::new(HashMap::new()),
             no_split: Mutex::new(HashMap::new()),
             probed: Mutex::new(HashMap::new()),
+            down_everywhere: Mutex::new(HashMap::new()),
             datagrams: Mutex::new(HashMap::new()),
             seen_names: Mutex::new(HashMap::new()),
             changes,

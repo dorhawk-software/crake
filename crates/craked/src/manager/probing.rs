@@ -265,6 +265,25 @@ impl Manager {
         if let Some(i) = chosen {
             let (name, label, _) = &candidates[i];
             let took = results[i].flatten().unwrap_or_default();
+            // Other hosts answer nowhere just now: the network, not this
+            // host, is in trouble. A public address isn't learned on that
+            // (a private one can't be reached directly anyway).
+            let others = self.network_trouble(dst);
+            if others >= TROUBLE_HOSTS && !crate::dns::is_private(dst) {
+                self.try_again_soon(dst);
+                let ms = took.as_millis().max(1);
+                self.record_hosts(
+                    LogKind::LeftAlone,
+                    name,
+                    &format!("Left {shown} alone."),
+                    format!(
+                        "{} Neither did {others} other hosts just now, not even through a tunnel: the network itself seems to be in trouble. Through {label} it answered in {ms} ms; Crake tries again in a minute.",
+                        why.said()
+                    ),
+                    vec![dst.to_string()],
+                );
+                return false;
+            }
             if self.asks(name) {
                 let ms = took.as_millis().max(1);
                 let why = format!("{} Through {label} it answered in {ms} ms.", why.said());
@@ -356,6 +375,10 @@ impl Manager {
                 format!("Unreachable directly, and no answer through {through}.")
             }
         };
+        self.down_everywhere
+            .lock()
+            .unwrap()
+            .insert(dst, Instant::now());
         let log_tunnel = candidates[0].0.clone();
         self.record_hosts(
             LogKind::LeftAlone,
@@ -365,6 +388,22 @@ impl Manager {
             vec![dst.to_string()],
         );
         false
+    }
+
+    /// How many hosts other than `dst` answered neither directly nor
+    /// through a tunnel within `TROUBLE_WINDOW`.
+    fn network_trouble(&self, dst: IpAddr) -> usize {
+        let mut down = self.down_everywhere.lock().unwrap();
+        down.retain(|_, at| at.elapsed() < TROUBLE_WINDOW);
+        down.keys().filter(|a| **a != dst).count()
+    }
+
+    /// Probe `dst` again after `TROUBLE_RETRY`, not `PROBED_FOR`.
+    fn try_again_soon(&self, dst: IpAddr) {
+        let at = Instant::now()
+            .checked_sub(PROBED_FOR - TROUBLE_RETRY)
+            .unwrap_or_else(Instant::now);
+        self.probed.lock().unwrap().insert(dst, at);
     }
 
     /// Tunnels a host may be probed through, in order: routed, not sent direct

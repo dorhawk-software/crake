@@ -822,3 +822,67 @@ async fn udp_that_only_the_tunnel_answers_is_learned() {
     stop.store(true, Ordering::Relaxed);
     responder.join().unwrap();
 }
+
+/// A minute of trouble on the local network (seen 2026-10-15, after a wake
+/// from sleep): two hosts answered neither directly nor through a tunnel,
+/// and the next public host that didn't answer directly but did through a
+/// company's tunnel was learned there for a week. While other hosts answer
+/// nowhere, a public address isn't learned (it's tried again a minute
+/// later); a private one is, as it can't be reached directly anyway.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_public_host_isnt_learned_while_the_network_is_in_trouble() {
+    if std::env::var("CRAKE_NETNS_TEST").as_deref() != Ok("1") {
+        eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
+        return;
+    }
+    let Probe {
+        mgr,
+        world,
+        stop,
+        responder,
+        _dir: dir,
+        _srv,
+    } = start_probe(false).await;
+    {
+        let mut w = world.lock().unwrap();
+        for a in ["198.51.100.20", "198.51.100.23", "10.70.0.9"] {
+            w.behind_tunnel.insert(a.parse().unwrap());
+        }
+    }
+    let path = dir.path().join("log");
+    tokio::task::spawn_blocking(move || {
+        let log = || std::fs::read_to_string(&path).unwrap_or_default();
+        let learned = |a: &str| sh("nft list set inet crake learned_acme").contains(a);
+        let wait_for = |line: String| {
+            let end = Instant::now() + Duration::from_secs(15);
+            while !log().contains(&line) {
+                assert!(Instant::now() < end, "never: {line}\n{}", log());
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        };
+        // A good minute: a public host only the tunnel reaches is learned.
+        let _ = connect("198.51.100.23", 443, Duration::from_secs(1));
+        wait_for("Sent 198.51.100.23 through ACME.".into());
+        // Then two hosts answer nowhere.
+        for a in ["198.51.100.21", "198.51.100.22"] {
+            let _ = connect(a, 443, Duration::from_secs(1));
+        }
+        for a in ["198.51.100.21", "198.51.100.22"] {
+            wait_for(format!("Left {a} alone."));
+        }
+        // Now a public host the tunnel answers for isn't learned...
+        let _ = connect("198.51.100.20", 443, Duration::from_secs(1));
+        wait_for("Left 198.51.100.20 alone.".into());
+        assert!(!learned("198.51.100.20"));
+        assert!(log().contains("the network itself"), "{}", log());
+        // ...and a private one is.
+        let _ = connect("10.70.0.9", 443, Duration::from_secs(1));
+        wait_for("Sent 10.70.0.9 through ACME.".into());
+        assert!(learned("10.70.0.9"));
+    })
+    .await
+    .unwrap();
+    mgr.shutdown().await;
+    stop.store(true, Ordering::Relaxed);
+    responder.join().unwrap();
+}
