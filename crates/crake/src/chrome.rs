@@ -32,3 +32,33 @@ const BUTTONS_LEFT: f32 = 18.;
 pub fn traffic_lights() -> Option<Point<Pixels>> {
     Some(point(px(BUTTONS_LEFT), px((HEADER_HEIGHT - BUTTON) / 2.)))
 }
+
+/// A window's round × (design/proposals/hover-close-and-sections.html,
+/// chosen by the user): red while pointed at, the × in the colour that
+/// reads on red. Its clicks aren't the header's, which moves the window;
+/// the caller says what a click does.
+pub fn close_button(t: &crate::theme::Theme) -> gpui_kit::Stateful<gpui_kit::Div> {
+    use gpui_kit::prelude::*;
+    let on_danger = t.on_danger;
+    gpui_kit::div()
+        .id("close")
+        .group("close")
+        .size(px(32.))
+        .rounded_full()
+        .bg(t.surface)
+        .flex()
+        .items_center()
+        .justify_center()
+        .cursor_pointer()
+        .hover(|s| s.bg(t.danger))
+        .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
+            cx.stop_propagation()
+        })
+        .child(
+            gpui_kit::svg()
+                .path("crake/close.svg")
+                .size(px(14.))
+                .text_color(t.ink)
+                .group_hover("close", move |s| s.text_color(on_danger)),
+        )
+}

@@ -71,7 +71,9 @@ One accent. Teal means **"Crake made a decision"**, nothing else.
 | accent | `#0F766E` | `#2DD4BF` | decisions, on-state, primary button |
 | accentInk | `#FFFFFF` | `#0B1514` | text on accent |
 | accentSoft | `#E2F1EF` | `#17332F` | selected row background |
-| danger | `#B42318` | `#F97066` | destructive actions, failed step |
+| danger | `#B42318` | `#F97066` | destructive actions, failed step; a window's × pointed at |
+| onDanger | `#FFFFFF` | `#0B1514` | the × on danger |
+| navHover | `#F9F9F7` | `#242729` | a Settings section pointed at: halfway from the sidebar to the current section |
 
 Follow the system light/dark setting. Never add a second accent. Tunnels are
 told apart by name, not colour.

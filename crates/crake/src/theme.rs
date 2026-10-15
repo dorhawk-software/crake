@@ -17,6 +17,11 @@ pub struct Theme {
     pub accent_ink: Rgba,
     pub accent_soft: Rgba,
     pub danger: Rgba,
+    /// What reads on `danger`: the × of a window's close button pointed at.
+    pub on_danger: Rgba,
+    /// A Settings section pointed at: halfway from the sidebar's colour to
+    /// the current section's (design/proposals/hover-close-and-sections.html).
+    pub nav_hover: Rgba,
     /// Chart volume bars.
     pub bars: Rgba,
     /// The switch's track when off.
@@ -37,6 +42,8 @@ impl Theme {
             accent_ink: rgb(0xFFFFFF),
             accent_soft: rgb(0xE2F1EF),
             danger: rgb(0xB42318),
+            on_danger: rgb(0xFFFFFF),
+            nav_hover: rgb(0xF9F9F7),
             bars: rgb(0xD8D9D5),
             track: rgb(0xBDBDB8),
         }
@@ -55,6 +62,8 @@ impl Theme {
             accent_ink: rgb(0x0B1514),
             accent_soft: rgb(0x17332F),
             danger: rgb(0xF97066),
+            on_danger: rgb(0x0B1514),
+            nav_hover: rgb(0x242729),
             bars: rgb(0x3E4246),
             track: rgb(0x4A4E53),
         }

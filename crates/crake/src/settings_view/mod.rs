@@ -238,24 +238,7 @@ impl Render for Settings {
                             })
                             .when(!system, |strip| {
                                 strip.child(
-                                    div()
-                                        .id("close")
-                                        .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
-                                            cx.stop_propagation()
-                                        })
-                                        .size(px(32.))
-                                        .rounded_full()
-                                        .bg(t.surface)
-                                        .flex()
-                                        .items_center()
-                                        .justify_center()
-                                        .cursor_pointer()
-                                        .child(
-                                            svg()
-                                                .path("crake/close.svg")
-                                                .size(px(14.))
-                                                .text_color(t.ink),
-                                        )
+                                    crate::chrome::close_button(&t)
                                         .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
                                         .test_support(),
                                 )
@@ -566,7 +549,10 @@ impl Settings {
                     .gap(px(10.))
                     .rounded(px(6.))
                     .when(current, |b| b.bg(t.panel).font_weight(FontWeight::BOLD))
-                    .when(!current, |b| b.font_weight(FontWeight::MEDIUM))
+                    .when(!current, |b| {
+                        b.font_weight(FontWeight::MEDIUM)
+                            .hover(|s| s.bg(t.nav_hover))
+                    })
                     .cursor_pointer()
                     .child(svg().path(icon).size(px(18.)).text_color(t.ink))
                     .child(label)
