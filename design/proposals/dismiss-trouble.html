@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: dismissing a stopped tunnel</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4;
+    --accent: #2DD4BF; --track: #4A4E53; --danger: #F97066; --bar: #1b1b1b; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --ink: #1A1C1E; --muted: #5A5F64;
+    --accent: #0F766E; --track: #BDBDB8; --danger: #B42318; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 40px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 980px; margin-bottom: 18px; }
+  .intro b { color: var(--ink); }
+  .cols { display: flex; gap: 36px; flex-wrap: wrap; align-items: flex-start; }
+  .cap { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 452px; min-height: 72px; }
+  .panel { width: 452px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding-bottom: 8px; }
+  .head { display: flex; align-items: center; gap: 10px; padding: 14px 18px 6px; }
+  .head .t { font-size: 16px; font-weight: 700; }
+  .head .w { font-size: 13px; color: var(--muted); }
+  .head .w.bad { color: var(--danger); }
+  .sec { padding: 12px 18px 4px; font-size: 13px; font-weight: 600; display: flex; align-items: baseline; }
+  .sec .act { margin-left: auto; font-weight: 400; color: var(--muted); font-size: 12.5px; }
+  .sec .act u { text-decoration: none; color: var(--ink); border-bottom: 1px solid var(--track); }
+  .tun { display: flex; align-items: center; gap: 12px; padding: 9px 18px; }
+  .tun .n { font-size: 15px; font-weight: 700; }
+  .tun .n.off { color: var(--muted); }
+  .tun .s { font-size: 13px; color: var(--muted); margin-left: 8px; }
+  .tun .s.bad { color: var(--danger); }
+  .tun .p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .x { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 4px;
+    border-radius: 4px; color: var(--muted); vertical-align: -3px; font-size: 13px; }
+  .x.hover { background: var(--surface); color: var(--ink); }
+  .tip { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 5px; background: var(--surface);
+    border: 1px solid var(--line); font-size: 11.5px; color: var(--ink); vertical-align: 1px; }
+  .sw { width: 46px; height: 26px; border-radius: 13px; background: var(--track); position: relative; flex: none; margin-left: auto; }
+  .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; }
+  .sw.on { background: var(--accent); }
+  .sw.on::after { left: 23px; }
+  .bar { display: inline-flex; gap: 22px; align-items: center; background: var(--bar); padding: 10px 18px; border-radius: 8px; }
+  .bar svg { width: 22px; height: 22px; display: block; }
+  .icons { display: flex; gap: 30px; flex-wrap: wrap; margin-top: 6px; }
+  .icon-cap { font-size: 12.5px; color: var(--muted); margin-top: 6px; max-width: 200px; }
+  .icon-cap b { color: var(--ink); }
+  h3 { font-size: 15px; margin: 34px 0 4px; }
+  ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); max-width: 980px; }
+  ul b { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>Dismissing a stopped tunnel.</b> A tunnel that stops on its own (session expired, the gateway
+    ended it) stays red in the panel, with the tray's red badge, until it's switched on again. Switching on and off
+    just to clear it is tedious. Dismissing puts it back to plain "Off": the red words and the tray's badge go, and the
+    reason stays in the log and in the tunnel's detail. Nothing else changes: the tunnel isn't switched on or signed
+    out.</div>
+
+  <div class="cols">
+    <div>
+      <div class="cap">A. An × after the red words (recommended)</div>
+      <div class="sub">Shown only on a tunnel that stopped. Hovering shows "Dismiss"; a click makes it "Off". It sits next
+        to the words it clears, so what it does is plain. The switch stays the way to reconnect.</div>
+      <div class="panel">
+        <div class="head"><span class="t">Crake</span><span class="w bad">Trouble</span></div>
+        <div class="sec">Tunnels</div>
+        <div class="tun"><div><div><span class="n off">Initech</span><span class="s bad">Session expired</span><span
+          class="x hover">✕</span><span class="tip">Dismiss</span></div>
+          <div class="p">Your profile · learning on</div></div><div class="sw"></div></div>
+        <div class="tun"><div><div><span class="n off">Globex</span><span class="s bad">Ended by OpenVPN 3</span><span
+          class="x">✕</span></div>
+          <div class="p">Your profile · learning on</div></div><div class="sw"></div></div>
+        <div class="tun"><div><div><span class="n off">ACME</span><span class="s">Off</span></div>
+          <div class="p">Your profile · learning on</div></div><div class="sw"></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">B. One "Dismiss" for all of them</div>
+      <div class="sub">A link at the Tunnels heading while any tunnel stopped clears them all at once. One target for a
+        morning with several, but it says less about which it clears, and a single one needs the same trip.</div>
+      <div class="panel">
+        <div class="head"><span class="t">Crake</span><span class="w bad">Trouble</span></div>
+        <div class="sec">Tunnels<span class="act">2 stopped · <u>Dismiss</u></span></div>
+        <div class="tun"><div><div><span class="n off">Initech</span><span class="s bad">Session expired</span></div>
+          <div class="p">Your profile · learning on</div></div><div class="sw"></div></div>
+        <div class="tun"><div><div><span class="n off">Globex</span><span class="s bad">Ended by OpenVPN 3</span></div>
+          <div class="p">Your profile · learning on</div></div><div class="sw"></div></div>
+        <div class="tun"><div><div><span class="n off">ACME</span><span class="s">Off</span></div>
+          <div class="p">Your profile · learning on</div></div><div class="sw"></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">After dismissing (either)</div>
+      <div class="sub">Plain "Off", as if switched off. The header says "Off" when nothing is up; the tray's head is
+        asleep with no badge.</div>
+      <div class="panel">
+        <div class="head"><span class="t">Crake</span><span class="w">Off</span></div>
+        <div class="sec">Tunnels</div>
+        <div class="tun"><div><div><span class="n off">Initech</span><span class="s">Off</span></div>
+          <div class="p">Your profile · learning on</div></div><div class="sw"></div></div>
+        <div class="tun"><div><div><span class="n off">Globex</span><span class="s">Off</span></div>
+          <div class="p">Your profile · learning on</div></div><div class="sw"></div></div>
+        <div class="tun"><div><div><span class="n off">ACME</span><span class="s">Off</span></div>
+          <div class="p">Your profile · learning on</div></div><div class="sw"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <h3>The tray: the badge on the head as it is</h3>
+  <div class="intro" style="margin-bottom:8px">Today the trouble icon is always the head awake with the badge, so a
+    tunnel that stopped overnight with nothing else up looks as if something were still connected. Proposed: the badge
+    goes on whatever the head would show without it: asleep when nothing is up, awake when something is.</div>
+  <div class="icons">
+    <div><div class="bar" id="today"></div>
+      <div class="icon-cap"><b>Today</b>, nothing up: awake, badge</div></div>
+    <div><div class="bar" id="asleep"></div>
+      <div class="icon-cap"><b>Proposed</b>, nothing up: asleep, badge</div></div>
+    <div><div class="bar" id="awake"></div>
+      <div class="icon-cap"><b>Proposed</b>, another tunnel up: awake, badge (as today)</div></div>
+    <div><div class="bar" id="clear"></div>
+      <div class="icon-cap"><b>Dismissed</b>, nothing up: asleep</div></div>
+  </div>
+
+  <h3>How it works</h3>
+  <ul>
+    <li><b>craked keeps it:</b> dismissing turns the tunnel from trouble to off in craked (a new D-Bus call, guarded
+      like switching), so it stays dismissed after the app restarts, and the log says nothing new.</li>
+    <li><b>The reason stays findable:</b> the tunnel's detail keeps the sentence under its title until the tunnel next
+      connects ("Stopped at 03:01. OpenVPN 3 ended its session: tun0 is gone."), and the log has it.</li>
+    <li><b>Today's other cause is fixed separately:</b> Globex wasn't really down this morning. openvpn3 reconnected it
+      at 03:01 after the Wi-Fi dropped, and Crake called it stopped in the second its device was being made again
+      (fixed: Crake now says "Globex is reconnecting." and follows the new device).</li>
+  </ul>
+</div>
+<script>
+if (location.search.includes('dark=false')) document.body.classList.add('light');
+const head = 'M8.5 20.5V12A3.75 3.75 0 0 1 15.95 11.4L16 10.4L20.6 11.6L16 12.8C16 15.5 15.1 17.8 13.4 20.5Z';
+const badge = `<circle cx="19.2" cy="9.75" r="2.75" fill="#F97066"/><path d="M19.2 8.25v1.7" fill="none" stroke="#0b1514"
+  stroke-width="1.15" stroke-linecap="round"/><circle cx="19.2" cy="11.35" r="0.6" fill="#0b1514"/>`;
+function icon(id, asleep, withBadge) {
+  const shape = asleep
+    ? `<g transform="translate(15.560 13.860) scale(0.820) rotate(25.00) translate(-14 -13)"><path d="${head}" fill="#fff"
+        stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><rect x="10.350" y="10.7" width="4.000" height="1.4"
+        rx="0.7" fill="#000"/></g>`
+    : `<path d="${head}" fill="#fff" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12.35"
+        cy="11.4" r="1.55" fill="#000"/>`;
+  const cut = withBadge ? '<circle cx="19.2" cy="9.75" r="3.45" fill="#000"/>' : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="7.1 6.6 15.2 15.2"><defs><mask id="m-${id}"
+    maskUnits="userSpaceOnUse" x="0" y="0" width="30" height="30">${shape}${cut}</mask></defs><rect x="0" y="0"
+    width="30" height="30" fill="#ffffff" opacity="${asleep ? 0.45 : 1}" mask="url(#m-${id})"/>${withBadge ? badge : ''}</svg>`;
+}
+const set = (id, asleep, b) => document.getElementById(id).innerHTML = icon(id, asleep, b);
+set('today', false, true); set('asleep', true, true); set('awake', false, true); set('clear', true, false);
+</script>
+</body>
+</html>
