@@ -247,6 +247,17 @@ impl Manager {
         // Every eligible tunnel is tried at once; the setting decides which
         // answer counts (CLAUDE.md, "When two tunnels answer").
         let mut tries = tokio::task::JoinSet::new();
+        // A public host is tried directly once more meanwhile: one lost
+        // connection on a working network isn't a reason to send a public
+        // site through a company's tunnel (seen 2026-10-15 with
+        // api.anthropic.com). One a company allows only from its own
+        // addresses never answers directly, and is learned as before.
+        let second = match &attempt {
+            crate::probe::Attempt::Tcp(port) if !crate::dns::is_private(dst) => Some(tokio::spawn(
+                crate::probe::direct(SocketAddr::new(dst, *port), PROBE_TIMEOUT),
+            )),
+            _ => None,
+        };
         for (i, (_, _, mark)) in candidates.iter().enumerate() {
             let (mark, attempt) = (*mark, attempt.clone());
             tries.spawn(async move { (i, attempt.through(dst, mark, PROBE_TIMEOUT).await) });
@@ -279,6 +290,22 @@ impl Manager {
                     format!(
                         "{} Neither did {others} other hosts just now, not even through a tunnel: the network itself seems to be in trouble. Through {label} it answered in {ms} ms; Crake tries again in a minute.",
                         why.said()
+                    ),
+                    vec![dst.to_string()],
+                );
+                return false;
+            }
+            if let Some(second) = second
+                && let Ok(crate::probe::DirectTry::Answered(direct)) = second.await
+            {
+                self.record_hosts(
+                    LogKind::LeftAlone,
+                    name,
+                    &format!("Left {shown} alone."),
+                    format!(
+                        "{} It answered directly when Crake tried again ({} ms): nothing to send through {label}.",
+                        why.said(),
+                        direct.as_millis().max(1)
                     ),
                     vec![dst.to_string()],
                 );

@@ -23,10 +23,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 - **The bird says what's up.** With a tunnel stopped and nothing else connected, the bird sleeps,
   with the red badge; it no longer looks awake as if something were connected. While another tunnel
   connects, it's drawn dashed with the badge.
-- **No company detours for public sites in a bad minute.** When the network itself has trouble
-  (just after waking up, a flaky Wi-Fi), several sites stop answering at once; one that a tunnel
-  still reached used to be sent through that tunnel for a week. Crake now leaves public sites alone
-  while that's happening and tries again a minute later.
+- **No company detours for public sites.** One connection to a public site that got no answer (a
+  lost packet on Wi-Fi), or a minute when the network itself had trouble, could send that site
+  through a company's tunnel for a week, and break it when that tunnel's session ended. Crake now
+  tries a public site directly once more before sending it through a tunnel, and leaves public
+  sites alone while several places stop answering at once.
 - **OpenVPN 3 profiles found the first time.** Switching on an OpenVPN 3 tunnel sometimes said its
   profile wasn't there, and "Try again" worked: openvpn3 had only just started. Crake now gives it
   a moment.

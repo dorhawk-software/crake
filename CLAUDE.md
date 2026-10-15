@@ -288,6 +288,13 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    the last 30 s (`down_everywhere`), a public address isn't learned
    ("Left X alone." saying the network seems to be in trouble) and is
    tried again after a minute; private addresses are learned as before
+   (netns-tested, fails without it). And a public address is tried
+   directly once more, alongside the tunnels (2026-10-15: on a working
+   Wi-Fi, one connection to api.anthropic.com got no answer, Initech's
+   tunnel did, and the chat on it broke when that session expired):
+   answering directly, it's left alone ("It answered directly when Crake
+   tried again"); one a company allows only from its own addresses never
+   answers directly and is learned as before, at most 3 s later
    (netns-tested, fails without it).
    UDP (Linux): with no handshake to try, a UDP host is tried with the
    app's own first datagram. The race chain copies a new UDP

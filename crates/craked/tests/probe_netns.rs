@@ -203,6 +203,10 @@ struct World {
     tunnel_syns: Vec<(IpAddr, u16)>,
     /// Hosts that echo UDP datagrams behind the tunnel (dropped directly).
     udp_behind: HashSet<IpAddr>,
+    /// Answered on the internet, except the first connection to each
+    /// (its SYNs lost, as on a flaky Wi-Fi): by its source port.
+    flaky_direct: HashSet<IpAddr>,
+    first_port: std::collections::HashMap<IpAddr, u16>,
 }
 
 /// An IPv4 UDP datagram in this packet: (source, destination).
@@ -238,8 +242,14 @@ fn responder(mut uplink: File, mut tun: File, world: Arc<Mutex<World>>, stop: Ar
         if let Ok(n) = uplink.read(&mut buf) {
             idle = false;
             if let Some((_, dst, _)) = syn_of(&buf[..n]) {
-                let w = world.lock().unwrap();
-                if w.refuse_direct.contains(&dst) {
+                let mut w = world.lock().unwrap();
+                if w.flaky_direct.contains(&dst) {
+                    let ihl = usize::from(buf[0] & 0x0f) * 4;
+                    let sport = u16::from_be_bytes([buf[ihl], buf[ihl + 1]]);
+                    if *w.first_port.entry(dst).or_insert(sport) != sport {
+                        uplink.write_all(&tcp_reply(&buf[..n], 0x12)).unwrap();
+                    }
+                } else if w.refuse_direct.contains(&dst) {
                     uplink.write_all(&tcp_reply(&buf[..n], 0x14)).unwrap();
                 } else if w.unreachable_direct.contains(&dst) {
                     let notice = if dst.is_ipv6() {
@@ -879,6 +889,50 @@ async fn a_public_host_isnt_learned_while_the_network_is_in_trouble() {
         let _ = connect("10.70.0.9", 443, Duration::from_secs(1));
         wait_for("Sent 10.70.0.9 through ACME.".into());
         assert!(learned("10.70.0.9"));
+    })
+    .await
+    .unwrap();
+    mgr.shutdown().await;
+    stop.store(true, Ordering::Relaxed);
+    responder.join().unwrap();
+}
+
+/// One connection to a public host got no answer (its SYNs lost, seen
+/// 2026-10-15 with api.anthropic.com on a working Wi-Fi), and a company's
+/// tunnel answered: Crake learned it there, and the chat on it broke when
+/// that tunnel's session expired. A public host is tried directly once
+/// more; answering, it's left alone.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_public_host_that_answers_directly_on_a_second_try_isnt_learned() {
+    if std::env::var("CRAKE_NETNS_TEST").as_deref() != Ok("1") {
+        eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
+        return;
+    }
+    let Probe {
+        mgr,
+        world,
+        stop,
+        responder,
+        _dir: dir,
+        _srv,
+    } = start_probe(false).await;
+    {
+        let mut w = world.lock().unwrap();
+        // Answers through the tunnel too, as any public host would.
+        w.behind_tunnel.insert("198.51.100.30".parse().unwrap());
+        w.flaky_direct.insert("198.51.100.30".parse().unwrap());
+    }
+    let path = dir.path().join("log");
+    tokio::task::spawn_blocking(move || {
+        let log = || std::fs::read_to_string(&path).unwrap_or_default();
+        let _ = connect("198.51.100.30", 443, Duration::from_secs(1));
+        let end = Instant::now() + Duration::from_secs(15);
+        while !log().contains("Left 198.51.100.30 alone.") {
+            assert!(Instant::now() < end, "never left alone:\n{}", log());
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        assert!(log().contains("answered directly"), "{}", log());
+        assert!(!sh("nft list set inet crake learned_acme").contains("198.51.100.30"));
     })
     .await
     .unwrap();
