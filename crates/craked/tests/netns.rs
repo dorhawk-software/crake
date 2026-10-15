@@ -687,6 +687,109 @@ async fn an_openvpn3_session_with_no_device_name_is_found_by_its_process() {
     mgr.shutdown().await;
 }
 
+/// openvpn3 makes a session's device again when it reconnects it (the
+/// Wi-Fi went away for a minute in the night, the computer woke up), often
+/// under another name, or the same name for a new device. Seen 2026-10-15:
+/// craked looked in the second the old device was gone, called the tunnel
+/// stopped, and it stayed so for hours while openvpn3's session was up.
+/// While the process running the session lives, the session does: craked
+/// says it's reconnecting and routes through its new device once it's there.
+#[tokio::test]
+async fn an_openvpn3_session_that_reconnects_keeps_its_tunnel() {
+    use std::collections::HashMap;
+    if !enabled() {
+        eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = Config {
+        hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
+        hook_socket: dir.path().join("hook.sock"),
+        openconnect: dir.path().join("openconnect"),
+        log_path: dir.path().join("log"),
+        state_path: dir.path().join("hosts.json"),
+        learned_expiry_days: 7,
+        probing: false,
+        race_first_syn: false,
+        probe_wait_secs: 3,
+        never: vec![],
+        use_resolved: false,
+        apply_network: true,
+        managed_dir: dir.path().join("managed.d"),
+        tunnels: vec![],
+    };
+    let mgr = Manager::new(cfg).unwrap();
+    mgr.init().await.unwrap();
+    let tun = hold_tun("tun5");
+    sh("ip link set tun5 up && ip addr add 10.8.0.6/24 dev tun5");
+    let name = mgr
+        .add_tunnel(&HashMap::from([
+            ("display_name".to_owned(), "Initech".to_owned()),
+            ("gateway".to_owned(), "initech".to_owned()),
+            ("protocol".to_owned(), "openvpn3".to_owned()),
+        ]))
+        .unwrap();
+    let fields = HashMap::from([
+        ("device".to_owned(), "tun5".to_owned()),
+        // This process is the session's backend (see the test above).
+        (
+            "backend_pid".to_owned(),
+            std::fs::read_link("/proc/self")
+                .unwrap()
+                .display()
+                .to_string(),
+        ),
+        ("dns".to_owned(), "10.8.0.1".to_owned()),
+    ]);
+    mgr.attach(&name, &fields).await.unwrap();
+    mgr.add_host(&name, "10.8.5.5").await.unwrap();
+    let routes = || sh("ip route show table all");
+    assert!(routes().contains("default dev tun5"), "{}", routes());
+
+    // Reconnecting: the device is gone, its process isn't.
+    drop(tun);
+    mgr.check_devices().await;
+    let snap = mgr.get(&name).unwrap();
+    assert_eq!(snap.state, TunnelState::Connecting, "not stopped");
+    mgr.check_devices().await;
+    let log = || std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(!log().contains("stopped unexpectedly"), "{}", log());
+    assert_eq!(
+        log().matches("Initech is reconnecting.").count(),
+        1,
+        "{}",
+        log()
+    );
+
+    // Back, under another name: routed through it.
+    let tun = hold_tun("tun6");
+    sh("ip link set tun6 up && ip addr add 10.8.0.7/24 dev tun6");
+    mgr.check_devices().await;
+    let snap = mgr.get(&name).unwrap();
+    assert_eq!(snap.state, TunnelState::Connected);
+    assert_eq!(snap.info.unwrap().device, "tun6");
+    assert!(routes().contains("default dev tun6"), "{}", routes());
+    assert!(
+        sh("nft list ruleset").contains("10.8.5.5"),
+        "the host it had is still routed"
+    );
+
+    // Gone and back under the same name between two looks: a new device
+    // (the kernel took the old one's routes with it), so routed again.
+    drop(tun);
+    let _tun = hold_tun("tun6");
+    sh("ip link set tun6 up && ip addr add 10.8.0.7/24 dev tun6");
+    assert!(
+        !routes().contains("default dev tun6"),
+        "the old routes went with it"
+    );
+    mgr.check_devices().await;
+    assert_eq!(mgr.get(&name).unwrap().state, TunnelState::Connected);
+    assert!(routes().contains("default dev tun6"), "{}", routes());
+    assert!(!log().contains("stopped unexpectedly"), "{}", log());
+    mgr.shutdown().await;
+}
+
 /// rp_filter=1 everywhere, as Fedora has it (scripts/netns-test.sh starts
 /// the namespace so): a reply arriving on an interface the main table
 /// wouldn't use to reach its sender is dropped, unless craked loosens it

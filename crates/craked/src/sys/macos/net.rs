@@ -12,8 +12,8 @@ use super::cmd;
 /// A tun device OpenVPN 3 made. Never asked here: `attach` refuses
 /// OpenVPN 3 sessions first (`ADOPTS_OPENVPN3`). Whoever lets craked adopt
 /// sessions it doesn't run here gives this system its own check.
-pub fn is_tun(_dev: &str) -> bool {
-    false
+pub fn tun_index(_dev: &str) -> Option<u32> {
+    None
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -59,7 +59,7 @@ impl Manager {
         } else if !device
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-            || !crate::net::is_tun(device) && self.cfg.apply_network
+            || crate::net::tun_index(device).is_none() && self.cfg.apply_network
         {
             Some(format!(
                 "{device:?} isn\u{2019}t a VPN device on this machine."
@@ -157,6 +157,9 @@ impl Manager {
         if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
             let mut fields = fields.clone();
             fields.insert("device".to_owned(), device.to_owned());
+            if let Some(index) = crate::net::tun_index(device) {
+                fields.insert("index".to_owned(), index.to_string());
+            }
             e.attached = Some(fields);
         }
         Ok(())
@@ -203,32 +206,93 @@ impl Manager {
         Ok(())
     }
 
-    /// OpenVPN 3: a session that ended without the app saying so (the app
-    /// quit, and openvpn3 took the session down with it) leaves its device
-    /// gone. Such a tunnel is down, not "its DNS doesn't answer" for good.
+    /// OpenVPN 3: where each attached session's device is now. openvpn3
+    /// makes a session's device again when it reconnects it (a network
+    /// that went away for a while, a wake from sleep), often under another
+    /// name (tun1 came back as tun0), or under the same name as a new
+    /// device, whose routes the kernel took with the old one. While the
+    /// process running the session lives, so does the session: craked says
+    /// it's reconnecting, and routes through its device once it's back. A
+    /// session whose device is gone with no process left (the app quit,
+    /// and openvpn3 took the session down with it) is down, not "its DNS
+    /// doesn't answer" for good.
     pub async fn check_devices(&self) {
         if !self.cfg.apply_network {
             return;
         }
-        let attached: Vec<(String, String)> = self
+        let attached: Vec<(String, HashMap<String, String>, bool)> = self
             .tunnels
             .lock()
             .unwrap()
             .iter()
-            .filter(|(_, e)| e.attached.is_some())
-            .filter_map(|(n, e)| Some((n.clone(), e.info.as_ref()?.device.clone())))
+            .filter_map(|(n, e)| Some((n.clone(), e.attached.clone()?, e.info.is_some())))
             .collect();
-        for (name, device) in attached {
-            if crate::net::is_tun(&device) {
+        for (name, fields, up) in attached {
+            let device = fields.get("device").cloned().unwrap_or_default();
+            let pid = fields.get("backend_pid").and_then(|p| p.parse().ok());
+            let now = match pid {
+                Some(pid) if crate::sys::process_alive(pid) => {
+                    let Some(now) = crate::sys::tun_of_process(pid) else {
+                        if up {
+                            self.reconnecting(&name).await;
+                        }
+                        continue;
+                    };
+                    Some(now)
+                }
+                // The session's process has ended: so has the session.
+                Some(_) => None,
+                None => Some(device.clone()),
+            };
+            let index = now.as_deref().and_then(crate::net::tun_index);
+            let Some(index) = index else {
+                let why = format!(
+                    "{}: {device} is gone. Switch it on to connect again.",
+                    crake_proto::trouble::OPENVPN3_ENDED
+                );
+                if let Err(e) = self.detach(&name, Some(why)).await {
+                    tracing::warn!("{name}: {e:#}");
+                }
+                continue;
+            };
+            let now = now.unwrap_or_default();
+            let same = now == device && fields.get("index").is_none_or(|i| *i == index.to_string());
+            if up && same {
                 continue;
             }
-            let why = format!(
-                "{}: {device} is gone. Switch it on to connect again.",
-                crake_proto::trouble::OPENVPN3_ENDED
-            );
-            if let Err(e) = self.detach(&name, Some(why)).await {
-                tracing::warn!("{name}: {e:#}");
-            }
+            let mut fields = fields;
+            fields.insert("device".to_owned(), now);
+            fields.remove("index");
+            self.attach_again(&name, &fields).await;
+        }
+    }
+
+    /// OpenVPN 3 is setting a session up again: its device is gone, and
+    /// what went through it waits for the new one.
+    async fn reconnecting(&self, name: &str) {
+        let Ok((_, label, _)) = self.entry(name) else {
+            return;
+        };
+        self.remove_routing(name).await;
+        self.set_state(name, TunnelState::Connecting, true);
+        self.update_hush().await;
+        self.log.system(
+            Some(name),
+            format!("{label} is reconnecting."),
+            Some("OpenVPN 3 is setting its session up again.".to_owned()),
+        );
+    }
+
+    /// The session's device is back (or new): route through it as at the
+    /// handover. craked's own settings for the old one go first.
+    async fn attach_again(&self, name: &str, fields: &HashMap<String, String>) {
+        self.remove_routing(name).await;
+        if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
+            e.attached = None;
+        }
+        self.set_state(name, TunnelState::Connecting, true);
+        if let Err(e) = self.attach(name, fields).await {
+            tracing::warn!("{name}: {e:#}");
         }
     }
 }

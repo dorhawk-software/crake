@@ -70,6 +70,12 @@ pub fn tun_of_process(pid: u32) -> Option<String> {
     (found.len() == 1).then(|| found.remove(0))
 }
 
+/// The process `pid` is still running (an OpenVPN 3 session's backend:
+/// while it runs, the session does, even while its device is gone).
+pub fn process_alive(pid: u32) -> bool {
+    std::path::Path::new(&format!("/proc/{pid}")).exists()
+}
+
 /// The interface named in a tun fd's info.
 fn iff(fdinfo: &str) -> Option<&str> {
     fdinfo

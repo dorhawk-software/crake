@@ -11,6 +11,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **OpenVPN 3 tunnels survive a reconnect.** When openvpn3 sets a session up again (the network
+  dropped for a moment, the computer woke up), Crake says the tunnel is reconnecting and routes
+  through it again once it's back. It used to call the tunnel stopped while the session carried on.
 - **Traffic, live.** A new window, from the panel's Traffic button, shows what goes where right
   now: this computer, each tunnel that's up and direct, the busiest places each one reaches, and
   packets ticking along every path as they go. Under it, the last five minutes, the connections

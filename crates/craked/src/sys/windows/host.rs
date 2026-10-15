@@ -364,3 +364,8 @@ pub fn counters(
 pub fn tun_of_process(_pid: u32) -> Option<String> {
     None
 }
+
+/// Whether an OpenVPN 3 session's process still runs: Linux only too.
+pub fn process_alive(_pid: u32) -> bool {
+    false
+}

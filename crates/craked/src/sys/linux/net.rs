@@ -133,15 +133,19 @@ const IFLA_INFO_KIND: u16 = 1;
 /// few kilobytes).
 const LINK_BUFFER: usize = 32 * 1024;
 
-/// `dev` is a tun device (as openvpn3 makes) in craked's own network
-/// namespace; false when there's no such device. Asked over netlink, which,
-/// unlike /sys, always speaks of the namespace craked runs in.
-pub fn is_tun(dev: &str) -> bool {
-    link_kind(dev).as_deref() == Some("tun")
+/// The index of `dev` if it's a tun device (as openvpn3 makes) in craked's
+/// own network namespace; None when there's no such device. Asked over
+/// netlink, which, unlike /sys, always speaks of the namespace craked runs
+/// in. The index tells a device made again under the same name (openvpn3
+/// reconnecting a session) from the one before.
+pub fn tun_index(dev: &str) -> Option<u32> {
+    let (index, kind) = link_kind(dev)?;
+    (kind == "tun").then_some(index)
 }
 
-/// What kind of link `dev` is ("tun", "dummy", ...; IFLA_INFO_KIND).
-fn link_kind(dev: &str) -> Option<String> {
+/// `dev`'s index and what kind of link it is ("tun", "dummy", ...;
+/// IFLA_INFO_KIND).
+fn link_kind(dev: &str) -> Option<(u32, String)> {
     use std::mem::offset_of;
     let name = std::ffi::CString::new(dev).ok()?;
     // SAFETY: a valid NUL-terminated name.
@@ -162,11 +166,12 @@ fn link_kind(dev: &str) -> Option<String> {
             let (_, kind) = netlink::attrs(info)
                 .into_iter()
                 .find(|(t, _)| *t == IFLA_INFO_KIND)?;
-            Some(
+            Some((
+                index,
                 String::from_utf8_lossy(kind)
                     .trim_end_matches('\0')
                     .to_owned(),
-            )
+            ))
         })
 }
 
@@ -233,7 +238,7 @@ async fn ip(args: &[&str]) -> Result<()> {
 mod tests {
     #[test]
     fn only_a_tun_device_is_one() {
-        assert!(!super::is_tun("lo"), "loopback");
-        assert!(!super::is_tun("crake-no-such-device"));
+        assert_eq!(super::tun_index("lo"), None, "loopback");
+        assert_eq!(super::tun_index("crake-no-such-device"), None);
     }
 }

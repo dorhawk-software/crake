@@ -630,6 +630,15 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    which, unlike /sys, follows craked's network namespace) and takes a
    tunnel whose device is gone down as stopped unexpectedly ("OpenVPN 3
    ended its session: tun0 is gone."; netns-tested).
+   Unless the session's process (`backend_pid`) still runs: openvpn3
+   makes a session's device again when it reconnects it (seen 2026-10-15:
+   the Wi-Fi dropped for a minute at night, a session's tun1 came back as tun0,
+   craked looked in between, called it stopped, and it stayed "stopped"
+   for three hours while openvpn3's session worked). Then craked logs
+   "Globex is reconnecting.", goes Connecting, and routes through the
+   session's device once the process holds one again, under any name; a
+   device made again under the same name between two looks is told by its
+   index (the kernel took the old one's routes with it). netns-tested.
    openvpn3-indicator acts on every session of the user, Crake's too: it
    calls Ready+Connect at CFG_OK and opens the web sign-in at
    SESS_AUTH_URL (22, the URL is the status message). So Ready may answer
@@ -840,6 +849,15 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
     `scripts/vm-test.sh` (AppArmor enforced, KVM; not in CI).
 - **The explainers** (docs/explainers.md): written down, not yet drawn or
   published anywhere.
+- **A public host learned through a company tunnel in a bad minute
+  (2026-10-15).** 20 minutes after a wake from sleep, api.anthropic.com
+  and api.beacondb.net answered neither way, and calendar.google.com
+  "didn't answer directly. Through Globex it answered in 14 ms.": a flaky
+  minute of the local network, and a public Google address went through
+  a company's Azure gateway for a week. Ideas, none decided: don't learn
+  while several unrelated hosts fail directly at once (the network, not
+  the host, is down), or try direct once more before learning a public
+  address.
 - **The website's version number** (dorhawk-website): visitors get the
   live one from versions.json; the page's fallback is bumped by hand at
   each release. Automating it (the packages workflow updating the page, or
