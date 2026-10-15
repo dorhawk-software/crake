@@ -15,23 +15,20 @@ use std::time::Duration;
 const READY_ATTEMPTS: u32 = 50;
 const READY_POLL: Duration = Duration::from_millis(200);
 const GONE_AFTER: u32 = 3;
-/// openvpn3's configuration service starts when first asked and exits when
-/// idle; just started, it answers before it has read the saved profiles
-/// (seen 2026-10-15: "no profile called initech" at once, found on "Try
-/// again" ten seconds later). An empty answer is asked again this long.
-const PROFILES_LOADING: Duration = Duration::from_secs(3);
-const PROFILES_POLL: Duration = Duration::from_millis(250);
 
 use futures_util::StreamExt;
 use zbus::Connection;
-use zbus::zvariant::{OwnedObjectPath, OwnedValue};
+use zbus::zvariant::OwnedObjectPath;
 
 use crate::Request;
 use crate::signin::{Ask, Event, Prompt, Reply};
 
 mod attached;
+mod bus;
 pub mod profile;
+
 use attached::attached;
+use bus::{call, patiently, property};
 
 const SESSIONS: &str = "net.openvpn.v3.sessions";
 const CONFIGURATION: &str = "net.openvpn.v3.configuration";
@@ -48,24 +45,6 @@ const SESS_REMOVED: u32 = 19;
 const SESS_AUTH_URL: u32 = 22;
 /// ClientAttentionGroup: a URL to sign in on the web.
 const OPEN_URL: u32 = 8;
-
-/// Ask openvpn3's configuration service, asking again for a moment while
-/// it finds nothing: it may have just started (`PROFILES_LOADING`).
-async fn patiently<T, E, F, Fut>(ask: F) -> Result<Vec<T>, E>
-where
-    F: Fn() -> Fut,
-    Fut: std::future::Future<Output = Result<Vec<T>, E>>,
-{
-    let mut waited = Duration::ZERO;
-    loop {
-        let found = ask().await?;
-        if !found.is_empty() || waited >= PROFILES_LOADING {
-            return Ok(found);
-        }
-        tokio::time::sleep(PROFILES_POLL).await;
-        waited += PROFILES_POLL;
-    }
-}
 
 /// The profiles the user has imported into openvpn3 (their names).
 pub fn profiles() -> Vec<String> {
@@ -132,46 +111,6 @@ pub fn import(name: &str, config: &str) -> Result<(), String> {
         })?;
         Ok(())
     })
-}
-
-async fn call<B, R>(
-    conn: &Connection,
-    dest: &str,
-    path: &str,
-    iface: &str,
-    method: &str,
-    body: &B,
-) -> zbus::Result<R>
-where
-    B: serde::Serialize + zbus::zvariant::DynamicType,
-    R: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
-{
-    let reply = conn
-        .call_method(Some(dest), path, Some(iface), method, body)
-        .await?;
-    reply.body().deserialize()
-}
-
-pub(super) async fn property<T>(
-    conn: &Connection,
-    dest: &str,
-    path: &str,
-    iface: &str,
-    name: &str,
-) -> zbus::Result<T>
-where
-    T: TryFrom<OwnedValue>,
-{
-    let v: OwnedValue = call(
-        conn,
-        dest,
-        path,
-        "org.freedesktop.DBus.Properties",
-        "Get",
-        &(iface, name),
-    )
-    .await?;
-    T::try_from(v).map_err(|_| zbus::Error::Failure(format!("{name}: unexpected type")))
 }
 
 /// Start the profile's session for `tunnel`. Events go to the sign-in

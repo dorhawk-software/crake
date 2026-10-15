@@ -154,16 +154,7 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
     );
 
     // 3. Settings: Learning's wait, changed in craked and shown back.
-    request(cx, Request::Settings);
-    let (s, _) = wait_window::<settings_view::Settings>(cx, "Settings opens");
-    click(cx, s, ("section", 2usize));
-    click(cx, s, ("wait", 0usize));
-    until(
-        cx,
-        "the wait is 1 s in craked",
-        Duration::from_secs(10),
-        |cx| model(cx).setting("probe_wait_secs") == "1",
-    );
+    settings_wait(cx);
 
     // 4. Tunnel detail: "Add a host" sends one through ACME.
     request(cx, Request::OpenDetail("acme".into()));
@@ -289,6 +280,20 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
         },
     );
     craked.rt.block_on(craked.mgr.shutdown());
+}
+
+/// Settings: Learning's wait, changed in craked and shown back.
+fn settings_wait(cx: &mut TestAppContext) {
+    request(cx, Request::Settings);
+    let (s, _) = wait_window::<settings_view::Settings>(cx, "Settings opens");
+    click(cx, s, ("section", 2usize));
+    click(cx, s, ("wait", 0usize));
+    until(
+        cx,
+        "the wait is 1 s in craked",
+        Duration::from_secs(10),
+        |cx| model(cx).setting("probe_wait_secs") == "1",
+    );
 }
 
 /// The profile editor (tunnel detail's "Edit…" on an OpenVPN 3 tunnel):
