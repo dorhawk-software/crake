@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.8.2 (2026-10-15)
+
 - **"Crake was updated" now appears after a package update.** The app kept running against the new
   service without noticing it had changed, so the panel never said to restart. Now it notices within
   a couple of seconds and offers Restart.
