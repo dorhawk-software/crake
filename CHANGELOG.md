@@ -15,6 +15,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
   up and left it "connecting": a sign-in through the browser looked stuck. Fixed: while the
   session's device is there, the tunnel stays up, and a session that reconnects is handed over
   again.
+- **An update keeps an OpenVPN 3 tunnel's names.** After an update, an OpenVPN 3 tunnel could come
+  back with none of its domains, and OpenVPN 3 could then send every name on the computer to the
+  company's DNS (Firefox hung looking for a proxy). The tunnel's DNS and domains now go along with
+  the handover.
 
 ## 0.8.0 (2026-10-15)
 

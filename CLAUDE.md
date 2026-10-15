@@ -677,6 +677,12 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    craked can't see into. The no-device-name case (Azure's profile, 7g)
    needs the process too: it works with craked run by hand, not under the
    package (Not now).
+   The handover keeps an attached tunnel's DNS servers and domains in its
+   fields (`attach` stores what it settled on): the craked before it had
+   reset the link in resolved on its way out, so the next one read no
+   domains, registered the tunnel with none, and couldn't stop openvpn3
+   making it every name's DNS again ("~." and the default route; Firefox's
+   proxy auto-detect hung on wpad), seen after a downgrade 2026-10-15.
    Unless the session's process (`backend_pid`) still runs: openvpn3
    makes a session's device again when it reconnects it (seen 2026-10-15:
    the Wi-Fi dropped for a minute at night, a session's tun1 came back as tun0,

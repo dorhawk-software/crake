@@ -133,6 +133,16 @@ impl Manager {
         } else {
             None
         };
+        // What it settled on, kept with the handover's fields: a craked
+        // taking over after an upgrade finds the link reset by the one
+        // before it, and a tunnel registered with no domains can't keep
+        // openvpn3 from making it every name's DNS again (2026-10-15).
+        let settled_dns = dns
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(",");
+        let settled_domains = domains.join(",");
         let servers = dns.iter().copied().map(IpAddr::V4).collect();
         let info = TunnelInfo {
             servers,
@@ -159,6 +169,12 @@ impl Manager {
             fields.insert("device".to_owned(), device.to_owned());
             if let Some(index) = crate::net::tun_index(device) {
                 fields.insert("index".to_owned(), index.to_string());
+            }
+            if !settled_dns.is_empty() {
+                fields.insert("dns".to_owned(), settled_dns);
+            }
+            if !settled_domains.is_empty() {
+                fields.insert("domains".to_owned(), settled_domains);
             }
             e.attached = Some(fields);
         }
