@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: is it safe?</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #26292C; --line: #33363A; --lineStrong: #4A4E53; --ink: #ECEDEE;
+    --muted: #A9AEB4; --accent: #2DD4BF; --track: #4A4E53; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F3F3F0; --line: #E2E2DE; --lineStrong: #BDBDB8; --ink: #1A1C1E;
+    --muted: #5A5F64; --accent: #0F766E; --track: #BDBDB8; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', monospace; }
+  .page { padding: 28px 40px 40px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 1000px; margin-bottom: 18px; }
+  .intro b { color: var(--ink); }
+  .cols { display: flex; gap: 36px; flex-wrap: wrap; align-items: flex-start; }
+  .cap { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 640px; min-height: 54px; }
+  .win { width: 640px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: flex; overflow: hidden; }
+  .nav { width: 170px; border-right: 1px solid var(--line); padding: 18px 10px; font-size: 13.5px; }
+  .nav div { padding: 7px 10px; border-radius: 6px; color: var(--muted); }
+  .nav div.on { background: var(--surface); color: var(--ink); font-weight: 600; }
+  .main { flex: 1; padding: 22px 26px 26px; }
+  h2 { margin: 0; font-size: 20px; }
+  .lede { color: var(--muted); margin-top: 4px; }
+  .q { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .q b { display: block; margin-bottom: 2px; }
+  .q p { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .ver { display: flex; gap: 14px; align-items: center; margin-top: 18px; }
+  .ver .t { font-size: 18px; font-weight: 700; }
+  .panel { width: 452px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; position: relative; }
+  .ph { display: flex; align-items: center; gap: 10px; padding: 14px 18px 10px; }
+  .ph .t { font-size: 16px; font-weight: 700; }
+  .ph .w { font-size: 13px; color: var(--muted); }
+  .help { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--muted); color: var(--muted); font-size: 11px;
+    display: inline-flex; align-items: center; justify-content: center; font-weight: 700; }
+  .card { position: absolute; left: 70px; top: 44px; width: 360px; background: var(--surface); border: 1px solid var(--lineStrong);
+    border-radius: 8px; padding: 12px 14px; box-shadow: 0 8px 24px rgba(0,0,0,.35); font-size: 13px; z-index: 2; }
+  .card b { display: block; margin-top: 8px; }
+  .card b:first-child { margin-top: 0; }
+  .card p { margin: 0; color: var(--muted); }
+  .rows { padding: 6px 18px 120px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>"Is it safe? Can it break my traffic?"</b> A colleague asked before trying Crake, and the
+    answer lived only in a chat. Four short answers in Crake's voice, true on every system Crake runs on. The same
+    words can go on dorhawk.software/crake later (docs/explainers.md).</div>
+  <div class="cols">
+    <div>
+      <div class="cap">A. In Settings → About (recommended)</div>
+      <div class="sub">Where people look when they wonder what an app does. Always there, out of the way, nothing
+        new in the panel.</div>
+      <div class="win">
+        <div class="nav"><div>Tunnels</div><div>General</div><div>Learning</div><div>Names</div><div>Privacy</div>
+          <div>Managed by IT</div><div class="on">About</div></div>
+        <div class="main">
+          <h2>About</h2>
+          <div class="lede">Named after the corncrake, <i>Crex crex</i>.</div>
+          <div class="ver"><div><div class="t">Crake 0.8.0</div><div class="lede" style="margin:0">A VPN client that
+            routes only what needs routing.</div></div></div>
+          <div class="q"><b>Does anything leave this computer?</b>
+            <p>No. Crake decides everything here: there's no Crake server, no account and no telemetry. Only your
+              VPN's own sign-in talks to your company.</p></div>
+          <div class="q"><b>Can Crake break my internet?</b>
+            <p>If Crake stops, its routes and rules go with it, and your traffic goes straight out as it would
+              without Crake. A tunnel that drops takes only what went through it.</p></div>
+          <div class="q"><b>What does my company see?</b>
+            <p>Only what goes through its tunnel: the hosts that need it. Everything else goes straight out,
+              not through the company.</p></div>
+          <div class="q"><b>Who can change what?</b>
+            <p>Changes need you, at this computer. A tunnel your IT set up can be switched on and off, but its
+              rules can't be widened.</p></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">B. A "?" next to Crake in the panel</div>
+      <div class="sub">Closer to hand while something feels off, like the "?" by What Crake did. One more thing in
+        the panel's header, and the answers squeezed into a card.</div>
+      <div class="panel">
+        <div class="ph"><span class="t">Crake</span><span class="help">?</span><span class="w">· Listening</span></div>
+        <div class="card"><b>Does anything leave this computer?</b><p>No. No Crake server, no telemetry.</p>
+          <b>Can Crake break my internet?</b><p>If it stops, its routes go with it: traffic goes straight out.</p>
+          <b>What does my company see?</b><p>Only what goes through its tunnel.</p>
+          <b>Who can change what?</b><p>Only you, at this computer. IT's rules can't be widened.</p></div>
+        <div class="rows">Last hour · What Crake did · Tunnels …</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>if (location.search.includes('dark=false')) document.body.classList.add('light');</script>
+</body>
+</html>

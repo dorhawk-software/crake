@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: editing an OpenVPN 3 profile</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #26292C; --line: #33363A; --lineStrong: #4A4E53; --ink: #ECEDEE;
+    --muted: #A9AEB4; --accent: #2DD4BF; --accentInk: #0B1514; --danger: #F97066; --changed: #17332F; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F3F3F0; --line: #E2E2DE; --lineStrong: #BDBDB8; --ink: #1A1C1E;
+    --muted: #5A5F64; --accent: #0F766E; --accentInk: #FFFFFF; --danger: #B42318; --changed: #E2F1EF; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', monospace; }
+  .page { padding: 28px 40px 40px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 1040px; margin-bottom: 18px; }
+  .intro b { color: var(--ink); }
+  .cap { font-size: 15px; font-weight: 700; margin: 26px 0 2px; }
+  .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 1040px; }
+  .facts { display: flex; border: 1px solid var(--line); border-radius: 8px; width: 820px; background: var(--panel); }
+  .facts > div { flex: 1; padding: 12px 14px; border-right: 1px solid var(--line); }
+  .facts > div:last-child { border-right: 0; }
+  .facts .k { font-size: 12px; color: var(--muted); }
+  .facts .v { font-weight: 700; margin-top: 2px; }
+  .facts .v.mono { font-weight: 400; }
+  .link { color: var(--accent); font-weight: 600; font-size: 13px; margin-left: 8px; }
+  .win { width: 820px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+  .bar .t { font-size: 17px; font-weight: 700; }
+  .bar .s { font-size: 13px; color: var(--muted); }
+  .x { margin-left: auto; width: 28px; height: 28px; border-radius: 50%; background: var(--surface); display: flex;
+    align-items: center; justify-content: center; color: var(--muted); }
+  .code { font-family: 'Atkinson Hyperlegible Mono', monospace; font-size: 13px; padding: 10px 0; max-height: 360px; overflow: hidden; }
+  .ln { display: flex; padding: 0 20px 0 0; }
+  .ln .n { width: 46px; text-align: right; padding-right: 14px; color: var(--muted); flex: none; user-select: none; }
+  .ln.ch { background: var(--changed); }
+  .ln .cur { border-left: 2px solid var(--accent); margin-left: -1px; }
+  .fold { display: inline-block; padding: 0 8px; border-radius: 4px; background: var(--surface); border: 1px solid var(--line);
+    color: var(--muted); font-family: 'Atkinson Hyperlegible Next', sans-serif; font-size: 12px; }
+  .foot { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--line); }
+  .foot .note { flex: 1; font-size: 13px; color: var(--muted); }
+  .foot .note.bad { color: var(--danger); }
+  .btn { border: 1px solid var(--line); border-radius: 6px; padding: 7px 14px; font-weight: 600; font-size: 13px; }
+  .btn.go { background: var(--accent); color: var(--accentInk); border-color: var(--accent); }
+  .btn.off { opacity: .45; }
+  .box { width: 820px; padding: 14px 16px; border-radius: 8px; background: var(--surface); font-size: 13px; }
+  ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); max-width: 1040px; }
+  ul b { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro"><b>Editing an OpenVPN 3 profile, in Crake (for experts).</b> Changing one value of a profile
+    (a remote, a route, a dhcp-option) means exporting it, editing the file and importing it again: "too many
+    clicks", and slow when debugging a config. openvpn3 can't edit a profile in place; Crake can do the round trip:
+    show the profile's text, let it be changed, then give openvpn3 the new text under the same name, remove the old
+    one, and reconnect. Out of the way of people who just import IT's file: it's reached from the tunnel's
+    details only.</div>
+
+  <div class="cap">1. Where it starts: tunnel detail, an OpenVPN 3 tunnel's Profile</div>
+  <div class="sub">The fact that names the profile gets "Edit…". Only for OpenVPN 3 tunnels, and only when openvpn3
+    shows the profile's text (see 4).</div>
+  <div class="facts">
+    <div><div class="k">Connected for</div><div class="v">1 h 12 min</div></div>
+    <div><div class="k">Your address</div><div class="v mono">10.8.0.6</div></div>
+    <div><div class="k">Protocol</div><div class="v">OpenVPN 3 · UDP</div></div>
+    <div><div class="k">Profile</div><div class="v mono">initech<span class="link">Edit…</span></div></div>
+  </div>
+
+  <div class="cap">2. The profile's text</div>
+  <div class="sub">A window of its own: the text as openvpn3 holds it, line numbers, plain monospace editing. The
+    certificates and keys inside (&lt;ca&gt;, &lt;cert&gt;, &lt;key&gt;, &lt;tls-crypt&gt;, …) are folded into one
+    line each and kept exactly as they are: no one edits base64 by hand, and it keeps them off the screen. Changed
+    lines are tinted. Save is there once something changed.</div>
+  <div class="win">
+    <div class="bar"><span class="t">Initech's profile</span><span class="s mono">initech · in OpenVPN 3</span><span class="x">✕</span></div>
+    <div class="code">
+      <div class="ln"><span class="n">1</span><span>client</span></div>
+      <div class="ln"><span class="n">2</span><span>dev tun</span></div>
+      <div class="ln"><span class="n">3</span><span>proto udp</span></div>
+      <div class="ln ch"><span class="n">4</span><span class="cur">remote vpn2.initech.example 1194</span></div>
+      <div class="ln"><span class="n">5</span><span>resolv-retry infinite</span></div>
+      <div class="ln"><span class="n">6</span><span>nobind</span></div>
+      <div class="ln"><span class="n">7</span><span>remote-cert-tls server</span></div>
+      <div class="ln"><span class="n">8</span><span>route 10.20.0.0 255.255.0.0</span></div>
+      <div class="ln ch"><span class="n">9</span><span>dhcp-option DNS 10.8.0.2</span></div>
+      <div class="ln"><span class="n">10</span><span>dhcp-option DOMAIN initech.internal</span></div>
+      <div class="ln"><span class="n">11</span><span><span class="fold">&lt;ca&gt; certificate, 31 lines, kept as it is</span></span></div>
+      <div class="ln"><span class="n">12</span><span><span class="fold">&lt;cert&gt; certificate, 27 lines, kept as it is</span></span></div>
+      <div class="ln"><span class="n">13</span><span><span class="fold">&lt;key&gt; private key, 28 lines, kept as it is</span></span></div>
+      <div class="ln"><span class="n">14</span><span><span class="fold">&lt;tls-crypt&gt; key, 21 lines, kept as it is</span></span></div>
+      <div class="ln"><span class="n">15</span><span>verb 3</span></div>
+    </div>
+    <div class="foot"><span class="note">Saving gives OpenVPN 3 the new text under the same name and reconnects
+      Initech.</span><span class="btn">Cancel</span><span class="btn go">Save and reconnect</span></div>
+  </div>
+
+  <div class="cap">3. openvpn3 refuses the text</div>
+  <div class="sub">openvpn3 checks a profile when it's given one; its reason is said under the text, in its own words,
+    and nothing has changed: the old profile is still there, the tunnel still up.</div>
+  <div class="win">
+    <div class="bar"><span class="t">Initech's profile</span><span class="s mono">initech · in OpenVPN 3</span><span class="x">✕</span></div>
+    <div class="code" style="max-height:120px">
+      <div class="ln ch"><span class="n">4</span><span class="cur">remote vpn2.initech.example 1194 udpp</span></div>
+      <div class="ln"><span class="n">5</span><span>resolv-retry infinite</span></div>
+      <div class="ln"><span class="n">6</span><span>nobind</span></div>
+    </div>
+    <div class="foot"><span class="note bad">OpenVPN 3 refused it: "remote: unknown protocol udpp". Nothing was
+      changed.</span><span class="btn">Cancel</span><span class="btn go">Save and reconnect</span></div>
+  </div>
+
+  <div class="cap">4. A profile openvpn3 won't show</div>
+  <div class="sub">Whoever imported it can lock it (openvpn3's <span class="mono">locked_down</span>, often IT's
+    profiles): then no one, Crake included, can read its text. The fact says so instead of offering Edit.</div>
+  <div class="box">Initech's profile is locked in OpenVPN 3: its text can't be shown or changed here.</div>
+
+  <div class="cap">How it works</div>
+  <ul>
+    <li><b>The round trip:</b> openvpn3's Fetch gives the text; Save imports the new text (persistent, the user's,
+      as Import .ovpn… does), and only once that's accepted removes the old profile. The new one has the same
+      name, so Crake's tunnel keeps pointing at it. A connected tunnel reconnects on the new profile.</li>
+    <li><b>Kept as they were:</b> the folded certificates and keys go back byte for byte. Overrides and tags set
+      with <span class="mono">openvpn3 config-manage</span> are copied to the new profile where openvpn3 lets the
+      owner read them.</li>
+    <li><b>Not offered:</b> for profiles of another user (shared with you), sealed ones (openvpn3 refuses changes),
+      and IT's managed tunnels in Crake.</li>
+  </ul>
+</div>
+<script>if (location.search.includes('dark=false')) document.body.classList.add('light');</script>
+</body>
+</html>
