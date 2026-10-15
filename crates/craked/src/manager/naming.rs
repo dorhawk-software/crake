@@ -202,8 +202,10 @@ impl Manager {
         if seen.len() > SEEN_NAMES_MAX {
             seen.retain(|_, (_, at)| at.elapsed() < SEEN_NAME_FOR);
         }
+        let now = Instant::now();
         for a in &answer.addrs {
-            seen.insert(*a, (answer.name.clone(), Instant::now()));
+            let kept = keep_name(seen.get(a), &answer.name, now);
+            seen.insert(*a, kept);
         }
     }
 
@@ -368,4 +370,43 @@ pub(super) async fn ask_within(
         }
     }
     None
+}
+
+/// The name an address goes by after `name` was answered with it: the one
+/// it has while that's fresh (looked up within SEEN_NAME_FOR; looking it
+/// up again keeps it fresh), another name only once it has gone stale.
+/// Many names can share one address (a company's DNS gave every name under
+/// gitlab.initech.example the same one): the latest answer won, so one
+/// stray lookup (a proxy auto-detect's wpad.gitlab.initech.example) renamed
+/// every connection to it in the Traffic window.
+fn keep_name(kept: Option<&(String, Instant)>, name: &str, now: Instant) -> (String, Instant) {
+    match kept {
+        Some((n, at)) if n != name && now.saturating_duration_since(*at) < SEEN_NAME_FOR => {
+            (n.clone(), *at)
+        }
+        _ => (name.to_owned(), now),
+    }
+}
+
+#[cfg(test)]
+mod name_tests {
+    use super::*;
+
+    #[test]
+    fn an_address_keeps_its_name_while_it_is_fresh() {
+        let t0 = Instant::now();
+        let gitlab = keep_name(None, "gitlab.initech.example", t0);
+        assert_eq!(gitlab.0, "gitlab.initech.example");
+        // A stray lookup of another name with the same address: kept.
+        let later = t0 + Duration::from_secs(60);
+        let after = keep_name(Some(&gitlab), "wpad.gitlab.initech.example", later);
+        assert_eq!(after, gitlab);
+        // Looked up again: still that name, fresh again.
+        let again = keep_name(Some(&after), "gitlab.initech.example", later);
+        assert_eq!(again, ("gitlab.initech.example".to_owned(), later));
+        // Gone stale: the next name takes it.
+        let stale = later + SEEN_NAME_FOR;
+        let other = keep_name(Some(&again), "git.initech.example", stale);
+        assert_eq!(other, ("git.initech.example".to_owned(), stale));
+    }
 }

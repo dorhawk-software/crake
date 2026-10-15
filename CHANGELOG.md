@@ -11,6 +11,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Traffic names things better and stays still when nothing flows.** Many names can share one
+  address (a company's DNS often gives every name under a domain the same one); a connection now
+  keeps the name it was first seen with instead of the latest one looked up. A tunnel carrying only
+  its keepalives no longer shows packets moving while it says 0 KB/s.
+
 ## 0.8.2 (2026-10-15)
 
 - **"Crake was updated" now appears after a package update.** The app kept running against the new

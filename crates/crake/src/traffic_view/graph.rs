@@ -45,6 +45,8 @@ const SPEED_PER_DECADE: f32 = 16.;
 const DOT_KB: f64 = 250.;
 const DOTS_MIN: f64 = 0.25;
 const DOTS_MAX: f64 = 2.;
+/// Bytes per second a path needs before it has dots at all.
+const DOTS_FROM: f64 = 1000.;
 const KB: f64 = 1000.;
 pub const DOT_RADIUS: f32 = 2.6;
 /// A path's line; still (animations off), up to this much thicker with
@@ -279,7 +281,9 @@ pub struct Flows {
 pub fn pace(rate: f64) -> (f32, f64) {
     let kb = rate / KB;
     let speed = SPEED_BASE + SPEED_PER_DECADE * (1. + kb).log10() as f32;
-    let every = if rate > 0. {
+    // A tunnel's keepalives and DNS lookups (tens of bytes a second, shown
+    // as "0 KB/s", with no destination to go to) draw no dots.
+    let every = if rate >= DOTS_FROM {
         (kb / DOT_KB).clamp(DOTS_MIN, DOTS_MAX)
     } else {
         0.
@@ -495,6 +499,8 @@ mod tests {
         assert_eq!(rare, DOTS_MIN, "one every four seconds at least");
         assert_eq!(often, DOTS_MAX, "two a second at most");
         assert_eq!(pace(0.).1, 0., "nothing flowing, no dots");
+        assert_eq!(pace(43.).1, 0., "a tunnel's keepalives draw no dots");
+        assert_eq!(pace(1_000.).1, DOTS_MIN, "1 KB/s does");
     }
 
     #[test]
