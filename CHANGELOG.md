@@ -11,6 +11,15 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Dismiss a stopped tunnel.** A tunnel that stopped on its own has a Dismiss button next to why in
+  the panel: it goes back to plain "Off" and the red badge leaves the bird. Why it stopped is still
+  in its details and the log.
+- **The bird says what's up.** With a tunnel stopped and nothing else connected, the bird sleeps,
+  with the red badge; it no longer looks awake as if something were connected. While another tunnel
+  connects, it's drawn dashed with the badge.
+- **OpenVPN 3 profiles found the first time.** Switching on an OpenVPN 3 tunnel sometimes said its
+  profile wasn't there, and "Try again" worked: openvpn3 had only just started. Crake now gives it
+  a moment.
 - **OpenVPN 3 tunnels survive a reconnect.** When openvpn3 sets a session up again (the network
   dropped for a moment, the computer woke up), Crake says the tunnel is reconnecting and routes
   through it again once it's back. It used to call the tunnel stopped while the session carried on.

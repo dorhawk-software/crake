@@ -189,6 +189,8 @@ pub enum Request {
     Forget(String, String),
     /// Forget everything learned for a tunnel (tunnel detail's "Forget all…").
     ForgetLearned(String),
+    /// A tunnel that stopped on its own, seen: Off (the panel's Dismiss).
+    DismissTrouble(String),
     /// macOS: System Settings' Login Items & Extensions, where Crake's
     /// service is switched on (`service`).
     OpenServiceSettings,

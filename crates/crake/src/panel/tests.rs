@@ -127,6 +127,23 @@ fn copy_for_helpdesk(cx: &mut TestAppContext) {
     }
 }
 
+/// A tunnel that stopped on its own has a Dismiss next to why
+/// (design/proposals/dismiss-trouble.html); it asks craked to make it Off.
+#[gpui_kit::test]
+fn a_stopped_tunnel_can_be_dismissed(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    let name = w.model.update(cx, |m, cx| {
+        m.tunnels[1].state = "trouble".into();
+        cx.notify();
+        m.tunnels[1].name.clone()
+    });
+    cx.run_until_parked();
+    match w.click(("dismiss", 1_usize), cx) {
+        Request::DismissTrouble(t) => assert_eq!(t, name),
+        other => panic!("{other:?}"),
+    }
+}
+
 /// The AnyConnect notice under a tunnel, and its "Got it".
 #[gpui_kit::test]
 fn the_anyconnect_notice_can_be_dismissed(cx: &mut TestAppContext) {

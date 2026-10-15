@@ -1,5 +1,6 @@
 //! The top-bar icon. States change shape, never colour (design/DESIGN.md):
-//! off, connecting, listening, routed (a few seconds), trouble. A click opens
+//! off, connecting, listening, routed (a few seconds), and trouble's red
+//! badge on the head as it is (asleep, dashed or awake). A click opens
 //! the panel; the menu is the plain fallback: tunnels with check marks, Open
 //! Crake, Quit. What it shows and how it's drawn lives here; each system's
 //! tray shows it (`sys::tray`).
@@ -14,12 +15,27 @@ pub enum Shape {
     Connecting,
     Listening,
     Routed,
+    /// The badge on the head awake: a tunnel stopped, another is up.
     Trouble,
+    /// The badge on the head asleep: a tunnel stopped, nothing is up.
+    OffTrouble,
+    /// The badge on the dashed head: a tunnel stopped, another connects.
+    ConnectingTrouble,
 }
 
 impl Shape {
     fn index(self) -> usize {
         self as usize
+    }
+
+    /// The shape without trouble's badge, and whether it has one.
+    pub fn badged(self) -> (Shape, bool) {
+        match self {
+            Shape::Trouble => (Shape::Listening, true),
+            Shape::OffTrouble => (Shape::Off, true),
+            Shape::ConnectingTrouble => (Shape::Connecting, true),
+            other => (other, false),
+        }
     }
 }
 
@@ -81,7 +97,7 @@ const SIZE: u32 = 64;
 /// 36 (macOS' menu bar on a Retina screen).
 const SMALL: [u32; 9] = [16, 20, 22, 24, 28, 32, 36, 40, 48];
 
-static ICONS: LazyLock<[Icon; 5]> = LazyLock::new(|| {
+static ICONS: LazyLock<[Icon; 7]> = LazyLock::new(|| {
     // The head alone, solid with the eye cut out: it holds its own next to app
     // icons in a small bar (DESIGN.md, Tray icon). CRAKE_TRAY=bird: the whole
     // bird, as in design/icons/crake-*-symbolic.svg.
@@ -96,8 +112,18 @@ static ICONS: LazyLock<[Icon; 5]> = LazyLock::new(|| {
             )),
             draw_as_is(include_str!("../../../assets/icons/tray-head-routed.svg")),
             draw_as_is(include_str!("../../../assets/icons/tray-head-trouble.svg")),
+            draw_as_is(include_str!(
+                "../../../assets/icons/tray-head-off-trouble.svg"
+            )),
+            draw_as_is(include_str!(
+                "../../../assets/icons/tray-head-connecting-trouble.svg"
+            )),
         ];
     }
+    // The whole bird has one trouble drawing, the head with "!".
+    let trouble = draw(include_str!(
+        "../../../assets/icons/crake-trouble-symbolic.svg"
+    ));
     [
         draw(include_str!("../../../assets/icons/crake-off-symbolic.svg")),
         draw(include_str!(
@@ -109,9 +135,9 @@ static ICONS: LazyLock<[Icon; 5]> = LazyLock::new(|| {
         draw(include_str!(
             "../../../assets/icons/crake-routed-symbolic.svg"
         )),
-        draw(include_str!(
-            "../../../assets/icons/crake-trouble-symbolic.svg"
-        )),
+        trouble.clone(),
+        trouble.clone(),
+        trouble,
     ]
 });
 
@@ -238,8 +264,10 @@ impl Art {
             );
         }
         let mut over = String::new();
+        // The corner's marks stay put when the head tips.
+        let mut corner = String::new();
         if let Some((a, b, opacity)) = self.calls {
-            holes += &format!(
+            corner += &format!(
                 r##"<path d="{MARK_1}{MARK_2}" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round" opacity="{opacity:.2}"/>"##
             );
             for (d, drawn) in [(MARK_1, a), (MARK_2, b)] {
@@ -252,7 +280,7 @@ impl Art {
             }
         }
         if let Some(size) = self.badge {
-            holes += &format!(
+            corner += &format!(
                 r##"<circle cx="19.2" cy="9.75" r="{:.3}" fill="#000"/>"##,
                 3.45 * size
             );
@@ -277,7 +305,7 @@ impl Art {
             )
         });
         format!(
-            r##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="7.1 6.6 15.2 15.2"><defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="30" height="30"><g{}><path d="{SIL}" fill="#fff" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>{holes}</g></mask></defs><rect x="0" y="0" width="30" height="30" fill="#ffffff" opacity="{:.2}" mask="url(#m)"/>{outline}{dashed}{over}</svg>"##,
+            r##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="7.1 6.6 15.2 15.2"><defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="30" height="30"><g{}><path d="{SIL}" fill="#fff" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>{holes}</g>{corner}</mask><mask id="c" maskUnits="userSpaceOnUse" x="0" y="0" width="30" height="30"><rect x="0" y="0" width="30" height="30" fill="#fff"/>{corner}</mask></defs><rect x="0" y="0" width="30" height="30" fill="#ffffff" opacity="{:.2}" mask="url(#m)"/><g mask="url(#c)">{outline}{dashed}</g>{over}</svg>"##,
             tuck_transform(self.tuck),
             self.fill
         )
@@ -290,6 +318,19 @@ impl Art {
 
 /// The resting look of each state, as `Art`.
 fn rest(shape: Shape) -> Art {
+    let (shape, badge) = shape.badged();
+    let art = rest_unbadged(shape);
+    if badge {
+        Art {
+            badge: Some(1.),
+            ..art
+        }
+    } else {
+        art
+    }
+}
+
+fn rest_unbadged(shape: Shape) -> Art {
     let head = Art {
         fill: 1.,
         eye: 1.,
@@ -312,19 +353,46 @@ fn rest(shape: Shape) -> Art {
             calls: Some((1., 1., 1.)),
             ..head
         },
-        Shape::Trouble => Art {
-            badge: Some(1.),
-            ..head
-        },
+        Shape::Trouble | Shape::OffTrouble | Shape::ConnectingTrouble => {
+            rest_unbadged(shape.badged().0)
+        }
     }
 }
 
-// literal: the icon's motion, frame by frame (design/proposals/animations.html)
 /// The frames from one state to the next (every ~70 ms), ending at the
 /// resting look of `to`. Connecting has its own loop (`connecting_loop`).
+/// Trouble's badge stays on through the motion, or appears once after it.
 pub fn transition(from: Shape, to: Shape) -> Vec<Art> {
+    let ((from, had), (to, has)) = (from.badged(), to.badged());
+    let mut v = transition_unbadged(from, to);
+    if has && had {
+        for art in &mut v {
+            art.badge = Some(1.);
+        }
+    } else if has {
+        let rest = rest(to);
+        v.extend(steps(BADGE_STEPS).map(|s| Art {
+            badge: Some(s),
+            ..rest
+        }));
+    }
+    v
+}
+
+/// How many frames the badge takes to appear.
+const BADGE_STEPS: usize = 4;
+
+/// `n` steps from just past 0 to 1, eased.
+fn steps(n: usize) -> impl Iterator<Item = f32> {
+    (1..=n).map(move |i| crate::motion::ease_out(i as f32 / n as f32))
+}
+
+// literal: the icon's motion, frame by frame (design/proposals/animations.html)
+fn transition_unbadged(from: Shape, to: Shape) -> Vec<Art> {
+    if from == to {
+        return Vec::new();
+    }
     let head = rest(Shape::Listening);
-    let steps = |n: usize| (1..=n).map(move |i| crate::motion::ease_out(i as f32 / n as f32));
     match (from, to) {
         // The dashed head fills in, then the eye opens.
         (Shape::Connecting, Shape::Listening | Shape::Routed) => {
@@ -374,13 +442,6 @@ pub fn transition(from: Shape, to: Shape) -> Vec<Art> {
                 ..head
             })
             .collect(),
-        // The badge appears once.
-        (_, Shape::Trouble) => steps(4)
-            .map(|s| Art {
-                badge: Some(s),
-                ..head
-            })
-            .collect(),
         // The eye closes, then the head tips down and dims: asleep.
         (_, Shape::Off) => {
             let mut v: Vec<Art> = steps(3)
@@ -420,11 +481,13 @@ pub fn transition(from: Shape, to: Shape) -> Vec<Art> {
 /// (design/proposals/tray-connecting.html). Every frame is the whole head,
 /// so a frame the bar misses only makes the dashes jump a little; a line
 /// drawing itself read as blinking there.
-pub fn connecting_loop() -> Vec<Art> {
+/// With `badge`, trouble's badge stays on it.
+pub fn connecting_loop(badge: bool) -> Vec<Art> {
     const STEPS: u8 = 10;
     (0..STEPS)
         .map(|i| Art {
             dashes: Some(f32::from(i) / f32::from(STEPS)),
+            badge: badge.then_some(1.),
             ..Art::default()
         })
         .collect()
@@ -459,10 +522,13 @@ mod tests {
             px(&ICONS[Shape::Routed.index()], 19.2, 7.7)[1..],
             [0x2D, 0xD4, 0xBF]
         );
-        assert_eq!(
-            px(&ICONS[Shape::Trouble.index()], 17.6, 9.75)[1..],
-            [0xF9, 0x70, 0x66]
-        );
+        for shape in [Shape::Trouble, Shape::OffTrouble, Shape::ConnectingTrouble] {
+            assert_eq!(
+                px(&ICONS[shape.index()], 17.6, 9.75)[1..],
+                [0xF9, 0x70, 0x66],
+                "{shape:?}"
+            );
+        }
     }
 
     #[test]
@@ -482,21 +548,34 @@ mod tests {
             (Shape::Listening, Shape::Trouble),
             (Shape::Listening, Shape::Off),
             (Shape::Off, Shape::Listening),
+            (Shape::Listening, Shape::OffTrouble),
+            (Shape::Off, Shape::OffTrouble),
+            (Shape::Connecting, Shape::ConnectingTrouble),
+            (Shape::OffTrouble, Shape::Trouble),
         ] {
             let last = transition(from, to).last().unwrap().icon();
             assert!(close(&last, &ICONS[to.index()]), "{from:?} -> {to:?}");
         }
         // Connecting goes round from the dashed head at rest, every frame
         // the whole head, its dashes moved on.
-        let frames: Vec<Icon> = connecting_loop().iter().map(Art::icon).collect();
+        let frames: Vec<Icon> = connecting_loop(false).iter().map(Art::icon).collect();
         assert!(close(&frames[0], &ICONS[Shape::Connecting.index()]));
         assert!(frames.windows(2).all(|w| w[0] != w[1]));
+        let frames: Vec<Icon> = connecting_loop(true).iter().map(Art::icon).collect();
+        assert!(close(&frames[0], &ICONS[Shape::ConnectingTrouble.index()]));
+        // Dismissed: the badge just goes.
+        assert!(transition(Shape::OffTrouble, Shape::Off).is_empty());
     }
 
     #[test]
     fn the_coloured_marks_fit_inside_the_icon() {
         // A mark that reaches the edge is cut flat there.
-        for shape in [Shape::Routed, Shape::Trouble] {
+        for shape in [
+            Shape::Routed,
+            Shape::Trouble,
+            Shape::OffTrouble,
+            Shape::ConnectingTrouble,
+        ] {
             let icon = &ICONS[shape.index()];
             // Coloured: drawn, and not the white head (which may touch the
             // bottom: the crop is tight).

@@ -15,6 +15,12 @@ use std::time::Duration;
 const READY_ATTEMPTS: u32 = 50;
 const READY_POLL: Duration = Duration::from_millis(200);
 const GONE_AFTER: u32 = 3;
+/// openvpn3's configuration service starts when first asked and exits when
+/// idle; just started, it answers before it has read the saved profiles
+/// (seen 2026-10-15: "no profile called initech" at once, found on "Try
+/// again" ten seconds later). An empty answer is asked again this long.
+const PROFILES_LOADING: Duration = Duration::from_secs(3);
+const PROFILES_POLL: Duration = Duration::from_millis(250);
 
 use futures_util::StreamExt;
 use zbus::Connection;
@@ -42,6 +48,24 @@ const SESS_AUTH_URL: u32 = 22;
 /// ClientAttentionGroup: a URL to sign in on the web.
 const OPEN_URL: u32 = 8;
 
+/// Ask openvpn3's configuration service, asking again for a moment while
+/// it finds nothing: it may have just started (`PROFILES_LOADING`).
+async fn patiently<T, E, F, Fut>(ask: F) -> Result<Vec<T>, E>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<Vec<T>, E>>,
+{
+    let mut waited = Duration::ZERO;
+    loop {
+        let found = ask().await?;
+        if !found.is_empty() || waited >= PROFILES_LOADING {
+            return Ok(found);
+        }
+        tokio::time::sleep(PROFILES_POLL).await;
+        waited += PROFILES_POLL;
+    }
+}
+
 /// The profiles the user has imported into openvpn3 (their names).
 pub fn profiles() -> Vec<String> {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -52,16 +76,18 @@ pub fn profiles() -> Vec<String> {
         let Ok(conn) = Connection::system().await else {
             return Vec::new();
         };
-        let paths: Vec<OwnedObjectPath> = match call(
-            &conn,
-            CONFIGURATION,
-            "/net/openvpn/v3/configuration",
-            CONFIGURATION,
-            "FetchAvailableConfigs",
-            &(),
-        )
-        .await
-        {
+        let paths = patiently(|| {
+            call::<_, Vec<OwnedObjectPath>>(
+                &conn,
+                CONFIGURATION,
+                "/net/openvpn/v3/configuration",
+                CONFIGURATION,
+                "FetchAvailableConfigs",
+                &(),
+            )
+        })
+        .await;
+        let paths = match paths {
             Ok(p) => p,
             Err(_) => return Vec::new(),
         };
@@ -195,14 +221,17 @@ async fn run(
     let path = match running {
         Some(path) => path,
         None => {
-            let configs: Vec<OwnedObjectPath> = call(
-                &conn,
-                CONFIGURATION,
-                "/net/openvpn/v3/configuration",
-                CONFIGURATION,
-                "LookupConfigName",
-                &(profile,),
-            )
+            let name = (profile,);
+            let configs = patiently(|| {
+                call::<_, Vec<OwnedObjectPath>>(
+                    &conn,
+                    CONFIGURATION,
+                    "/net/openvpn/v3/configuration",
+                    CONFIGURATION,
+                    "LookupConfigName",
+                    &name,
+                )
+            })
             .await
             .map_err(|e| format!("Couldn\u{2019}t look up the profile {profile}: {e}"))?;
             let config = configs
@@ -669,6 +698,24 @@ async fn answer(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A configuration service that has just started finds nothing at
+    /// first: Crake asks again rather than saying the profile isn't there.
+    #[tokio::test]
+    async fn a_profile_not_found_at_once_is_asked_for_again() {
+        let asked = std::cell::Cell::new(0);
+        let found: Result<Vec<u8>, ()> = patiently(|| {
+            asked.set(asked.get() + 1);
+            let n = asked.get();
+            async move { Ok(if n < 3 { Vec::new() } else { vec![1] }) }
+        })
+        .await;
+        assert_eq!(found, Ok(vec![1]));
+        assert_eq!(asked.get(), 3);
+        // None at all: said after a few seconds, not for ever.
+        let none: Result<Vec<u8>, ()> = patiently(|| async { Ok(Vec::new()) }).await;
+        assert_eq!(none, Ok(Vec::new()));
+    }
 
     fn log(body: impl serde::Serialize + zbus::zvariant::DynamicType) -> zbus::Message {
         zbus::Message::signal(

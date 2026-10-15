@@ -171,7 +171,7 @@ square so it fills the slot. White; the states:
 | connecting | the head drawn dashed |
 | listening | eye open |
 | routed (a few seconds) | the two call marks over the corner, **teal** |
-| trouble | a **red** badge with "!" over the corner |
+| trouble | a **red** badge with "!" over the corner of the head as it would be without it: asleep when nothing is up, dashed while another tunnel connects, awake while one is up (design/proposals/dismiss-trouble.html) |
 
 The head changes shape, never colour; only the two state marks are coloured
 (dark-mode accent and danger, the bar is dark), with a gap cut into the head

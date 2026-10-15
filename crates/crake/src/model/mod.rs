@@ -436,23 +436,38 @@ impl Model {
         v
     }
 
+    /// The tray's shape: what the tunnels are doing, with the red badge on
+    /// it when one stopped on its own (asleep, dashed or awake as the head
+    /// would be without it; design/proposals/dismiss-trouble.html).
     pub fn shape(&self) -> Shape {
+        let shape = self.shape_untroubled();
+        if self.reachable != Some(true) || !self.tunnels.iter().any(|t| t.state == "trouble") {
+            return shape;
+        }
+        match shape {
+            Shape::Off => Shape::OffTrouble,
+            Shape::Connecting => Shape::ConnectingTrouble,
+            _ => Shape::Trouble,
+        }
+    }
+
+    fn shape_untroubled(&self) -> Shape {
         let any = |s: &str| self.tunnels.iter().any(|t| t.state == s);
         if self.reachable != Some(true) {
             Shape::Off
-        } else if any("trouble") {
-            Shape::Trouble
         } else if any("connecting") {
             Shape::Connecting
+        } else if !any("connected") {
+            // A host routed a moment ago by a tunnel that's gone since
+            // doesn't wake the head.
+            Shape::Off
         } else if self
             .routed_at
             .is_some_and(|t| t.elapsed() < ROUTED_SHAPE_FOR)
         {
             Shape::Routed
-        } else if any("connected") {
-            Shape::Listening
         } else {
-            Shape::Off
+            Shape::Listening
         }
     }
 
@@ -461,7 +476,7 @@ impl Model {
         match (self.reachable, self.shape()) {
             (None, _) => "Starting",
             (Some(false), _) => "Not running",
-            (_, Shape::Trouble) => "Trouble",
+            (_, Shape::Trouble | Shape::OffTrouble | Shape::ConnectingTrouble) => "Trouble",
             (_, Shape::Connecting) => "Connecting",
             (_, Shape::Listening | Shape::Routed) => "Listening",
             (_, Shape::Off) => "Off",
@@ -756,16 +771,54 @@ mod tests {
             ..Default::default()
         };
         m.apply(trouble());
-        assert_eq!(m.shape(), Shape::Trouble);
+        assert_eq!(m.shape(), Shape::OffTrouble);
         m.signing_in("initech", true, false);
         assert_eq!(m.shape(), Shape::Connecting);
         // craked still says trouble until the session is handed over.
         m.apply(trouble());
         assert_eq!(m.shape(), Shape::Connecting);
-        // Cancelled: craked's word again.
+        // Cancelled: craked's word again (asleep: nothing else is up).
         m.signing_in("initech", false, false);
         m.apply(trouble());
+        assert_eq!(m.shape(), Shape::OffTrouble);
+    }
+
+    /// The badge goes on the head as it would be without it
+    /// (design/proposals/dismiss-trouble.html): a tunnel that stopped in
+    /// the night with nothing else up looked as if one were connected.
+    #[test]
+    fn trouble_shows_on_the_head_as_it_is() {
+        let tunnels = |states: &[&str]| {
+            Update::Tunnels(
+                states
+                    .iter()
+                    .enumerate()
+                    .map(|(i, s)| Tunnel {
+                        name: format!("t{i}"),
+                        state: (*s).into(),
+                        ..Default::default()
+                    })
+                    .collect(),
+            )
+        };
+        let mut m = Model {
+            reachable: Some(true),
+            ..Default::default()
+        };
+        m.apply(tunnels(&["trouble", "off"]));
+        assert_eq!(m.shape(), Shape::OffTrouble);
+        assert_eq!(m.status(), "Trouble");
+        m.apply(tunnels(&["trouble", "connecting"]));
+        assert_eq!(m.shape(), Shape::ConnectingTrouble);
+        assert_eq!(m.status(), "Trouble");
+        m.apply(tunnels(&["trouble", "connected"]));
         assert_eq!(m.shape(), Shape::Trouble);
+        // Dismissed: craked says off. Asleep, even right after a host was
+        // routed (the routed head is for a tunnel that's up).
+        m.routed_at = Some(std::time::Instant::now());
+        m.apply(tunnels(&["off", "off"]));
+        assert_eq!(m.shape(), Shape::Off);
+        assert_eq!(m.status(), "Off");
     }
 
     #[test]
@@ -877,7 +930,7 @@ mod tests {
             state: "trouble".into(),
             ..Default::default()
         }]));
-        assert_eq!(m.shape(), Shape::Trouble);
+        assert_eq!(m.shape(), Shape::OffTrouble);
     }
 
     /// Undo takes back the decision it's about, Redo brings that same one

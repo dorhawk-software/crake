@@ -53,6 +53,11 @@ impl Panel {
                                             )
                                             .child(tunnel_state(tunnel)),
                                     )
+                                    // Stopped on its own: seen, it's plain Off
+                                    // (design/proposals/dismiss-trouble.html, A).
+                                    .when(tunnel.state == "trouble", |row| {
+                                        row.child(dismiss(i, tunnel.name.clone(), t, cx))
+                                    })
                                     .when(tunnel.managed, |row| {
                                         row.child(
                                             div()
@@ -199,6 +204,31 @@ impl Panel {
         }
         list
     }
+}
+
+/// A tunnel that stopped on its own, seen: it's plain Off
+/// (design/proposals/dismiss-trouble.html, A; a word, not an ×, which
+/// could read as removing the tunnel).
+fn dismiss(i: usize, name: String, t: &Theme, cx: &mut Context<Panel>) -> impl IntoElement {
+    div()
+        .id(("dismiss", i))
+        .flex_none()
+        .px(px(7.))
+        .py(px(1.))
+        .rounded(px(5.))
+        .border_1()
+        .border_color(t.line)
+        .bg(t.surface)
+        .text_size(px(12.))
+        .line_height(px(16.))
+        .text_color(t.ink)
+        .cursor_pointer()
+        .hover(|d| d.border_color(t.muted))
+        .child("Dismiss")
+        .on_click(cx.listener(move |this, _, _, _| {
+            this.send(Request::DismissTrouble(name.clone()));
+        }))
+        .test_support()
 }
 
 /// What "Got it" remembers for a browser's notice.

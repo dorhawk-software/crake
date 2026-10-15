@@ -277,9 +277,11 @@ pub(super) fn duration(secs: u64) -> String {
     }
 }
 
-/// In trouble: the whole sentence craked logged, under the title.
+/// In trouble, or off after the panel's Dismiss: the whole sentence craked
+/// logged, under the title, until the tunnel is switched on again.
 pub(super) fn why(tunnel: &Tunnel, t: &Theme) -> impl IntoElement {
-    div().when(tunnel.state == "trouble" && !tunnel.why.is_empty(), |d| {
+    let stopped = matches!(tunnel.state.as_str(), "trouble" | "off");
+    div().when(stopped && !tunnel.why.is_empty(), |d| {
         d.mt(px(6.))
             .text_size(px(13.))
             .text_color(t.muted)

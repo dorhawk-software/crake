@@ -347,6 +347,16 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    first, pinned hosts kept (D-Bus `ForgetLearned`); "Add a host"
    takes an address, a network (pinned) or a name (asked of the tunnel's
    DNS, `add_name`). Refreshed every 5 s while open.
+   Dismissing a stopped tunnel (requested 2026-10-15;
+   design/proposals/dismiss-trouble.html, option A with the word, not an
+   ×, which could read as removing the tunnel): a tunnel in trouble has a
+   "Dismiss" next to its red words in the panel; D-Bus `DismissTrouble`
+   makes it Off with nothing logged, its `why` kept for tunnel detail
+   until it's switched on. The tray's badge sits on the head as it would
+   be without it (`tray::Shape::{OffTrouble, ConnectingTrouble,
+   Trouble}`): asleep when nothing is up (a tunnel that stopped in the
+   night looked connected), dashed and moving while another connects,
+   awake while one is up; and the routed head only while a tunnel is up.
    Why a tunnel stopped (design/proposals/trouble-reason.html, option A,
    chosen by the user): craked keeps the sentence it logged with the
    tunnel while it's in trouble (ListTunnels `why`); the panel's status

@@ -281,9 +281,10 @@ pub(super) fn animate_tray(from: tray::Shape, to: tray::Shape, cx: &mut App) {
         cx.global_mut::<Shell>().tray_motion = Some(task);
         return;
     }
-    let looping = to == tray::Shape::Connecting;
+    let (base, badge) = to.badged();
+    let looping = base == tray::Shape::Connecting;
     let frames: Vec<tray::Icon> = if looping {
-        tray::connecting_loop()
+        tray::connecting_loop(badge)
             .iter()
             .map(tray::Art::icon)
             .collect()

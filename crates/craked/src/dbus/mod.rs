@@ -157,6 +157,18 @@ impl Service {
         self.mgr.forget_learned(tunnel).await.map_err(failed)
     }
 
+    /// A tunnel that stopped on its own, seen: Off, its reason kept for
+    /// tunnel detail (the panel's Dismiss).
+    async fn dismiss_trouble(
+        &self,
+        tunnel: &str,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+    ) -> fdo::Result<()> {
+        self.authorize(&hdr, conn).await?;
+        self.mgr.dismiss_trouble(tunnel).map_err(failed)
+    }
+
     /// Send learned hosts direct (one decision), and keep them direct until redone.
     async fn undo(
         &self,

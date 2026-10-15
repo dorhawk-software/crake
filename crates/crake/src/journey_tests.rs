@@ -255,6 +255,9 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
     });
     assert!(!sh("ip link").contains("crake-acme"));
 
+    // 7b. On again, then stopped on its own; the panel's Dismiss.
+    stopped_and_dismissed(cx);
+
     // 8. craked stops and comes back (an upgrade, a crash): the app follows.
     let Daemon { rt, mgr } = craked;
     rt.block_on(mgr.shutdown());
@@ -276,6 +279,69 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
         },
     );
     craked.rt.block_on(craked.mgr.shutdown());
+}
+
+/// ACME on again from the panel, then its openconnect dies (a crash):
+/// stopped on its own, the tray's badge on the head asleep (nothing else is
+/// up), and the panel's Dismiss makes it plain Off, the badge gone.
+fn stopped_and_dismissed(cx: &mut TestAppContext) {
+    let p = panel(cx);
+    let acme = index(cx, "acme");
+    // Switched off keeping its sign-in (step 7): no sign-in this time.
+    let kept = model(cx).tunnels[acme].signed_in;
+    click(cx, p, ("switch", acme));
+    if !kept {
+        sign_in(cx);
+    }
+    until(cx, "ACME connected again", Duration::from_secs(30), |cx| {
+        state(cx, "acme") == "connected"
+    });
+    kill_openconnect("crake-acme");
+    until(
+        cx,
+        "ACME stopped on its own",
+        Duration::from_secs(15),
+        |cx| state(cx, "acme") == "trouble",
+    );
+    let tray = |cx: &mut TestAppContext| cx.read(|cx| cx.global::<Shell>().tray_shape);
+    assert_eq!(tray(cx), crate::tray::Shape::OffTrouble);
+    let p = panel(cx);
+    let acme = index(cx, "acme");
+    click(cx, p, ("dismiss", acme));
+    until(cx, "ACME dismissed: Off", Duration::from_secs(10), |cx| {
+        state(cx, "acme") == "off"
+    });
+    assert_eq!(tray(cx), crate::tray::Shape::Off, "no badge");
+}
+
+/// Kill the openconnect running `interface` as a crash would (SIGKILL).
+/// Found by its exact arguments in /proc, which in the test's container is
+/// the machine's: its number in the container's own numbering is the last
+/// of its status' NSpid.
+fn kill_openconnect(interface: &str) {
+    let want = format!("--interface={interface}");
+    let pids: Vec<String> = std::fs::read_dir("/proc")
+        .unwrap()
+        .flatten()
+        .filter_map(|e| {
+            let pid = e.file_name().to_str()?.parse::<u32>().ok()?;
+            let cmdline = std::fs::read(format!("/proc/{pid}/cmdline")).ok()?;
+            let args: Vec<&[u8]> = cmdline.split(|b| *b == 0).collect();
+            let openconnect = args.first()?.ends_with(b"openconnect");
+            if !(openconnect && args.contains(&want.as_bytes())) {
+                return None;
+            }
+            let status = std::fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
+            status
+                .lines()
+                .find_map(|l| l.strip_prefix("NSpid:"))
+                .and_then(|n| n.split_whitespace().last())
+                .map(str::to_owned)
+        })
+        .collect();
+    assert_eq!(pids.len(), 1, "one openconnect for {interface}: {pids:?}");
+    let out = sh(&format!("kill -KILL {}; echo $?", pids[0]));
+    assert_eq!(out.trim(), "0", "killed: {out}");
 }
 
 /// The Traffic window, from the panel's footer: an open connection to

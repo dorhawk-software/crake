@@ -86,6 +86,23 @@ impl Manager {
         }
     }
 
+    /// The user has seen that the tunnel stopped (the panel's Dismiss,
+    /// design/proposals/dismiss-trouble.html): Off, with nothing logged.
+    /// Why it stopped stays, for tunnel detail, until it's switched on.
+    pub fn dismiss_trouble(&self, name: &str) -> Result<()> {
+        let mut map = self.tunnels.lock().unwrap();
+        let e = map
+            .get_mut(name)
+            .ok_or_else(|| anyhow!("no tunnel named {name}"))?;
+        if e.state != TunnelState::Trouble {
+            return Ok(());
+        }
+        e.state = TunnelState::Off;
+        drop(map);
+        let _ = self.changes.send(name.to_owned());
+        Ok(())
+    }
+
     /// Stop every running tunnel and wait for them to finish (daemon shutdown).
     pub async fn shutdown(&self) {
         self.traffic
