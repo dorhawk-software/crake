@@ -30,7 +30,7 @@ only answers from inside, and then routes just that host and tells you why, in o
 ago. Neither knows what you actually open.**
 
 <p align="center">
-  <a href="https://youtu.be/MzXZIYudz50"><img src="docs/media/video.jpg" alt="Crake in a minute: a narrated video on YouTube. Its first frame: most VPNs send everything through the company." width="760" /></a>
+  <a href="https://youtu.be/snQUfK75huY"><img src="docs/media/video.jpg" alt="Crake in ninety seconds: a narrated video on YouTube. Watch where everything goes. Most of it, straight out." width="760" /></a>
 </p>
 
 |        | Step                 | How                                                                                       |
@@ -88,14 +88,18 @@ Beta: openconnect speaks it, but Crake hasn't been used against a real gateway o
 | <img src="docs/screenshots/tunnels-light.webp" width="300"> | <img src="docs/screenshots/newtunnel-light.webp" width="260"> | <img src="docs/screenshots/signin-light.webp" width="260"> |
 | In the order traffic tries them, drag to change it. A full tunnel waits underneath. | Type the gateway: Crake asks it what it speaks and which groups it offers. | Your certificate's password from the keyring next time; browser sign-in for SSO. |
 
+| Traffic | An OpenVPN 3 profile | Is it safe? |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/traffic-light.webp" width="260"> | <img src="docs/screenshots/editor-light.webp" width="300"> | <img src="docs/screenshots/safe-light.webp" width="300"> |
+| Where everything goes right now: each tunnel and direct, the busiest places, packets on every path. | Change a line and save: Crake reconnects the tunnel. Certificates stay folded, kept as they are. | Four plain answers in Settings → About: what leaves this computer, whether Crake can break your internet, what your company sees, who can change what. |
+
 <br/>
 
 **Light and dark, following your desktop.**
 
 <img src="docs/screenshots/panel-light.webp" width="230"> <img src="docs/screenshots/panel-dark.webp" width="230">
 
-<sub>Every name, host and address in the screenshots is made up (<code>crates/crake/src/model.rs</code>,
-<code>demo()</code>). Run <code>CRAKE_DEMO=1 ./target/debug/crake</code> to see them yourself.</sub>
+<sub>Every name, host and address in the screenshots is made up (<code>crates/crake/src/model/demo.rs</code>). Run <code>CRAKE_DEMO=1 ./target/debug/crake</code> to see them yourself.</sub>
 
 </div>
 
@@ -144,6 +148,20 @@ Passwords and certificates live in your GNOME keyring. Import a certificate once
 <td align="center">
 <h3>🧾 Copy for helpdesk</h3>
 What happened today in plain text, with host names left out if you like, ready to paste into a ticket.
+</td>
+</tr>
+<tr>
+<td align="center">
+<h3>📈 Traffic, live</h3>
+Each tunnel and the direct way out, the busiest places each one reaches, and packets ticking along every path.
+</td>
+<td align="center">
+<h3>🌐 Public sites stay direct</h3>
+One lost packet isn't the company's: a public site is tried directly again before anything goes through a tunnel.
+</td>
+<td align="center">
+<h3>✏️ OpenVPN 3 profiles, edited in place</h3>
+Change a remote, a route or a DNS option and save. No exporting and importing again.
 </td>
 </tr>
 </table>
@@ -328,7 +346,7 @@ forgotten so the app's next try goes through.
 
 ## Status
 
-**In daily use, before its first release.**
+**In daily use, and released: the [release notes](https://github.com/dorhawk-software/crake/releases) say what each version changed.**
 
 - ✅ Per-host learning from DNS and from probing, with undo
 - ✅ Several tunnels side by side, try order, when two answer
@@ -336,7 +354,8 @@ forgotten so the app's next try goes through.
 - ✅ Public name, private address (split-horizon DNS)
 - ✅ Internal names kept private while a tunnel is off
 - ✅ Gateways that only admit Cisco's client, said openly
-- ✅ OpenVPN 3 profiles, including sessions started elsewhere
+- ✅ OpenVPN 3 profiles, including sessions started elsewhere, edited in place
+- ✅ Traffic: a live view of what goes direct and what goes through each tunnel
 - ✅ Tray, panel, log, settings, new tunnel, sign-in, tunnel detail; light and dark
 - ✅ Networks that block UDP: noticed, run over TCP on the same session, and remembered for next
   time — tested on a real network that blocks it
