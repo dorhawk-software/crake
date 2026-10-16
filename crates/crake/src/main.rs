@@ -42,6 +42,10 @@ mod motion;
 mod new_tunnel;
 
 mod notify;
+// When nothing shows tray icons: what would bring the bird back.
+mod no_tray;
+mod no_tray_view;
+mod tray_host;
 
 mod ovpn3;
 
@@ -156,6 +160,8 @@ pub enum Request {
     ClearLog,
     /// Show or hide the bird in the tray.
     ShowBird(bool),
+    /// The tray came or went, or what would bring it back (`tray_host`).
+    NoTray(tray_host::Event),
     /// Send hosts through another tunnel that answered too (from, to, hosts).
     Move(String, String, Vec<String>),
     /// "Ask me first": send these hosts through the tunnel.
@@ -242,6 +248,8 @@ struct Shell {
     detail: Option<(String, AnyWindowHandle)>,
     /// Started at login: switch on the tunnels left on, once craked is reached.
     autostart_pending: bool,
+    /// Started at login (--autostart): no tray is said in a notification.
+    started_at_login: bool,
     /// A tunnel being added (New tunnel): its certificate for the keyring,
     /// kept until craked says its name.
     adding: Option<Option<Vec<u8>>>,
@@ -402,6 +410,11 @@ fn main() {
                 Ok("leftover") => model::demo_leftover(model),
                 _ => model,
             };
+            let mut model = model;
+            model.no_tray = std::env::var("CRAKE_DEMO")
+                .ok()
+                .as_deref()
+                .and_then(no_tray::demo);
             let setup = Setup {
                 model,
                 x11,
@@ -591,6 +604,7 @@ pub(crate) fn start(cx: &mut App, setup: Setup) -> bool {
         settings: None,
         detail: None,
         autostart_pending: autostart,
+        started_at_login: autostart,
         adding: None,
         new_tunnel: None,
         sessions: Default::default(),

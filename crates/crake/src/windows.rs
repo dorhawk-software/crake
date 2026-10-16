@@ -134,6 +134,10 @@ pub(super) fn open_panel(at: Option<(i32, i32)>, cx: &mut App) {
             place::place_at_bar((x as f32, y as f32), panel_size, &screens, place::Bar::EDGE)
         }
         (true, Some((x, y))) => place::place((x as f32, y as f32), panel_size, &screens),
+        // No tray at all (`no_tray`): near the top, not at an icon.
+        (true, None) if model.read(cx).no_tray.is_some() => {
+            place::near_top(panel_size, &screens).or_else(|| place::centered(panel_size, &screens))
+        }
         // No position from the tray (Dash to Panel sends none): work out
         // where the tray is from the desktop's bar.
         (true, None) => {

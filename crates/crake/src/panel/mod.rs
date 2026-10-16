@@ -22,6 +22,7 @@ mod chart;
 mod decisions;
 mod first_run;
 mod leftover;
+mod no_tray;
 mod tunnels;
 mod version;
 
@@ -173,7 +174,8 @@ impl Render for Panel {
             .line_height(px(20.))
             .track_focus(&self.focus)
             .on_key_down(crate::focus::tab_moves)
-            .child(self.header(model, &t, cx));
+            .child(self.header(model, &t, cx))
+            .children(self.no_tray_note(model, &t, cx));
 
         if reachable && model.tunnels.is_empty() {
             panel = panel.child(self.first_run(&t, window, cx));

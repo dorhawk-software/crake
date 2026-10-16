@@ -40,6 +40,37 @@ pub(super) fn row(
         .child(div().flex_none().child(control))
 }
 
+/// A setting with something to do under its explanation (`no_tray_view`):
+/// the control at the title's height, the thing below across the row.
+pub(super) fn row_below(
+    label: impl IntoElement,
+    explain: &str,
+    control: impl IntoElement,
+    below: Option<AnyElement>,
+    t: &Theme,
+) -> impl IntoElement {
+    div()
+        .py(px(14.))
+        .px(px(16.))
+        .border_t_1()
+        .border_color(t.line)
+        .child(
+            div()
+                .flex()
+                .items_start()
+                .gap(px(16.))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .child(div().font_weight(FontWeight::SEMIBOLD).child(label))
+                        .child(sub(explain, t)),
+                )
+                .child(div().flex_none().child(control)),
+        )
+        .when_some(below, |r, b| r.child(div().mt(px(10.)).flex().child(b)))
+}
+
 pub(super) fn toggle(id: &'static str, on: bool, t: &Theme) -> Stateful<Div> {
     crate::panel::switch(id, on, t)
 }

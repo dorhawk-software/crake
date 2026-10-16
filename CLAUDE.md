@@ -475,6 +475,25 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    the running Crake, `single.rs`), start at login (`autostart.rs`, an
    entry in ~/.config/autostart for this binary with `--autostart`, which
    switches on the tunnels left on), hide host names in helpdesk copies.
+   **No tray (requested 2026-10-16; design/proposals/no-tray-after.html,
+   after an impeccable critique of no-tray.html):** ksni runs with
+   `assume_sni_available`, so a missing StatusNotifierWatcher is heard
+   (`watcher_offline`/`watcher_online`, `tray_host::Event::Host`) instead
+   of the tray failing to start. While there's none, the app asks GNOME
+   every 3 s what would help (`sys::gnome_tray::look`: org.gnome.Shell.
+   Extensions' GetExtensionInfo for Ubuntu's and upstream's ids,
+   UserExtensionsEnabled, the extension's files on disk, whether
+   enabled-extensions is writable; a newly installed one is put in
+   enabled-extensions for the next login) and `no_tray::decide` picks the
+   case: switch on, refused (extensions off, locked, broken: Open
+   Extensions), next login, install (the command from /etc/os-release),
+   no tray. Settings' bird row says it with the remedy under it; started by
+   hand the panel opens near the top with a note ("Not now" until next
+   start); at login (`--autostart`) one notification after 10 s, once per
+   case (`dismissed`, "no-tray:<case>"). Nothing with the bird hidden.
+   `CRAKE_DEMO=notray:<a|refused|b|c|d>`. Tried in a container with a
+   session bus and no tray (the panel near the top, no window at login);
+   not on a real Fedora yet (the checklist).
    **Beta protocols (requested):** only protocols used against a real
    gateway are shown plain; every other one carries a "Beta" tag (New
    tunnel's list, the Tunnels rows) and New tunnel says what that means
@@ -1049,8 +1068,12 @@ daily.
 
 **Linux distributions** (a real desktop, not the package test's container):
 - [ ] Fedora with GNOME: no tray icons without the AppIndicator extension
-  installed and switched on; what a new user sees (no bird at all?), and
-  how Crake should tell them.
+  installed and switched on. Crake now tells them (built 2026-10-16,
+  `no_tray.rs`, `tray_host.rs`, `sys/linux/gnome_tray.rs`;
+  design/proposals/no-tray-after.html): to check on a real Fedora that
+  "Switch on AppIndicator" (EnableExtension) brings the bird at once, that
+  a just-installed extension marked in enabled-extensions is on after one
+  login, and that the panel opened by hand gets focus there.
 - [ ] KDE Plasma, X11 and Wayland: the tray, and the panel placed at it.
   The KDE VM was removed for disk space (2026-10-14); a VM can be made
   again (`~/.cache/crake-vms/make-vm.sh`) or a real machine used.

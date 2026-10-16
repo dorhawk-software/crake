@@ -13,6 +13,14 @@ struct Sni {
     nudge: bool,
 }
 
+impl Sni {
+    fn tell(&self, there: bool) {
+        self.requests
+            .send_blocking(Request::NoTray(crate::tray_host::Event::Host(there)))
+            .ok();
+    }
+}
+
 impl ksni::Tray for Sni {
     fn id(&self) -> String {
         "crake".into()
@@ -51,6 +59,19 @@ impl ksni::Tray for Sni {
     fn activate(&mut self, x: i32, y: i32) {
         let at = (x != 0 || y != 0).then_some((x, y));
         self.requests.send_blocking(Request::Panel(at)).ok();
+    }
+
+    /// A tray appeared (GNOME's AppIndicator extension switched on, a slow
+    /// login's shell up).
+    fn watcher_online(&self) {
+        self.tell(true);
+    }
+
+    /// Nothing shows tray icons (now, or from the start): Crake keeps the
+    /// icon ready for when something does, and says what would (`no_tray`).
+    fn watcher_offline(&self, _reason: ksni::OfflineReason) -> bool {
+        self.tell(false);
+        true
     }
 
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
@@ -149,7 +170,8 @@ impl Handle {
     }
 }
 
-/// On the session bus; none when nothing there shows trays.
+/// On the session bus. With nothing there that shows trays it waits for
+/// one, and says so (`watcher_offline`); none only without a session bus.
 pub fn start(requests: async_channel::Sender<Request>) -> Option<Handle> {
     use ksni::blocking::TrayMethods;
     Sni {
@@ -157,6 +179,7 @@ pub fn start(requests: async_channel::Sender<Request>) -> Option<Handle> {
         requests,
         nudge: false,
     }
+    .assume_sni_available(true)
     .spawn()
     .ok()
     .map(Handle)

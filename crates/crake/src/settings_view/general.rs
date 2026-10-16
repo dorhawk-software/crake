@@ -85,20 +85,7 @@ impl Settings {
                                 t,
                             )),
                     )
-                    .child(row(
-                        self.title(tray_row::TITLE, t, cx),
-                        Some(&tray_row::LINE),
-                        toggle("bird", prefs.show_bird, t)
-                            .keys()
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                let on = !prefs.show_bird;
-                                Self::pref(cx, |p| p.show_bird = on);
-                                this.requests.send_blocking(Request::ShowBird(on)).ok();
-                            }))
-                            .test_support(),
-                        true,
-                        t,
-                    ))
+                    .child(self.bird_row(prefs.show_bird, t, cx))
                     .child(row(
                         self.title("When Crake routes a host", t, cx),
                         Some("Undo stays in the panel either way."),

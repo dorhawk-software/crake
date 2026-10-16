@@ -102,6 +102,10 @@ pub struct Model {
     /// The Traffic window's rates, while it's open (shared: the panel
     /// copies the model on every frame).
     pub live: std::sync::Arc<live::LiveTraffic>,
+    /// Nothing shows tray icons: what would bring the bird back (Linux).
+    pub no_tray: Option<crate::no_tray::Remedy>,
+    /// The panel's note about it was put off ("Not now") until next start.
+    pub no_tray_quiet: bool,
 }
 
 /// One of a tunnel's hosts (craked's HostDetails).

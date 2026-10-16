@@ -88,6 +88,20 @@ pub fn centered(size: (f32, f32), screens: &[Rect]) -> Option<Placement> {
     })
 }
 
+/// With no tray to open at (`no_tray`): centred near the top of the first
+/// screen, below a top bar.
+pub fn near_top(size: (f32, f32), screens: &[Rect]) -> Option<Placement> {
+    let s = screens.first()?;
+    Some(Placement {
+        x: s.x + (s.w - size.0) / 2.,
+        y: s.y + NO_TRAY_TOP,
+        upward: false,
+    })
+}
+
+/// How far below the screen's top edge: clear of GNOME's top bar.
+const NO_TRAY_TOP: f32 = 64.;
+
 /// Where the bar with the tray icons sits.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Bar {

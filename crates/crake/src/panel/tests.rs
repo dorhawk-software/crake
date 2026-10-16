@@ -429,3 +429,44 @@ fn tab_reaches_the_controls_and_enter_acts(cx: &mut TestAppContext) {
     press("enter", cx);
     assert!(w.requests.try_recv().is_ok(), "Enter acts on it");
 }
+
+/// Nothing shows tray icons: the note says what would bring the bird back,
+/// its button asks for it, "Not now" puts it off; a hidden bird says nothing.
+#[gpui_kit::test]
+fn with_no_tray_the_note_says_what_would_help(cx: &mut TestAppContext) {
+    use crate::no_tray::{EXTENSION, Remedy};
+    use crate::tray_host::Event;
+    let w = open(cx, Prefs::default());
+    let shown = |cx: &mut TestAppContext| {
+        cx.update_window(w.window, |_, window, cx| {
+            window.render_frame(cx);
+            window.try_find("no-tray").is_some()
+        })
+        .unwrap()
+    };
+    assert!(!shown(cx), "a tray: no note");
+    w.model.update(cx, |m, cx| {
+        m.no_tray = Some(Remedy::SwitchOn(EXTENSION.into()));
+        cx.notify();
+    });
+    assert!(shown(cx));
+    assert!(matches!(
+        w.click("no-tray-switch", cx),
+        Request::NoTray(Event::SwitchOn(id)) if id == EXTENSION
+    ));
+    assert!(matches!(
+        w.click("no-tray-later", cx),
+        Request::NoTray(Event::Quiet)
+    ));
+    w.model.update(cx, |m, cx| {
+        m.no_tray_quiet = true;
+        cx.notify();
+    });
+    assert!(!shown(cx), "put off until the next start");
+    w.model.update(cx, |m, cx| {
+        m.no_tray_quiet = false;
+        cx.notify();
+    });
+    cx.update(|cx| cx.global_mut::<Prefs>().show_bird = false);
+    assert!(!shown(cx), "the bird hidden: nothing said");
+}

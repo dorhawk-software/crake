@@ -82,6 +82,21 @@ pub(super) fn start_left_on(cx: &mut App) {
     }
 }
 
+/// Settings' "Show the bird in the tray".
+fn show_bird(on: bool, cx: &mut App) {
+    let shell = cx.global_mut::<Shell>();
+    if on && shell.tray.is_none() {
+        // Switched on in Settings: its row says what's missing.
+        crate::tray_host::said_at_start();
+        shell.tray = tray::start(shell.requests.clone());
+        refresh_tray(cx);
+    } else if !on && let Some(tray) = shell.tray.take() {
+        tray.shutdown();
+        // No bird wanted: nothing is missing.
+        crate::tray_host::handle(crate::tray_host::Event::Host(true), cx);
+    }
+}
+
 pub(super) fn on_request(request: Request, cx: &mut App) {
     debug(&format!("request: {request:?}"));
     let commands = cx.global::<Shell>().commands.clone();
@@ -214,15 +229,8 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
             }
         }
         Request::ClearLog => send(Command::ClearLog),
-        Request::ShowBird(on) => {
-            let shell = cx.global_mut::<Shell>();
-            if on && shell.tray.is_none() {
-                shell.tray = tray::start(shell.requests.clone());
-                refresh_tray(cx);
-            } else if !on && let Some(tray) = shell.tray.take() {
-                tray.shutdown();
-            }
-        }
+        Request::ShowBird(on) => show_bird(on, cx),
+        Request::NoTray(event) => crate::tray_host::handle(event, cx),
         Request::Move(from, to, hosts) => send(Command::Move(from, to, hosts)),
         Request::Send(t, hosts) => send(Command::AddHosts(t, hosts)),
         Request::Pin(t, targets) => send(Command::Pin(t, targets)),

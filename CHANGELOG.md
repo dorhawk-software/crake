@@ -11,6 +11,12 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Crake says so when your desktop shows no tray icons.** Stock GNOME on Fedora and Debian
+  shows none without its AppIndicator extension, and Crake used to start with nothing on screen.
+  Now its panel opens with a note when you start it, and at login it sends one notification. Where
+  it can, Crake switches the extension on in one click, or gives you the command to install it.
+  Settings' bird row says the same.
+
 - **Settings no longer says the bird is in the "top bar".** It's "the tray" on Linux and Windows
   and "the menu bar" on a Mac, with the bird itself next to the words, drawn the way that bar shows
   it. Its "?" now says what each look of the bird means: asleep, dashed, awake, two teal marks, an

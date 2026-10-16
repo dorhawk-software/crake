@@ -31,7 +31,7 @@ mod tests;
 // What the sections share.
 use self::about::{about, bird};
 use self::managed::managed;
-use self::widgets::{group, outline, row, select, small_button, sub, toggle};
+use self::widgets::{group, outline, row, row_below, select, small_button, sub, toggle};
 use crate::focus::Keys as _;
 
 pub const WIDTH: f32 = 1040.;

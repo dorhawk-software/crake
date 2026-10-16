@@ -13,7 +13,7 @@ use crate::Request;
 // macOS: notify-rust shows plain notifications there (no actions, no
 // urgency); the panel offers what the buttons would.
 #[cfg(target_os = "macos")]
-pub use plain::{also_answered, asked, left_running, routed, stopped};
+pub use plain::{also_answered, asked, left_running, no_tray, routed, stopped};
 
 /// Crake decided it, not you.
 pub fn worth_telling(entry: &LogEntry) -> bool {
@@ -154,6 +154,39 @@ pub fn left_running(entry: &LogEntry) {
     });
 }
 
+/// Nothing shows tray icons (`no_tray`), told once at login: what would
+/// bring the bird back, with the button that does it when Crake can.
+#[cfg(not(target_os = "macos"))]
+pub fn no_tray(remedy: &crate::no_tray::Remedy, requests: async_channel::Sender<Request>) {
+    let mut n = Notification::new();
+    n.appname("Crake")
+        .summary(crate::no_tray::NOTIFICATION_TITLE)
+        .body(remedy.notification())
+        .urgency(Urgency::Normal)
+        .timeout(Timeout::Milliseconds(STOPPED_SHOWN));
+    let switch = match remedy {
+        crate::no_tray::Remedy::SwitchOn(id) => Some(id.clone()),
+        _ => None,
+    };
+    if switch.is_some() {
+        n.action("switch", crate::no_tray::SWITCH_ON);
+    }
+    n.action("default", "Open Crake");
+    std::thread::spawn(move || {
+        let Ok(handle) = n.show() else { return };
+        handle.wait_for_action(|action| {
+            let request = match (action, &switch) {
+                ("switch", Some(id)) => {
+                    Request::NoTray(crate::tray_host::Event::SwitchOn(id.clone()))
+                }
+                ("default", _) => Request::Panel(None),
+                _ => return,
+            };
+            requests.send_blocking(request).ok();
+        });
+    });
+}
+
 #[cfg(target_os = "macos")]
 mod plain {
     use super::{LogEntry, Notification, Request};
@@ -191,6 +224,9 @@ mod plain {
     pub fn left_running(entry: &LogEntry) {
         show(entry);
     }
+
+    /// macOS always has its menu bar: never called there.
+    pub fn no_tray(_remedy: &crate::no_tray::Remedy, _requests: async_channel::Sender<Request>) {}
 }
 
 /// The corncrake's call, "crex crex": two short rasps, made here (no sound

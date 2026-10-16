@@ -250,6 +250,13 @@ The panel header uses the listening bird with the call marks in accent.
   draw it so), and its "?" lists each look of the bird with a sentence
   (design/proposals/tray-setting-after.html; impeccable critique
   2026-10-16).
+- When nothing shows tray icons (design/proposals/no-tray-after.html): the
+  bird row keeps its switch and says why the bird isn't there, with what
+  would help under it (a bordered "Switch on AppIndicator" or "Open
+  Extensions", or the install command on one line with Copy). Started by
+  hand, the panel opens near the top of the screen with a neutral note
+  (surface, no amber: the tray is optional; no teal: a bordered action and
+  a muted "Not now"); at login, one notification instead of a window.
 - Segmented controls frame the chosen segment in its own colour (each
   segment draws its own edges): a grey rim around dark teal reads as blur
   in light mode, as it did in settings.html and log.html.

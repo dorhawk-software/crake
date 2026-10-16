@@ -265,3 +265,45 @@ fn with_the_systems_window_buttons(cx: &mut TestAppContext) {
         f32::from(first.origin.y)
     );
 }
+
+/// Nothing shows tray icons: the bird's row says why, with what would help
+/// under it (here the command, copied); the switch still works.
+#[gpui_kit::test]
+fn the_bird_row_says_what_would_bring_it_back(cx: &mut TestAppContext) {
+    use crate::no_tray::{EXTENSION, Remedy};
+    use crate::tray_host::Event;
+    let w = open(cx, Section::General);
+    assert!(!w.shown("no-tray-switch", cx));
+    w.model.update(cx, |m, cx| {
+        m.no_tray = Some(Remedy::SwitchOn(EXTENSION.into()));
+        cx.notify();
+    });
+    w.click("no-tray-switch", cx);
+    assert!(matches!(
+        w.request(),
+        Request::NoTray(Event::SwitchOn(id)) if id == EXTENSION
+    ));
+    w.model.update(cx, |m, cx| {
+        m.no_tray = Some(Remedy::Refused(crate::no_tray::Why::Locked));
+        cx.notify();
+    });
+    w.click("no-tray-extensions", cx);
+    assert!(matches!(
+        w.request(),
+        Request::NoTray(Event::OpenExtensions)
+    ));
+    let command = "sudo apt install gnome-shell-extension-appindicator";
+    w.model.update(cx, |m, cx| {
+        m.no_tray = Some(Remedy::Install(Some(command.into())));
+        cx.notify();
+    });
+    w.click("no-tray-copy", cx);
+    assert_eq!(
+        cx.read_from_clipboard().and_then(|c| c.text()).as_deref(),
+        Some(command)
+    );
+    w.quiet();
+    let bird = cx.read(|cx| cx.global::<Prefs>().show_bird);
+    w.click("bird", cx);
+    assert!(matches!(w.request(), Request::ShowBird(on) if on == !bird));
+}

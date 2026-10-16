@@ -120,6 +120,41 @@ fn badge(shape: Shape, side: f32, head: f32) -> Div {
         .child(img(image).size(px(head)))
 }
 
+impl super::Settings {
+    /// The row: the switch, and when nothing shows tray icons
+    /// (`crate::no_tray`), why and what would bring the bird back.
+    pub(super) fn bird_row(
+        &self,
+        show: bool,
+        t: &Theme,
+        cx: &mut gpui_kit::Context<Self>,
+    ) -> gpui_kit::AnyElement {
+        use crate::focus::Keys as _;
+        let switch = super::toggle("bird", show, t)
+            .keys()
+            .on_click(cx.listener(move |this, _, _, cx| {
+                Self::pref(cx, |p| p.show_bird = !show);
+                this.requests
+                    .send_blocking(crate::Request::ShowBird(!show))
+                    .ok();
+            }))
+            .test_support();
+        let missing = self.model.read(cx).no_tray.clone().filter(|_| show);
+        match missing {
+            Some(remedy) => super::row_below(
+                self.title(TITLE, t, cx),
+                remedy.line(),
+                switch,
+                crate::no_tray_view::remedy(&remedy, &self.requests, t),
+                t,
+            )
+            .into_any_element(),
+            None => super::row(self.title(TITLE, t, cx), Some(&LINE), switch, true, t)
+                .into_any_element(),
+        }
+    }
+}
+
 /// After the title: the bird awake, as this system's bar shows it.
 pub fn title_badge() -> Div {
     badge(Shape::Listening, BADGE, BADGE_HEAD)
