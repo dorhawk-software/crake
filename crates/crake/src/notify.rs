@@ -225,8 +225,17 @@ mod plain {
         show(entry);
     }
 
-    /// macOS always has its menu bar: never called there.
-    pub fn no_tray(_remedy: &crate::no_tray::Remedy, _requests: async_channel::Sender<Request>) {}
+    /// macOS always has its menu bar, so this isn't expected there; plain
+    /// like the rest, should it come.
+    pub fn no_tray(remedy: &crate::no_tray::Remedy, _requests: async_channel::Sender<Request>) {
+        let mut n = Notification::new();
+        n.appname("Crake")
+            .summary(crate::no_tray::NOTIFICATION_TITLE)
+            .body(remedy.notification());
+        std::thread::spawn(move || {
+            let _ = n.show();
+        });
+    }
 }
 
 /// The corncrake's call, "crex crex": two short rasps, made here (no sound
