@@ -29,7 +29,7 @@ impl TunnelDetail {
         // Newest first.
         learned.sort_by_key(|r| std::cmp::Reverse(r.learned.as_ref().map_or(0, |l| l.0)));
         let pinned: Vec<&HostRow> = rows.iter().filter(|r| r.kind == "pinned").collect();
-        let counts = [learned.len(), pinned.len(), gateway.len()];
+        let counts = tab_counts(rows, gateway.len());
 
         let mut bar = div().flex().gap(px(22.)).border_b_1().border_color(t.line);
         for (i, (tab, label)) in [
@@ -238,6 +238,7 @@ impl TunnelDetail {
             None => "\u{2014}".to_owned(),
         };
         let (target, pin_target) = (r.target.clone(), r.target.clone());
+        let (danger, surface) = (t.danger, t.surface);
         row_frame(t)
             .child(icon(icon_path, color))
             .child(host_text(i, host, how, t, cx))
@@ -249,6 +250,7 @@ impl TunnelDetail {
                     .justify_end()
                     .child(
                         row_button(("pin", i), if pinned { "Unpin" } else { "Pin" }, t)
+                            .hover(move |s| s.bg(surface))
                             .on_click(cx.listener(move |this, _, _, _| {
                                 let tunnel = this.tunnel.clone();
                                 this.send(if pinned {
@@ -261,6 +263,7 @@ impl TunnelDetail {
                     )
                     .child(
                         row_button(("forget", i), "Forget", t)
+                            .hover(move |s| s.bg(surface).text_color(danger))
                             .on_click(cx.listener(move |this, _, _, _| {
                                 this.send(Request::Forget(this.tunnel.clone(), target.clone()));
                             }))
@@ -268,6 +271,17 @@ impl TunnelDetail {
                     ),
             )
     }
+}
+
+/// Learned, Pinned, From the gateway.
+const TABS: usize = 3;
+
+/// Each tab's count: learned hosts, pinned ones, the gateway's. A learned
+/// host since pinned shows in Learned too, but counts once, under Pinned
+/// (design/proposals/critique-2026-10-15, 5).
+pub(super) fn tab_counts(rows: &[HostRow], gateway: usize) -> [usize; TABS] {
+    let of = |kind: &str| rows.iter().filter(|r| r.kind == kind).count();
+    [of("learned"), of("pinned"), gateway]
 }
 
 pub(super) fn row_frame(t: &Theme) -> Div {
@@ -336,6 +350,9 @@ impl TunnelDetail {
         let bar = bar.items_center().when(can, |b| {
             b.child(div().flex_1()).child(
                 row_button("forget-all", "Forget all\u{2026}", t)
+                    .px(px(12.))
+                    .border_1()
+                    .border_color(t.line)
                     .h(px(30.))
                     .text_size(px(13.))
                     .on_click(cx.listener(|this, _, _, cx| {
@@ -433,6 +450,9 @@ impl TunnelDetail {
     }
 }
 
+/// A host's action: quiet, no border, so the host leads; still there at
+/// rest for a screen share. Its caller fills it when pointed at (Forget
+/// turns red too; design/proposals/critique-2026-10-15, 5).
 pub(super) fn row_button(
     id: impl Into<gpui_kit::ElementId>,
     label: &'static str,
@@ -441,13 +461,10 @@ pub(super) fn row_button(
     div()
         .id(id)
         .h(px(34.))
-        .px(px(12.))
+        .px(px(8.))
         .flex()
         .items_center()
-        .border_1()
-        .border_color(t.line)
         .rounded(px(6.))
-        .bg(t.panel)
         .text_color(t.ink)
         .font_weight(FontWeight::SEMIBOLD)
         .cursor_pointer()

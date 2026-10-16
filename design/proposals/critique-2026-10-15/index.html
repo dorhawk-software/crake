@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Critique fixes: before and after</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+ :root{--bg:#121314;--ink:#ECEDEE;--muted:#A9AEB4;--line:#33363A;--chip:#2A2D30}
+ body.light{--bg:#DCDCD8;--ink:#1A1C1E;--muted:#5A5F64;--line:#BDBDB8;--chip:#F1F1EE}
+ body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 'Atkinson Hyperlegible Next',system-ui,sans-serif}
+ .page{padding:28px 32px 60px;max-width:1700px}
+ h1{font-size:22px;margin:0 0 6px} .lede{color:var(--muted);max-width:900px;margin:0 0 18px}
+ .switch{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:24px}
+ .switch button{font:600 13px inherit;font-family:inherit;padding:7px 16px;border:0;background:transparent;color:var(--muted);cursor:pointer}
+ .switch button.on{background:var(--chip);color:var(--ink)}
+ section{border-top:1px solid var(--line);padding:22px 0 10px}
+ h2{font-size:17px;margin:0 0 4px} .sev{font-size:12px;font-weight:700;color:var(--muted);margin-right:8px}
+ .what{color:var(--muted);max-width:980px;margin:0 0 14px}
+ .row{display:flex;gap:24px;align-items:flex-start}
+ .row figure{flex:1 1 0;min-width:0}
+ .row img{width:100%}
+ figure{margin:0} figcaption{font-size:13px;font-weight:600;margin:0 0 6px}
+ img{max-width:100%;height:auto;border-radius:6px;display:block}
+ body:not(.light) .light-only, body.light .dark-only{display:none}
+ a{color:inherit}
+ .live{font-size:12.5px;color:var(--muted);margin-top:8px}
+</style></head><body>
+<div class="page">
+<h1>Critique fixes: before and after</h1>
+<p class="lede">From the design critique of 15 October 2026 (impeccable, 28/40). Each issue: the app as it is today, captured in demo mode, next to a mockup of the fix. The mockups are drawn from the design files the app was built from, so small sample differences (numbers, a column) aren't part of a proposal; the change described above each one is. Nothing in the app changes until you choose.</p>
+<div class="switch"><button id="d" class="on">Dark</button><button id="l">Light</button></div>
+
+<section><h2><span class="sev">1 · P1</span>The profile editor loses edits on Escape, × or Cancel</h2><p class="what">With unsaved changes, Escape, × and Cancel no longer close the window: the footer asks in place, with Keep editing as the default (Escape or Enter again keeps editing). With nothing changed, Escape closes as today.</p><div class="row">
+<figure class="dark-only"><figcaption>Today in the app</figcaption><img src="img/before-profile-dark.webp" width="820" alt="Today in the app, dark"></figure>
+<figure class="light-only"><figcaption>Today in the app</figcaption><img src="img/before-profile-light.webp" width="820" alt="Today in the app, light"></figure>
+<figure class="dark-only"><figcaption>After</figcaption><img src="img/after-editor-dark.webp" width="838" alt="After, dark"></figure>
+<figure class="light-only"><figcaption>After</figcaption><img src="img/after-editor-light.webp" width="838" alt="After, light"></figure>
+</div><p class="live">Live mockup: <a href="editor-after.html">editor-after.html</a></p></section>
+<section><h2><span class="sev">2 · P2</span>Traffic draws traffic volume in teal</h2><p class="what">DESIGN.md: teal means only “Crake made a decision”; its charts show volume in greys and the moment Crake routed as a teal tick. After: the strip's bars in greys, a teal tick in each 5-second slot where Crake routed a new host, tunnel boxes outlined grey like Direct. The teal packets on tunnel paths stay. The middle picture is the design Traffic was built from, so the only difference from the “after” is the colour.</p><div class="row">
+<figure class="dark-only"><figcaption>Today in the app</figcaption><img src="img/before-traffic-dark.webp" width="920" alt="Today in the app, dark"></figure>
+<figure class="light-only"><figcaption>Today in the app</figcaption><img src="img/before-traffic-light.webp" width="920" alt="Today in the app, light"></figure>
+<figure class="dark-only"><figcaption>The design it was built from</figcaption><img src="img/after-trafficwas-dark.webp" width="938" alt="The design it was built from, dark"></figure>
+<figure class="light-only"><figcaption>The design it was built from</figcaption><img src="img/after-trafficwas-light.webp" width="938" alt="The design it was built from, light"></figure>
+<figure class="dark-only"><figcaption>After</figcaption><img src="img/after-traffic-dark.webp" width="938" alt="After, dark"></figure>
+<figure class="light-only"><figcaption>After</figcaption><img src="img/after-traffic-light.webp" width="938" alt="After, light"></figure>
+</div><p class="live">Live mockup: <a href="traffic-after.html">traffic-after.html</a></p></section>
+<section><h2><span class="sev">3 · P2</span>New tunnel shows nine protocols after the gateway already answered</h2><p class="what">Once detection has answered, the list folds into one quiet row, “Choose the protocol yourself · 8 more”, and Group comes up into view; a hairline marks the footer. Opened, the protocols sit under two subheads (used with real gateways / Beta) instead of six Beta badges. While detecting, or when detection fails, the full list shows as today.</p><div class="row">
+<figure class="dark-only"><figcaption>Today in the app</figcaption><img src="img/before-newtunnel-dark.webp" width="720" alt="Today in the app, dark"></figure>
+<figure class="light-only"><figcaption>Today in the app</figcaption><img src="img/before-newtunnel-light.webp" width="720" alt="Today in the app, light"></figure>
+<figure class="dark-only"><figcaption>After (folded, then opened)</figcaption><img src="img/after-newtunnel-dark.webp" width="823" alt="After (folded, then opened), dark"></figure>
+<figure class="light-only"><figcaption>After (folded, then opened)</figcaption><img src="img/after-newtunnel-light.webp" width="823" alt="After (folded, then opened), light"></figure>
+</div><p class="live">Live mockup: <a href="newtunnel-after.html">newtunnel-after.html</a></p></section>
+<section><h2><span class="sev">4 · P2</span>The leftover notice: Copy, Got it, and the header's bird</h2><p class="what">Copy becomes a button inside the command (no teal in an amber box), Got it a real button, one line says the note goes by itself, and the header's bird wears the same amber triangle as the bird in the bar.</p><div class="row">
+<figure class="dark-only"><figcaption>Today in the app</figcaption><img src="img/before-notice-dark.webp" width="452" alt="Today in the app, dark"></figure>
+<figure class="light-only"><figcaption>Today in the app</figcaption><img src="img/before-notice-light.webp" width="452" alt="Today in the app, light"></figure>
+<figure><figcaption>After (dark and light)</figcaption><img src="img/after-notice.webp" width="1007" alt="After (dark and light)"></figure>
+</div><p class="live">Live mockup: <a href="notice-after.html">notice-after.html</a></p></section>
+<section><h2><span class="sev">5 · P3</span>Tunnel detail's Learned list is a grid of buttons</h2><p class="what">Pin, Unpin and Forget lose their borders and stay visible; pointed at, they get a fill and Forget turns red. The Learned tab counts learned hosts only (4; the pinned one is under Pinned 1).</p><div class="row">
+<figure class="dark-only"><figcaption>Today in the app</figcaption><img src="img/before-detail-dark.webp" width="900" alt="Today in the app, dark"></figure>
+<figure class="light-only"><figcaption>Today in the app</figcaption><img src="img/before-detail-light.webp" width="900" alt="Today in the app, light"></figure>
+<figure class="dark-only"><figcaption>After</figcaption><img src="img/after-detail-dark.webp" width="1046" alt="After, dark"></figure>
+<figure class="light-only"><figcaption>After</figcaption><img src="img/after-detail-light.webp" width="1046" alt="After, light"></figure>
+</div><p class="live">Live mockup: <a href="detail-after.html">detail-after.html</a></p></section>
+</div>
+<script>
+ const b=document.body,d=document.getElementById('d'),l=document.getElementById('l');
+ function set(light){b.classList.toggle('light',light);l.classList.toggle('on',light);d.classList.toggle('on',!light);
+   try{localStorage.setItem('crit-theme',light?'light':'dark')}catch(e){}}
+ d.onclick=()=>set(false); l.onclick=()=>set(true);
+ try{ if(localStorage.getItem('crit-theme')==='light') set(true);}catch(e){}
+ if(location.search.includes('dark=false')) set(true);
+</script></body></html>

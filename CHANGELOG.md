@@ -11,6 +11,19 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **An edited OpenVPN 3 profile is never thrown away by one key.** With changes not saved, Escape,
+  the × or Cancel ask first ("Leave without saving?"), and Keep editing is the default.
+- **New tunnel gets out of the way once the gateway has answered.** The protocol list folds into
+  "Choose the protocol yourself", so the next field is in view; opened, the protocols sit under
+  "Used with real gateways" and "Beta" instead of a badge on each.
+- **Traffic keeps teal for Crake's decisions.** The last five minutes are drawn in greys, with a
+  teal tick where Crake sent a host through a tunnel; every way out has the same grey outline.
+- **Quieter hosts in tunnel detail.** Pin and Forget no longer look like a wall of buttons; they fill
+  in when pointed at, and a pinned host counts once, under Pinned.
+- **The panel's bird says what the bird in the bar says**, with its amber triangle or red badge, and
+  the leftover OpenVPN 3 notice has a Copy button inside the command, a Got it button, and says it
+  goes away by itself.
+
 - **A process OpenVPN 3 left running is shown in the panel, with the command that stops it.** The
   notice is tinted amber and has Copy and Got it beside the command; it goes by itself once the
   process has ended. The bird in the bar wears a small amber triangle meanwhile (a red badge, for a

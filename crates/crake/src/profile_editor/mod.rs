@@ -99,6 +99,9 @@ pub struct ProfileEditor {
     /// openvpn3's refusal, or a folded line that can't be put back.
     note: Option<String>,
     changed: bool,
+    /// Asked to close with changes not saved: the footer asks first
+    /// (design/proposals/critique-2026-10-15, 1).
+    leaving: bool,
     tint: Option<RangeDecorationCollection>,
     muted: Option<TextDecorationCollection>,
     store: Arc<dyn Store>,
@@ -156,6 +159,7 @@ impl ProfileEditor {
             stage: Stage::Loading,
             note: None,
             changed: false,
+            leaving: false,
             tint: None,
             muted: None,
             store,
@@ -295,6 +299,72 @@ impl ProfileEditor {
         .detach();
     }
 
+    /// ×, Cancel or Escape: closes, unless there are changes not saved;
+    /// then the footer asks first. Nothing is thrown away by one key.
+    fn close(&mut self, cx: &mut Context<Self>) {
+        if self.changed && self.stage == Stage::Editing {
+            self.leaving = true;
+            cx.notify();
+        } else {
+            cx.emit(Close);
+        }
+    }
+
+    fn escape(&mut self, cx: &mut Context<Self>) {
+        if self.leaving {
+            self.keep_editing(cx);
+        } else {
+            self.close(cx);
+        }
+    }
+
+    fn keep_editing(&mut self, cx: &mut Context<Self>) {
+        self.leaving = false;
+        cx.notify();
+    }
+
+    /// "Leave without saving?" in the footer's place, Keep editing first.
+    fn leave_footer(&self, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .flex()
+            .items_center()
+            .gap(px(10.))
+            .px(px(SIDE))
+            .py(px(12.))
+            .border_t_1()
+            .border_color(t.line)
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .flex()
+                    .items_baseline()
+                    .gap(px(6.))
+                    .child(
+                        div()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child("Leave without saving?"),
+                    )
+                    .child(div().text_size(px(13.)).text_color(t.muted).child(format!(
+                        "Your changes to {}\u{2019}s profile will be lost.",
+                        self.display
+                    ))),
+            )
+            .child(
+                button("keep-editing", "Keep editing", false, t)
+                    .border_2()
+                    .border_color(t.accent)
+                    .on_click(cx.listener(|this, _, _, cx| this.keep_editing(cx)))
+                    .test_support(),
+            )
+            .child(
+                button("discard", "Discard changes", false, t)
+                    .text_color(t.danger)
+                    .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
+                    .test_support(),
+            )
+    }
+
     fn footer(&self, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {
         let (note, bad) = match (&self.note, &self.stage) {
             (Some(n), _) => (n.clone(), true),
@@ -326,7 +396,7 @@ impl ProfileEditor {
             )
             .child(
                 button("cancel", "Cancel", false, t)
-                    .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
+                    .on_click(cx.listener(|this, _, _, cx| this.close(cx)))
                     .test_support(),
             )
             .child(
@@ -402,7 +472,7 @@ impl Render for ProfileEditor {
             .when(!system, |h| {
                 h.child(
                     crate::chrome::close_button(&t)
-                        .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
+                        .on_click(cx.listener(|this, _, _, cx| this.close(cx)))
                         .test_support(),
                 )
             });
@@ -425,7 +495,7 @@ impl Render for ProfileEditor {
                 .child(
                     Editor::new(&self.editor)
                         .appearance(false)
-                        .readonly(self.stage == Stage::Saving)
+                        .readonly(self.stage == Stage::Saving || self.leaving)
                         .h_full(),
                 )
                 .into_any_element(),
@@ -445,15 +515,20 @@ impl Render for ProfileEditor {
             .font_family(fonts::UI)
             .text_size(px(14.))
             .line_height(px(20.))
-            .on_key_down(cx.listener(|_, e: &gpui_kit::KeyDownEvent, _, cx| {
-                if e.keystroke.key == "escape" {
-                    cx.emit(Close);
+            .on_key_down(cx.listener(|this, e: &gpui_kit::KeyDownEvent, _, cx| {
+                match e.keystroke.key.as_str() {
+                    "escape" => this.escape(cx),
+                    // Asking: Enter keeps editing, as Escape does.
+                    "enter" if this.leaving => this.keep_editing(cx),
+                    _ => {}
                 }
             }))
             .child(header)
             .child(body)
-            .when(matches!(self.stage, Stage::Editing | Stage::Saving), |d| {
-                d.child(self.footer(&t, cx))
-            })
+            .when(
+                matches!(self.stage, Stage::Editing | Stage::Saving) && !self.leaving,
+                |d| d.child(self.footer(&t, cx)),
+            )
+            .when(self.leaving, |d| d.child(self.leave_footer(&t, cx)))
     }
 }

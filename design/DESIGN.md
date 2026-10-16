@@ -143,6 +143,13 @@ One rule across every chart:
   chart title says which traffic ("Last hour" in the panel = direct,
   "Today" in the log = everything, "Today through ACME" in tunnel detail).
 - **Teal two-stroke ticks = the moment Crake routed a host.**
+- **Two kinds of traffic in one chart: two greys.** Traffic's "Last 5
+  minutes" stacks through tunnels (`muted`, on the baseline) under direct
+  (`bars`); never teal for volume, which would make teal mean "through a
+  tunnel" instead of "Crake decided" (critique 2026-10-15,
+  `design/proposals/critique-2026-10-15/`). Its 5 s bars are narrower than
+  a tick, so a tick stands at its slot's right edge, notching the
+  neighbouring bars rather than hiding one.
 - **Hollow grey circle = a host Crake tried and left alone.**
 - Baseline: 1 px lineStrong. Time labels in mono 11 px, muted, under the
   baseline: start, middle, "now".

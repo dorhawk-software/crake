@@ -225,6 +225,9 @@ impl Render for NewTunnel {
                     .pt(px(16.))
                     .px(px(32.))
                     .pb(px(22.))
+                    // What scrolls passes under it (critique-2026-10-15, 3).
+                    .border_t_1()
+                    .border_color(t.line)
                     .when(self.step > 1, |f| {
                         f.child(
                             div()

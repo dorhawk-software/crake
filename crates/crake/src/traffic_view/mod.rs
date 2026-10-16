@@ -162,11 +162,9 @@ impl Traffic {
                     .child("This computer"),
             );
         for (way, (cy, hosts)) in ways.iter().zip(&l.ways) {
-            let color = if way.tunnel.is_some() {
-                t.accent
-            } else {
-                t.muted
-            };
+            // Every way the same: teal is for decisions, not for which way
+            // (design/proposals/critique-2026-10-15, 2).
+            let color = t.line_strong;
             g = g.child(
                 div()
                     .id(gpui_kit::ElementId::Name(
@@ -243,7 +241,16 @@ impl Traffic {
 
     fn strip(&self, model: &Model, t: &Theme) -> Div {
         let bars = strip::bars(&model.live.history, Instant::now());
-        let (grey, accent) = (t.bars, t.accent);
+        let ticks =
+            strip::ticks(&model.marks_within(strip::SPAN_MINUTES, None, strip::MERGE_MINUTES));
+        let colours = strip::Colours {
+            tunnels: t.muted,
+            direct: t.bars,
+            baseline: t.line_strong,
+            accent: t.accent,
+            undone: t.muted,
+            panel: t.panel,
+        };
         let legend = |color, label: &'static str| {
             div()
                 .flex()
@@ -268,8 +275,21 @@ impl Traffic {
                             .text_size(px(12.))
                             .font_weight(FontWeight::NORMAL)
                             .text_color(t.muted)
+                            .child(legend(t.muted, "through tunnels"))
                             .child(legend(t.bars, "direct"))
-                            .child(legend(t.accent, "through tunnels")),
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(4.))
+                                    .child(
+                                        gpui_kit::svg()
+                                            .path("crake/mark-routed.svg")
+                                            .size(px(12.))
+                                            .text_color(t.accent),
+                                    )
+                                    .child("routed"),
+                            ),
                     ),
             )
             .child(
@@ -277,7 +297,7 @@ impl Traffic {
                     canvas(
                         |_, _, _| {},
                         move |bounds, _, window, _| {
-                            strip::paint(&bars, bounds, grey, accent, window);
+                            strip::paint(&bars, &ticks, bounds, colours, window);
                         },
                     )
                     .size_full(),

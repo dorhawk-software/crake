@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: traffic, live</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+    --ink: #ECEDEE; --muted: #A9AEB4; --bars: #3E4246; --accent: #2DD4BF; --direct: #7D8287; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8;
+    --ink: #1A1C1E; --muted: #5A5F64; --bars: #D8D9D5; --accent: #0F766E; --direct: #8A8F94; }
+  body { margin: 0; background: var(--desk); color: var(--ink);
+    font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  .page { padding: 28px 40px 48px; }
+  .intro { color: var(--muted); font-size: 13px; max-width: 920px; margin-bottom: 18px; }
+  .intro b { color: var(--ink); }
+  .win { width: 920px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  .top { display: flex; align-items: baseline; gap: 12px; padding: 18px 28px 0; }
+  .top h2 { margin: 0; font-size: 22px; }
+  .top .s { color: var(--muted); font-size: 13px; }
+  .top .r { margin-left: auto; font-size: 13px; color: var(--muted); }
+  .map { display: block; margin: 6px 0 0; }
+  .strip { padding: 0 28px; }
+  .shead { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-top: 6px; }
+  .legend { font-size: 12px; color: var(--muted); font-weight: 400; display: flex; gap: 12px; align-items: center; }
+  .sq { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .times { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); margin: 18px 28px 0; }
+  .tab { padding-bottom: 8px; font-weight: 600; color: var(--muted); font-size: 14px; }
+  .tab.on { color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+  .tab .n { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 4px; }
+  table { width: calc(100% - 56px); margin: 0 28px 20px; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; padding: 8px 10px 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+  td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--line); }
+  tr.hi td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .way { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .num { font-family: 'Atkinson Hyperlegible Mono', monospace; font-size: 12px; color: var(--muted); text-align: right; }
+  .notes { max-width: 920px; margin-top: 24px; font-size: 13px; color: var(--muted); }
+  .notes b { color: var(--ink); }
+  .notes li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="intro">After: volume in greys, teal only where Crake routed.</div>
+
+  <div class="win">
+    <div class="top"><h2>Traffic</h2><span class="s">Live</span><span class="r mono" id="total"></span></div>
+    <svg class="map" id="map" viewBox="0 0 920 330" width="920" height="330"></svg>
+    <div class="strip">
+      <div class="shead"><span>Last 5 minutes</span>
+        <span class="legend"><span><span class="sq" style="background:var(--muted)"></span>through tunnels</span>
+          <span><span class="sq" style="background:var(--bars)"></span>direct</span>
+          <span><span style="display:inline-block;width:3px;height:11px;background:var(--accent);vertical-align:-1px;margin-right:2px"></span><span style="display:inline-block;width:3px;height:8px;background:var(--accent);vertical-align:-1px;margin-right:5px"></span>routed</span></span></div>
+      <svg id="strip" viewBox="0 0 864 56" width="864" height="56" style="display:block;margin-top:6px"></svg>
+      <div class="times mono"><span>5 min ago</span><span>now</span></div>
+    </div>
+    <div class="tabs"><span class="tab on">Right now<span class="n">23</span></span><span class="tab">Where things go<span class="n">31</span></span></div>
+    <table>
+      <tr><th>Destination</th><th>App</th><th>Goes</th><th class="num">Now</th><th class="num">Since</th></tr>
+      <tr class="hi"><td class="mono">git.acme.internal:443</td><td>git</td><td><span class="way"><span class="dot" style="background:var(--accent)"></span>ACME</span></td><td class="num">1.1 MB/s</td><td class="num">12 s</td></tr>
+      <tr><td class="mono">sftp.nordbank.example:22</td><td>FileZilla</td><td><span class="way"><span class="dot" style="background:var(--accent)"></span>Nordbank</span></td><td class="num">420 KB/s</td><td class="num">4 min</td></tr>
+      <tr><td class="mono">teams.microsoft.com:443</td><td>Teams</td><td><span class="way"><span class="dot" style="background:var(--direct)"></span>direct</span></td><td class="num">310 KB/s</td><td class="num">1 h</td></tr>
+      <tr><td class="mono">github.com:443</td><td>Firefox</td><td><span class="way"><span class="dot" style="background:var(--direct)"></span>direct</span></td><td class="num">60 KB/s</td><td class="num">2 min</td></tr>
+    </table>
+  </div>
+
+  <div class="notes">
+    <ul>
+      <li><b>The graph.</b> Paths from this computer to each way out, and on to the five busiest destinations of each
+        (the rest as "and 18 more"). Dots move slowly, as fast as the path's traffic flows (a trickle crawls,
+        a big download moves about twice as fast), and come one per ~250 KB: between one every four seconds and two a
+        second, so the window can stay open beside work without pulling the eye. Direct is grey,
+        tunnels teal, as in the panel. Pointing at a path or a host names it and its rate; clicking one finds it in the
+        table below.</li>
+      <li><b>When Crake decides.</b> A host Crake sends through a tunnel right now gets its path drawn from the tunnel
+        to it, once (the panel's "What Crake did", seen happening). Undo moves it to direct the same way.</li>
+      <li><b>Last 5 minutes.</b> The panel's chart, shorter and finer: a bar every 5 s, direct and through tunnels
+        stacked, sliding left as time passes.</li>
+      <li><b>The tables.</b> "Right now": open connections (the connection table craked already reads for probing),
+        the app where the system says, and the rate. "Where things go": every rule (learned, pinned, never, sent direct
+        with Undo, and everything else), the "tree" of the split, searchable.</li>
+      <li><b>Quiet.</b> Only while the window is open (craked sends rates once a second then, nothing otherwise); with
+        GNOME's animations off the dots stand still and the paths' thickness shows the rate instead. It stays on this
+        computer like everything Crake sees; Copy for helpdesk never includes it.</li>
+    </ul>
+  </div>
+</div>
+<script>
+if (location.search.includes('dark=false')) document.body.classList.add('light');
+const css = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+const NS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; };
+const map = document.getElementById('map');
+
+// Ways out, and their busiest destinations (rates in KB/s).
+const ways = [
+  { name: 'ACME', tunnel: true, y: 70, hosts: [['git.acme.internal', 1100], ['jira.acme.internal', 85], ['10.40.8.21', 40], ['wiki.acme.internal', 12]] },
+  { name: 'Nordbank', tunnel: true, y: 165, hosts: [['sftp.nordbank.example', 420], ['portal.nordbank.example', 30]] },
+  { name: 'Direct', tunnel: false, y: 262, hosts: [['teams.microsoft.com', 310], ['github.com', 60], ['open.spotify.com', 180], ['and 18 more', 95]] },
+];
+const ME = { x: 96, y: 165 }, WAY_X = 400, HOST_X = 640;
+const paths = [];
+function curve(x1, y1, x2, y2) { const m = (x1 + x2) / 2; return `M${x1} ${y1} C${m} ${y1} ${m} ${y2} ${x2} ${y2}`; }
+const gPaths = el('g', {}, map), gDots = el('g', {}, map), gNodes = el('g', {}, map);
+
+// This computer.
+el('rect', { x: ME.x - 66, y: ME.y - 24, width: 132, height: 48, rx: 8, fill: css('--surface'), stroke: css('--line') }, gNodes);
+const me = el('text', { x: ME.x, y: ME.y + 5, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': 700, fill: css('--ink') }, gNodes);
+me.textContent = 'This computer';
+
+ways.forEach(w => {
+  const color = w.tunnel ? css('--accent') : css('--direct');
+  const rate = w.hosts.reduce((s, h) => s + h[1], 0);
+  const p = el('path', { d: curve(ME.x + 66, ME.y, WAY_X - 58, w.y), fill: 'none', stroke: css('--line'), 'stroke-width': 2 }, gPaths);
+  paths.push({ el: p, rate, color, len: 0 });
+  el('rect', { x: WAY_X - 58, y: w.y - 22, width: 116, height: 44, rx: 8, fill: css('--panel'), stroke: css('--lineStrong'), 'stroke-width': 1 }, gNodes);
+  const t = el('text', { x: WAY_X, y: w.y - 2, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': 700, fill: css('--ink') }, gNodes);
+  t.textContent = w.name;
+  const r = el('text', { x: WAY_X, y: w.y + 14, 'text-anchor': 'middle', 'font-size': 11.5, fill: css('--muted'), 'font-family': 'Atkinson Hyperlegible Mono' }, gNodes);
+  r.textContent = fmt(rate);
+  const n = w.hosts.length;
+  w.hosts.forEach(([host, hr], i) => {
+    const hy = w.y + (i - (n - 1) / 2) * 21;
+    const hp = el('path', { d: curve(WAY_X + 58, w.y, HOST_X - 8, hy), fill: 'none', stroke: css('--line'), 'stroke-width': 1.5 }, gPaths);
+    paths.push({ el: hp, rate: hr, color, len: 0, fresh: host === 'jira.acme.internal' });
+    const ht = el('text', { x: HOST_X, y: hy + 4, 'font-size': 12.5, fill: host.startsWith('and ') ? css('--muted') : css('--ink'), 'font-family': 'Atkinson Hyperlegible Mono' }, gNodes);
+    ht.textContent = host;
+    const hr2 = el('text', { x: 900, y: hy + 4, 'text-anchor': 'end', 'font-size': 11.5, fill: css('--muted'), 'font-family': 'Atkinson Hyperlegible Mono' }, gNodes);
+    hr2.textContent = fmt(hr);
+  });
+});
+function fmt(kb) { return kb >= 1000 ? (kb / 1000).toFixed(1) + ' MB/s' : Math.round(kb) + ' KB/s'; }
+document.getElementById('total').textContent = fmt(ways.flatMap(w => w.hosts).reduce((s, h) => s + h[1], 0)) + ' in all';
+
+// Packets, calm: a path's dots move as fast as its traffic flows (slowly for a trickle,
+// about twice as fast for a big download), and come one per ~250 KB, between one every
+// four seconds and two a second.
+paths.forEach(p => { p.len = p.el.getTotalLength(); p.acc = Math.random(); p.dots = [];
+  p.speed = 22 + 16 * Math.log10(1 + p.rate); p.every = Math.max(0.25, Math.min(2, p.rate / 250)); });
+let last = performance.now(), t0 = last;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  paths.forEach(p => {
+    p.acc += dt * p.every;
+    while (p.acc >= 1) { p.acc -= 1; p.dots.push({ d: 0, e: el('circle', { r: 2.6, fill: p.color }, gDots) }); }
+    p.dots = p.dots.filter(o => {
+      o.d += p.speed * dt;
+      if (o.d > p.len) { o.e.remove(); return false; }
+      const pt = p.el.getPointAtLength(o.d);
+      o.e.setAttribute('cx', pt.x); o.e.setAttribute('cy', pt.y);
+      return true;
+    });
+    // A host just sent through a tunnel: its path drawn in once, in the first second and a half.
+    if (p.fresh) {
+      const k = Math.min(1, (now - t0) / 1500);
+      p.el.setAttribute('stroke', k < 1 ? p.color : css('--line'));
+      p.el.setAttribute('stroke-dasharray', `${p.len * k} ${p.len}`);
+    }
+  });
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// Last 5 minutes: a bar every 5 s, tunnels on the baseline, direct on top; both grey.
+// Teal only where Crake routed a host: the two-stroke tick, as in the panel's chart.
+const strip = document.getElementById('strip');
+let s = 7; const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+const ROUTED = [6, 30, 56];
+const bars = Array.from({ length: 60 }, (_, i) => ({ d: 6 + rnd() * 14, t: (i > 40 ? 14 : 4) + rnd() * (i > 40 ? 22 : 10), routed: ROUTED.includes(i) }));
+const BASE = 55;
+const bar = (x, top, base, w) => `M${x - w / 2} ${base}V${top + w / 2}a${w / 2} ${w / 2} 0 0 1 ${w} 0V${base}Z`;
+function drawStrip() {
+  strip.innerHTML = '';
+  bars.forEach((b, i) => {
+    const x = 2 + i * 14.4;
+    el('rect', { x, y: BASE - b.t, width: 9, height: b.t, fill: css('--muted') }, strip);
+    el('rect', { x, y: BASE - b.t - b.d - 1, width: 9, height: b.d, fill: css('--bars') }, strip);
+  });
+  // A tick with its gap is wider than a 9 px bar; centred on the slot's right edge (the 5.4 px
+  // space before the next bar) it only notches the two bars beside it, so both stay.
+  const ticks = bars.map((b, i) => b.routed ? 2 + i * 14.4 + 9 + 2.7 - 2.5 : null).filter(x => x !== null)
+    .map(cx => bar(cx, BASE - 42, BASE, 3.2) + bar(cx + 5, BASE - 32, BASE, 3.2));
+  // A gap in the panel colour around each tick, so it never runs into the bars.
+  ticks.forEach(d => el('path', { d, fill: 'none', stroke: css('--panel'), 'stroke-width': 3, 'stroke-linejoin': 'round' }, strip));
+  // The baseline after the gaps, so they don't cut it.
+  el('line', { x1: 0, y1: BASE + 0.5, x2: 864, y2: BASE + 0.5, stroke: css('--lineStrong'), 'stroke-width': 1 }, strip);
+  ticks.forEach(d => el('path', { d, fill: css('--accent') }, strip));
+}
+drawStrip();
+setInterval(() => { bars.shift(); bars.push({ d: 6 + rnd() * 14, t: 16 + rnd() * 22 }); drawStrip(); }, 5000);
+</script>
+</body>
+</html>

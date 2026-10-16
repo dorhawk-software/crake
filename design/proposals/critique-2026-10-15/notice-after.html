@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>After: the leftover notice, polished</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  .dark { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4;
+    --accent: #2DD4BF; --track: #4A4E53; --bars: #3E4246;
+    --warning: #F5B740; --warningSoft: #2C2618; --warningLine: #5C4A22; --onWarning: #1A1408; }
+  .light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --ink: #1A1C1E; --muted: #5A5F64;
+    --accent: #0F766E; --track: #BDBDB8; --bars: #D8D9D5;
+    --warning: #E39A1B; --warningSoft: #FCF4E4; --warningLine: #EFD9AE; --onWarning: #1A1C1E; }
+  body { margin: 0; background: #0E0F10; color: #ECEDEE; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 40px; max-width: 1180px; }
+  .cap { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+  .sub { font-size: 12.5px; color: #A9AEB4; margin-bottom: 14px; max-width: 980px; }
+  .pair { display: flex; gap: 20px; flex-wrap: wrap; }
+  .theme { background: var(--desk); padding: 16px; border-radius: 10px; color: var(--ink); }
+  .panel { width: 452px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding-bottom: 8px; }
+  .head { display: flex; align-items: center; gap: 10px; padding: 14px 18px 10px; }
+  .head .t { font-weight: 700; font-size: 18px; } .head .s { color: var(--muted); font-size: 13px; }
+  .bird { width: 24px; height: 24px; color: var(--ink); flex: none; }
+  .note { margin: 0 18px 10px; padding: 10px 12px; border-radius: 8px; font-size: 13px; display: flex; gap: 10px;
+    background: var(--warningSoft); border: 1px solid var(--warningLine); }
+  .note .body { flex: 1; min-width: 0; }
+  .note .title { font-weight: 600; }
+  .note .why { color: var(--muted); margin-top: 3px; }
+  .note .row { margin-top: 8px; display: flex; align-items: center; gap: 10px; }
+  .chip { flex: 1; min-width: 0; display: flex; align-items: stretch; background: var(--panel); border: 1px solid var(--warningLine);
+    border-radius: 6px; overflow: hidden; }
+  .chip code { flex: 1; font-family: 'Atkinson Hyperlegible Mono', monospace; font-size: 13px; padding: 6px 9px; color: var(--ink); }
+  .chip .copy { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-left: 1px solid var(--warningLine);
+    font-weight: 600; font-size: 13px; color: var(--ink); }
+  .chip .copy svg { width: 14px; height: 14px; }
+  .btn { flex: none; font-weight: 600; font-size: 13px; color: var(--ink); border: 1px solid var(--warningLine); border-radius: 6px;
+    padding: 6px 12px; background: transparent; }
+  .note .after { color: var(--muted); margin-top: 6px; font-size: 13px; }
+  .ico { flex: none; width: 22px; height: 22px; color: var(--ink); margin-top: -1px; }
+  .sec { padding: 8px 18px 4px; font-size: 13px; font-weight: 600; border-top: 1px solid var(--line); }
+  .tun { display: flex; align-items: center; gap: 12px; padding: 8px 18px; }
+  .tun .n { font-weight: 700; font-size: 15px; } .tun .st { color: var(--muted); font-size: 13px; margin-left: 8px; }
+  .sw { width: 46px; height: 26px; border-radius: 13px; background: var(--accent); position: relative; margin-left: auto; flex: none; }
+  .sw::after { content: ''; position: absolute; top: 3px; left: 23px; width: 20px; height: 20px; border-radius: 50%; background: #fff; }
+  .sw.off { background: var(--track); } .sw.off::after { left: 3px; }
+  .on { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; margin-right: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); display: inline-block; margin-right: 6px; }
+  .copied .copy { color: var(--muted); }
+  .notes { margin-top: 18px; font-size: 12.5px; color: #A9AEB4; max-width: 980px; }
+  .notes li { margin: 3px 0; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="head-warning" viewBox="6.6 5.2 17.4 17.4">
+    <defs><mask id="cut" maskUnits="userSpaceOnUse" x="0" y="0" width="30" height="30">
+      <path d="M8.5 20.5V12A3.75 3.75 0 0 1 15.95 11.4L16 10.4L20.6 11.6L16 12.8C16 15.5 15.1 17.8 13.4 20.5Z" fill="#fff" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>
+      <circle cx="12.35" cy="11.4" r="1.55" fill="#000"/>
+      <path d="M19.6 5.9L23.6 12.9H15.6Z" fill="#000" stroke="#000" stroke-width="2.6" stroke-linejoin="round"/>
+    </mask></defs>
+    <rect x="0" y="0" width="30" height="30" fill="currentColor" mask="url(#cut)"/>
+    <path d="M19.6 6.7L22.9 12.4H16.3Z" fill="var(--warning)" stroke="var(--warning)" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M19.6 8.6v1.7" stroke="var(--onWarning)" stroke-width="1.1" stroke-linecap="round"/>
+    <circle cx="19.6" cy="11.35" r="0.55" fill="var(--onWarning)"/>
+  </symbol>
+  <!-- The panel header's bird (assets/icons/bird.svg) with the amber triangle where its call marks sit. -->
+  <symbol id="bird-warning" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3.5 20.5 5.3 15M6.2 20.5l.6-3.4M17.4 20.5l-.6-3.6M20.5 20.5l-1.7-5.2"/>
+      <path d="M8.5 20.5V12a3.75 3.75 0 0 1 7.5 0"/><path d="M16 10.4l4.3 1.2-4.3 1.2"/><path d="M16 12.8c0 2.7-.9 5-2.6 7.7"/>
+    </g>
+    <circle cx="12.4" cy="10.6" r="0.9" fill="currentColor"/>
+    <path d="M20.2 2.6L23.3 8H17.1Z" fill="var(--warning)" stroke="var(--warning)" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M20.2 4.5v1.5" stroke="var(--onWarning)" stroke-width="1" stroke-linecap="round"/>
+    <circle cx="20.2" cy="7.1" r="0.5" fill="var(--onWarning)"/>
+  </symbol>
+  <symbol id="clip" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></g></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+<div class="page">
+  <div class="cap">After: the notice says what to do, and the panel agrees with the bar</div>
+  <div class="sub">Copy sits inside the command, with its icon; "Got it" is a real button; one line says the note goes by
+    itself; the header's bird wears the same amber triangle as the bird in the bar, and the status word stays.</div>
+  <template id="panel">
+    <div class="panel">
+      <div class="head"><svg class="bird"><use href="#bird-warning"/></svg><span class="t">Crake</span><span class="s"><span class="on"></span>Listening</span></div>
+      <div class="note">
+        <svg class="ico"><use href="#head-warning"/></svg>
+        <div class="body">
+          <div class="title">OpenVPN 3 left a connection running.</div>
+          <div class="why">Its Globex session ended, but the process kept going: it reconnects on its own and
+            changes your other tunnels' DNS. Stop it in a terminal:</div>
+          <div class="row">
+            <div class="chip"><code>sudo kill -9 2415678</code><span class="copy"><svg><use href="#clip"/></svg>Copy</span></div>
+            <span class="btn">Got it</span>
+          </div>
+          <div class="after">This note goes away by itself once the process ends.</div>
+        </div>
+      </div>
+      <div class="sec">Tunnels</div>
+      <div class="tun"><span class="n">Initech</span><span class="st">Connected · 4 hosts</span><div class="sw"></div></div>
+      <div class="tun"><span class="n">Globex</span><span class="st">Off</span><div class="sw off"></div></div>
+    </div>
+  </template>
+  <div class="pair" id="pair"></div>
+  <ul class="notes">
+    <li>After Copy: the chip's button says "Copied" with a check for 3 s, in muted ink; nothing else moves.</li>
+    <li>No teal in the notice any more: teal stays for decisions, amber for this.</li>
+    <li>The red trouble badge would follow the same rule: the header's bird shows what the bar shows.</li>
+  </ul>
+</div>
+<script>
+  const tpl = document.getElementById('panel'), pair = document.getElementById('pair');
+  for (const theme of ['dark', 'light']) {
+    const box = document.createElement('div');
+    box.className = 'theme ' + theme;
+    box.appendChild(tpl.content.cloneNode(true));
+    pair.appendChild(box);
+  }
+</script>
+</body>
+</html>

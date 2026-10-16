@@ -197,3 +197,34 @@ fn close_and_cancel_ask_the_app_to_close(cx: &mut TestAppContext) {
     w.click("close", cx);
     assert_eq!(closed.get(), 2);
 }
+
+/// With changes not saved, ×, Cancel and Escape ask first: Keep editing
+/// (also Escape again) keeps them, Discard changes closes
+/// (design/proposals/critique-2026-10-15, 1).
+#[gpui_kit::test]
+fn changes_are_never_thrown_away_by_one_key(cx: &mut TestAppContext) {
+    let w = open(cx, Fetched::Text(PROFILE.into()), None);
+    let closed = std::rc::Rc::new(std::cell::Cell::new(0));
+    let seen = closed.clone();
+    cx.update(|cx| {
+        cx.subscribe(&w.view, move |_, _: &Close, _| seen.set(seen.get() + 1))
+            .detach();
+    });
+    let edited = w.shown(cx).replace("vpn.initech", "vpn2.initech");
+    w.type_text(&edited, cx);
+    let leaving = |cx: &mut TestAppContext| w.view.read_with(cx, |v, _| v.leaving);
+    w.click("cancel", cx);
+    assert!(leaving(cx), "Cancel asks");
+    w.click("keep-editing", cx);
+    assert!(!leaving(cx));
+    w.view.update(cx, |v, cx| v.escape(cx));
+    assert!(leaving(cx), "Escape asks");
+    w.view.update(cx, |v, cx| v.escape(cx));
+    assert!(!leaving(cx), "Escape again keeps editing");
+    assert_eq!(w.shown(cx), edited, "the edit is still there");
+    w.click("close", cx);
+    assert!(leaving(cx), "\u{d7} asks");
+    assert_eq!(closed.get(), 0);
+    w.click("discard", cx);
+    assert_eq!(closed.get(), 1);
+}

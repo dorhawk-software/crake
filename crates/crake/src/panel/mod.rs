@@ -126,6 +126,25 @@ pub struct Panel {
     _subscriptions: Vec<Subscription>,
 }
 
+/// Over the header's bird, what the bird in the bar shows
+/// (design/proposals/critique-2026-10-15): a red badge when a tunnel stopped,
+/// an amber triangle when something needs you, else the call marks.
+fn header_marks(model: &Model, t: &Theme) -> Vec<gpui_kit::Svg> {
+    let layer =
+        |path: &'static str, color| svg().path(path).size(px(24.)).text_color(color).absolute();
+    match model.shape().badged().1 {
+        Some(crate::tray::Badge::Trouble) => vec![
+            layer("crake/bird-badge-trouble.svg", t.danger),
+            layer("crake/bird-badge-mark.svg", t.on_danger),
+        ],
+        Some(crate::tray::Badge::Warning) => vec![
+            layer("crake/bird-badge-warning.svg", t.warning),
+            layer("crake/bird-badge-mark.svg", t.on_warning),
+        ],
+        None => vec![layer("crake/call.svg", t.accent)],
+    }
+}
+
 impl Render for Panel {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = Theme::current(cx);
@@ -442,13 +461,7 @@ impl Panel {
                             .text_color(t.ink)
                             .absolute(),
                     )
-                    .child(
-                        svg()
-                            .path("crake/call.svg")
-                            .size(px(24.))
-                            .text_color(t.accent)
-                            .absolute(),
-                    ),
+                    .children(header_marks(model, t)),
             )
             .child(
                 div()

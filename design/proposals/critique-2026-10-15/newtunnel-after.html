@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New tunnel, after</title>
+<script src="../../screens/support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0F766E}a:hover{color:#0B5D57}
+button,input,select{font:inherit}
+.mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}
+</style>
+</helmet>
+<div style="min-height: max(1000px, 100vh); box-sizing: border-box; padding: 40px 16px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
+<p style="max-width: 720px; margin: 0 auto 16px; color: {{c.muted}}">After: once the gateway has answered, the protocol list folds away.</p>
+<div style="max-width: 720px; margin: 0 auto; background: {{c.panel}}; border: 1px solid {{c.line}}; border-radius: 12px; box-shadow: 0 30px 60px -30px rgba(0,0,0,0.35); overflow: hidden">
+
+<div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 10px 12px; border-bottom: 1px solid {{c.line}}">
+<div><button type="button" style="height: 36px; padding: 0 12px; border: none; border-radius: 6px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">Cancel</button></div>
+<span style="font-size: 15px; font-weight: 700">New tunnel</span>
+<div style="display: flex; justify-content: flex-end"><button type="button" aria-label="Close" style="width: 32px; height: 32px; border: none; border-radius: 50%; background: {{c.surface}}; color: {{c.ink}}; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"></path></svg></button></div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0 32px; border-bottom: 1px solid {{c.line}}">
+<sc-for list="{{steps}}" as="s" hint-placeholder-count="3">
+<button type="button" onClick="{{s.go}}" style="display: flex; align-items: center; gap: 8px; height: 50px; padding: 0; border: none; border-bottom: 2px solid {{s.bar}}; margin-bottom: -1px; background: transparent; color: {{s.fg}}; font-weight: {{s.weight}}; cursor: pointer">
+<span style="width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid {{s.ring}}; background: {{s.dotBg}}; color: {{s.dotFg}}; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; box-sizing: border-box">{{s.mark}}</span>{{s.label}}
+</button>
+</sc-for>
+</div>
+
+<div style="padding: 26px 32px 8px">
+
+<sc-if value="{{is1}}" hint-placeholder-val="{{true}}">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700">Where does it connect?</h2>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; margin-top: 18px">
+<div>
+<label for="tname" style="display: block; font-weight: 600; margin-bottom: 6px">Name</label>
+<input id="tname" type="text" value="Nordbank" style="width: 100%; box-sizing: border-box; height: 42px; padding: 0 12px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-size: 15px">
+</div>
+<div>
+<label for="tgw" style="display: block; font-weight: 600; margin-bottom: 6px">Gateway</label>
+<input id="tgw" type="text" value="gw.nordbank.example" class="mono" style="width: 100%; box-sizing: border-box; height: 42px; padding: 0 12px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-size: 14px">
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: {{c.muted}}">
+<svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><path d="M6 15V4M12 15V8" stroke="{{c.accent}}" stroke-width="2.4" stroke-linecap="round"></path></svg>
+<span>Found a Cisco AnyConnect gateway. Its certificate is valid until March 2027.</span>
+</div>
+
+<div style="margin-top: 24px; font-weight: 600">Protocol</div>
+<sc-for list="{{fig1}}" as="f" hint-placeholder-count="1">
+<div role="radiogroup" aria-label="Protocol" style="margin-top: 8px; border: 1px solid {{c.line}}; border-radius: 8px; overflow: hidden">
+<sc-for list="{{f.detect}}" as="p" hint-placeholder-count="1">
+<button type="button" role="radio" aria-checked="{{p.aria}}" onClick="{{p.pick}}" style="width: 100%; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 46px; padding: 8px 14px; border: none; border-top: {{p.border}}; background: {{p.bg}}; color: {{c.ink}}; text-align: left; cursor: pointer">
+<span style="width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{p.ring}}; display: flex; align-items: center; justify-content: center"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{p.dot}}"></span></span>
+<span style="min-width: 0">
+<span style="display: block; font-weight: 600">{{p.name}}<span style="margin-left: 8px; font-size: 12px; font-weight: 600; color: {{c.accent}}">{{p.tag}}</span></span>
+<span style="display: block; font-size: 13px; color: {{c.muted}}">{{p.sub}}</span>
+</span>
+<span class="mono" style="font-size: 12px; color: {{c.muted}}">{{p.code}}</span>
+</button>
+</sc-for>
+<button type="button" aria-expanded="{{f.fold.aria}}" onClick="{{f.fold.toggle}}" style="width: 100%; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 46px; padding: 8px 14px; border: none; border-top: 1px solid {{c.line}}; background: {{c.panel}}; color: {{c.ink}}; text-align: left; cursor: pointer">
+<span style="display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{c.muted}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{f.fold.chevron}}"></path></svg></span>
+<span>Choose the protocol yourself</span>
+<span style="font-size: 13px; color: {{c.muted}}">{{f.fold.more}}</span>
+</button>
+<sc-if value="{{f.fold.open}}" hint-placeholder-val="{{false}}">
+<div style="padding: 12px 14px 4px 46px; border-top: 1px solid {{c.line}}; font-size: 13px; color: {{c.muted}}">Used with real gateways</div>
+<sc-for list="{{f.tried}}" as="p" hint-placeholder-count="2">
+<button type="button" role="radio" aria-checked="{{p.aria}}" onClick="{{p.pick}}" style="width: 100%; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 46px; padding: 8px 14px; border: none; border-top: {{p.border}}; background: {{p.bg}}; color: {{c.ink}}; text-align: left; cursor: pointer">
+<span style="width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{p.ring}}; display: flex; align-items: center; justify-content: center"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{p.dot}}"></span></span>
+<span style="min-width: 0">
+<span style="display: block; font-weight: 600">{{p.name}}</span>
+<span style="display: block; font-size: 13px; color: {{c.muted}}">{{p.sub}}</span>
+</span>
+<span class="mono" style="font-size: 12px; color: {{c.muted}}">{{p.code}}</span>
+</button>
+</sc-for>
+<div style="padding: 12px 14px 4px 46px; border-top: 1px solid {{c.line}}; font-size: 13px; color: {{c.muted}}">Beta: not yet tried with a real gateway</div>
+<sc-for list="{{f.beta}}" as="p" hint-placeholder-count="6">
+<button type="button" role="radio" aria-checked="{{p.aria}}" onClick="{{p.pick}}" style="width: 100%; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 46px; padding: 8px 14px; border: none; border-top: {{p.border}}; background: {{p.bg}}; color: {{c.ink}}; text-align: left; cursor: pointer">
+<span style="width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{p.ring}}; display: flex; align-items: center; justify-content: center"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{p.dot}}"></span></span>
+<span style="min-width: 0">
+<span style="display: block; font-weight: 600">{{p.name}}</span>
+<span style="display: block; font-size: 13px; color: {{c.muted}}">{{p.sub}}</span>
+</span>
+<span class="mono" style="font-size: 12px; color: {{c.muted}}">{{p.code}}</span>
+</button>
+</sc-for>
+</sc-if>
+</div>
+</sc-for>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 18px">
+<div>
+<label for="grp" style="display: block; font-weight: 600; margin-bottom: 6px">Group</label>
+<select id="grp" style="width: 100%; height: 42px; padding: 0 10px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}"><option>Employees</option><option>Contractors</option></select>
+</div>
+<div style="font-size: 13px; color: {{c.muted}}; align-self: end; padding-bottom: 4px">The gateway offers two groups. Ask your IT team if you’re not sure.</div>
+</div>
+</sc-if>
+
+<sc-if value="{{is2}}" hint-placeholder-val="{{false}}">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700">How do you sign in?</h2>
+<div role="radiogroup" aria-label="Sign-in method" style="display: flex; flex-direction: column; gap: 8px; margin-top: 18px">
+<sc-for list="{{methods}}" as="m" hint-placeholder-count="3">
+<button type="button" role="radio" aria-checked="{{m.aria}}" onClick="{{m.pick}}" style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 12px; align-items: start; padding: 14px 16px; border: 1px solid {{m.border}}; box-shadow: {{m.ring}}; border-radius: 8px; background: {{c.panel}}; color: {{c.ink}}; text-align: left; cursor: pointer">
+<span style="width: 18px; height: 18px; margin-top: 2px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{m.radio}}; display: flex; align-items: center; justify-content: center"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{m.dot}}"></span></span>
+<span><span style="display: block; font-size: 15px; font-weight: 700">{{m.name}}</span><span style="display: block; color: {{c.muted}}">{{m.sub}}</span></span>
+</button>
+</sc-for>
+</div>
+
+<sc-if value="{{mPassword}}" hint-placeholder-val="{{false}}">
+<div style="margin-top: 18px">
+<label for="uname" style="display: block; font-weight: 600; margin-bottom: 6px">Username</label>
+<input id="uname" type="text" value="ondrej.simon" style="width: 100%; max-width: 320px; box-sizing: border-box; height: 42px; padding: 0 12px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-size: 15px">
+<div style="margin-top: 8px; font-size: 13px; color: {{c.muted}}">Your password goes to the system keyring, never into Crake’s files.</div>
+</div>
+</sc-if>
+<sc-if value="{{mCert}}" hint-placeholder-val="{{false}}">
+<div style="margin-top: 18px">
+<label for="csrc" style="display: block; font-weight: 600; margin-bottom: 6px">Certificate from</label>
+<select id="csrc" style="width: 100%; max-width: 320px; height: 42px; padding: 0 10px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}"><option>Smart card (PKCS#11)</option><option>System keyring</option><option>A file…</option></select>
+</div>
+</sc-if>
+<sc-if value="{{mBrowser}}" hint-placeholder-val="{{true}}">
+<label style="display: flex; align-items: center; gap: 10px; margin-top: 18px; cursor: pointer"><input type="checkbox" checked="checked" style="width: 18px; height: 18px; accent-color: {{c.accent}}">Stay signed in for 12 hours, if the gateway allows it</label>
+<div style="margin-top: 6px; margin-left: 28px; font-size: 13px; color: {{c.muted}}">Opens in Firefox, your default browser.</div>
+</sc-if>
+
+<details style="margin-top: 22px; border-top: 1px solid {{c.line}}; padding-top: 14px">
+<summary style="cursor: pointer; font-weight: 600">Advanced</summary>
+<label style="display: flex; align-items: center; gap: 10px; margin-top: 12px"><input type="checkbox" style="width: 18px; height: 18px; accent-color: {{c.accent}}">Report a different client version</label>
+<label style="display: flex; align-items: center; gap: 10px; margin-top: 10px"><input type="checkbox" style="width: 18px; height: 18px; accent-color: {{c.accent}}">Allow weak ciphers <span style="color: {{c.muted}}">(only if your gateway is very old)</span></label>
+</details>
+</sc-if>
+
+<sc-if value="{{is3}}" hint-placeholder-val="{{false}}">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700">What should go through it?</h2>
+<div role="radiogroup" aria-label="Routing" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 18px">
+<sc-for list="{{modes}}" as="m" hint-placeholder-count="4">
+<button type="button" role="radio" aria-checked="{{m.aria}}" onClick="{{m.pick}}" style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 12px; align-items: start; padding: 14px 16px; border: 1px solid {{m.border}}; box-shadow: {{m.ring}}; border-radius: 8px; background: {{c.panel}}; color: {{c.ink}}; text-align: left; cursor: pointer">
+<span style="width: 18px; height: 18px; margin-top: 2px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{m.radio}}; display: flex; align-items: center; justify-content: center"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{m.dot}}"></span></span>
+<span><span style="display: block; font-size: 15px; font-weight: 700">{{m.name}}<span style="margin-left: 8px; font-size: 12px; color: {{c.accent}}">{{m.tag}}</span></span><span style="display: block; color: {{c.muted}}">{{m.sub}}</span></span>
+</button>
+</sc-for>
+</div>
+
+<div style="margin-top: 18px; padding: 14px 16px; border-radius: 8px; background: {{c.surface}}">
+<div style="font-weight: 600">The gateway suggests</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px">
+<span class="mono" style="font-size: 13px; padding: 3px 8px; border-radius: 4px; background: {{c.panel}}; border: 1px solid {{c.line}}">*.nordbank.example</span>
+<span class="mono" style="font-size: 13px; padding: 3px 8px; border-radius: 4px; background: {{c.panel}}; border: 1px solid {{c.line}}">172.22.0.0/16</span>
+</div>
+<label style="display: flex; align-items: center; gap: 10px; margin-top: 12px"><input type="checkbox" style="width: 18px; height: 18px; accent-color: {{c.accent}}">Send these through from the start, without waiting</label>
+</div>
+
+<div style="display: flex; align-items: center; gap: 12px; margin-top: 18px">
+<label for="forget" style="font-weight: 600">Forget hosts unused for</label>
+<select id="forget" style="height: 40px; padding: 0 10px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}"><option>1 day</option><option selected="selected">7 days</option><option>30 days</option><option>Never</option></select>
+</div>
+
+<p style="margin: 22px 0 0; padding-top: 16px; border-top: 1px solid {{c.line}}; font-size: 15px">{{summary}}</p>
+</sc-if>
+
+</div>
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 16px 32px 22px; border-top: 1px solid {{c.line}}">
+<sc-if value="{{notFirst}}" hint-placeholder-val="{{false}}">
+<button type="button" onClick="{{back}}" style="height: 42px; padding: 0 16px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Back</button>
+</sc-if>
+<span style="flex: 1 1 auto"></span>
+<span style="font-size: 13px; color: {{c.muted}}">{{stepOf}}</span>
+<button type="button" onClick="{{next}}" style="height: 42px; padding: 0 20px; border: none; border-radius: 6px; background: {{c.accent}}; color: {{c.accentInk}}; font-weight: 700; cursor: pointer">{{nextLabel}}</button>
+</div>
+
+</div>
+
+<div style="max-width: 720px; margin: 40px auto 0; zoom: 0.8">
+<div style="background: {{c.panel}}; border: 1px solid {{c.line}}; border-radius: 12px; box-shadow: 0 30px 60px -30px rgba(0,0,0,0.35); overflow: hidden; padding: 22px 32px 26px">
+<div style="font-weight: 600">Protocol</div>
+<sc-for list="{{fig2}}" as="f" hint-placeholder-count="1">
+<div role="radiogroup" aria-label="Protocol" style="margin-top: 8px; border: 1px solid {{c.line}}; border-radius: 8px; overflow: hidden">
+<sc-for list="{{f.detect}}" as="p" hint-placeholder-count="1">
+<button type="button" role="radio" aria-checked="{{p.aria}}" onClick="{{p.pick}}" style="width: 100%; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 46px; padding: 8px 14px; border: none; border-top: {{p.border}}; background: {{p.bg}}; color: {{c.ink}}; text-align: left; cursor: pointer">
+<span style="width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{p.ring}}; display: flex; align-items: center; justify-content: center"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{p.dot}}"></span></span>
+<span style="min-width: 0">
+<span style="display: block; font-weight: 600">{{p.name}}<span style="margin-left: 8px; font-size: 12px; font-weight: 600; color: {{c.accent}}">{{p.tag}}</span></span>
+<span style="display: block; font-size: 13px; color: {{c.muted}}">{{p.sub}}</span>
+</span>
+<span class="mono" style="font-size: 12px; color: {{c.muted}}">{{p.code}}</span>
+</button>
+</sc-for>
+<button type="button" aria-expanded="{{f.fold.aria}}" onClick="{{f.fold.toggle}}" style="width: 100%; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 46px; padding: 8px 14px; border: none; border-top: 1px solid {{c.line}}; background: {{c.panel}}; color: {{c.ink}}; text-align: left; cursor: pointer">
+<span style="display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{c.muted}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{f.fold.chevron}}"></path></svg></span>
+<span>Choose the protocol yourself</span>
+<span style="font-size: 13px; color: {{c.muted}}">{{f.fold.more}}</span>
+</button>
+<sc-if value="{{f.fold.open}}" hint-placeholder-val="{{false}}">
+<div style="padding: 12px 14px 4px 46px; border-top: 1px solid {{c.line}}; font-size: 13px; color: {{c.muted}}">Used with real gateways</div>
+<sc-for list="{{f.tried}}" as="p" hint-placeholder-count="2">
+<button type="button" role="radio" aria-checked="{{p.aria}}" onClick="{{p.pick}}" style="width: 100%; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 46px; padding: 8px 14px; border: none; border-top: {{p.border}}; background: {{p.bg}}; color: {{c.ink}}; text-align: left; cursor: pointer">
+<span style="width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{p.ring}}; display: flex; align-items: center; justify-content: center"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{p.dot}}"></span></span>
+<span style="min-width: 0">
+<span style="display: block; font-weight: 600">{{p.name}}</span>
+<span style="display: block; font-size: 13px; color: {{c.muted}}">{{p.sub}}</span>
+</span>
+<span class="mono" style="font-size: 12px; color: {{c.muted}}">{{p.code}}</span>
+</button>
+</sc-for>
+<div style="padding: 12px 14px 4px 46px; border-top: 1px solid {{c.line}}; font-size: 13px; color: {{c.muted}}">Beta: not yet tried with a real gateway</div>
+<sc-for list="{{f.beta}}" as="p" hint-placeholder-count="6">
+<button type="button" role="radio" aria-checked="{{p.aria}}" onClick="{{p.pick}}" style="width: 100%; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 46px; padding: 8px 14px; border: none; border-top: {{p.border}}; background: {{p.bg}}; color: {{c.ink}}; text-align: left; cursor: pointer">
+<span style="width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{p.ring}}; display: flex; align-items: center; justify-content: center"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{p.dot}}"></span></span>
+<span style="min-width: 0">
+<span style="display: block; font-weight: 600">{{p.name}}</span>
+<span style="display: block; font-size: 13px; color: {{c.muted}}">{{p.sub}}</span>
+</span>
+<span class="mono" style="font-size: 12px; color: {{c.muted}}">{{p.code}}</span>
+</button>
+</sc-for>
+</sc-if>
+</div>
+</sc-for>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 18px">
+<div>
+<label for="grp2" style="display: block; font-weight: 600; margin-bottom: 6px">Group</label>
+<select id="grp2" style="width: 100%; height: 42px; padding: 0 10px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}"><option>Employees</option><option>Contractors</option></select>
+</div>
+<div style="font-size: 13px; color: {{c.muted}}; align-self: end; padding-bottom: 4px">The gateway offers two groups. Ask your IT team if you’re not sure.</div>
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true},&quot;$preview&quot;:{&quot;width&quot;:1100,&quot;height&quot;:1000}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: 1, proto: 'auto', method: 'browser', mode: 'learn', open: false };
+  }
+  renderVals() {
+    const dark = this.props.dark ?? false;
+    const c = dark ? {
+      desk: '#121314', panel: '#1E2022', surface: '#26292C', line: '#33363A', lineStrong: '#4A4E53',
+      ink: '#ECEDEE', muted: '#A9AEB4', accent: '#2DD4BF', accentInk: '#0B1514', accentSoft: '#17332F'
+    } : {
+      desk: '#DCDCD8', panel: '#FFFFFF', surface: '#F3F3F0', line: '#E2E2DE', lineStrong: '#BDBDB8',
+      ink: '#1A1C1E', muted: '#5A5F64', accent: '#0F766E', accentInk: '#FFFFFF', accentSoft: '#E2F1EF'
+    };
+    const st = this.state;
+    const steps = [['Server', 1], ['Sign-in', 2], ['Routing', 3]].map(([label, n]) => {
+      const cur = st.step === n, done = st.step > n;
+      return {
+        label, mark: done ? '✓' : String(n),
+        bar: cur ? c.accent : 'transparent', fg: cur || done ? c.ink : c.muted, weight: cur ? 700 : 500,
+        ring: cur || done ? c.accent : c.lineStrong, dotBg: done ? c.accent : 'transparent', dotFg: done ? c.accentInk : (cur ? c.accent : c.muted),
+        go: () => this.setState({ step: n })
+      };
+    });
+    const radioRow = (on) => ({ ring: on ? c.accent : c.lineStrong, dot: on ? c.accent : 'transparent', aria: on ? 'true' : 'false' });
+    const card = (rows) => rows.map(([id, name, sub, code, tag], i) => {
+      const on = st.proto === id;
+      return Object.assign(radioRow(on), {
+        name, sub, code, tag,
+        bg: on ? c.accentSoft : c.panel, border: i === 0 ? 'none' : '1px solid ' + c.line,
+        pick: () => this.setState({ proto: id })
+      });
+    });
+    const detect = card([['auto', 'Detect automatically', 'Crake asks the gateway. It answered: AnyConnect.', '', 'Recommended']]);
+    const tried = card([
+      ['anyconnect', 'Cisco AnyConnect / ocserv', 'Most corporate gateways', 'anyconnect', ''],
+      ['openvpn3', 'OpenVPN 3 profile', 'One of your openvpn3 profiles on this computer', 'openvpn3', '']
+    ]);
+    const beta = card([
+      ['gp', 'Palo Alto GlobalProtect', 'Portal and gateway', 'gp', ''],
+      ['pulse', 'Ivanti Connect Secure (Pulse)', 'Newer Pulse servers', 'pulse', ''],
+      ['nc', 'Juniper Network Connect', 'Older Juniper servers', 'nc', ''],
+      ['fortinet', 'Fortinet SSL VPN', 'FortiGate', 'fortinet', ''],
+      ['f5', 'F5 BIG-IP', 'Access Policy Manager', 'f5', ''],
+      ['array', 'Array Networks', 'AG / vxAG', 'array', '']
+    ]);
+    const fold = (open) => ({
+      open, aria: open ? 'true' : 'false',
+      chevron: open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6',
+      more: open ? '' : (tried.length + beta.length) + ' more',
+      toggle: () => this.setState({ open: !this.state.open })
+    });
+    // Figure 1 folds and opens; figure 2 is the opened state, always.
+    const fig1 = [{ detect, tried, beta, fold: fold(st.open) }];
+    const fig2 = [{ detect, tried, beta, fold: Object.assign(fold(true), { toggle: () => {} }) }];
+    const cardRow = (on) => ({
+      aria: on ? 'true' : 'false', radio: on ? c.accent : c.lineStrong, dot: on ? c.accent : 'transparent',
+      border: on ? c.accent : c.line, ring: on ? 'inset 0 0 0 1px ' + c.accent : 'none'
+    });
+    const methods = [
+      ['browser', 'In your browser', 'Single sign-on, passkeys and MFA. Crake opens your browser and waits.'],
+      ['password', 'Username and password', 'Crake asks for a code if the gateway wants one.'],
+      ['cert', 'Certificate', 'From a smart card, your keyring or a file.']
+    ].map(([id, name, sub]) => Object.assign(cardRow(st.method === id), { name, sub, pick: () => this.setState({ method: id }) }));
+    const modes = [
+      ['learn', 'Learn as it goes', 'Only hosts that don’t answer directly.', 'Recommended'],
+      ['ask', 'Ask me first', 'A notification for each new host.', ''],
+      ['list', 'Only what I list', 'Names and networks you add, nothing else.', ''],
+      ['full', 'Everything', 'Full tunnel. Crake won’t learn anything.', '']
+    ].map(([id, name, sub, tag]) => Object.assign(cardRow(st.mode === id), { name, sub, tag, pick: () => this.setState({ mode: id }) }));
+    const protoName = { auto: 'AnyConnect', anyconnect: 'AnyConnect', openvpn3: 'OpenVPN 3', gp: 'GlobalProtect', pulse: 'Ivanti Connect Secure', nc: 'Network Connect', fortinet: 'Fortinet SSL VPN', f5: 'F5 BIG-IP', array: 'Array Networks' }[st.proto];
+    const signIn = { browser: 'sign you in through your browser', password: 'ask for your password', cert: 'use your certificate' }[st.method];
+    const route = { learn: 'learn which hosts need it as it goes', ask: 'ask you before sending any host through', list: 'only send what you listed', full: 'send everything through it' }[st.mode];
+    return {
+      c, steps, fig1, fig2, methods, modes,
+      is1: st.step === 1, is2: st.step === 2, is3: st.step === 3,
+      mBrowser: st.method === 'browser', mPassword: st.method === 'password', mCert: st.method === 'cert',
+      notFirst: st.step > 1,
+      stepOf: 'Step ' + st.step + ' of 3',
+      nextLabel: st.step === 3 ? 'Add and connect' : 'Continue',
+      next: () => this.setState({ step: Math.min(3, this.state.step + 1) }),
+      back: () => this.setState({ step: Math.max(1, this.state.step - 1) }),
+      summary: 'Nordbank will connect with ' + protoName + ', ' + signIn + ', and ' + route + '.'
+    };
+  }
+}
+</script>
+</body>
+</html>

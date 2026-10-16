@@ -275,7 +275,9 @@ fn on_a_small_screen_continue_stays_in_view(cx: &mut TestAppContext) {
         .unwrap()
     };
     assert!(visible(cx, "next".into()), "Continue in view");
-    let last: gpui_kit::ElementId = ("protocol", OPENVPN3).into();
+    // The last card shown: Array Networks, the last Beta one (OpenVPN 3
+    // sits near the top, with those used with real gateways).
+    let last: gpui_kit::ElementId = ("protocol", 7usize).into();
     assert!(!visible(cx, last.clone()), "the list runs past the window");
     cx.update_window(w.window, |_, window, cx| {
         window.render_frame(cx);
@@ -484,4 +486,39 @@ fn with_the_systems_window_buttons(cx: &mut TestAppContext) {
         "Cancel is at {:.0} px, on the left under the system's buttons",
         f32::from(cancel.origin.x)
     );
+}
+
+/// Once the gateway has answered, the protocols fold behind "Choose the
+/// protocol yourself"; opened, they're all there to pick
+/// (design/proposals/critique-2026-10-15, 3).
+#[gpui_kit::test]
+fn the_protocols_fold_once_the_gateway_answered(cx: &mut TestAppContext) {
+    let w = open(cx);
+    let shows = |id: gpui_kit::ElementId, cx: &mut TestAppContext| {
+        cx.update_window(w.window, |_, window, cx| {
+            window.render_frame(cx);
+            window.try_find(id).is_some()
+        })
+        .unwrap()
+    };
+    // Not asked yet: every protocol, no fold.
+    assert!(shows(("protocol", 1usize).into(), cx));
+    assert!(!shows("protocols-more".into(), cx));
+    w.view.update(cx, |v, cx| {
+        v.detect = Detect::Done(Found::AnyConnect {
+            groups: Vec::new(),
+            expires: None,
+        });
+        cx.notify();
+    });
+    assert!(shows("protocols-more".into(), cx), "folded");
+    assert!(!shows(("protocol", 1usize).into(), cx));
+    assert!(
+        shows(("protocol", 0usize).into(), cx),
+        "Detect automatically stays"
+    );
+    w.click("protocols-more", cx);
+    assert!(shows(("protocol", 8usize).into(), cx), "opened");
+    w.click(("protocol", 1usize), cx);
+    assert_eq!(w.view.read_with(cx, |v, _| v.protocol), "anyconnect");
 }

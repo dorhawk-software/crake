@@ -7,7 +7,7 @@
 use super::*;
 
 /// How long "Copied" stays after Copy.
-const COPIED_FOR: Duration = Duration::from_secs(2);
+const COPIED_FOR: Duration = Duration::from_secs(3);
 
 impl Panel {
     pub(super) fn leftover_notices(
@@ -77,47 +77,16 @@ impl Panel {
                             .flex()
                             .items_center()
                             .gap(px(10.))
-                            .child(
-                                div()
-                                    .flex_1()
-                                    .min_w_0()
-                                    .font_family(fonts::MONO)
-                                    .text_size(px(12.5))
-                                    .bg(t.panel)
-                                    .border_1()
-                                    .border_color(t.warning_line)
-                                    .rounded(px(6.))
-                                    .px(px(8.))
-                                    .py(px(5.))
-                                    .child(command.clone()),
-                            )
-                            .child(
-                                div()
-                                    .id(("leftover-copy", i))
-                                    .flex_none()
-                                    .text_color(t.accent)
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .cursor_pointer()
-                                    .child(if copied { "Copied" } else { "Copy" })
-                                    .on_click(cx.listener(move |this, _, _, cx| {
-                                        cx.write_to_clipboard(ClipboardItem::new_string(
-                                            command.clone(),
-                                        ));
-                                        this.leftover_copied = Some((pid, Instant::now()));
-                                        cx.notify();
-                                        cx.spawn(async move |this, cx| {
-                                            cx.background_executor().timer(COPIED_FOR).await;
-                                            this.update(cx, |_, cx| cx.notify()).ok();
-                                        })
-                                        .detach();
-                                    }))
-                                    .test_support(),
-                            )
+                            .child(self.command_chip(i, &command, pid, copied, t, cx))
                             .child(
                                 div()
                                     .id(("leftover-got-it", i))
                                     .flex_none()
-                                    .text_color(t.muted)
+                                    .px(px(12.))
+                                    .py(px(6.))
+                                    .rounded(px(6.))
+                                    .border_1()
+                                    .border_color(t.warning_line)
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .cursor_pointer()
                                     .child("Got it")
@@ -127,9 +96,85 @@ impl Panel {
                                     }))
                                     .test_support(),
                             ),
+                    )
+                    .child(
+                        div()
+                            .mt(px(6.))
+                            .text_color(t.muted)
+                            .child("This note goes away by itself once the process ends."),
                     ),
             )
             .test_support()
+    }
+}
+
+impl Panel {
+    /// The command, with Copy inside it: an icon and a word, "Copied" with
+    /// a check for a moment after.
+    fn command_chip(
+        &self,
+        i: usize,
+        command: &str,
+        pid: u32,
+        copied: bool,
+        t: &Theme,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement + use<> {
+        let text = command.to_owned();
+        div()
+            .flex_1()
+            .min_w_0()
+            .flex()
+            .bg(t.panel)
+            .border_1()
+            .border_color(t.warning_line)
+            .rounded(px(6.))
+            .overflow_hidden()
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .px(px(9.))
+                    .py(px(6.))
+                    .font_family(fonts::MONO)
+                    .child(text.clone()),
+            )
+            .child(
+                div()
+                    .id(("leftover-copy", i))
+                    .flex_none()
+                    .flex()
+                    .items_center()
+                    .gap(px(6.))
+                    .px(px(10.))
+                    .border_l_1()
+                    .border_color(t.warning_line)
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(if copied { t.muted } else { t.ink })
+                    .cursor_pointer()
+                    .child(
+                        svg()
+                            .path(if copied {
+                                "crake/check.svg"
+                            } else {
+                                "crake/clipboard.svg"
+                            })
+                            .size(px(14.))
+                            .text_color(if copied { t.muted } else { t.ink }),
+                    )
+                    .child(if copied { "Copied" } else { "Copy" })
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        cx.write_to_clipboard(ClipboardItem::new_string(text.clone()));
+                        this.leftover_copied = Some((pid, Instant::now()));
+                        cx.notify();
+                        cx.spawn(async move |this, cx| {
+                            cx.background_executor().timer(COPIED_FOR).await;
+                            this.update(cx, |_, cx| cx.notify()).ok();
+                        })
+                        .detach();
+                    }))
+                    .test_support(),
+            )
     }
 }
 

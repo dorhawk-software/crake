@@ -395,7 +395,11 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    rate, since; the rates shown follow the traffic over ~3 s, and the
    busiest places and the rows are ordered by a ~20 s average,
    `model::live` SHOWN_OVER/STANDING_OVER: the first window reshuffled
-   every second, the user called it chaotic; no dots below 1 KB/s,
+   every second, the user called it chaotic; the strip's volume in greys,
+   tunnels `muted` under direct `bars`, with a teal tick where Crake routed
+   and every way's box outlined `lineStrong`, critique 2026-10-15
+   (design/proposals/critique-2026-10-15/): teal had meant tunnel volume;
+   no dots below 1 KB/s,
    `DOTS_FROM`: a tunnel's keepalives drew dots at "0 KB/s"; an address
    keeps the name it was first seen with while fresh, `keep_name`: one
    stray wpad lookup had renamed GitLab) and "Where things go" (every tunnel's learned, pinned and

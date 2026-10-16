@@ -163,6 +163,9 @@ pub struct NewTunnel {
     cert_file: Option<(String, Vec<u8>)>,
     keep_signed_in: bool,
     advanced: bool,
+    /// "Choose the protocol yourself": the list opened after the gateway
+    /// answered (design/proposals/critique-2026-10-15, 3).
+    protocols_open: bool,
     client_version: bool,
     weak_ciphers: bool,
     mode: &'static str,
@@ -386,6 +389,7 @@ impl NewTunnel {
             cert_file: None,
             keep_signed_in: field("keep_signed_in") != "false",
             advanced: false,
+            protocols_open: false,
             client_version: field("client_version") == "true",
             weak_ciphers: field("weak_ciphers") == "true",
             mode: static_of(&MODES, &field("mode"), |m| m.0),

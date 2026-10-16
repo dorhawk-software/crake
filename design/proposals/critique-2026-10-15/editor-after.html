@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>After: leaving the profile editor</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53; --ink: #ECEDEE;
+    --muted: #A9AEB4; --accent: #2DD4BF; --accentInk: #0B1514; --danger: #F97066; --changed: #17332F; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8; --ink: #1A1C1E;
+    --muted: #5A5F64; --accent: #0F766E; --accentInk: #FFFFFF; --danger: #B42318; --changed: #E2F1EF; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', monospace; }
+  .page { padding: 28px 40px 40px; }
+  .lead { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .cap { font-size: 14px; font-weight: 700; margin: 22px 0 10px; }
+  .win { width: 820px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+  .bar .t { font-size: 17px; font-weight: 700; }
+  .bar .s { font-size: 13px; color: var(--muted); }
+  .x { margin-left: auto; width: 28px; height: 28px; border-radius: 50%; background: var(--surface); display: flex;
+    align-items: center; justify-content: center; color: var(--muted); }
+  .code { font-family: 'Atkinson Hyperlegible Mono', monospace; font-size: 13px; padding: 10px 0; }
+  .ln { display: flex; padding: 0 20px 0 0; }
+  .ln .n { width: 46px; text-align: right; padding-right: 14px; color: var(--muted); flex: none; user-select: none; }
+  .ln.ch { background: var(--changed); }
+  .ln .cur { border-left: 2px solid var(--accent); margin-left: -1px; }
+  .ln .fold { color: var(--muted); }
+  .foot { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--line); }
+  .foot .note { flex: 1; font-size: 13px; color: var(--muted); }
+  .foot .ask { flex: 1; min-width: 0; white-space: nowrap; }
+  .foot .ask b { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .foot .ask span { font-size: 13px; color: var(--muted); margin-left: 6px; }
+  .btn { border: 1px solid var(--line); border-radius: 6px; padding: 7px 14px; font-weight: 600; font-size: 13px; white-space: nowrap; }
+  .btn.go { background: var(--accent); color: var(--accentInk); border-color: var(--accent); }
+  .btn.focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn.bad { color: var(--danger); }
+  .under { width: 820px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="lead">After: unsaved changes are never thrown away by one key.</div>
+
+  <div class="cap">1. Edited</div>
+  <div class="win">
+    <div class="bar"><span class="t">Nordbank’s profile</span><span class="s mono">nordbank-production-eu-west-2-split · in OpenVPN 3</span><span class="x">✕</span></div>
+    <div class="code">
+      <div class="ln"><span class="n">1</span><span>client</span></div>
+      <div class="ln"><span class="n">2</span><span>dev tun</span></div>
+      <div class="ln"><span class="n">3</span><span>proto udp</span></div>
+      <div class="ln ch"><span class="n">4</span><span class="cur">remote vpn2.nordbank.example 1194</span></div>
+      <div class="ln"><span class="n">5</span><span>resolv-retry infinite</span></div>
+      <div class="ln"><span class="n">6</span><span>nobind</span></div>
+      <div class="ln"><span class="n">7</span><span>remote-cert-tls server</span></div>
+      <div class="ln"><span class="n">8</span><span>route 10.20.0.0 255.255.0.0</span></div>
+      <div class="ln"><span class="n">9</span><span>dhcp-option DNS 10.8.0.1</span></div>
+      <div class="ln"><span class="n">10</span><span>dhcp-option DOMAIN nordbank.internal</span></div>
+      <div class="ln"><span class="n">11</span><span class="fold">&lt;ca&gt; certificate, 31 lines, kept as they are &lt;/ca&gt;</span></div>
+      <div class="ln"><span class="n">12</span><span class="fold">&lt;cert&gt; certificate, 27 lines, kept as they are &lt;/cert&gt;</span></div>
+      <div class="ln"><span class="n">13</span><span class="fold">&lt;key&gt; private key, 28 lines, kept as they are &lt;/key&gt;</span></div>
+      <div class="ln"><span class="n">14</span><span class="fold">&lt;tls-crypt&gt; key, 21 lines, kept as they are &lt;/tls-crypt&gt;</span></div>
+      <div class="ln"><span class="n">15</span><span>verb 3</span></div>
+    </div>
+    <div class="foot"><span class="note">Saving gives OpenVPN 3 the new text under the same name and reconnects
+      Nordbank.</span><span class="btn">Cancel</span><span class="btn go">Save and reconnect</span></div>
+  </div>
+
+  <div class="cap">2. Escape, ×, or Cancel pressed with changes</div>
+  <div class="win">
+    <div class="bar"><span class="t">Nordbank’s profile</span><span class="s mono">nordbank-production-eu-west-2-split · in OpenVPN 3</span><span class="x">✕</span></div>
+    <div class="code">
+      <div class="ln"><span class="n">1</span><span>client</span></div>
+      <div class="ln"><span class="n">2</span><span>dev tun</span></div>
+      <div class="ln"><span class="n">3</span><span>proto udp</span></div>
+      <div class="ln ch"><span class="n">4</span><span>remote vpn2.nordbank.example 1194</span></div>
+      <div class="ln"><span class="n">5</span><span>resolv-retry infinite</span></div>
+      <div class="ln"><span class="n">6</span><span>nobind</span></div>
+      <div class="ln"><span class="n">7</span><span>remote-cert-tls server</span></div>
+      <div class="ln"><span class="n">8</span><span>route 10.20.0.0 255.255.0.0</span></div>
+      <div class="ln"><span class="n">9</span><span>dhcp-option DNS 10.8.0.1</span></div>
+      <div class="ln"><span class="n">10</span><span>dhcp-option DOMAIN nordbank.internal</span></div>
+      <div class="ln"><span class="n">11</span><span class="fold">&lt;ca&gt; certificate, 31 lines, kept as they are &lt;/ca&gt;</span></div>
+      <div class="ln"><span class="n">12</span><span class="fold">&lt;cert&gt; certificate, 27 lines, kept as they are &lt;/cert&gt;</span></div>
+      <div class="ln"><span class="n">13</span><span class="fold">&lt;key&gt; private key, 28 lines, kept as they are &lt;/key&gt;</span></div>
+      <div class="ln"><span class="n">14</span><span class="fold">&lt;tls-crypt&gt; key, 21 lines, kept as they are &lt;/tls-crypt&gt;</span></div>
+      <div class="ln"><span class="n">15</span><span>verb 3</span></div>
+    </div>
+    <div class="foot"><span class="ask"><b>Leave without saving?</b><span>Your changes to Nordbank’s profile will be
+      lost.</span></span><span class="btn focus">Keep editing</span><span class="btn bad">Discard changes</span></div>
+  </div>
+  <div class="under">Escape or Enter again: Keep editing. With nothing changed, Escape closes as today.</div>
+</div>
+<script>if (location.search.includes('dark=false')) document.body.classList.add('light');</script>
+</body>
+</html>

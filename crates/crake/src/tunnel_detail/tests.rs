@@ -253,3 +253,26 @@ fn with_the_systems_window_buttons(cx: &mut TestAppContext) {
         f32::from(back.origin.x)
     );
 }
+
+/// A learned host since pinned is listed under Learned but counted once,
+/// under Pinned (design/proposals/critique-2026-10-15, 5).
+#[gpui_kit::test]
+fn a_pinned_host_counts_once(cx: &mut TestAppContext) {
+    let w = open(cx);
+    let rows = w.rows(cx);
+    let [learned_count, pinned_count, _] = super::hosts::tab_counts(&rows, 0);
+    let listed = learned(&rows).len();
+    let pinned_learned = rows
+        .iter()
+        .filter(|r| r.kind == "pinned" && r.learned.is_some())
+        .count();
+    assert!(
+        pinned_learned > 0,
+        "the sample has a pinned host that was learned"
+    );
+    assert_eq!(learned_count, listed - pinned_learned);
+    assert_eq!(
+        pinned_count,
+        rows.iter().filter(|r| r.kind == "pinned").count()
+    );
+}

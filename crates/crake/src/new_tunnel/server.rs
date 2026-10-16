@@ -223,8 +223,11 @@ impl NewTunnel {
             .children(group_row)
     }
 
-    /// The protocols, each with what it is, its code, and its tags (Beta,
-    /// not installed); "Detect automatically" first.
+    /// The protocols: "Detect automatically" first, then those used with a
+    /// real gateway and the Beta ones under their own headings, each with
+    /// what it is, its code, and "Not installed" when its engine is missing.
+    /// Once the gateway has answered, the list folds away behind "Choose
+    /// the protocol yourself" (design/proposals/critique-2026-10-15, 3).
     fn protocol_list(&self, t: &Theme, cx: &mut Context<Self>) -> Div {
         let auto_sub = match &self.detect {
             Detect::Done(Found::AnyConnect { .. }) => {
@@ -234,75 +237,153 @@ impl NewTunnel {
             Detect::Done(_) => "Crake asked; the gateway didn\u{2019}t say.",
             Detect::Idle => "Crake asks the gateway.",
         };
+        let answered = matches!(self.detect, Detect::Done(Found::AnyConnect { .. }))
+            && self.protocol == "auto";
+        let folded = answered && !self.protocols_open;
         let mut protocols = div()
             .mt(px(8.))
             .border_1()
             .border_color(t.line)
             .rounded(px(8.))
-            .overflow_hidden();
-        for (i, (id, name, sub, code)) in PROTOCOLS.into_iter().enumerate() {
-            let on = self.protocol == id;
-            let sub = if id == "auto" { auto_sub } else { sub };
+            .overflow_hidden()
+            .child(self.protocol_card(0, PROTOCOLS[0], auto_sub, t, cx));
+        if answered {
+            protocols = protocols.child(self.choose_yourself(folded, t, cx));
+        }
+        if folded {
+            return protocols;
+        }
+        for (heading, tried) in [
+            ("Used with real gateways", true),
+            ("Beta: not yet tried with a real gateway", false),
+        ] {
             protocols = protocols.child(
                 div()
-                    .id(("protocol", i))
-                    .min_h(px(46.))
-                    .py(px(8.))
                     .px(px(14.))
-                    .flex()
-                    .items_center()
-                    .gap(px(12.))
-                    .when(i > 0, |r| r.border_t_1().border_color(t.line))
-                    .bg(if on { t.accent_soft } else { t.panel })
-                    .cursor_pointer()
-                    .child(radio(on, t))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .child(
-                                div()
-                                    .flex()
-                                    .items_baseline()
-                                    .gap(px(8.))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child(name)
-                                    .when(id == "auto", |d| {
-                                        d.child(
-                                            div()
-                                                .text_size(px(12.))
-                                                .text_color(t.accent)
-                                                .child("Recommended"),
-                                        )
-                                    })
-                                    .when(beta(id), |d| d.child(beta_tag(t)))
-                                    .when(id != "auto" && self.missing(id).is_some(), |d| {
-                                        d.child(tag("Not installed", t))
-                                    }),
-                            )
-                            .child(
-                                div()
-                                    .text_size(px(13.))
-                                    .line_height(px(19.))
-                                    .text_color(t.muted)
-                                    .child(sub),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .font_family(fonts::MONO)
-                            .text_size(px(12.))
-                            .text_color(t.muted)
-                            .child(code),
-                    )
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.protocol = id;
-                        cx.notify();
-                    }))
-                    .test_support(),
+                    .pt(px(10.))
+                    .pb(px(4.))
+                    .border_t_1()
+                    .border_color(t.line)
+                    .text_size(px(13.))
+                    .text_color(t.muted)
+                    .child(heading),
             );
+            for (i, p) in PROTOCOLS
+                .into_iter()
+                .enumerate()
+                .skip(1)
+                .filter(|(_, p)| TRIED.contains(&p.0) == tried)
+            {
+                protocols = protocols.child(self.protocol_card(i, p, p.2, t, cx));
+            }
         }
         protocols
+    }
+
+    /// The quiet row that opens (or folds) the list after the gateway answered.
+    fn choose_yourself(&self, folded: bool, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .id("protocols-more")
+            .min_h(px(46.))
+            .px(px(14.))
+            .flex()
+            .items_center()
+            .gap(px(12.))
+            .border_t_1()
+            .border_color(t.line)
+            .cursor_pointer()
+            .child(
+                svg()
+                    .path(if folded {
+                        "crake/chevron-down.svg"
+                    } else {
+                        "crake/chevron-up.svg"
+                    })
+                    .size(px(16.))
+                    .text_color(t.muted),
+            )
+            .child(div().flex_1().child("Choose the protocol yourself"))
+            .when(folded, |d| {
+                d.child(
+                    div()
+                        .text_size(px(13.))
+                        .text_color(t.muted)
+                        .child(format!("{} more", PROTOCOLS.len() - 1)),
+                )
+            })
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.protocols_open = !this.protocols_open;
+                cx.notify();
+            }))
+            .test_support()
+    }
+
+    /// One protocol's card. Its id is its place in PROTOCOLS, whatever the
+    /// order shown.
+    fn protocol_card(
+        &self,
+        i: usize,
+        (id, name, _, code): (&'static str, &'static str, &'static str, &'static str),
+        sub: &'static str,
+        t: &Theme,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let on = self.protocol == id;
+        div()
+            .id(("protocol", i))
+            .min_h(px(46.))
+            .py(px(8.))
+            .px(px(14.))
+            .flex()
+            .items_center()
+            .gap(px(12.))
+            .when(i > 0, |r| r.border_t_1().border_color(t.line))
+            .bg(if on { t.accent_soft } else { t.panel })
+            .cursor_pointer()
+            .child(radio(on, t))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .child(
+                        div()
+                            .flex()
+                            .items_baseline()
+                            .gap(px(8.))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(name)
+                            .when(id == "auto", |d| {
+                                d.child(
+                                    div()
+                                        .text_size(px(12.))
+                                        .text_color(t.accent)
+                                        .child("Recommended"),
+                                )
+                            })
+                            .when(id != "auto" && self.missing(id).is_some(), |d| {
+                                d.child(tag("Not installed", t))
+                            }),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(13.))
+                            .line_height(px(19.))
+                            .text_color(t.muted)
+                            .child(sub),
+                    ),
+            )
+            .child(
+                div()
+                    .font_family(fonts::MONO)
+                    .text_size(px(12.))
+                    .text_color(t.muted)
+                    .child(code),
+            )
+            .on_click(cx.listener(move |this, _, _, cx| {
+                this.protocol = id;
+                cx.notify();
+            }))
+            .test_support()
     }
 
     /// The gateway's sign-in groups to choose from, when it offers more than one.
