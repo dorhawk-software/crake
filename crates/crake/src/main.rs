@@ -154,7 +154,7 @@ pub enum Request {
     /// A craked setting changed in the Settings window (key, text form).
     Setting(String, String),
     ClearLog,
-    /// Show or hide the bird in the top bar.
+    /// Show or hide the bird in the tray.
     ShowBird(bool),
     /// Send hosts through another tunnel that answered too (from, to, hosts).
     Move(String, String, Vec<String>),
@@ -407,7 +407,7 @@ fn main() {
                 x11,
                 demo,
                 connect: (!demo).then(|| Box::new(client::start) as Connect),
-                // Settings: "Show the bird in the top bar".
+                // Settings: "Show the bird in the tray".
                 tray: cx.global::<prefs::Prefs>().show_bird,
                 single_instance: !demo,
                 openvpn3: !demo,

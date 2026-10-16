@@ -174,6 +174,11 @@ fn general(cx: &mut TestAppContext) {
     let bird = cx.read(|cx| cx.global::<Prefs>().show_bird);
     w.click("bird", cx);
     assert!(matches!(w.request(), Request::ShowBird(on) if on == !bird));
+    // The bird row's "?" says what each look of the bird means.
+    assert!(!w.shown("bird-legend", cx));
+    w.click(tray_row::TITLE, cx);
+    assert!(w.shown("bird-legend", cx));
+    w.quiet();
 }
 
 /// A tunnel added in the app can be edited and removed (after asking);

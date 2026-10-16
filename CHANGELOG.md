@@ -11,6 +11,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Settings no longer says the bird is in the "top bar".** It's "the tray" on Linux and Windows
+  and "the menu bar" on a Mac, with the bird itself next to the words, drawn the way that bar shows
+  it. Its "?" now says what each look of the bird means: asleep, dashed, awake, two teal marks, an
+  amber triangle, a red badge.
+
 ## 0.9.0 (2026-10-16)
 
 - **A host that didn't answer once is no longer called "probably down".** The log now says what

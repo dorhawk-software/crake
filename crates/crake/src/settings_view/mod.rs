@@ -21,6 +21,7 @@ mod learning;
 mod managed;
 mod names;
 mod privacy;
+mod tray_row;
 mod tunnels;
 mod widgets;
 
@@ -315,9 +316,7 @@ fn help(label: &str) -> Option<&'static str> {
         "Switch on the tunnels you left on" => {
             "At login, Crake switches back on the VPNs that were on when you last used it.\n\nExample: ACME was on when you shut down yesterday, so it comes back on today. You may be asked to sign in again.\n\nOff: Crake starts with every VPN off, and you switch on what you need."
         }
-        "Show the bird in the top bar" => {
-            "The little bird next to the clock is how you open Crake and see what it's doing at a glance.\n\nHide it and Crake keeps working; start Crake again from your apps to open it."
-        }
+        tray_row::TITLE => tray_row::HELP.as_str(),
         "When Crake routes a host" => {
             "Each time Crake decides something needs a VPN, it can tell you.\n\nExample: you open wiki.acme.internal. Crake sends it through ACME and says \u{201c}Sent wiki.acme.internal through ACME\u{201d}, with Undo."
         }
@@ -433,7 +432,10 @@ impl Settings {
             .items_center()
             .gap(px(6.))
             .font_weight(FontWeight::SEMIBOLD)
-            .child(label);
+            .child(label)
+            .when(label == tray_row::TITLE, |r| {
+                r.child(tray_row::title_badge())
+            });
         let Some(text) = help(label) else {
             return row;
         };
@@ -489,8 +491,12 @@ impl Settings {
                 .text_size(px(13.))
                 .line_height(px(19.))
                 .text_color(t.ink);
-            for para in text.split("\n\n") {
+            for (i, para) in text.split("\n\n").enumerate() {
                 card = card.child(div().child(para.to_owned()));
+                // The bird's looks, after what it's for.
+                if i == 0 && label == tray_row::TITLE {
+                    card = card.child(tray_row::legend(t));
+                }
             }
             q = q.child(gpui_kit::deferred(card.occlude()).with_priority(2));
         }

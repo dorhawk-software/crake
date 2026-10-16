@@ -379,6 +379,12 @@ impl Art {
     }
 }
 
+/// The resting look of `shape` as an SVG, the head white (Settings shows
+/// each look in the bird row's "?").
+pub fn resting_svg(shape: Shape) -> String {
+    rest(shape).svg()
+}
+
 /// The resting look of each state, as `Art`.
 fn rest(shape: Shape) -> Art {
     let (shape, badge) = shape.badged();

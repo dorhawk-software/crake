@@ -86,8 +86,8 @@ impl Settings {
                             )),
                     )
                     .child(row(
-                        self.title("Show the bird in the top bar", t, cx),
-                        Some("Without it, open Crake from your apps."),
+                        self.title(tray_row::TITLE, t, cx),
+                        Some(&tray_row::LINE),
                         toggle("bird", prefs.show_bird, t)
                             .keys()
                             .on_click(cx.listener(move |this, _, _, cx| {

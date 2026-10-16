@@ -24,7 +24,7 @@ pub struct Prefs {
     /// When Crake routes a host: "none", "quiet" or "crex" (with the call).
     #[serde(default = "quiet")]
     pub notify: String,
-    /// Show the bird in the top bar.
+    /// Show the bird in the tray (the menu bar on macOS).
     #[serde(default = "yes")]
     pub show_bird: bool,
     /// Tunnels the user left on: switched on again when Crake starts at login.

@@ -242,6 +242,14 @@ The panel header uses the listening bird with the call marks in accent.
   with ACME off, looking up git.acme.internal simply fails at once."). VPN, DNS
   ("the internet's phone book") and the like are explained the first time.
   Requested by the user: some settings read as jargon.
+- Settings rows carry no icons, with one exception: the bird's own row
+  ("Show the bird in the tray", "…in the menu bar" on macOS; never "top
+  bar" or "panel", which is Crake's popover) shows the bird after its
+  title, 18 px on a 4 px-rounded square in the bar's colour (dark
+  #2B2D30, or light #EEEEEE with the head dark where Windows and macOS
+  draw it so), and its "?" lists each look of the bird with a sentence
+  (design/proposals/tray-setting-after.html; impeccable critique
+  2026-10-16).
 - Segmented controls frame the chosen segment in its own colour (each
   segment draws its own edges): a grey rim around dark teal reads as blur
   in light mode, as it did in settings.html and log.html.
