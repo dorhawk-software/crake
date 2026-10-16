@@ -1047,7 +1047,7 @@ daily.
 
 **Windows** (a real PC, ideally a company laptop):
 - [ ] Installing: SmartScreen's warning for the unsigned installer, and
-  what a user has to click past (Windows code signing is undecided,
+  what a user has to click past (Windows code signing: applied to SignPath,
   see Other platforms).
 - [ ] Antivirus and endpoint security: craked's service, Wintun, and the
   routes, NRPT rules and firewall rules it writes, not blocked or flagged.
@@ -1578,7 +1578,21 @@ gateway tests by someone with a Mac. **Signing:** the user has the paid
 Apple Developer Program (ask for the details when a macOS build is signed
 and notarized); no Windows code signing yet: development builds stay
 unsigned, and a certificate (e.g. Azure Trusted Signing) is decided with
-the user before a Windows release. Phases: (1) craked's OS-specific parts behind
+the user before a Windows release. **Applied to SignPath Foundation
+(2026-10-16):** free signing for open-source projects, the certificate
+SignPath Foundation's (it shows as the publisher), needing an OSI licence,
+a fully automated build (release.yml) and a code signing policy page on
+the website. The user emailed support@signpath.io (the apply form is
+signpath.org/apply) and asked whether bundling Wintun's prebuilt DLL
+(WireGuard's own licence, already signed by its authors) is acceptable,
+offering to download it at install time instead. Waiting for their
+answer. Fallbacks, researched the same day: Certum's open-source
+certificate (cheap, in the user's name, a cloud key that's awkward from
+CI); Azure Artifact Signing ($9.99/month) takes individuals from the US
+and Canada only, organisations in the EU. Microsoft has no free tier for
+open source. None of them avoids SmartScreen's warning at first: trust
+builds with downloads. The WFP driver would still need its own EV
+certificate. Phases: (1) craked's OS-specific parts behind
 interfaces, Linux unchanged and all its tests green; (2) build both
 binaries for Windows in a container; (3) Windows implementations:
 openconnect + Wintun with crake-hook as its script, per-host routes (IP
