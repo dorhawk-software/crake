@@ -1199,7 +1199,10 @@ The user doesn't want development builds installed on their machine.
   once, the journey included. Caches (asked for: quick feedback): Rust's
   (rust-cache) for check and Windows; `~/crake-cache` for the packages
   (`CRAKE_CACHE`: build-deb.sh and build-arch.sh use a folder instead of
-  their Docker volumes; a new key each week and Cargo.lock), about 35 s
+  their Docker volumes; a new key each week, stable Rust's version and
+  Cargo.lock: on 2026-10-16 Rust 1.99.1 came mid-week, the cache held
+  1.99.0's build, and since a key that exists is never saved again every
+  .deb built from scratch all week), about 35 s
   instead of 14 min for the .deb, 37 s instead of 10 for Arch; the Nix store
   (cache-nix-action), where crane keeps the crates.io dependencies a
   derivation of their own (packaging/nix/package.nix; the vendored GPUI
