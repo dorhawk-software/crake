@@ -81,6 +81,7 @@ impl Log {
                     outline_button("whole-day", "Whole day", px(30.), t)
                         .px(px(10.))
                         .text_size(px(13.))
+                        .keys()
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.view = None;
                             cx.notify();

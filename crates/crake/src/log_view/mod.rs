@@ -21,6 +21,7 @@ mod rows;
 mod tests;
 
 use self::rows::rows;
+use crate::focus::Keys as _;
 
 pub const WIDTH: f32 = 980.;
 
@@ -107,6 +108,7 @@ impl Render for Log {
                         outline_button("earlier", "Show earlier days", px(38.), &t)
                             .mt(px(8.))
                             .px(px(14.))
+                            .keys()
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.earlier_days = true;
                                 cx.notify();
@@ -133,6 +135,7 @@ impl Render for Log {
             .font_family(fonts::UI)
             .text_size(px(14.))
             .line_height(px(20.))
+            .on_key_down(crate::focus::tab_moves)
             .on_key_down(cx.listener(|this, e: &gpui_kit::KeyDownEvent, _, cx| {
                 if e.keystroke.key == "escape" {
                     if this.picking_tunnel {
@@ -345,18 +348,21 @@ impl Log {
                     t,
                 )
                 .px(px(12.))
+                .keys()
                 .on_click(cx.listener(|this, _, _, cx| this.copy_for_helpdesk(cx)))
                 .test_support(),
             )
             .child(
                 outline_button("export", "Export\u{2026}", px(36.), t)
                     .px(px(12.))
+                    .keys()
                     .on_click(cx.listener(|this, _, _, cx| this.export(cx))),
             )
             .when(!system, |header| {
                 header.child(
                     crate::chrome::close_button(t)
                         .ml(px(4.))
+                        .keys()
                         .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
                         .test_support(),
                 )
@@ -372,6 +378,7 @@ impl Log {
                     .px(px(12.))
                     .font_weight(FontWeight::SEMIBOLD)
                     .child(show.label())
+                    .keys()
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.show = show;
                         cx.notify();
@@ -406,6 +413,7 @@ impl Log {
                         .size(px(14.))
                         .text_color(t.ink),
                 )
+                .keys()
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.picking_tunnel = !this.picking_tunnel;
                     cx.notify();
@@ -441,6 +449,7 @@ impl Log {
                         .when(on, |b| b.bg(t.accent_soft))
                         .hover(|s| s.bg(t.surface))
                         .child(label)
+                        .keys()
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.tunnel = name.clone();
                             this.picking_tunnel = false;

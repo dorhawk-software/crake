@@ -109,12 +109,15 @@ pub fn ways(model: &Model) -> Vec<Way> {
     });
     for way in &mut ways {
         let mut by_dest: HashMap<String, (f64, f64)> = HashMap::new();
-        for (c, rate) in &rates.connections {
+        for (c, _) in &rates.connections {
             if c.tunnel == way.tunnel {
                 let label = c.name.clone().unwrap_or_else(|| c.dst.to_string());
+                // Shown as ordered: by the last twenty seconds or so, so the
+                // numbers agree with the order (critique 2026-10-15).
+                let standing = model.live.standing(c);
                 let d = by_dest.entry(label).or_default();
-                d.0 += rate;
-                d.1 += model.live.standing(c);
+                d.0 += standing;
+                d.1 += standing;
             }
         }
         way.hosts = busiest(by_dest);

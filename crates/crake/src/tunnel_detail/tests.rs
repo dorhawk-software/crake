@@ -276,3 +276,30 @@ fn a_pinned_host_counts_once(cx: &mut TestAppContext) {
         rows.iter().filter(|r| r.kind == "pinned").count()
     );
 }
+
+/// The keyboard reaches tunnel detail's controls too (critique 2026-10-15):
+/// Tab moves on, Shift+Tab back, and Enter acts as a click would.
+#[gpui_kit::test]
+fn the_keyboard_reaches_the_controls(cx: &mut TestAppContext) {
+    let w = open(cx);
+    let focused = |cx: &mut TestAppContext| {
+        cx.update_window(w.window, |_, window, cx| window.focused(cx))
+            .unwrap()
+    };
+    let press = |key: &str, cx: &mut TestAppContext| {
+        cx.update_window(w.window, |_, window, cx| window.press(key, cx))
+            .unwrap();
+        cx.run_until_parked();
+    };
+    let start = focused(cx);
+    assert!(start.is_some(), "the window has the keyboard as it opens");
+    press("tab", cx);
+    let first = focused(cx);
+    assert_ne!(first, start, "Tab moves it to a control");
+    press("tab", cx);
+    press("shift-tab", cx);
+    assert_eq!(focused(cx), first, "Shift+Tab goes back");
+    while w.next().is_some() {}
+    press("enter", cx);
+    assert!(w.next().is_some(), "Enter acts on it");
+}

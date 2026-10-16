@@ -25,6 +25,7 @@ mod controls;
 mod detect;
 
 mod engines;
+mod focus;
 
 mod gateway_cert;
 

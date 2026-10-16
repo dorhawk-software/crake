@@ -24,6 +24,7 @@ use gpui_kit::{
 };
 
 use crate::Request;
+use crate::focus::Keys as _;
 use crate::ovpn3::profile::Fetched;
 use crate::theme::{Theme, fonts};
 
@@ -164,7 +165,12 @@ impl ProfileEditor {
             muted: None,
             store,
             requests,
-            focus: cx.focus_handle(),
+            // Focused as it opens: the keyboard reaches it (Tab, Escape).
+            focus: {
+                let focus = cx.focus_handle();
+                window.focus(&focus, cx);
+                focus
+            },
             _subscriptions: subscriptions,
         }
     }
@@ -354,12 +360,14 @@ impl ProfileEditor {
                 button("keep-editing", "Keep editing", false, t)
                     .border_2()
                     .border_color(t.accent)
+                    .keys()
                     .on_click(cx.listener(|this, _, _, cx| this.keep_editing(cx)))
                     .test_support(),
             )
             .child(
                 button("discard", "Discard changes", false, t)
                     .text_color(t.danger)
+                    .keys()
                     .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
                     .test_support(),
             )
@@ -396,12 +404,14 @@ impl ProfileEditor {
             )
             .child(
                 button("cancel", "Cancel", false, t)
+                    .keys()
                     .on_click(cx.listener(|this, _, _, cx| this.close(cx)))
                     .test_support(),
             )
             .child(
                 button("save", "Save and reconnect", true, t)
                     .when(!can_save, |b| b.opacity(UNAVAILABLE).cursor_default())
+                    .keys()
                     .on_click(cx.listener(|this, _, window, cx| this.save(window, cx)))
                     .test_support(),
             )
@@ -472,6 +482,7 @@ impl Render for ProfileEditor {
             .when(!system, |h| {
                 h.child(
                     crate::chrome::close_button(&t)
+                        .keys()
                         .on_click(cx.listener(|this, _, _, cx| this.close(cx)))
                         .test_support(),
                 )
@@ -515,6 +526,7 @@ impl Render for ProfileEditor {
             .font_family(fonts::UI)
             .text_size(px(14.))
             .line_height(px(20.))
+            .on_key_down(crate::focus::tab_moves)
             .on_key_down(cx.listener(|this, e: &gpui_kit::KeyDownEvent, _, cx| {
                 match e.keystroke.key.as_str() {
                     "escape" => this.escape(cx),

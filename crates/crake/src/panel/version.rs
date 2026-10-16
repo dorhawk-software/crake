@@ -56,6 +56,7 @@ impl Panel {
                     .font_weight(FontWeight::SEMIBOLD)
                     .cursor_pointer()
                     .child(label)
+                    .keys()
                     .on_click(cx.listener(move |this, _, _, _| {
                         this.send(request.clone());
                     }))

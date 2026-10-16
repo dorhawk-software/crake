@@ -852,13 +852,17 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   from another user's session needs root: craked can't see the user's
   sessions, the app can't see others'); worth reporting to OpenVPN (a
   Connect that times out shouldn't orphan the process).
-- **Public hosts 0.7 learned stay learned (2026-10-15).** 0.8.0's guards
-  (a network in trouble, a public address tried directly once more) stop
-  new mistakes, but an upgrade doesn't forget what an older Crake learned
-  by mistake: connectivity-check.ubuntu.com, learned through a company's
-  tunnel during a hiccup, is used every few minutes, so it never expires.
-  The user forgets it in tunnel detail. Could do: on upgrade, try each
-  learned public address directly once and forget those that answer.
+- **Public hosts an older Crake learned by mistake: built for Linux
+  (2026-10-16), not Windows or macOS.** Once per version, for each
+  tunnel that's up, craked tries every public address it learned by
+  probing directly (`recheck_public`, 443 then 80) and forgets those that
+  answer ("connectivity-check.ubuntu.com goes direct again."; netns-tested,
+  and it fails if the direct try goes through the tunnel). The try passes
+  the tunnels with `plan::DIRECT_MARK` (0x43520000), which every tunnel's
+  chain returns on and no `ip rule` matches. Windows and macOS route a
+  learned host with a route, which craked's own socket follows too: they'd
+  need the socket bound to the physical interface (IP_UNICAST_IF /
+  IP_BOUND_IF on the default route's device).
 - **Windows: names another VPN client serves are still kept private**
   (2026-10-14). Linux and macOS leave a domain another program serves to
   it (`served_elsewhere`); Windows returns nothing yet. To do: read other
@@ -904,6 +908,40 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   company is dropping. Options if it matters: the capability and an
   AppArmor rule (a wide permission for one case), or matching the
   session's address to a tun device's.
+- **A shared practices repository for dorhawk.software (the user's idea,
+  2026-10-16; written down so it isn't lost, to do once Crake is stable).**
+  What the user has in mind, in their words' spirit: Crake grew a lot of
+  hard-won engineering practice (lints as hard errors, a magic-number lint,
+  file and function size limits, coverage floors that only rise, a journey
+  regression suite on every supported system, tests that never touch the
+  developer's machine, split and cached CI, pruned caches, two-layer Nix
+  dependency builds, release scripts that refuse an empty changelog, a
+  hand-written changelog in the product's voice, design proposals before UI
+  changes, "write down what we don't do now", nice'd builds, never
+  `nix path:` on a repo with target/...). That knowledge should outlive
+  Crake and help the sibling apps: tern (a Rust/GPUI mail client, on hold
+  until Crake is stable) and Obálka (TypeScript, React Native, which has
+  tried good patterns of its own). The plan:
+  1. A new **public** repository under dorhawk-software describing the
+     practices: each one with what it is, why it's worth it (the incident
+     or cost that taught it, e.g. the 328 GB disk fill, the cache
+     evictions), how to apply it, and how to check it's applied.
+     Actionable, not essays.
+  2. **Structure: common plus per language.** Practices that hold anywhere
+     (changelog discipline, deferrals written down, design proposals,
+     release gates, CI caching ideas, privacy rules for public repos) in a
+     common part; Rust specifics (clippy deny, lint-literals, cargo deny,
+     machete, llvm-cov floors, GPUI patterns) and TypeScript/React Native
+     specifics (from Obálka) in their own parts, with room for more.
+  3. **Central management:** project repositories register with it (or
+     hook into it), and when the practices change, the change reaches every
+     registered project (e.g. a workflow opening a pull request there), so
+     the practices are available to future agents in each repository as
+     skills, CLAUDE.md sections and checks, not just as a document.
+  4. **Usable beyond dorhawk.software:** any repository could adopt it as
+     its baseline, like a runbook of what was learned. How the hook works
+     (a template, a GitHub Action, a CLI, a skills package) is to be
+     designed when we start; this note is the reminder of the intent.
 - **Untried on real systems:** see "Tried by real people" below, a
   checklist of its own.
 - **Performance: never measured.** Believed negligible (NFQUEUE holds

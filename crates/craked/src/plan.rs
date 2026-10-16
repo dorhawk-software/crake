@@ -7,6 +7,10 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use crate::hosts::Target;
 
 pub const MARK_BASE: u32 = 0x4352_0000; // "CR"
+/// A socket of craked's that must go direct, whatever the tunnels send
+/// (no tunnel has it: theirs start at MARK_BASE + 1): every tunnel's chain
+/// lets it by, and no `ip rule` matches it.
+pub const DIRECT_MARK: u32 = MARK_BASE;
 /// Rule priorities and routing tables are BASE + 1 + tunnel index.
 pub const ID_BASE: u32 = 7300;
 pub const MAX_TUNNELS: usize = 64;

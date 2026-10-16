@@ -412,6 +412,7 @@ impl Manager {
                     tokio::time::sleep(DEVICE_CHECK_EVERY).await;
                     this.check_devices().await;
                     this.refresh_hush().await;
+                    this.recheck_public().await;
                     // The Traffic window closed a while ago: conntrack's
                     // accounting back off, if craked switched it on.
                     crate::conntrack::connections_idle(false);

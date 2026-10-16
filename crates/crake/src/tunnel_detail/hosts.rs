@@ -71,6 +71,7 @@ impl TunnelDetail {
                             .text_color(t.muted)
                             .child(counts[i].to_string()),
                     )
+                    .keys()
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.tab = tab;
                         cx.notify();
@@ -196,6 +197,7 @@ impl TunnelDetail {
                                 .font_weight(FontWeight::BOLD)
                                 .cursor_pointer()
                                 .child(format!("Send through {display}"))
+                                .keys()
                                 .on_click(
                                     cx.listener(|this, _, window, cx| this.send_added(window, cx)),
                                 )
@@ -251,6 +253,7 @@ impl TunnelDetail {
                     .child(
                         row_button(("pin", i), if pinned { "Unpin" } else { "Pin" }, t)
                             .hover(move |s| s.bg(surface))
+                            .keys()
                             .on_click(cx.listener(move |this, _, _, _| {
                                 let tunnel = this.tunnel.clone();
                                 this.send(if pinned {
@@ -264,6 +267,7 @@ impl TunnelDetail {
                     .child(
                         row_button(("forget", i), "Forget", t)
                             .hover(move |s| s.bg(surface).text_color(danger))
+                            .keys()
                             .on_click(cx.listener(move |this, _, _, _| {
                                 this.send(Request::Forget(this.tunnel.clone(), target.clone()));
                             }))
@@ -355,6 +359,7 @@ impl TunnelDetail {
                     .border_color(t.line)
                     .h(px(30.))
                     .text_size(px(13.))
+                    .keys()
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.confirm_forget_all = true;
                         cx.notify();
@@ -418,6 +423,7 @@ impl TunnelDetail {
                             .font_weight(FontWeight::SEMIBOLD)
                             .cursor_pointer()
                             .child("Cancel")
+                            .keys()
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.confirm_forget_all = false;
                                 cx.notify();
@@ -438,6 +444,7 @@ impl TunnelDetail {
                             .font_weight(FontWeight::SEMIBOLD)
                             .cursor_pointer()
                             .child("Forget all")
+                            .keys()
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.confirm_forget_all = false;
                                 this.send(Request::ForgetLearned(this.tunnel.clone()));

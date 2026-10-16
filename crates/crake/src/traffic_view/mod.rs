@@ -27,6 +27,7 @@ mod tables;
 mod tests;
 
 use self::graph::{Flows, HOST_X, ME_H, ME_W, ME_X, WAY_H, WAY_W, WAY_X, rate};
+use crate::focus::Keys as _;
 
 pub const WIDTH: f32 = 920.;
 /// The window's height, at most the screen's.
@@ -107,7 +108,12 @@ impl Traffic {
             flows: Flows::default(),
             settled: false,
             max_height: crate::place::max_window_height_or(HEIGHT),
-            focus: cx.focus_handle(),
+            // Focused as it opens: the keyboard reaches it (Tab, Escape).
+            focus: {
+                let focus = cx.focus_handle();
+                window.focus(&focus, cx);
+                focus
+            },
             _subscriptions: subscriptions,
         }
     }
@@ -352,6 +358,7 @@ impl Traffic {
             .border_color(t.line)
             .child(
                 tab("tab-now", "Right now", now.len(), self.tab == Tab::Now)
+                    .keys()
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.tab = Tab::Now;
                         cx.notify();
@@ -365,6 +372,7 @@ impl Traffic {
                     rules.len(),
                     self.tab == Tab::Rules,
                 )
+                .keys()
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.tab = Tab::Rules;
                     cx.notify();
@@ -481,6 +489,7 @@ impl Render for Traffic {
             .font_family(fonts::UI)
             .text_size(px(14.))
             .line_height(px(20.))
+            .on_key_down(crate::focus::tab_moves)
             .on_key_down(cx.listener(|_, e: &gpui_kit::KeyDownEvent, _, cx| {
                 if e.keystroke.key == "escape" {
                     cx.emit(Close);
@@ -493,6 +502,7 @@ impl Render for Traffic {
 
 fn close_button(t: &Theme, cx: &mut Context<Traffic>) -> impl IntoElement {
     crate::chrome::close_button(t)
+        .keys()
         .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
         .test_support()
 }

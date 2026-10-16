@@ -88,6 +88,7 @@ pub fn up_script(plan: &Plan) -> String {
         ipv6,
     } = *plan;
     let mark = ids(index).mark;
+    let direct = crate::plan::DIRECT_MARK;
     let (ls, ps) = (learned_set(name), pinned_set(name));
     let (ls6, ps6) = (learned6_set(name), pinned6_set(name));
     let mut s = format!("add table inet {TABLE}\n");
@@ -102,6 +103,7 @@ pub fn up_script(plan: &Plan) -> String {
          flush set inet {TABLE} {ps}\n\
          flush set inet {TABLE} {ls6}\n\
          flush set inet {TABLE} {ps6}\n\
+         add rule inet {TABLE} out_{name} meta mark {direct:#x} return\n\
          add rule inet {TABLE} out_{name} ip daddr @{ps} meta mark set {mark:#x}\n\
          add rule inet {TABLE} out_{name} ip daddr @{ls} update @{ls} {{ ip daddr timeout {timeout}s }} meta mark set {mark:#x}\n\
          add rule inet {TABLE} out_{name} ip6 daddr @{ps6} meta mark set {mark:#x}\n\
@@ -662,6 +664,11 @@ mod tests {
         assert!(s.contains("ip6 daddr @pinned6_acme meta mark set 0x43520001"));
         assert!(s.contains("ip6 daddr @learned6_acme update @learned6_acme"));
         assert!(s.contains("meta mark set 0x43520001"));
+        // craked's own direct sockets pass every tunnel, before its rules.
+        let direct = s
+            .find("out_acme meta mark 0x43520000 return")
+            .expect("direct rule");
+        assert!(direct < s.find("ip daddr @pinned_acme").unwrap());
         assert!(s.contains("oifname \"crake-acme\" masquerade"));
         assert!(s.contains(
             "iifname \"crake-acme\" ip saddr { 10.40.0.53 } meta l4proto { udp, tcp } th sport 53 queue num 7300 bypass"

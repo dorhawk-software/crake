@@ -31,6 +31,7 @@ impl Settings {
                 .gap(px(8.))
                 .child(
                     outline("cancel-clear", "Keep it", t.line_strong, t.ink, None)
+                        .keys()
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.confirm_clear = false;
                             cx.notify();
@@ -46,6 +47,7 @@ impl Settings {
                         Some("crake/broom.svg"),
                     )
                     .bg(t.danger)
+                    .keys()
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.requests.send_blocking(Request::ClearLog).ok();
                         this.confirm_clear = false;
@@ -62,6 +64,7 @@ impl Settings {
                 t.danger,
                 Some("crake/broom.svg"),
             )
+            .keys()
             .on_click(cx.listener(|this, _, _, cx| {
                 this.confirm_clear = true;
                 cx.notify();

@@ -132,6 +132,7 @@ impl Panel {
                     .font_weight(FontWeight::SEMIBOLD)
                     .cursor_pointer()
                     .child("Add a tunnel\u{2026}")
+                    .keys()
                     .on_click(cx.listener(|this, _, _, _| this.send(Request::NewTunnel(None))))
                     .test_support(),
             )

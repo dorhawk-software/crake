@@ -144,6 +144,7 @@ pub(super) fn select(
                     .size(px(14.))
                     .text_color(t.ink),
             )
+            .keys()
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.open_select = if open { None } else { Some(id) };
                 cx.notify();
@@ -175,6 +176,7 @@ pub(super) fn select(
                     .when(on, |b| b.bg(t.accent_soft))
                     .hover(|s| s.bg(t.surface))
                     .child(*label)
+                    .keys()
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.open_select = None;
                         pick(this, value.clone(), cx);

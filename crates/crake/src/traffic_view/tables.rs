@@ -35,8 +35,10 @@ pub struct Row {
     pub cols: Vec<String>,
 }
 
-/// "Right now": each open connection, busiest first (over the last twenty
-/// seconds or so: rows don't trade places every second).
+/// "Right now": each open connection, busiest first, with the rate it's
+/// ordered by: over the last twenty seconds or so, so rows don't trade
+/// places every second and a row never shows more than the one above it
+/// (critique 2026-10-15: 313 KB/s stood above 380).
 pub fn right_now(model: &Model, now: Instant) -> Vec<Row> {
     let Some(rates) = model.live.rates.as_ref() else {
         return Vec::new();
@@ -51,7 +53,7 @@ pub fn right_now(model: &Model, now: Instant) -> Vec<Row> {
     });
     conns
         .into_iter()
-        .map(|(c, r)| Row {
+        .map(|(c, _)| Row {
             dest: format!(
                 "{}:{}",
                 c.name.clone().unwrap_or_else(|| c.dst.to_string()),
@@ -61,7 +63,7 @@ pub fn right_now(model: &Model, now: Instant) -> Vec<Row> {
             tunnel: c.tunnel.clone(),
             goes: way_label(model, c.tunnel.as_deref()),
             cols: vec![
-                rate(*r),
+                rate(model.live.standing(c)),
                 model.live.open_for(c, now).map(since).unwrap_or_default(),
             ],
         })

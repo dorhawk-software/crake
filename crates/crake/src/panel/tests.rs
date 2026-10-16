@@ -401,3 +401,31 @@ fn a_leftover_process_says_how_to_stop_it(cx: &mut TestAppContext) {
     });
     assert!(w.shows_element(("leftover", 0usize), cx));
 }
+
+/// The keyboard reaches every control (critique 2026-10-15): Tab moves to
+/// the first and on, Shift+Tab back, and Enter acts as a click would.
+#[gpui_kit::test]
+fn tab_reaches_the_controls_and_enter_acts(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    let focused = |cx: &mut TestAppContext| {
+        cx.update_window(w.window, |_, window, cx| window.focused(cx))
+            .unwrap()
+    };
+    // The panel itself has the keyboard when it opens; no control yet.
+    let start = focused(cx);
+    let press = |key: &str, cx: &mut TestAppContext| {
+        cx.update_window(w.window, |_, window, cx| window.press(key, cx))
+            .unwrap();
+        cx.run_until_parked();
+    };
+    press("tab", cx);
+    let first = focused(cx).expect("Tab gives a control the keyboard");
+    assert_ne!(Some(first.clone()), start);
+    press("tab", cx);
+    let second = focused(cx).expect("and Tab again the next");
+    assert_ne!(first, second);
+    press("shift-tab", cx);
+    assert_eq!(focused(cx), Some(first.clone()), "Shift+Tab goes back");
+    press("enter", cx);
+    assert!(w.requests.try_recv().is_ok(), "Enter acts on it");
+}

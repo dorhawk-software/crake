@@ -74,6 +74,7 @@ impl Panel {
                 }))
                 // A click lands after the hover that opened it: it keeps
                 // it open (moving away closes it).
+                .keys()
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.help_open = true;
                     cx.notify();
@@ -166,6 +167,7 @@ impl Panel {
                 button(("act", i), label, t)
                     .px(px(10.))
                     .h(px(30.))
+                    .keys()
                     .on_click(cx.listener(move |this, _, _, _| {
                         let r = match action {
                             Action::Undo => Request::Undo(tunnel.clone(), hosts.clone()),

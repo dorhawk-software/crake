@@ -18,6 +18,7 @@ use gpui_kit::{
     canvas, div, font, px,
 };
 
+use crate::focus::Keys as _;
 use crate::theme::{Theme, fonts};
 
 /// How long "Copied" shows after a click.
@@ -72,6 +73,7 @@ pub fn host_name(
             let name = tip.clone();
             cx.new(|_| Card { name, cut, size }).into()
         })
+        .keys()
         .on_click(move |_, window, cx| {
             cx.write_to_clipboard(ClipboardItem::new_string(copy.to_string()));
             cx.set_global(Copied(copy.clone(), Instant::now()));

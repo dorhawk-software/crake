@@ -133,6 +133,18 @@ fn the_tabs_list_connections_and_rules(cx: &mut TestAppContext) {
         .read_with(cx, |m, _| tables::right_now(m, Instant::now()));
     assert_eq!(rows.len(), 10, "the sample's connections");
     assert_eq!(rows[0].dest, "git.acme.internal:443", "busiest first");
+    // The rate shown is the one they're ordered by: never more than above.
+    let bytes = |s: &str| {
+        let (n, unit) = s.split_once(' ').unwrap();
+        let n: f64 = n.parse().unwrap();
+        if unit.starts_with("MB") {
+            n * 1e6
+        } else {
+            n * 1e3
+        }
+    };
+    let shown: Vec<f64> = rows.iter().map(|r| bytes(&r.cols[0])).collect();
+    assert!(shown.windows(2).all(|p| p[0] >= p[1]), "{shown:?}");
     w.click("tab-rules", cx);
     assert!(w.view.read_with(cx, |v, _| v.tab == Tab::Rules));
     w.click("tab-now", cx);

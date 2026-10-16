@@ -90,6 +90,7 @@ impl Panel {
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .cursor_pointer()
                                     .child("Got it")
+                                    .keys()
                                     .on_click(cx.listener(move |this, _, _, cx| {
                                         this.send(Request::Dismiss(key.clone()));
                                         cx.notify();
@@ -163,6 +164,7 @@ impl Panel {
                             .text_color(if copied { t.muted } else { t.ink }),
                     )
                     .child(if copied { "Copied" } else { "Copy" })
+                    .keys()
                     .on_click(cx.listener(move |this, _, _, cx| {
                         cx.write_to_clipboard(ClipboardItem::new_string(text.clone()));
                         this.leftover_copied = Some((pid, Instant::now()));

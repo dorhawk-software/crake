@@ -31,6 +31,7 @@ mod tests;
 use self::about::{about, bird};
 use self::managed::managed;
 use self::widgets::{group, outline, row, select, small_button, sub, toggle};
+use crate::focus::Keys as _;
 
 pub const WIDTH: f32 = 1040.;
 
@@ -199,6 +200,7 @@ impl Render for Settings {
             .font_family(fonts::UI)
             .text_size(px(14.))
             .line_height(px(20.))
+            .on_key_down(crate::focus::tab_moves)
             .on_key_down(cx.listener(|this, e: &gpui_kit::KeyDownEvent, _, cx| {
                 if e.keystroke.key == "escape" {
                     if this.open_select.is_some() || this.adding_never || this.confirm_clear {
@@ -239,6 +241,7 @@ impl Render for Settings {
                             .when(!system, |strip| {
                                 strip.child(
                                     crate::chrome::close_button(&t)
+                                        .keys()
                                         .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
                                         .test_support(),
                                 )
@@ -273,6 +276,7 @@ impl Render for Settings {
                                             .text_color(t.accent)
                                             .cursor_pointer()
                                             .child("Crex crex")
+                                            .keys()
                                             .on_click(|_, _, cx| {
                                                 cx.open_url(
                                                     "https://en.wikipedia.org/wiki/Corn_crake",
@@ -459,6 +463,7 @@ impl Settings {
                 }))
                 // A click lands after the hover that opened it: it keeps
                 // it open (moving away closes it), instead of closing it.
+                .keys()
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.hint = Some(label);
                     cx.notify();
@@ -556,6 +561,7 @@ impl Settings {
                     .cursor_pointer()
                     .child(svg().path(icon).size(px(18.)).text_color(t.ink))
                     .child(label)
+                    .keys()
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.section = section;
                         this.open_select = None;

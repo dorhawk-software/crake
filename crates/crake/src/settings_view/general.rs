@@ -54,6 +54,7 @@ impl Settings {
                         self.title("Start when you log in", t, cx),
                         Some("The bird is there when you need it."),
                         toggle("startup", starts, t)
+                            .keys()
                             .on_click(cx.listener(move |_, _, _, cx| {
                                 crate::autostart::set(!starts);
                                 cx.notify();
@@ -88,6 +89,7 @@ impl Settings {
                         self.title("Show the bird in the top bar", t, cx),
                         Some("Without it, open Crake from your apps."),
                         toggle("bird", prefs.show_bird, t)
+                            .keys()
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 let on = !prefs.show_bird;
                                 Self::pref(cx, |p| p.show_bird = on);
@@ -109,6 +111,7 @@ impl Settings {
                             self.title("Tell me when there\u{2019}s a new version", t, cx),
                             Some("Once a day Crake asks dorhawk.software which version is the newest."),
                             toggle("versions", prefs.check_versions, t)
+                                .keys()
                                 .on_click(cx.listener(move |_, _, _, cx| {
                                     Self::pref(cx, |p| p.check_versions = !prefs.check_versions);
                                 }))

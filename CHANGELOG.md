@@ -11,6 +11,15 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Crake can be used from the keyboard.** Tab and Shift+Tab move through the panel, tunnel detail,
+  Settings, the log, Traffic and the editor; Enter or Space presses what's in focus, and a ring
+  shows where you are.
+
+- **Public sites an older Crake sent through a company by mistake go direct again.** Before 0.8.0,
+  one lost connection on a shaky network could send a public site through a tunnel for good (it's
+  kept while it's used). Once after an update, Crake tries each such site directly and forgets the
+  ones that answer, and says so in the log. Linux for now.
+
 - **Switching an OpenVPN 3 tunnel off no longer says it "stopped unexpectedly".** Crake ended the
   session before telling its service, which sometimes noticed the tunnel's device gone first and
   called it ended by OpenVPN 3. The service is told first now, and a device missing for a moment
@@ -21,6 +30,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 - **New tunnel gets out of the way once the gateway has answered.** The protocol list folds into
   "Choose the protocol yourself", so the next field is in view; opened, the protocols sit under
   "Used with real gateways" and "Beta" instead of a badge on each.
+- **Traffic's numbers agree with their order.** The busiest places and connections show the rate
+  they're ordered by (the last twenty seconds or so), so a row never shows more than the one above.
 - **Traffic keeps teal for Crake's decisions.** The last five minutes are drawn in greys, with a
   teal tick where Crake sent a host through a tunnel; every way out has the same grey outline.
 - **Quieter hosts in tunnel detail.** Pin and Forget no longer look like a wall of buttons; they fill

@@ -161,6 +161,7 @@ pub(super) fn facts(
                                     .text_color(t.accent)
                                     .cursor_pointer()
                                     .child("Edit\u{2026}")
+                                    .keys()
                                     .on_click(cx.listener(move |this, _, _, _| {
                                         this.ask(Request::EditProfile(name.clone()));
                                     }))

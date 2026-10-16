@@ -524,6 +524,131 @@ pub(super) fn pick(
     }
 }
 
+/// Ports a learned public host is tried on directly: its web server, as
+/// split-horizon tries one.
+const RECHECK_PORTS: [u16; 2] = [443, 80];
+
+impl Manager {
+    /// Public hosts an older Crake learned by mistake (before 0.8.0's
+    /// guards one lost connection on a hiccuping network sent a public
+    /// site through a company's tunnel: connectivity-check.ubuntu.com,
+    /// used every few minutes, never expired; the user's, 2026-10-15). Once
+    /// per version, for each tunnel that's up, every public address it
+    /// learned by probing is tried directly (craked's direct mark passes
+    /// the tunnels); one that answers is forgotten, and said. A company's
+    /// host that answers only from inside stays. Linux only: elsewhere a
+    /// learned host is a route, which craked's sockets follow too.
+    pub(super) async fn recheck_public(&self) {
+        if !cfg!(target_os = "linux") || !self.cfg.apply_network {
+            return;
+        }
+        let version = env!("CARGO_PKG_VERSION");
+        let up: Vec<(String, String)> = self
+            .tunnels
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, e)| e.state == TunnelState::Connected)
+            .map(|(n, e)| (n.clone(), e.config.display().to_owned()))
+            .collect();
+        for (name, label) in up {
+            let done = self
+                .hosts
+                .lock()
+                .unwrap()
+                .tunnel(&name)
+                .rechecked
+                .as_deref()
+                == Some(version);
+            if !done {
+                self.recheck_tunnel(&name, &label).await;
+            }
+        }
+    }
+
+    /// Try the tunnel's learned public hosts directly now (the background
+    /// loop does it once per version; tests call it), forgetting those that
+    /// answer.
+    pub async fn recheck_tunnel(&self, name: &str, label: &str) {
+        let due: Vec<(IpAddr, Option<String>)> = {
+            let mut store = self.hosts.lock().unwrap();
+            let th = store.tunnel(name);
+            th.learned
+                .keys()
+                .filter(|a| !crate::dns::is_private(**a))
+                .filter(|a| th.learned_how.get(a).is_some_and(|(_, how)| how == "probe"))
+                .map(|a| (*a, th.names.get(a).cloned()))
+                .collect()
+        };
+        let mut tries = tokio::task::JoinSet::new();
+        for (addr, shown) in due {
+            tries.spawn(async move {
+                for port in RECHECK_PORTS {
+                    let took = crate::probe::Attempt::Tcp(port)
+                        .through(addr, crate::plan::DIRECT_MARK, PROBE_TIMEOUT)
+                        .await;
+                    if took.is_some() {
+                        return (addr, shown, took);
+                    }
+                }
+                (addr, shown, None)
+            });
+        }
+        let mut direct: Vec<(IpAddr, Option<String>, Duration)> = Vec::new();
+        while let Some(Ok((addr, shown, took))) = tries.join_next().await {
+            if let Some(took) = took {
+                direct.push((addr, shown, took));
+            }
+        }
+        self.send_direct_again(name, label, env!("CARGO_PKG_VERSION"), direct)
+            .await;
+    }
+
+    /// Forget what answers directly (not Undo: Crake may learn it again if
+    /// it's ever needed), say so once per name, and note the version.
+    async fn send_direct_again(
+        &self,
+        name: &str,
+        label: &str,
+        version: &str,
+        direct: Vec<(IpAddr, Option<String>, Duration)>,
+    ) {
+        let _ops = self.ops.lock().await;
+        {
+            let mut store = self.hosts.lock().unwrap();
+            let th = store.tunnel(name);
+            for (addr, _, _) in &direct {
+                th.learned.remove(addr);
+                th.names.remove(addr);
+                th.learned_how.remove(addr);
+            }
+            th.rechecked = Some(version.to_owned());
+            store.save();
+        }
+        let mut said: BTreeMap<String, Duration> = BTreeMap::new();
+        for (addr, shown, took) in &direct {
+            if self.is_routed(name)
+                && let Err(e) = self.routing.remove_learned(name, *addr).await
+            {
+                tracing::warn!("{name}: {addr}: {e:#}");
+            }
+            crate::conntrack::close_to(Target::host(*addr)).await;
+            said.entry(shown.clone().unwrap_or_else(|| addr.to_string()))
+                .or_insert(*took);
+        }
+        for (shown, took) in said {
+            self.log.system(
+                Some(name),
+                format!("{shown} goes direct again."),
+                Some(format!(
+                    "It answers directly ({} ms): an older Crake had sent it through {label} when one connection to it failed.",
+                    took.as_millis()
+                )),
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -28,6 +28,7 @@ const CONNECTED_SHOWN: Duration = Duration::from_millis(900);
 
 use self::explain::explain;
 use self::widgets::{Look, button, buttons, checkbox, link, lower_first, para, steps, title};
+use crate::focus::Keys as _;
 
 pub const WIDTH: f32 = 340.;
 
@@ -152,6 +153,7 @@ impl Render for SignIn {
                     .child(
                         div().mt(px(6.)).flex().child(
                             link("helpdesk", "Copy for helpdesk", &t)
+                                .keys()
                                 .on_click(cx.listener(|this, _, _, cx| this.copy_for_helpdesk(cx)))
                                 .test_support(),
                         ),
@@ -161,11 +163,13 @@ impl Render for SignIn {
                             .child(div().flex_1())
                             .child(
                                 button("close", "Close", Look::Text, &t)
+                                    .keys()
                                     .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
                                     .test_support(),
                             )
                             .child(
                                 button("retry", "Try again", Look::Primary, &t)
+                                    .keys()
                                     .on_click(
                                         cx.listener(|this, _, window, cx| this.retry(window, cx)),
                                     )
@@ -180,6 +184,7 @@ impl Render for SignIn {
                 .child(
                     buttons().child(div().flex_1()).child(
                         button("cancel", "Cancel", Look::Text, &t)
+                            .keys()
                             .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
                             .test_support(),
                     ),
@@ -194,6 +199,7 @@ impl Render for SignIn {
             .flex()
             .flex_col()
             .items_start()
+            .on_key_down(crate::focus::tab_moves)
             .on_key_down(cx.listener(|this, event: &gpui_kit::KeyDownEvent, _, cx| {
                 if event.keystroke.key == "escape" {
                     this.cancel(cx);

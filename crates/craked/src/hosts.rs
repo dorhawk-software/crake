@@ -236,6 +236,10 @@ pub struct TunnelHosts {
     /// to keep known names working while that DNS doesn't answer.
     #[serde(default)]
     pub answers: BTreeMap<String, (Vec<IpAddr>, u64)>,
+    /// The craked version that last tried its learned public hosts directly
+    /// (`Manager::recheck_public`): once per version.
+    #[serde(default)]
+    pub rechecked: Option<String>,
 }
 
 impl TunnelHosts {

@@ -28,6 +28,7 @@ pub(super) fn about(t: &Theme, cx: &mut Context<Settings>) -> impl IntoElement {
             .underline()
             .cursor_pointer()
             .child(label)
+            .keys()
             .on_click(move |_, _, cx| cx.open_url(url))
     };
     let _ = cx;
@@ -167,6 +168,7 @@ fn coffee(t: &Theme) -> impl IntoElement {
                 .cursor_pointer()
                 .hover(|s| s.border_color(t.accent))
                 .child("Buy me a coffee")
+                .keys()
                 .on_click(|_, _, cx| cx.open_url(COFFEE))
                 .test_support(),
         )

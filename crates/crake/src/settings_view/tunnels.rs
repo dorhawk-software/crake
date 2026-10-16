@@ -92,6 +92,7 @@ impl Settings {
                         .font_weight(FontWeight::BOLD)
                         .cursor_pointer()
                         .child("+ New tunnel")
+                        .keys()
                         .on_click(cx.listener(|this, _, _, _| {
                             this.requests.send_blocking(Request::NewTunnel(None)).ok();
                         }))
@@ -165,6 +166,7 @@ impl Settings {
                     .flex_1()
                     .min_w_0()
                     .cursor_pointer()
+                    .keys()
                     .on_click({
                         let name = tunnel.name.clone();
                         cx.listener(move |this, _, _, _| {
@@ -241,6 +243,7 @@ impl Settings {
                 .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
                     cx.stop_propagation()
                 })
+                .keys()
                 .on_click({
                     let name = tunnel.name.clone();
                     cx.listener(move |this, _, _, _| {
@@ -272,6 +275,7 @@ impl Settings {
                     .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
                         cx.stop_propagation()
                     })
+                    .keys()
                     .on_click({
                         let name = tunnel.name.clone();
                         cx.listener(move |this, _, _, _| {
@@ -308,6 +312,7 @@ impl Settings {
                             t.ink,
                             t,
                         )
+                        .keys()
                         .on_click(cx.listener(move |this, _, _, _| {
                             this.requests
                                 .send_blocking(Request::NewTunnel(Some(edit.clone())))
@@ -324,6 +329,7 @@ impl Settings {
                             t.danger,
                             t,
                         )
+                        .keys()
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.removing = Some(remove.clone());
                             cx.notify();
@@ -381,6 +387,7 @@ impl Settings {
                 )
                 .child(
                     small_button("keep-tunnel", "Keep it", None, t.line, t.ink, t)
+                        .keys()
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.removing = None;
                             cx.notify();
@@ -397,6 +404,7 @@ impl Settings {
                         t,
                     )
                     .bg(t.danger)
+                    .keys()
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.requests
                             .send_blocking(Request::RemoveTunnel(name.clone()))

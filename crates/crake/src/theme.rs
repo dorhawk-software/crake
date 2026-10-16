@@ -97,6 +97,12 @@ impl Theme {
 
     /// Follows the desktop's light or dark setting.
     pub fn current(cx: &App) -> Self {
+        let t = Self::pick(cx);
+        crate::focus::remember(t.accent, t.panel);
+        t
+    }
+
+    fn pick(cx: &App) -> Self {
         // Settings: "Appearance" may pin light or dark.
         match cx
             .try_global::<crate::prefs::Prefs>()

@@ -940,3 +940,60 @@ async fn a_public_host_that_answers_directly_on_a_second_try_isnt_learned() {
     stop.store(true, Ordering::Relaxed);
     responder.join().unwrap();
 }
+
+/// A public host an older Crake learned by mistake (through a company's
+/// tunnel, after one lost connection) is tried directly once a new version
+/// runs: answering, it's forgotten and said; one that answers only through
+/// the tunnel stays.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_public_host_learned_by_mistake_goes_direct_again() {
+    if std::env::var("CRAKE_NETNS_TEST").as_deref() != Ok("1") {
+        eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
+        return;
+    }
+    let p = start_probe(false).await;
+    {
+        let mut w = p.world.lock().unwrap();
+        // Two public hosts only the tunnel answers for, for now.
+        w.behind_tunnel.insert("198.51.100.40".parse().unwrap());
+        w.behind_tunnel.insert("198.51.100.41".parse().unwrap());
+    }
+    let learned = || sh("nft list set inet crake learned_acme");
+    tokio::task::spawn_blocking(move || {
+        for host in ["198.51.100.40", "198.51.100.41"] {
+            let _ = connect(host, 443, Duration::from_secs(1));
+        }
+        let end = Instant::now() + Duration::from_secs(20);
+        while !(learned().contains("198.51.100.40") && learned().contains("198.51.100.41")) {
+            assert!(Instant::now() < end, "never learned:\n{}", learned());
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    })
+    .await
+    .unwrap();
+    {
+        // .41 answers directly now: its one lost connection is long past.
+        let mut w = p.world.lock().unwrap();
+        let a: IpAddr = "198.51.100.41".parse().unwrap();
+        w.flaky_direct.insert(a);
+        w.first_port.insert(a, 1);
+    }
+    p.mgr.recheck_tunnel("acme", "ACME").await;
+    let set = sh("nft list set inet crake learned_acme");
+    assert!(
+        !set.contains("198.51.100.41"),
+        "answers directly: forgotten\n{set}"
+    );
+    assert!(
+        set.contains("198.51.100.40"),
+        "only through the tunnel: kept\n{set}"
+    );
+    let log = std::fs::read_to_string(p._dir.path().join("log")).unwrap();
+    assert!(
+        log.contains("198.51.100.41 goes direct again.") && log.contains("an older Crake"),
+        "{log}"
+    );
+    p.mgr.shutdown().await;
+    p.stop.store(true, Ordering::Relaxed);
+    p.responder.join().unwrap();
+}

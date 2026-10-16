@@ -30,6 +30,7 @@ const MERGE_PX: f32 = 12.;
 
 use self::chart::{now_minutes, today};
 use self::facts::{facts, policy, title_row, why};
+use crate::focus::Keys as _;
 
 pub const WIDTH: f32 = 900.;
 
@@ -153,6 +154,7 @@ impl Render for TunnelDetail {
                             .text_color(t.ink),
                     )
                     .child("Tunnels")
+                    .keys()
                     .on_click(cx.listener(|this, _, _, cx| {
                         let _ = this.requests.send_blocking(Request::Settings);
                         cx.emit(Close);
@@ -167,6 +169,7 @@ impl Render for TunnelDetail {
                     .border_color(t.line)
                     .bg(t.panel)
                     .child(if on { "Disconnect" } else { "Connect" })
+                    .keys()
                     .on_click(cx.listener(move |this, _, _, _| {
                         let _ = this
                             .requests
@@ -177,6 +180,7 @@ impl Render for TunnelDetail {
             .when(!system, |header| {
                 header.child(
                     crate::chrome::close_button(&t)
+                        .keys()
                         .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
                         .test_support(),
                 )
@@ -216,6 +220,7 @@ impl Render for TunnelDetail {
             .font_family(fonts::UI)
             .text_size(px(14.))
             .line_height(px(20.))
+            .on_key_down(crate::focus::tab_moves)
             .on_key_down(cx.listener(|_, e: &gpui_kit::KeyDownEvent, _, cx| {
                 if e.keystroke.key == "escape" {
                     cx.emit(Close);
@@ -320,7 +325,12 @@ impl TunnelDetail {
             add,
             hint: String::new(),
             max_height,
-            focus: cx.focus_handle(),
+            // Focused as it opens: the keyboard reaches it (Tab, Escape).
+            focus: {
+                let focus = cx.focus_handle();
+                window.focus(&focus, cx);
+                focus
+            },
             chart_hover: crate::timeline::Hover::default(),
             confirm_forget_all: false,
             profile_locked: None,

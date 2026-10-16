@@ -53,6 +53,7 @@ impl SignIn {
                         button(("choice", i), "", Look::Outline, t)
                             .h(px(40.))
                             .child(option.clone())
+                            .keys()
                             .on_click(cx.listener(move |this, _, _, cx| this.reply(o.clone(), cx)))
                             .test_support(),
                     );
@@ -60,6 +61,7 @@ impl SignIn {
                 return body.child(list).child(
                     buttons().child(div().flex_1()).child(
                         button("cancel", "Cancel", Look::Text, t)
+                            .keys()
                             .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
                             .test_support(),
                     ),
@@ -123,6 +125,7 @@ impl SignIn {
                     t,
                 )
                 .mt(px(14.))
+                .keys()
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.remember = !this.remember;
                     cx.notify();
@@ -135,6 +138,7 @@ impl SignIn {
                 body = body.child(
                     checkbox("keep", self.keep_certificate, "Keep a copy of the certificate in your keyring", t)
                         .mt(px(8.))
+                        .keys()
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.keep_certificate = !this.keep_certificate;
                             cx.notify();
@@ -158,11 +162,13 @@ impl SignIn {
                 .child(div().flex_1())
                 .child(
                     button("cancel", "Cancel", Look::Text, t)
+                        .keys()
                         .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
                         .test_support(),
                 )
                 .child(
                     button("continue", "Continue", Look::Primary, t)
+                        .keys()
                         .on_click(cx.listener(|this, _, _, cx| this.answer(cx)))
                         .test_support(),
                 ),

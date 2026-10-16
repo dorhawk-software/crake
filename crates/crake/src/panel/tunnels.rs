@@ -118,6 +118,7 @@ impl Panel {
                     )
                     .child(
                         switch(("switch", i), on, t)
+                            .keys()
                             .on_click(cx.listener(move |this, _, _, _| {
                                 this.send(Request::Switch(name.clone(), !on));
                             }))
@@ -156,6 +157,7 @@ impl Panel {
                                 .font_weight(FontWeight::SEMIBOLD)
                                 .cursor_pointer()
                                 .child("Got it")
+                                .keys()
                                 .on_click(cx.listener(move |this, _, _, _| {
                                     this.send(Request::Dismiss(key.clone()));
                                 }))
@@ -191,6 +193,7 @@ impl Panel {
                                 .font_weight(FontWeight::SEMIBOLD)
                                 .cursor_pointer()
                                 .child("Got it")
+                                .keys()
                                 .on_click(cx.listener(move |this, _, _, _| {
                                     for key in &keys {
                                         this.send(Request::Dismiss(key.clone()));
@@ -225,6 +228,7 @@ fn dismiss(i: usize, name: String, t: &Theme, cx: &mut Context<Panel>) -> impl I
         .cursor_pointer()
         .hover(|d| d.border_color(t.muted))
         .child("Dismiss")
+        .keys()
         .on_click(cx.listener(move |this, _, _, _| {
             this.send(Request::DismissTrouble(name.clone()));
         }))

@@ -135,6 +135,15 @@ Related marks in the same family (18 px grid, stroke 2.4, round caps):
 | set by gateway | `M4 9h10v7H4zM6.5 9V6.5a2.5 2.5 0 0 1 5 0V9` | muted |
 | unreachable (chart) | hollow circle r 4–4.5, muted stroke | muted |
 
+## Keyboard
+
+Every control is reachable from the keyboard (critique 2026-10-15): Tab
+and Shift+Tab move through a window's controls in reading order, Enter or
+Space acts as a click does, Escape closes. The control in focus wears a
+2 px ring in the accent with a 2 px gap in the panel colour, following the
+control's own corners, and only when the focus came from the keyboard (a
+mouse click shows no ring). New tunnel moves between its fields as before.
+
 ## Charts
 
 One rule across every chart:

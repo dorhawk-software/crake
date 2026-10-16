@@ -14,6 +14,7 @@ use gpui_kit::{
 };
 
 use crate::Request;
+use crate::focus::Keys as _;
 use crate::model::{Action, Decision, Model, tunnel_state};
 use crate::theme::{Theme, fonts};
 
@@ -123,6 +124,8 @@ pub struct Panel {
     peek: first_run::Peek,
     /// The leftover OpenVPN 3 process whose command was copied, and when.
     leftover_copied: Option<(u32, Instant)>,
+    /// The panel's own focus, so the keyboard reaches it (Tab, `focus`).
+    focus: gpui_kit::FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -168,6 +171,8 @@ impl Render for Panel {
             .font_family(fonts::UI)
             .text_size(px(14.))
             .line_height(px(20.))
+            .track_focus(&self.focus)
+            .on_key_down(crate::focus::tab_moves)
             .child(self.header(model, &t, cx));
 
         if reachable && model.tunnels.is_empty() {
@@ -266,6 +271,7 @@ fn not_running(model: &Model, t: &Theme, cx: &mut Context<Panel>) -> impl IntoEl
                     .font_weight(FontWeight::SEMIBOLD)
                     .cursor_pointer()
                     .child("Open Login Items")
+                    .keys()
                     .on_click(cx.listener(|this, _, _, _| this.send(Request::OpenServiceSettings)))
                     .test_support(),
             )
@@ -325,6 +331,8 @@ pub(crate) fn switch(id: impl Into<gpui_kit::ElementId>, on: bool, t: &Theme) ->
         .flex_none()
         .w(px(46.))
         .h(px(26.))
+        // Its keyboard ring takes the pill's shape.
+        .rounded_full()
         .cursor_pointer()
         .child(div().relative().size_full().rounded_full().with_spring(
             "knob",
@@ -418,6 +426,11 @@ impl Panel {
             help_open: false,
             peek: first_run::Peek::new(),
             leftover_copied: None,
+            focus: {
+                let focus = cx.focus_handle();
+                window.focus(&focus, cx);
+                focus
+            },
             _subscriptions: subscriptions,
         }
     }
@@ -503,6 +516,7 @@ impl Panel {
                     )
                     // Stop the header's window drag from taking the click.
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .keys()
                     .on_click(cx.listener(|this, _, _, _| this.send(Request::Settings)))
                     .test_support(),
             )
@@ -528,6 +542,7 @@ impl Panel {
                 button("traffic", "Traffic", t)
                     .flex_1()
                     .h(px(40.))
+                    .keys()
                     .on_click(cx.listener(|this, _, _, _| this.send(Request::Traffic)))
                     .test_support(),
             )
@@ -535,6 +550,7 @@ impl Panel {
                 button("full-log", "Full log", t)
                     .flex_1()
                     .h(px(40.))
+                    .keys()
                     .on_click(cx.listener(|this, _, _, _| this.send(Request::Log)))
                     .test_support(),
             )
@@ -550,6 +566,7 @@ impl Panel {
                 )
                 .flex_1()
                 .h(px(40.))
+                .keys()
                 .on_click(cx.listener(move |_, _, _, cx| {
                     let hide = cx.global::<crate::prefs::Prefs>().hide_hosts;
                     let text = model.read(cx).helpdesk(hide);

@@ -25,6 +25,7 @@ impl Settings {
                     .font_family(fonts::MONO)
                     .text_size(px(13.))
                     .child(format!("{n} s"))
+                    .keys()
                     .on_click(cx.listener(move |this, _, _, _| {
                         this.set("probe_wait_secs", n.to_owned());
                     }))
@@ -102,6 +103,7 @@ impl Settings {
                                     .size(px(11.))
                                     .text_color(t.muted),
                             )
+                            .keys()
                             .on_click(cx.listener(move |this, _, _, _| {
                                 this.set("never", rest.join("\n"));
                             }))
@@ -139,6 +141,7 @@ impl Settings {
                     .font_weight(FontWeight::SEMIBOLD)
                     .cursor_pointer()
                     .child("+ Add")
+                    .keys()
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.adding_never = true;
                         this.never_input.update(cx, |f, cx| f.focus(window, cx));
