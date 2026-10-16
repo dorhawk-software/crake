@@ -393,7 +393,10 @@ impl Manager {
         let through = labels.join(" or ");
         let reason = match why {
             crate::probe::Direct::NoAnswer => {
-                format!("It didn't answer directly or through {through}. Probably down.")
+                // Said as what happened, not a verdict on the host: one
+                // connection that got no answer is often a moment's loss
+                // (the user, 2026-10-16: "although it answers just fine").
+                format!("No answer just then, directly or through {through}. Nothing was changed.")
             }
             crate::probe::Direct::Refused => {
                 format!("Refused directly, and no answer through {through}.")

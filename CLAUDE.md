@@ -106,7 +106,9 @@ Two signals, in order of value:
    default 3), or gets refused or ICMP-unreachable, probe the same IP and port
    through each eligible tunnel (socket bound with `SO_BINDTODEVICE`). If one
    answers, add the host to that tunnel's set and log it. If none answer, leave
-   it alone and log "probably down".
+   it alone and log "No answer just then, directly or through ACME.
+   Nothing was changed." (until 2026-10-16 "Probably down.", which read as
+   a verdict on a host that answered fine a moment later).
 
 When two tunnels answer: ask the user (default), use the faster, or use the
 first in order. Never route hosts on the user's "never send through a tunnel"

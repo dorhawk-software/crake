@@ -139,7 +139,7 @@ class Component extends DCLogic {
     const log = [
       u ? { t: '13:21', icon: dash, iconColor: c.muted, text: 'git.acme.internal goes direct again.', why: 'You undid the route. Crake won’t learn this host again on its own.', canUndo: true, undoLabel: 'Redo', undo: () => this.setState({ undone: false }) }
         : { t: '13:21', icon: tick, iconColor: c.accent, text: 'Sent git.acme.internal through ACME.', why: 'It didn’t answer directly. Through ACME it answered in 38 ms.', canUndo: true, undoLabel: 'Undo', undo: () => this.setState({ undone: true }) },
-      { t: '13:02', icon: dash, iconColor: c.muted, text: 'Left 10.62.0.77 alone.', why: 'No answer directly or through ACME. Probably down.', canUndo: false, undoLabel: '', undo: null },
+      { t: '13:02', icon: dash, iconColor: c.muted, text: 'Left 10.62.0.77 alone.', why: 'No answer just then, directly or through ACME. Nothing was changed.', canUndo: false, undoLabel: '', undo: null },
       { t: '11:04', icon: tick, iconColor: c.accent, text: 'Sent sftp.nordbank.example through Nordbank.', why: 'Refused directly. Through Nordbank it answered in 61 ms.', canUndo: false, undoLabel: '', undo: null }
     ];
     const on = this.state.on;

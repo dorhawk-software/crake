@@ -11,6 +11,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **A host that didn't answer once is no longer called "probably down".** The log now says what
+  happened: "No answer just then, directly or through ACME. Nothing was changed."
+
 - **Crake can be used from the keyboard.** Tab and Shift+Tab move through the panel, tunnel detail,
   Settings, the log, Traffic and the editor; Enter or Space presses what's in focus, and a ring
   shows where you are.

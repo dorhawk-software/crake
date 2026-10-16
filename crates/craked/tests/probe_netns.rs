@@ -542,7 +542,7 @@ async fn connections_that_fail_directly_are_tried_through_the_tunnel() {
         "Sent 10.70.0.8 through ACME.",
         "Unreachable directly. Through ACME it answered in",
         "Left 10.70.0.7 alone.",
-        "It didn't answer directly or through ACME. Probably down.",
+        "No answer just then, directly or through ACME. Nothing was changed.",
         "10.70.0.5 goes direct again.",
         "Sent 10.70.0.5 through ACME again.",
     ] {

@@ -121,7 +121,7 @@ pub fn demo() -> Model {
                 LogKind::LeftAlone,
                 "acme",
                 "Left 10.62.0.77 alone.",
-                "No answer directly or through ACME. Probably down.",
+                "No answer just then, directly or through ACME. Nothing was changed.",
                 &["10.62.0.77"],
             ),
             entry(
@@ -437,7 +437,7 @@ fn log_until(until: jiff::Timestamp) -> Model {
             LeftAlone,
             Some("acme"),
             "Left 10.62.0.77 alone.",
-            "No answer directly or through ACME. Probably down.",
+            "No answer just then, directly or through ACME. Nothing was changed.",
         ),
         row(
             0,
