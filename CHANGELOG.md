@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.9.0 (2026-10-16)
+
 - **A host that didn't answer once is no longer called "probably down".** The log now says what
   happened: "No answer just then, directly or through ACME. Nothing was changed."
 
