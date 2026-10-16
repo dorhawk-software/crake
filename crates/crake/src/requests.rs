@@ -151,6 +151,12 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
                 .any(|x| x.name == t && x.protocol == "openvpn3");
             match cx.global::<Shell>().sessions.get(&t) {
                 Some((_, control)) => {
+                    // craked first, then the session: ended first, its
+                    // device went before craked knew it was meant
+                    // ("stopped unexpectedly", 2026-10-16).
+                    if openvpn3 {
+                        send(Command::Detach(t.clone(), String::new()));
+                    }
                     control.send_blocking(signin::Reply::Cancel).ok();
                 }
                 // Started before this app did: at least stop routing it.

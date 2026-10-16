@@ -11,6 +11,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Switching an OpenVPN 3 tunnel off no longer says it "stopped unexpectedly".** Crake ended the
+  session before telling its service, which sometimes noticed the tunnel's device gone first and
+  called it ended by OpenVPN 3. The service is told first now, and a device missing for a moment
+  isn't taken for a stop.
+
 - **An edited OpenVPN 3 profile is never thrown away by one key.** With changes not saved, Escape,
   the × or Cancel ask first ("Leave without saving?"), and Keep editing is the default.
 - **New tunnel gets out of the way once the gateway has answered.** The protocol list folds into

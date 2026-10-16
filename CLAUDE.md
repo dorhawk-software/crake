@@ -676,7 +676,11 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    tunnel's device every 2 s (`check_devices`; netlink's link kind "tun",
    which, unlike /sys, follows craked's network namespace) and takes a
    tunnel whose device is gone down as stopped unexpectedly ("OpenVPN 3
-   ended its session: tun0 is gone."; netns-tested).
+   ended its session: tun0 is gone."; netns-tested). Missing at two looks
+   in a row, not one (`MISSING` in the attached fields): switching off in
+   the app ended the session before craked heard of it, and craked, looking
+   in between, logged "stopped unexpectedly" (2026-10-16); the app now
+   tells craked (Detach) before it ends the session.
    **0.8.0's regression (2026-10-15):** the packaged craked can't look
    into openvpn3's process (it runs as `_openvpn`; the service has no
    CAP_SYS_PTRACE, AppArmor allows no other process's fdinfo), so

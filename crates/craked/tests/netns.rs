@@ -589,7 +589,36 @@ async fn an_openvpn3_tunnel_whose_device_is_gone_is_down() {
         "still there"
     );
 
+    // Switched off in the app while craked looks: the session ended, its
+    // device went, and the app's word arrives a moment later. Missing once
+    // isn't "stopped unexpectedly" (seen 2026-10-16).
     sh("ip link del tun7");
+    mgr.check_devices().await;
+    assert_eq!(
+        mgr.get(&name).unwrap().state,
+        TunnelState::Connected,
+        "missing once: perhaps being switched off"
+    );
+    mgr.detach(&name, None).await.unwrap();
+    assert_eq!(mgr.get(&name).unwrap().state, TunnelState::Off);
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(!log.contains("stopped unexpectedly"), "{log}");
+
+    // Gone with no word from the app: down, at the next look.
+    sh("ip tuntap add dev tun7 mode tun && ip link set tun7 up \
+        && ip addr add 10.8.0.6/24 dev tun7");
+    mgr.attach(
+        &name,
+        &HashMap::from([
+            ("device".to_owned(), "tun7".to_owned()),
+            ("dns".to_owned(), "10.8.0.1".to_owned()),
+            ("domains".to_owned(), "initech.internal".to_owned()),
+        ]),
+    )
+    .await
+    .unwrap();
+    sh("ip link del tun7");
+    mgr.check_devices().await;
     mgr.check_devices().await;
     let snap = mgr.get(&name).unwrap();
     assert_eq!(snap.state, TunnelState::Trouble);

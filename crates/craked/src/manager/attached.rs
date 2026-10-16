@@ -8,6 +8,9 @@ use super::*;
 const RESOLVED_POLLS: u32 = 10;
 const RESOLVED_POLL: Duration = Duration::from_millis(200);
 
+/// In an attached tunnel's fields: its device was missing at the last look.
+const MISSING: &str = "missing";
+
 impl Manager {
     /// OpenVPN 3: the app started the session (as the user, who owns the
     /// profile) and hands over its device and DNS. Routing works as for
@@ -253,6 +256,9 @@ impl Manager {
             // another user: 0.8.0 took that for a session reconnecting and
             // pulled every OpenVPN 3 tunnel's routes, 2026-10-15.)
             if up && index.is_some() && (had.is_none() || had == index) {
+                if fields.contains_key(MISSING) {
+                    self.missing(&name, false);
+                }
                 continue;
             }
             // The same name as a new device (the kernel took the old one's
@@ -283,6 +289,13 @@ impl Manager {
                 }
                 continue;
             }
+            // Missing once: maybe the user switched it off and the app's
+            // word is still on its way (it ends the session, then tells
+            // craked; seen 2026-10-16: "stopped unexpectedly" for a switch
+            // the user had just turned off). Gone if still missing next time.
+            if !self.missing(&name, true) {
+                continue;
+            }
             let why = format!(
                 "{}: {device} is gone. Switch it on to connect again.",
                 crake_proto::trouble::OPENVPN3_ENDED
@@ -290,6 +303,20 @@ impl Manager {
             if let Err(e) = self.detach(&name, Some(why)).await {
                 tracing::warn!("{name}: {e:#}");
             }
+        }
+    }
+
+    /// Notes (`missing`) or forgets that the tunnel's device was missing at
+    /// the last look; whether it already was.
+    fn missing(&self, name: &str, now: bool) -> bool {
+        let mut map = self.tunnels.lock().unwrap();
+        let Some(fields) = map.get_mut(name).and_then(|e| e.attached.as_mut()) else {
+            return false;
+        };
+        if now {
+            fields.insert(MISSING.to_owned(), String::new()).is_some()
+        } else {
+            fields.remove(MISSING).is_some()
         }
     }
 
