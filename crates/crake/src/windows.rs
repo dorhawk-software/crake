@@ -7,10 +7,9 @@ use super::*;
 /// (half a pixel: rounding is not a change).
 pub const FIT_SLACK: f32 = 0.5;
 /// The panel opening upward is fitted again this long after it grew (the
-/// window system may not have placed it yet: `sys::resize_upward`), and
-/// keeps its bottom where it was for as long.
+/// window system may not have placed it yet: `sys::resize_upward`, which
+/// keeps its bottom where it was meanwhile).
 pub const REFIT_AGAIN: [Duration; 2] = [Duration::from_millis(150), Duration::from_millis(500)];
-pub const REFIT_FOR: Duration = Duration::from_secs(1);
 /// A click on the tray right after the panel lost focus is the click that
 /// closed it.
 const BLURRED_JUST_NOW: Duration = Duration::from_millis(500);

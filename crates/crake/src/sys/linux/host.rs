@@ -132,17 +132,19 @@ pub fn resize_upward(window: &gpui_kit::Window, height: f32) -> bool {
 /// the bottom comes from here, not from where the window ended up.
 static ANCHOR: std::sync::Mutex<Option<(u32, i32, std::time::Instant)>> =
     std::sync::Mutex::new(None);
+/// How long the bottom is kept: past the last of `windows::REFIT_AGAIN`.
+const ANCHORED_FOR: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// The bottom kept for window `id`, or `bottom` (where it is now) once the
-/// last fit is past `crate::windows::REFIT_FOR` (the panel may have been
-/// dragged since).
+/// last fit is past `ANCHORED_FOR` (the panel may have been dragged
+/// since).
 fn anchored_bottom(id: u32, bottom: i32) -> i32 {
     let now = std::time::Instant::now();
     let Ok(mut anchor) = ANCHOR.lock() else {
         return bottom;
     };
     let kept = match *anchor {
-        Some((was, kept, at)) if was == id && now - at < crate::windows::REFIT_FOR => kept,
+        Some((was, kept, at)) if was == id && now - at < ANCHORED_FOR => kept,
         _ => bottom,
     };
     *anchor = Some((id, kept, now));
