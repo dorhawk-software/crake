@@ -49,16 +49,16 @@ impl Settings {
                     .child(sub("Pushed by your gateways when they connect.", t))
                     .child(chips),
             )
-            .child(row(
+            .child(row_below(
                 self.title("Keep internal names private", t, cx),
-                Some("Names like *.acme.internal never go to your internet provider\u{2019}s DNS."),
+                "Names like *.acme.internal never go to your internet provider\u{2019}s DNS.",
                 toggle("private", private, t)
                     .keys()
                     .on_click(cx.listener(move |this, _, _, _| {
                         this.set("keep_private", (!private).to_string());
                     }))
                     .test_support(),
-                true,
+                not_kept(model, t),
                 t,
             ))
             .child(row(
@@ -74,4 +74,20 @@ impl Settings {
                 t,
             ))
     }
+}
+
+/// Why the names aren't kept private although the setting is on (craked
+/// can't answer for them now: `hush::why_not`), under the setting.
+fn not_kept(model: &Model, t: &Theme) -> Option<AnyElement> {
+    let why = model.setting("keep_private_trouble");
+    (model.setting("keep_private") == "true" && !why.is_empty()).then(|| {
+        div()
+            .id("private-trouble")
+            .text_size(px(13.))
+            .line_height(px(19.))
+            .text_color(t.danger)
+            .child(format!("Not kept private right now. {why}"))
+            .test_support()
+            .into_any_element()
+    })
 }

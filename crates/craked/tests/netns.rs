@@ -468,36 +468,7 @@ async fn internal_names_stay_private_while_the_tunnel_is_off() {
     // Strict reverse-path filtering, as Fedora has it.
     strict_rp_filter();
     let dir = tempfile::tempdir().unwrap();
-    let cfg = Config {
-        hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
-        hook_socket: dir.path().join("hook.sock"),
-        openconnect: dir.path().join("openconnect"),
-        log_path: dir.path().join("log"),
-        state_path: dir.path().join("hosts.json"),
-        learned_expiry_days: 7,
-        probing: false,
-        race_first_syn: false,
-        probe_wait_secs: 3,
-        never: vec![],
-        // No systemd-resolved in the namespace: its calls just fail; the
-        // link and the answers are what's tested.
-        use_resolved: true,
-        apply_network: true,
-        managed_dir: dir.path().join("managed.d"),
-        tunnels: vec![TunnelConfig {
-            name: "acme".into(),
-            display_name: Some("ACME".into()),
-            gateway: "vpn.acme.example".into(),
-            protocol: Protocol::Anyconnect,
-            user: None,
-            passwd_file: None,
-            dns_domains: vec!["acme.internal".into()],
-            auth_args: vec![],
-            extra_args: vec![],
-            managed: None,
-            own: None,
-        }],
-    };
+    let cfg = hush_config(&dir);
     let mgr = Manager::new(cfg).unwrap();
     mgr.init().await.unwrap();
     assert!(
@@ -529,6 +500,79 @@ async fn internal_names_stay_private_while_the_tunnel_is_off() {
     assert!(!sh("ip link").contains("crake-hush"), "off: the link goes");
     mgr.set_setting("keep_private", "true").await.unwrap();
     assert!(sh("ip link").contains("crake-hush"));
+    mgr.shutdown().await;
+    assert!(!sh("ip link").contains("crake-hush"), "nothing left behind");
+}
+
+/// ACME off with its domain, `acme.internal`: what the hush tests start from.
+fn hush_config(dir: &tempfile::TempDir) -> Config {
+    Config {
+        hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
+        hook_socket: dir.path().join("hook.sock"),
+        openconnect: dir.path().join("openconnect"),
+        log_path: dir.path().join("log"),
+        state_path: dir.path().join("hosts.json"),
+        learned_expiry_days: 7,
+        probing: false,
+        race_first_syn: false,
+        probe_wait_secs: 3,
+        never: vec![],
+        // No systemd-resolved in the namespace: its calls just fail; the
+        // link and the answers are what's tested.
+        use_resolved: true,
+        apply_network: true,
+        managed_dir: dir.path().join("managed.d"),
+        tunnels: vec![TunnelConfig {
+            name: "acme".into(),
+            display_name: Some("ACME".into()),
+            gateway: "vpn.acme.example".into(),
+            protocol: Protocol::Anyconnect,
+            user: None,
+            passwd_file: None,
+            dns_domains: vec!["acme.internal".into()],
+            auth_args: vec![],
+            extra_args: vec![],
+            managed: None,
+            own: None,
+        }],
+    }
+}
+
+/// A DNS server already listening on every address (some dnsmasq, unbound
+/// or bind setups): craked can't answer on 169.254.53.53:53, so it gives
+/// the hush link no domains (they'd reach that server and go upstream),
+/// Settings says why, and once the port is free it keeps them private.
+#[tokio::test]
+async fn names_go_nowhere_half_kept_when_another_dns_server_holds_port_53() {
+    if !enabled() {
+        eprintln!("skipped: set CRAKE_NETNS_TEST=1 inside a throwaway network namespace");
+        return;
+    }
+    let squatter = std::net::UdpSocket::bind("0.0.0.0:53").unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let mgr = Manager::new(hush_config(&dir)).unwrap();
+    mgr.init().await.unwrap();
+    assert!(
+        !sh("ip link").contains("crake-hush"),
+        "no link while nobody of Crake's answers"
+    );
+    let why = mgr
+        .settings()
+        .get("keep_private_trouble")
+        .cloned()
+        .unwrap_or_default();
+    assert!(why.contains("Another DNS server"), "{why:?}");
+
+    drop(squatter);
+    mgr.update_hush().await;
+    assert!(
+        sh("ip -br addr show crake-hush").contains("169.254.53.53"),
+        "taken once free"
+    );
+    assert!(
+        !mgr.settings().contains_key("keep_private_trouble"),
+        "and Settings stops saying so"
+    );
     mgr.shutdown().await;
     assert!(!sh("ip link").contains("crake-hush"), "nothing left behind");
 }

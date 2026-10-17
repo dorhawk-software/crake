@@ -130,6 +130,29 @@ fn learning(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn names_not_kept_private_say_why(cx: &mut TestAppContext) {
+    let w = open(cx, Section::Names);
+    assert!(
+        !w.shown("private-trouble", cx),
+        "nothing to say while they're kept"
+    );
+    w.model.update(cx, |m, _| {
+        m.settings.insert(
+            "keep_private_trouble".into(),
+            "Another DNS server on this computer answers on every address.".into(),
+        );
+    });
+    assert!(w.shown("private-trouble", cx), "said under the setting");
+    w.model.update(cx, |m, _| {
+        m.settings.insert("keep_private".into(), "false".into());
+    });
+    assert!(
+        !w.shown("private-trouble", cx),
+        "not when the setting is off"
+    );
+}
+
+#[gpui_kit::test]
 fn names(cx: &mut TestAppContext) {
     let w = open(cx, Section::Names);
     let private = w

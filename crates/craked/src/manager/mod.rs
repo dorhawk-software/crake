@@ -137,7 +137,10 @@ pub struct Manager {
     settings: Mutex<crate::settings::Settings>,
     /// One hush update at a time; the REFUSED answerer runs once.
     hush: tokio::sync::Mutex<()>,
-    hush_serving: std::sync::atomic::AtomicBool,
+    /// The answerer has its socket (it clears this if the socket fails).
+    hush_serving: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// Why names aren't kept private now (Settings shows it); None if they are.
+    hush_trouble: Mutex<Option<String>>,
     /// The domains kept private last (`refresh_hush` changes them only
     /// when they differ).
     hush_last: Mutex<Option<Vec<String>>>,
@@ -331,7 +334,8 @@ impl Manager {
             networks: Mutex::new(networks),
             settings: Mutex::new(settings),
             hush: tokio::sync::Mutex::new(()),
-            hush_serving: std::sync::atomic::AtomicBool::new(false),
+            hush_serving: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            hush_trouble: Mutex::new(None),
             hush_last: Mutex::new(None),
             dns_down: Mutex::new(HashMap::new()),
             dns_misses: Mutex::new(HashMap::new()),
@@ -499,11 +503,6 @@ impl Manager {
             .unwrap()
             .get(name)
             .is_some_and(|e| e.config.asks())
-    }
-
-    /// Every setting, in its text form (the D-Bus API).
-    pub fn settings(&self) -> std::collections::HashMap<String, String> {
-        self.settings.lock().unwrap().to_map()
     }
 
     pub fn config(&self) -> &Config {

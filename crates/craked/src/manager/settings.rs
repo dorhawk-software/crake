@@ -4,6 +4,16 @@
 use super::*;
 
 impl Manager {
+    /// Every setting, in its text form (the D-Bus API).
+    pub fn settings(&self) -> std::collections::HashMap<String, String> {
+        let mut map = self.settings.lock().unwrap().to_map();
+        // Read-only: why "Keep internal names private" can't keep them now.
+        if let Some(why) = self.hush_trouble.lock().unwrap().clone() {
+            map.insert(crate::settings::KEEP_PRIVATE_TROUBLE.into(), why);
+        }
+        map
+    }
+
     /// Change one setting; it takes effect at once.
     pub async fn set_setting(&self, key: &str, value: &str) -> Result<()> {
         let (expiry_changed, log_days) = {
@@ -62,7 +72,11 @@ impl Manager {
             return;
         }
         let domains = self.hush_domains().await;
-        if self.hush_last.lock().unwrap().as_ref() != Some(&domains) {
+        // Also when the answerer lost its socket: it's taken again.
+        let serving = self.hush_serving.load(std::sync::atomic::Ordering::SeqCst);
+        if self.hush_last.lock().unwrap().as_ref() != Some(&domains)
+            || (!serving && !domains.is_empty())
+        {
             self.apply_hush(domains).await;
         }
     }
@@ -106,26 +120,45 @@ impl Manager {
     }
 
     async fn apply_hush(&self, domains: Vec<String>) {
-        *self.hush_last.lock().unwrap() = Some(domains.clone());
         let _hush = self.hush.lock().await;
         if domains.is_empty() {
             self.resolved.revert(crate::hush::DEVICE).await;
             self.net.remove(crate::hush::DEVICE).await;
+            *self.hush_last.lock().unwrap() = Some(domains);
+            self.hush_trouble(None);
             return;
         }
         if let Err(e) = self.net.dummy(crate::hush::DEVICE, crate::hush::ADDR).await {
-            tracing::error!("keeping internal names private: {e:#}");
+            let why = format!(
+                "Crake couldn\u{2019}t add its own DNS link to this computer ({}).",
+                e.root_cause()
+            );
+            self.hush_failed(why).await;
             return;
         }
-        if !self
-            .hush_serving
-            .swap(true, std::sync::atomic::Ordering::SeqCst)
-        {
-            tokio::spawn(async {
-                if let Err(e) = crate::hush::serve().await {
-                    tracing::error!("answering for private names: {e:#}");
+        // The answerer's socket first: domains given to the link while
+        // nobody answered there would wait, or go to whatever DNS server
+        // listens on every address.
+        if !self.hush_serving.load(std::sync::atomic::Ordering::SeqCst) {
+            match crate::hush::bind().await {
+                Ok(sock) => {
+                    self.hush_serving
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
+                    if let Some(sock) = sock {
+                        let serving = self.hush_serving.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = crate::hush::serve(sock).await {
+                                tracing::error!("answering for private names: {e:#}");
+                            }
+                            serving.store(false, std::sync::atomic::Ordering::SeqCst);
+                        });
+                    }
                 }
-            });
+                Err(e) => {
+                    self.hush_failed(crate::hush::why_not(&e)).await;
+                    return;
+                }
+            }
         }
         if let Err(e) = self
             .resolved
@@ -140,6 +173,35 @@ impl Manager {
             tracing::error!("keeping internal names private: {e:#}");
         }
         self.resolved.flush().await;
+        *self.hush_last.lock().unwrap() = Some(domains);
+        self.hush_trouble(None);
+    }
+
+    /// The hush can't work now: nothing is left half done (no link, so no
+    /// domain sent where nobody answers), Settings says why, and the next
+    /// look (`refresh_hush`, every 2 s) tries again.
+    async fn hush_failed(&self, why: String) {
+        self.resolved.revert(crate::hush::DEVICE).await;
+        self.net.remove(crate::hush::DEVICE).await;
+        *self.hush_last.lock().unwrap() = None;
+        if self.hush_trouble(Some(why.clone())) {
+            tracing::error!("keeping internal names private: {why}");
+        }
+    }
+
+    /// Records why names aren't kept private; tells the app when that
+    /// changed (and says whether it did, so it's logged once).
+    fn hush_trouble(&self, why: Option<String>) -> bool {
+        let changed = {
+            let mut t = self.hush_trouble.lock().unwrap();
+            let changed = *t != why;
+            *t = why;
+            changed
+        };
+        if changed {
+            let _ = self.changes.send(String::new());
+        }
+        changed
     }
 
     /// Empty the log. Learned hosts stay.

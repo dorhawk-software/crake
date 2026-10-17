@@ -228,7 +228,13 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    dummy link `crake-hush` in resolved, whose DNS (169.254.53.53, craked)
    answers REFUSED at once (`hush.rs`; netns-tested, and verified with the
    user's systemd-resolved: looking up an internal name with its tunnel
-   off fails at once); removed on shutdown. Not a domain another program
+   off fails at once); removed on shutdown. The link gets its domains only
+   once craked holds 169.254.53.53:53 (2026-10-17: with a DNS server on
+   every address, e.g. some dnsmasq setups, the bind failed, was logged
+   once and never retried, and the domains went to that server); when it
+   can't, the link goes, Settings → Names says why
+   (`keep_private_trouble` in the Settings map, `hush::why_not`) and the
+   2 s look tries again (netns-tested with a squatter on port 53). Not a domain another program
    serves (2026-10-14: a colleague's AnyConnect on a Mac failed every
    internal name while Crake refused them): `Resolved::served_elsewhere`
    (Linux: resolved's domains on links not Crake's; macOS: every network

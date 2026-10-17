@@ -9,6 +9,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::hosts::Target;
 
+/// A read-only entry of the Settings map (not stored): why "Keep internal
+/// names private" can't keep them now (`hush::why_not`).
+pub const KEEP_PRIVATE_TROUBLE: &str = "keep_private_trouble";
+
 /// When two tunnels answer for the same host.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

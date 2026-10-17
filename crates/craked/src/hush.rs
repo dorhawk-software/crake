@@ -45,19 +45,36 @@ pub fn reply_code(query: &[u8], rcode: u8) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// Answer on ADDR:53 until the socket fails. Windows: craked's DNS server
-/// answers for this link (`sys::windows::dns_queue`).
-pub async fn serve() -> Result<()> {
-    if cfg!(windows) {
-        return Ok(());
+/// The socket the hush answers on: ADDR:53, taken before the link is given
+/// any domain, so a name is never sent there while nobody (or, worse, a
+/// DNS server listening on every address) would answer it. Linux only:
+/// on Windows and macOS craked's own DNS server answers for this link
+/// (`sys::dns_links`), and the address isn't on the machine at all.
+pub async fn bind() -> std::io::Result<Option<UdpSocket>> {
+    if !cfg!(target_os = "linux") {
+        return Ok(None);
     }
-    let sock = UdpSocket::bind((ADDR, dns::PORT)).await?;
+    UdpSocket::bind((ADDR, dns::PORT)).await.map(Some)
+}
+
+/// Answer on `sock` until it fails.
+pub async fn serve(sock: UdpSocket) -> Result<()> {
     let mut buf = vec![0u8; dns::BUFFER];
     loop {
         let (n, from) = sock.recv_from(&mut buf).await?;
         if let Some(reply) = refuse(&buf[..n]) {
             let _ = sock.send_to(&reply, from).await;
         }
+    }
+}
+
+/// Why names aren't kept private now, in the user's words (Settings shows
+/// it under "Keep internal names private").
+pub fn why_not(bind: &std::io::Error) -> String {
+    if bind.kind() == std::io::ErrorKind::AddrInUse {
+        "Another DNS server on this computer answers on every address, so Crake can\u{2019}t answer for these names.".into()
+    } else {
+        format!("Crake couldn\u{2019}t answer for these names ({bind}).")
     }
 }
 
