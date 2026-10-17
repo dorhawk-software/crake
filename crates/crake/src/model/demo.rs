@@ -176,11 +176,17 @@ pub fn demo() -> Model {
         .into_iter()
         .map(|(k, v)| (k.to_owned(), v.to_owned()))
         .collect(),
-        // ACME's hosts, as tunnel detail and Traffic list them.
-        host_rows: [(
-            "acme".to_owned(),
-            acme_hosts(jiff::Timestamp::now().as_second() as u64),
-        )]
+        // ACME's and Nordbank's hosts, as tunnel detail and Traffic list them.
+        host_rows: [
+            (
+                "acme".to_owned(),
+                acme_hosts(jiff::Timestamp::now().as_second() as u64),
+            ),
+            (
+                "nord".to_owned(),
+                nord_hosts(jiff::Timestamp::now().as_second() as u64),
+            ),
+        ]
         .into_iter()
         .collect(),
         ..Default::default()
@@ -251,10 +257,41 @@ const ACME_HOSTS: [(&str, &str, u64, &str, u64, bool); 5] = [
     ),
 ];
 
+// literal: the demo's sample data, as the panel's decisions say
+/// Nordbank's hosts in the sample, as `ACME_HOSTS`: the two the panel and
+/// Traffic show, both learned.
+const NORD_HOSTS: [(&str, &str, u64, &str, u64, bool); 2] = [
+    (
+        "172.22.4.9",
+        "sftp.nordbank.example",
+        137,
+        "probe",
+        0,
+        false,
+    ),
+    (
+        "172.22.4.30",
+        "portal.nordbank.example",
+        190,
+        "dns",
+        2,
+        false,
+    ),
+];
+
 /// ACME's host rows as craked would list them, `now` seconds since the epoch.
-// literal: minutes to seconds
 fn acme_hosts(now: u64) -> Vec<HostRow> {
-    ACME_HOSTS
+    rows(&ACME_HOSTS, now)
+}
+
+/// Nordbank's host rows, as `acme_hosts`.
+fn nord_hosts(now: u64) -> Vec<HostRow> {
+    rows(&NORD_HOSTS, now)
+}
+
+// literal: minutes to seconds
+fn rows(hosts: &[(&str, &str, u64, &str, u64, bool)], now: u64) -> Vec<HostRow> {
+    hosts
         .iter()
         .map(|(target, name, learned, how, used, pinned)| HostRow {
             target: (*target).into(),

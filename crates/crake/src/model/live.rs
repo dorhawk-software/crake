@@ -151,7 +151,7 @@ pub fn demo(second: u64) -> Live {
             Some("acme"),
             85_000,
         ),
-        ("10.40.8.21", "", 5432, Some("acme"), 40_000),
+        ("10.62.0.18", "", 5432, Some("acme"), 40_000),
         (
             "10.40.1.11",
             "wiki.acme.internal",

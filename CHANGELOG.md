@@ -11,6 +11,14 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **The pointer keeps its size.** After the display's scale changed while Crake ran (a laptop
+  docked to a large monitor, or undocked), pointing at a button or a field in Crake's windows
+  showed a pointer twice (or half) its size. It follows the scale now, and the cursor size set in
+  Accessibility too.
+
+- **Traffic's ticks have room.** The line to a destination Crake learned stopped under its
+  two-stroke tick, and packets ran beneath it; it now ends before the tick.
+
 - **The bird in the bar is smooth again at its smallest.** 0.10.0 drew it pixel by pixel at 16 px,
   and next to the bar's other icons it looked pixelated; it's drawn with soft edges, as at every
   other size, with the cut of its wing back.
