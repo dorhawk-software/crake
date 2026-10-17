@@ -1,0 +1,96 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Audit: what I’d change</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&family=Atkinson+Hyperlegible+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#0E0F10;--ink:#ECEDEE;--muted:#A9AEB4;--line:#33363A;--accent:#2DD4BF;--surface:#1E2022}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 'Atkinson Hyperlegible Next',system-ui,sans-serif}
+.page{padding:28px 40px 56px;max-width:1300px}@media (max-width:700px){.page{padding:20px 16px 40px}}
+h1{font-size:22px;margin:0 0 6px}h2{font-size:17px;margin:40px 0 4px}
+p,li{max-width:960px}.intro{color:var(--muted)}.intro b,.why b,li b,.rule b{color:var(--ink)}.why{color:var(--muted);font-size:13px;margin:0 0 12px}
+.rule{margin:22px 0 0;padding:14px 18px;background:var(--surface);border:1px solid var(--line);border-radius:8px;max-width:960px;font-size:13px;color:var(--muted)}
+.pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;max-width:1240px;align-items:start}.pair.wide{grid-template-columns:1fr}
+.pair+.pair{margin-top:16px}
+figure{margin:0;min-width:0}figure img{display:block;max-width:100%;height:auto;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;background:#DCDCD8}
+figcaption{font-size:12px;color:var(--muted);margin:0 0 6px}figure a{display:block}
+table{border-collapse:collapse;font-size:13px;max-width:960px}th,td{text-align:left;padding:6px 14px 6px 0;border-bottom:1px solid var(--line);vertical-align:top;color:var(--muted)}th{color:var(--ink);font-weight:600}td:first-child{color:var(--ink)}
+.mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace;font-size:12.5px}
+ul{color:var(--muted);font-size:13px;padding-left:18px}li{margin:5px 0}
+.ask{margin-top:36px;padding:16px 18px;border:1px solid var(--line);border-radius:8px;max-width:960px}.ask b{color:var(--accent)}.ask ol{color:var(--muted);font-size:13px;padding-left:20px;margin:6px 0 0}.ask li b{color:var(--ink)}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:1px 6px;border:1px solid var(--line);border-radius:4px;color:var(--muted);margin-left:8px;vertical-align:middle}
+</style></head><body><div class="page">
+<h1>The app, audited: what I’d change</h1>
+<p class="intro">Every window of Crake, captured from the app in both themes with its demo data, read against DESIGN.md and the screens by two independent assessments and by me. <b>The app reads as Crake.</b> The sentence per decision with its reason and its Undo is the thing no other VPN client has. The two-stroke tick carries from the tray to the chart, the log and tunnel detail. The voice holds in every window. First run, the leftover notice and New tunnel’s three steps need nothing.</p>
+<p class="intro">What drifts is small: teal doing work that isn’t a decision, red at rest, a few places where the app slipped from its own screens, and copy. <b>One window changes its structure, Traffic. The rest is polish.</b> Below, <i>before</i> is the app today and <i>after</i> is a screen or a proposal page with the change, drawn by a different engine and often from older sample data; each caption says what else differs, so you judge the change, not the rendering. Click an image for its full size.</p>
+<div class="rule"><b>The rule the audit holds to</b>, from DESIGN.md’s token table: teal is a <b>decision</b> (the ticks, “Sent … through”), an <b>on or chosen state</b> (a switch, the Listening dot, a chosen filter or step card, “Recommended”) or the <b>one primary action</b>. It is not information: a path in a graph, an acknowledgement, a confirmation. Red is a destructive action when it is armed (pointed at, or in its confirm step), or something that failed; amber is “needs you”.</div>
+
+<h2>1. Traffic: the graph in greys, the decision marked<span class="tag">redesign</span></h2>
+<p class="why">The graph paints every tunnel path teal and every tunnel’s dot in the table, so there teal means “through a tunnel”: the meaning the strip under it gave up on 2026-10-15, and the loudest element in the app. After: every path in one grey, thickness the rate (the rule the window already has with animations off); a two-stroke tick before each destination Crake <i>learned</i> (pinned and full-tunnel destinations stay unmarked) and in the table instead of a dot, so the strip’s tick and the graph’s mean the same thing. The strip stays as the app draws it: tunnels under direct, square on the baseline, the routed tick. “Goes” becomes “Way”, the window’s own word, and names take the leftover width.</p>
+<div class="pair wide"><figure><figcaption>the app today (10 connections of the demo)</figcaption><a href="audit-2026-10-17/traffic-before.webp"><img src="audit-2026-10-17/traffic-before.webp" width="920" height="980" alt="the app today (10 connections of the demo)" loading="lazy"></a></figure><figure><figcaption>proposed (the proposal page’s own sample: 23 connections, other rates; judge the paths, the ticks, the Way column)</figcaption><a href="audit-2026-10-17/traffic-after.webp"><img src="audit-2026-10-17/traffic-after.webp" width="922" height="735" alt="proposed (the proposal page’s own sample: 23 connections, other rates; judge the paths, the ticks, the Way column)" loading="lazy"></a></figure></div>
+<div class="pair wide"><figure><figcaption>the app today, dark</figcaption><a href="audit-2026-10-17/traffic-before-dark.webp"><img src="audit-2026-10-17/traffic-before-dark.webp" width="920" height="980" alt="the app today, dark" loading="lazy"></a></figure><figure><figcaption>proposed, dark</figcaption><a href="audit-2026-10-17/traffic-after-dark.webp"><img src="audit-2026-10-17/traffic-after-dark.webp" width="922" height="735" alt="proposed, dark" loading="lazy"></a></figure></div>
+
+<h2>2. Red only when it is armed<span class="tag">decide: a rule change</span></h2>
+<p class="why">Settings → Tunnels shows two red “Remove…” buttons with trash icons on an idle list, and Privacy a red “Clear log…”. They are faithful to the approved proposal (settings-tunnels.html draws Remove… in danger), so this changes the rule, not the app: red at rest means something is wrong; a destructive action shows its colour when pointed at and in the confirm step it already has. After: muted bordered buttons until then.</p>
+<div class="pair"><figure><figcaption>the app today</figcaption><a href="audit-2026-10-17/tunnels-before.webp"><img src="audit-2026-10-17/tunnels-before.webp" width="1040" height="820" alt="the app today" loading="lazy"></a></figure><figure><figcaption>proposed (the proposal predates the switches, the Beta tag and the host counts; judge the buttons)</figcaption><a href="audit-2026-10-17/tunnels-after.webp"><img src="audit-2026-10-17/tunnels-after.webp" width="1024" height="822" alt="proposed (the proposal predates the switches, the Beta tag and the host counts; judge the buttons)" loading="lazy"></a></figure></div>
+
+<h2>3. Tunnel detail back to its screen<span class="tag">fix</span></h2>
+<p class="why">Pin and Forget became bare bold text, as heavy as the host name; the screen has quiet bordered buttons. The screen also right-aligns the last-used column and shows a time on the pinned row too, where the app shows a dash. And “Disconnect” in the title row becomes “Switch off”, the word every other place uses.</p>
+<div class="pair"><figure><figcaption>the app today</figcaption><a href="audit-2026-10-17/detail-before.webp"><img src="audit-2026-10-17/detail-before.webp" width="900" height="880" alt="the app today" loading="lazy"></a></figure><figure><figcaption>the screen with “Switch off” (it predates Forget all… and the tick counts; judge the rows and the title row)</figcaption><a href="audit-2026-10-17/detail-after.webp"><img src="audit-2026-10-17/detail-after.webp" width="900" height="887" alt="the screen with “Switch off” (it predates Forget all… and the tick counts; judge the rows and the title row)" loading="lazy"></a></figure></div>
+
+<h2>4. The log: an empty day, said once<span class="tag">fix</span></h2>
+<p class="why">A day with nothing to say says it three times: “0 hosts routed, 0 left alone, 0 undone”, then the chart, then “Nothing matches today”, which implies a filter while Everything is chosen. After: the chart stays (it is the day’s traffic, and the only place to see it) and one line under it: “Nothing to tell today. No host needed a decision.” (not “everything went direct”, which the log can’t vouch for with a full tunnel on). Also: no chip for a host left alone (a badge holding a dash said nothing), and the zoom hint only while the pointer is over the chart. The chosen filter stays teal: a chosen state.</p>
+<div class="pair"><figure><figcaption>the app today</figcaption><a href="audit-2026-10-17/log-before.webp"><img src="audit-2026-10-17/log-before.webp" width="980" height="900" alt="the app today" loading="lazy"></a></figure><figure><figcaption>proposed (the screen with an empty day)</figcaption><a href="audit-2026-10-17/log-after.webp"><img src="audit-2026-10-17/log-after.webp" width="980" height="637" alt="proposed (the screen with an empty day)" loading="lazy"></a></figure></div>
+
+<h2>5. The AnyConnect notice’s “Got it”<span class="tag">fix</span></h2>
+<p class="why">It is teal text; the leftover notice’s “Got it” is a bordered button on the command’s line (your choice, A2, 2026-10-15, which stays), the no-tray note has a bordered action and a muted “Not now”. After: the AnyConnect notice gets the same bordered button; an acknowledgement is never teal. New notices follow the no-tray note’s shape: a title at 600, a body, an actions row with a bordered action and a muted text dismiss.</p>
+<div class="pair"><figure><figcaption>the app today (Globex, a managed full tunnel, off)</figcaption><a href="audit-2026-10-17/notice-before.webp"><img src="audit-2026-10-17/notice-before.webp" width="452" height="126" alt="the app today (Globex, a managed full tunnel, off)" loading="lazy"></a></figure><figure><figcaption>proposed (the proposal page: ACME, on)</figcaption><a href="audit-2026-10-17/notice-after.webp"><img src="audit-2026-10-17/notice-after.webp" width="454" height="231" alt="proposed (the proposal page: ACME, on)" loading="lazy"></a></figure></div>
+
+<h2>6. The status dot says what the bird says<span class="tag">fix</span></h2>
+<p class="why">With a tunnel stopped the header reads “● Trouble” with a grey dot while the bird wears its red badge and the row says “Session expired” in red. After: the dot in danger.</p>
+<div class="pair"><figure><figcaption>the app today</figcaption><a href="audit-2026-10-17/header-before.webp"><img src="audit-2026-10-17/header-before.webp" width="452" height="60" alt="the app today" loading="lazy"></a></figure><figure><figcaption>proposed</figcaption><a href="audit-2026-10-17/header-after.webp"><img src="audit-2026-10-17/header-after.webp" width="452" height="60" alt="proposed" loading="lazy"></a></figure></div>
+
+<h2>7. “?” where it earns its place<span class="tag">fix</span></h2>
+<p class="why">A “?” after every row in General and Learning marks nothing. Keep it where its card says more than the line under the title: General’s Show the bird (the legend of the bird’s looks) and When Crake routes a host; Learning’s Wait for a direct answer, When two tunnels answer and Forget hosts unused for (its card holds the rule that a host used today isn’t forgotten seven days after it was learned); Names’ and Privacy’s all stay (each explains a DNS or privacy behaviour the line can’t). Drop it on Start when you log in, Switch on the tunnels you left on, Tell me when there’s a new version, Never send through a tunnel.</p>
+
+<h2>8. Sign-in asks in words<span class="tag">fix</span></h2>
+<p class="why">The app shows the gateway’s raw field name: “ACME asks: GROUP”. The screen says it the other way, “Nordbank asks for a code”, with the gateway’s own words quoted under it. After: the same, from a small table of the field names gateways use; a name not in it keeps today’s quoted form.</p>
+<div class="pair"><figure><figcaption>the app today</figcaption><a href="audit-2026-10-17/signin-before.webp"><img src="audit-2026-10-17/signin-before.webp" width="340" height="275" alt="the app today" loading="lazy"></a></figure><figure><figcaption>proposed</figcaption><a href="audit-2026-10-17/signin-after.webp"><img src="audit-2026-10-17/signin-after.webp" width="340" height="275" alt="proposed" loading="lazy"></a></figure></div>
+<table><tr><th>Field</th><th>Crake says</th></tr><tr><td class="mono">group</td><td>ACME asks for your group</td></tr><tr><td class="mono">username</td><td>ACME asks for your username</td></tr><tr><td class="mono">password</td><td>ACME asks for your password</td></tr><tr><td class="mono">passcode, OTP, token, code</td><td>ACME asks for a code</td></tr><tr><td class="mono">second password</td><td>ACME asks for your second password</td></tr><tr><td class="mono">PIN</td><td>ACME asks for your PIN</td></tr><tr><td>anything else</td><td>ACME asks: <span class="mono">NAME</span> (as today)</td></tr></table>
+
+<h2>9. Tokens and type</h2>
+<p class="why"><b>Light amber</b> <span class="tag">decide</span>: <span class="mono">warning</span> #E39A1B measures 2.4:1 on the panel, under the 3:1 for a mark. Where it is drawn that matters only at the triangle’s edge, where it leaves the bird’s ink head onto the panel or the notice’s tint. Two values that pass, beside today’s, on both backgrounds; #BF7E12 keeps more of the amber. Dark keeps #F5B740 (9.1:1); the tint and hairline tokens don’t change.</p>
+<figure><figcaption>today, #BF7E12 and #B9791A: the notice icon at 22 and 44 px, on the panel and on a notice, light theme</figcaption><a href="audit-2026-10-17/amber.webp"><img src="audit-2026-10-17/amber.webp" width="790" height="196" alt="today, #BF7E12 and #B9791A: the notice icon at 22 and 44 px, on the panel and on a notice, light theme" loading="lazy"></a></figure>
+<ul>
+<li><b>Disabled rows</b> <span class="tag">fix</span>: “Switch on the tunnels you left on” renders at 2.0–2.9:1 light and 2.5–3.9:1 dark. After: the row’s ink and muted at 55 % opacity instead of a lighter grey; off, and still readable.</li>
+<li><b>Privacy’s statement box</b> <span class="tag">fix</span>: tinted accentSoft, the chosen-row token, with a teal shield, for a sentence that states a fact. After: surface and an ink shield, as tunnel detail’s policy card.</li>
+<li><b>The screens’ housekeeping</b> <span class="tag">fix</span>: tray-panel.html’s 12.5 px reason line (the scale says 13); <span class="mono">a:hover</span> #0B5D57 in every screen with no token (name it, or use ink); settings.html and new-tunnel.html carry their own <span class="mono">surface</span> values (#26292C, #F3F3F0) instead of the table’s; a 500 weight loaded and used once where the table names 400/600/700.</li>
+</ul>
+
+<h2>10. One title row<span class="tag">fix</span></h2>
+<p class="why">The screens agree with each other: the title row starts 20 px from the left, its hairline sits at 56. The app’s windows start at 20, 22, 24, 22, 25, 23 and 29 (Traffic, drawn from a proposal, is the odd one). After: 20 and 56 everywhere, the same × in the same corner; a window then differs only in its actions.</p>
+
+<h2>11. Copy<span class="tag">fix</span></h2>
+<table><tr><th>Where</th><th>Today</th><th>After</th></tr>
+<tr><td>Panel, log, detail</td><td>“answered in 38 / ms.” can break between number and unit</td><td>a non-breaking space between every number and its unit</td></tr>
+<tr><td>New tunnel, step 2</td><td>“Opens in your default browser.” under the Stay signed in box</td><td>in the “In your browser” card, or gone: the card says it</td></tr>
+<tr><td>New tunnel, step 1</td><td>“Found a Cisco AnyConnect gateway” with the two-stroke tick</td><td>a muted check: the tick means routed</td></tr>
+<tr><td>Tunnel detail</td><td>“Disconnect”</td><td>“Switch off”</td></tr>
+<tr><td>Traffic</td><td>“Goes”</td><td>“Way”</td></tr>
+<tr><td>Traffic, demo data</td><td>“Since” says “5 min” on every row</td><td>real times in the demo (the column stays in both tabs)</td></tr>
+<tr><td>Log, empty day</td><td>“0 hosts routed, 0 left alone, 0 undone” · “Nothing matches today.”</td><td>“Nothing to tell today. No host needed a decision.”</td></tr></table>
+
+<h2>Considered and kept</h2>
+<ul>
+<li><b>The chosen filter and Learning’s segments in teal</b>, “Recommended”, the chosen step card’s tint, the Listening dot, About’s links: on or chosen states, and links.</li>
+<li><b>A smaller Settings frame.</b> About with “Is it safe?” and the coffee card needs about 800 px of the 820; a frame per section would jump. The frame stays.</li>
+<li><b>The panel’s three footer buttons.</b> Traffic was asked for and belongs beside the log.</li>
+<li><b>Cancel and × in New tunnel.</b> A dialog’s two exits, where people look for them.</li>
+<li><b>Traffic as a window of its own.</b> A “Right now” tab of the log was suggested; the log is history, Traffic is now.</li>
+<li><b>Left alone:</b> the panel’s body, first run, the leftover notice, Managed by IT, Names, New tunnel steps 1–3.</li>
+</ul>
+
+<div class="ask"><b>The ask</b>, in three groups.
+<ol>
+<li><b>Decide:</b> 1, the Traffic graph; 2, red only when armed (a rule change that also edits settings-tunnels.html); 9, the light amber (today, #BF7E12 or #B9791A).</li>
+<li><b>Rules to write into DESIGN.md</b> if you agree: teal as the box above says (its Colour section still opens with “Teal means ‘Crake made a decision’, nothing else”; the box reconciles that line with the token table); the danger line (“destructive actions” → armed) if 2 is taken; the notice shape (5); the title row (10).</li>
+<li><b>Fixes needing no decision</b>, done in one pass with their tests: 3, 4, 5, 6, 7, 8, the rest of 9, 11.</li>
+</ol></div>
+</div></body></html>
