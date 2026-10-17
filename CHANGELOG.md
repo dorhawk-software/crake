@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.10.2 (2026-10-17)
+
 - **"Keep internal names private" says when it can't.** If another DNS server on your computer
   holds the port Crake answers on, or Crake can't add its private DNS link, Settings → Names now
   says so under the setting, and Crake keeps trying. Before, it failed quietly, and with such a
