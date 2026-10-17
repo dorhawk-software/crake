@@ -7,4 +7,5 @@ pub mod single;
 pub mod tray;
 
 mod host;
+mod root_cursor;
 pub use host::*;

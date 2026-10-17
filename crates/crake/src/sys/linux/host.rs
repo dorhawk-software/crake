@@ -151,6 +151,25 @@ fn anchored_bottom(id: u32, bottom: i32) -> i32 {
     kept
 }
 
+/// XWayland's root window keeps the theme's arrow at the desktop's size,
+/// on a thread of its own (`root_cursor`: the pointer blinked large coming
+/// onto Crake's windows). Nothing on other X servers.
+pub fn keep_root_cursor() {
+    if cfg!(test) {
+        return;
+    }
+    let _ = std::thread::Builder::new()
+        .name("root cursor".into())
+        .spawn(|| {
+            let Ok((conn, screen)) = x11rb::connect(None) else {
+                return;
+            };
+            if super::root_cursor::is_xwayland(&conn) {
+                super::root_cursor::follow(&conn, screen);
+            }
+        });
+}
+
 /// A folder only this user can read, for files that live as long as a
 /// sign-in ($XDG_RUNTIME_DIR/crake, on tmpfs).
 pub fn private_dir() -> Result<PathBuf, String> {

@@ -33,8 +33,9 @@ notify-rust = "4"
 ksni = { version = "0.3", features = ["blocking"] }
 # Certificate passwords and certificates, in the GNOME keyring (Secret Service).
 oo7 = { version = "0.6", default-features = false, features = ["async-std", "native_crypto"] }
-# The real monitors (GPUI's X11 backend reports one screen spanning them all).
-x11rb = { version = "0.14", features = ["randr", "resource_manager"] }
+# The real monitors (GPUI's X11 backend reports one screen spanning them all),
+# and XWayland's root cursor (`sys::keep_root_cursor`).
+x11rb = { version = "0.14", features = ["cursor", "randr", "resource_manager"] }
 # The panel's X11 window, resized and moved in one step (`sys::resize_upward`).
 raw-window-handle = "0.6"
 
@@ -79,4 +80,4 @@ harness = false
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 # tests/x11_scale.rs reads the cursor's size from the X server.
-x11rb = { version = "0.14", features = ["randr", "resource_manager", "xfixes"] }
+x11rb = { version = "0.14", features = ["cursor", "randr", "resource_manager", "xfixes"] }

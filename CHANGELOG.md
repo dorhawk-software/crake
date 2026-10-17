@@ -11,6 +11,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **No more large pointer for a moment.** Coming onto a Crake window, the pointer could blink
+  large for an instant: GNOME had given XWayland's background a pointer at an older scale's size,
+  which shows before the window's own. Crake now gives it your theme's pointer at today's size,
+  and keeps it so when the scale or the pointer size changes.
+
 ## 0.10.3 (2026-10-17)
 
 - **The panel stays above the bar.** With long names in "What Crake did" (an Azure cluster's

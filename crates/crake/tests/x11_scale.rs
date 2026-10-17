@@ -10,6 +10,11 @@
 //! was loaded once at the scale Crake started with, and after a change the
 //! windows had the new scale and the cursor the old (twice the size).
 
+/// The app's own code for XWayland's root cursor, tried here on Xvfb.
+#[cfg(target_os = "linux")]
+#[path = "../src/sys/linux/root_cursor.rs"]
+mod root_cursor;
+
 #[cfg(target_os = "linux")]
 mod x11 {
     use std::time::{Duration, Instant};
@@ -132,6 +137,13 @@ mod x11 {
             (g.height / 2) as i16,
         )
         .expect("warp");
+        conn.flush().expect("flush");
+    }
+
+    /// Puts the pointer where no window is: the root window's own cursor.
+    fn point_at_root(conn: &RustConnection, root: u32) {
+        conn.warp_pointer(x11rb::NONE, root, 0, 0, 0, 0, 1800, 1000)
+            .expect("warp");
         conn.flush().expect("flush");
     }
 
@@ -299,6 +311,23 @@ mod x11 {
                 point_at(&conn, root, PLAIN);
                 let step = "a window with no cursor of its own shows the theme's arrow";
                 check_cursor(cx, &conn, |w| w == large, step).await;
+                // XWayland's root cursor (sys::keep_root_cursor): the theme's
+                // arrow at the desktop's size, following it. Xvfb isn't
+                // XWayland, where the app does it; here the test runs it.
+                if crate::root_cursor::is_xwayland(&conn) {
+                    println!("x11_scale: FAILED: Xvfb taken for XWayland");
+                    std::process::exit(1);
+                }
+                std::thread::spawn(|| {
+                    let (conn, screen) = x11rb::connect(None).expect("X");
+                    crate::root_cursor::follow(&conn, screen);
+                });
+                point_at_root(&conn, root);
+                let step = "the root window's cursor is the theme's arrow";
+                check_cursor(cx, &conn, |w| w == large, step).await;
+                set_scale(&conn, root, 96, 24);
+                let step = "the root window's cursor follows the size";
+                check_cursor(cx, &conn, |w| w == small, step).await;
                 println!("x11_scale: ok");
                 std::process::exit(0);
             })

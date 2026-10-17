@@ -354,6 +354,8 @@ fn main() {
     if x11 {
         // SAFETY: first thing in main, before any other thread exists.
         unsafe { std::env::remove_var("WAYLAND_DISPLAY") };
+        #[cfg(target_os = "linux")]
+        sys::keep_root_cursor();
     }
     gpui_kit::application()
         .with_assets(Assets)

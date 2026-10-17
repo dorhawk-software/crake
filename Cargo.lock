@@ -9852,6 +9852,7 @@ dependencies = [
  "gethostname",
  "rustix",
  "x11rb-protocol 0.14.0",
+ "xcursor",
 ]
 
 [[package]]
