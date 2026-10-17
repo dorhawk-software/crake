@@ -25,8 +25,16 @@ Changes in `src/linux/x11/window.rs` (and, for 3, `client.rs`), marked
    client watches the root window's RESOURCE_MANAGER, reads the scale again
    and gives each window the new one, keeping its logical size (the window
    asks for the new number of pixels; its ConfigureNotify tells GPUI).
+   The cursor follows as well (2026-10-17): x11rb fixes a cursor theme's
+   size when it's loaded (Xcursor.size, else Xft.dpi), so a Crake started
+   at one scale kept its cursors at that size after the windows took the
+   other: twice the size after undocking, once the pointer was over
+   anything that sets its own cursor. When Xcursor.size, Xcursor.theme or
+   Xft.dpi change, the theme is loaded again, the cached cursors are freed
+   and every window's cursor is set again.
    Tested on a real X server: `crates/crake/tests/x11_scale.rs`
-   (`scripts/x11-test.sh`, Xvfb with a software GPU).
+   (`scripts/x11-test.sh`, Xvfb with a software GPU; the cursor's size is
+   read back with XFixes).
 
 Keeping it current: the change itself is `vendor/gpui-pre-linux.patch` (a
 diff against crates.io's pristine source). `scripts/update-gpui.sh` takes the

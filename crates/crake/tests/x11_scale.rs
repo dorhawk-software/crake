@@ -6,7 +6,9 @@
 //! of the monitors' (xwayland-native-scaling) and is published as Xft.dpi in
 //! the root window's RESOURCE_MANAGER. Plugging a HiDPI monitor into a laptop
 //! that ran at 100% doubles it; GPUI read Xft.dpi once at start, so every
-//! window opened afterwards came out half size.
+//! window opened afterwards came out half size. The cursor follows too: it
+//! was loaded once at the scale Crake started with, and after a change the
+//! windows had the new scale and the cursor the old (twice the size).
 
 #[cfg(target_os = "linux")]
 mod x11 {
@@ -17,6 +19,7 @@ mod x11 {
         WindowHandle, WindowOptions, div, point, prelude::*, px, size,
     };
     use x11rb::connection::Connection as _;
+    use x11rb::protocol::xfixes::ConnectionExt as _;
     use x11rb::protocol::xproto::{AtomEnum, ConnectionExt as _, PropMode};
     use x11rb::rust_connection::RustConnection;
     use x11rb::wrapper::ConnectionExt as _;
@@ -34,13 +37,29 @@ mod x11 {
 
     impl Render for Blank {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-            div().size_full().bg(gpui_kit::rgb(0x2DD4BF))
+            // A pointing hand: GPUI sets this window's cursor itself.
+            div()
+                .size_full()
+                .bg(gpui_kit::rgb(0x2DD4BF))
+                .cursor_pointer()
         }
     }
 
     /// What the desktop does: the X resources with this Xft.dpi.
     fn set_dpi(conn: &RustConnection, root: u32, dpi: u32) {
-        let resources = format!("Xft.dpi:\t{dpi}\n");
+        set_resources(conn, root, &format!("Xft.dpi:\t{dpi}\n"));
+    }
+
+    /// GNOME's xsettings: Xft.dpi and the cursor's size, both at the scale.
+    fn set_scale(conn: &RustConnection, root: u32, dpi: u32, cursor: u32) {
+        set_resources(
+            conn,
+            root,
+            &format!("Xft.dpi:\t{dpi}\nXcursor.theme:\tAdwaita\nXcursor.size:\t{cursor}\n"),
+        );
+    }
+
+    fn set_resources(conn: &RustConnection, root: u32, resources: &str) {
         conn.change_property8(
             PropMode::REPLACE,
             root,
@@ -67,6 +86,67 @@ mod x11 {
             let g = conn.get_geometry(w).ok()?.reply().ok()?;
             Some((g.width, g.height))
         })
+    }
+
+    /// The width of the cursor the server shows now (XFixes).
+    fn cursor_width(conn: &RustConnection) -> Option<u16> {
+        Some(conn.xfixes_get_cursor_image().ok()?.reply().ok()?.width)
+    }
+
+    /// Puts the pointer in the middle of the window called `title`.
+    fn point_at(conn: &RustConnection, root: u32, title: &str) {
+        let tree = conn.query_tree(root).expect("tree").reply().expect("tree");
+        let window = tree
+            .children
+            .into_iter()
+            .find(|w| {
+                conn.get_property(false, *w, AtomEnum::WM_NAME, AtomEnum::ANY, 0, 64)
+                    .ok()
+                    .and_then(|c| c.reply().ok())
+                    .is_some_and(|n| n.value == title.as_bytes())
+            })
+            .expect("the window");
+        let g = conn
+            .get_geometry(window)
+            .expect("geometry")
+            .reply()
+            .expect("geometry");
+        conn.warp_pointer(
+            x11rb::NONE,
+            window,
+            0,
+            0,
+            0,
+            0,
+            (g.width / 2) as i16,
+            (g.height / 2) as i16,
+        )
+        .expect("warp");
+        conn.flush().expect("flush");
+    }
+
+    /// Waits until the cursor's width passes `ok` (or PATIENCE runs out);
+    /// says what it saw, and fails the test if it doesn't.
+    async fn check_cursor(
+        cx: &mut AsyncApp,
+        conn: &RustConnection,
+        ok: impl Fn(u16) -> bool,
+        step: &str,
+    ) -> u16 {
+        let start = Instant::now();
+        let width = loop {
+            let width = cursor_width(conn).unwrap_or(0);
+            if ok(width) || start.elapsed() > PATIENCE {
+                break width;
+            }
+            cx.background_executor().timer(POLL).await;
+        };
+        println!("{step}: cursor {width} px wide");
+        if !ok(width) {
+            println!("x11_scale: FAILED: {step}");
+            std::process::exit(1);
+        }
+        width
     }
 
     #[derive(Debug, PartialEq)]
@@ -142,6 +222,11 @@ mod x11 {
         }
         let (conn, screen) = x11rb::connect(None).expect("an X server (DISPLAY)");
         let root = conn.setup().roots[screen].root;
+        // XFixes answers only once its version is asked.
+        conn.xfixes_query_version(5, 0)
+            .expect("XFixes")
+            .reply()
+            .expect("XFixes");
         // The laptop alone, at 100%.
         set_dpi(&conn, root, 96);
 
@@ -163,6 +248,30 @@ mod x11 {
                 set_dpi(&conn, root, 96);
                 check(cx, &conn, root, first, expect(1.), "back at 100%").await;
                 check(cx, &conn, root, second, expect(1.), "back at 100%").await;
+
+                // The cursor, as GNOME sets it: 24 px at 100%, 48 at 200%.
+                set_scale(&conn, root, 96, 24);
+                check(cx, &conn, root, first, expect(1.), "at 100%, cursor 24").await;
+                point_at(&conn, root, FIRST);
+                let small = check_cursor(cx, &conn, |w| w > 0, "pointing at 100%").await;
+                set_scale(&conn, root, 192, 48);
+                check(cx, &conn, root, first, expect(2.), "at 200%, cursor 48").await;
+                check_cursor(cx, &conn, |w| w > small, "the cursor grew with the scale").await;
+                set_scale(&conn, root, 96, 24);
+                check(
+                    cx,
+                    &conn,
+                    root,
+                    first,
+                    expect(1.),
+                    "back at 100%, cursor 24",
+                )
+                .await;
+                let step = "the cursor is its old size again";
+                check_cursor(cx, &conn, |w| w == small, step).await;
+                // The cursor's size alone (Accessibility's "Large cursor").
+                set_scale(&conn, root, 96, 48);
+                check_cursor(cx, &conn, |w| w > small, "a larger cursor, same scale").await;
                 println!("x11_scale: ok");
                 std::process::exit(0);
             })

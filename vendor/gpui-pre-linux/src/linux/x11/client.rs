@@ -230,6 +230,9 @@ pub struct X11ClientState {
     pub(crate) cursor_cache: HashMap<CursorStyle, Option<xproto::Cursor>>,
     pub(crate) invisible_cursor_cache: Option<xproto::Cursor>,
     pub(crate) cursor_hidden_window: Option<xproto::Window>,
+    /// CRAKE PATCH: the resources the cursors were loaded with (Xcursor.size,
+    /// Xcursor.theme, Xft.dpi): when they change, the cursors are loaded again.
+    pub(crate) cursor_resources: [Option<String>; 3],
 
     pointer_device_states: BTreeMap<xinput::DeviceId, PointerDeviceState>,
 
@@ -488,6 +491,7 @@ impl X11Connection {
                 &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
             ),
         )?;
+        let cursor_resources = cursor_resources(&resource_database);
         let cursor_handle = cursor::Handle::new(&xcb_connection, x_root_index, &resource_database)
             .context("Failed to initialize cursor theme handler")?
             .reply()
@@ -555,6 +559,7 @@ impl X11Connection {
                 cursor_styles: HashMap::default(),
                 cursor_cache: HashMap::default(),
                 cursor_hidden_window: None,
+                cursor_resources,
                 invisible_cursor_cache: None,
 
                 pointer_device_states,
@@ -900,7 +905,15 @@ impl X11Client {
             return;
         };
         let scale = get_scale_factor(&state.xcb_connection, &database, state.x_root_index);
+        let cursors = cursor_resources(&database);
         state.resource_database = database;
+        // The cursor's size was fixed when it was loaded: a cursor loaded at
+        // the old scale stayed twice (or half) the size after the windows
+        // followed the new one.
+        if cursors != state.cursor_resources {
+            state.cursor_resources = cursors;
+            state.reload_cursors();
+        }
         if scale == state.scale_factor {
             return;
         }
@@ -2128,6 +2141,49 @@ impl X11ClientState {
             .expect("Failed to initialize window refresh timer")
     }
 
+    /// CRAKE PATCH: the cursor theme loaded again from the current resources
+    /// (its size and theme), and every window's cursor set again from it.
+    fn reload_cursors(&mut self) {
+        let Some(handle) =
+            cursor::Handle::new(&self.xcb_connection, self.x_root_index, &self.resource_database)
+                .context("X11: Failed to load the cursor theme again")
+                .log_err()
+                .and_then(|cookie| {
+                    cookie
+                        .reply()
+                        .context("X11: Failed to load the cursor theme again")
+                        .log_err()
+                })
+        else {
+            return;
+        };
+        self.cursor_handle = handle;
+        for cursor in self.cursor_cache.drain().filter_map(|(_, cursor)| cursor) {
+            self.xcb_connection.free_cursor(cursor).log_err();
+        }
+        let styled: Vec<_> = self.cursor_styles.iter().map(|(w, s)| (*w, *s)).collect();
+        for (window, style) in styled {
+            if self.cursor_hidden_window == Some(window) {
+                continue;
+            }
+            let Some(cursor) = self.get_cursor_icon(style) else {
+                continue;
+            };
+            check_reply(
+                || "Failed to set the reloaded cursor",
+                self.xcb_connection.change_window_attributes(
+                    window,
+                    &ChangeWindowAttributesAux {
+                        cursor: Some(cursor),
+                        ..Default::default()
+                    },
+                ),
+            )
+            .log_err();
+        }
+        self.xcb_connection.flush().log_err();
+    }
+
     fn get_cursor_icon(&mut self, style: CursorStyle) -> Option<xproto::Cursor> {
         if let Some(cursor) = self.cursor_cache.get(&style) {
             return *cursor;
@@ -2262,6 +2318,12 @@ impl X11ClientState {
 
 // Adapted from:
 // https://docs.rs/winit/0.29.11/src/winit/platform_impl/linux/x11/monitor.rs.html#103-111
+/// CRAKE PATCH: what x11rb's cursor handle takes its size and theme from.
+fn cursor_resources(database: &Database) -> [Option<String>; 3] {
+    ["Xcursor.size", "Xcursor.theme", "Xft.dpi"]
+        .map(|name| database.get_string(name, "").map(str::to_owned))
+}
+
 pub fn mode_refresh_rate(mode: &randr::ModeInfo) -> Duration {
     if mode.dot_clock == 0 || mode.htotal == 0 || mode.vtotal == 0 {
         return Duration::from_millis(16);
