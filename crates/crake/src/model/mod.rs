@@ -135,6 +135,19 @@ impl HostRow {
             used_ago: num("used_ago"),
         }
     }
+
+    /// Crake decided to send this host through the tunnel (it found it by
+    /// DNS, probing, a split...): it wears the two-stroke tick, also once
+    /// pinned. A host the user added ("you"), a network, or one sent
+    /// direct doesn't.
+    pub fn crakes_decision(&self) -> bool {
+        let by_crake = |how: &str| how != "you";
+        match self.kind.as_str() {
+            "learned" => self.learned.as_ref().is_none_or(|(_, how)| by_crake(how)),
+            "pinned" => self.learned.as_ref().is_some_and(|(_, how)| by_crake(how)),
+            _ => false,
+        }
+    }
 }
 
 /// What a decision row's button does.
@@ -695,6 +708,36 @@ impl Model {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn crakes_decisions_wear_the_tick_also_when_pinned() {
+        let row = |kind: &str, how: Option<&str>| HostRow {
+            target: "10.40.8.4".into(),
+            name: None,
+            kind: kind.into(),
+            learned: how.map(|h| (1, h.into())),
+            used_ago: None,
+        };
+        assert!(row("learned", Some("probe")).crakes_decision());
+        assert!(row("learned", None).crakes_decision(), "an older store");
+        assert!(
+            row("pinned", Some("dns")).crakes_decision(),
+            "learned, then pinned"
+        );
+        assert!(
+            !row("pinned", Some("you")).crakes_decision(),
+            "added by hand"
+        );
+        assert!(
+            !row("learned", Some("you")).crakes_decision(),
+            "added by hand"
+        );
+        assert!(!row("pinned", None).crakes_decision(), "a network pinned");
+        assert!(
+            !row("direct", Some("probe")).crakes_decision(),
+            "sent direct"
+        );
+    }
 
     #[test]
     fn helpdesk_copies_can_leave_hosts_out() {

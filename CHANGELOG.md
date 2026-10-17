@@ -16,6 +16,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
   showed a pointer twice (or half) its size. It follows the scale now, and the cursor size set in
   Accessibility too.
 
+- **Traffic's tick stays on a host you pinned.** A host Crake sent through a tunnel lost its
+  two-stroke tick in Traffic once you pinned it; it keeps it now. Hosts you added yourself have none.
+
 - **Traffic's ticks have room.** The line to a destination Crake learned stopped under its
   two-stroke tick, and packets ran beneath it; it now ends before the tick.
 

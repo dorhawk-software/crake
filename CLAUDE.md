@@ -409,7 +409,7 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    **The audit of 2026-10-17** (design/proposals/audit-2026-10-17.html,
    every window captured and read against DESIGN.md by two assessments;
    the user took it all): the graph's packets are grey on every way and
-   the two-stroke tick marks each learned destination, in the graph and
+   the two-stroke tick marks each destination Crake decided on (pinned later or not), in the graph and
    the table's "Way" column (teal had come to mean "through a tunnel"
    there); Settings' Remove…/Clear log… are quiet until pointed at; the
    "?" only where its card says more; tunnel detail's buttons and

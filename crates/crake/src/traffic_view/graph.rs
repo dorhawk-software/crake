@@ -80,12 +80,13 @@ pub struct Dest {
     pub label: String,
     pub rate: f64,
     pub more: bool,
-    /// Crake learned this host for the way (a decision: it wears the
-    /// two-stroke tick); pinned and full-tunnel destinations don't.
+    /// Crake decided to send this host through the way (it wears the
+    /// two-stroke tick, also once pinned); hosts the user added and
+    /// full-tunnel destinations don't (`HostRow::crakes_decision`).
     pub learned: bool,
 }
 
-/// The names and addresses `tunnel` learned (not pinned, not sent direct).
+/// The names and addresses Crake decided to send through `tunnel`.
 pub fn learned_labels(model: &Model, tunnel: Option<&str>) -> HashSet<String> {
     let Some(tunnel) = tunnel else {
         return HashSet::new();
@@ -95,7 +96,7 @@ pub fn learned_labels(model: &Model, tunnel: Option<&str>) -> HashSet<String> {
         .get(tunnel)
         .into_iter()
         .flatten()
-        .filter(|r| r.kind == "learned")
+        .filter(|r| r.crakes_decision())
         .flat_map(|r| {
             r.name
                 .iter()

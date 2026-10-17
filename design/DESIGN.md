@@ -132,6 +132,10 @@ told apart by name, not colour.
 
 Crake's one ownable mark is a **two-stroke tick**: a taller and a shorter
 vertical bar side by side, the "crex crex" call. It means **routed**.
+Beside a host (Traffic's graph and its Way column) it marks every host
+Crake itself decided to send through, and stays when the user pins it; a
+host the user added, a network, or one sent direct has none (wiki was
+learned by DNS, then pinned, and lost its tick: the user, 2026-10-17).
 
 - **Icon (18 px grid):** `M6 15V4M12 15V8`, stroke 2.4, round caps, accent.
 - **In charts:** two filled bars, **flat bottom sitting exactly on the
