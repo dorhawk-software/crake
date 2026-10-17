@@ -4,15 +4,13 @@
 //! triangle when something needs the user (red wins). A click opens
 //! the panel; the menu is the plain fallback: tunnels with check marks, Open
 //! Crake, Quit. What it shows and how it's drawn lives here (`art`: the
-//! bird, `grid`: its 16 px pixels, `motion`: its frames); each system's
-//! tray shows it (`sys::tray`).
+//! bird, `motion`: its frames); each system's tray shows it (`sys::tray`).
 
 use std::sync::LazyLock;
 
 pub use crate::sys::tray::{Handle, start};
 
 mod art;
-mod grid;
 mod motion;
 
 pub use art::Art;
@@ -154,23 +152,13 @@ const SIZE: u32 = 64;
 /// notification areas, GNOME's and KDE's bars), 32 to 48 (2x and more),
 /// 36 (macOS' menu bar on a Retina screen).
 const SMALL: [u32; 9] = [16, 20, 22, 24, 28, 32, 36, 40, 48];
-/// The size the bird is placed by hand for (`grid`).
-const GRID: u32 = 16;
 
 static ICONS: LazyLock<[Icon; 10]> = LazyLock::new(|| {
     // The bird alone, solid with the eye cut out: it holds its own next to
     // app icons in a small bar (DESIGN.md, Tray icon). CRAKE_TRAY=bird: the
     // whole bird in the grass, as in design/icons/crake-*-symbolic.svg.
     if std::env::var("CRAKE_TRAY").as_deref() != Ok("bird") {
-        return SHAPES.map(|shape| {
-            let mut icon = rest(shape).icon();
-            for (size, data) in &mut icon.small {
-                if *size == GRID {
-                    *data = raster(&grid::svg(shape), GRID);
-                }
-            }
-            icon
-        });
+        return SHAPES.map(|shape| rest(shape).icon());
     }
     // The whole bird has one trouble drawing, the bird with "!", and no
     // warning drawing (the plain bird; CRAKE_TRAY=bird is a fallback).

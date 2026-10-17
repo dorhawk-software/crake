@@ -11,6 +11,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **The bird in the bar is smooth again at its smallest.** 0.10.0 drew it pixel by pixel at 16 px,
+  and next to the bar's other icons it looked pixelated; it's drawn with soft edges, as at every
+  other size, with the cut of its wing back.
+
 - **The app icon is the bird in one ink.** The corncrake's colours are gone from the icon: it's
   the same light bird as in the panel and the bar, calling in teal, on the dark tile.
 

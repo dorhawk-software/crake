@@ -223,8 +223,11 @@ the folded wing one straight cut across the breast, the base running off
 the bottom edge. Its richness is cuts, not shading, and each cut is a
 feature: the mouth, the eye, the wing. One geometry, drawn by
 `crates/crake/src/tray/art.rs` at every size a tray asks for with the eye
-snapped to that size's pixels; 16 px is placed pixel by pixel
-(`tray/grid.rs`; the spec copies are `design/icons/tray-head-*.svg`).
+snapped to that size's pixels, anti-aliased at every size, 16 px included
+(the spec copies are `design/icons/tray-head-*.svg`). Rejected: 16 px
+placed pixel by pixel with no anti-aliasing (0.10.0): beside the bar's
+other icons it read as pixelated, and it lost the wing's cut (the user,
+2026-10-17).
 White; the states:
 
 | State | Shape |

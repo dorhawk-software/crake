@@ -41,30 +41,23 @@ fn the_eye_is_a_hole_the_bar_shows_through() {
 }
 
 #[test]
-fn the_sixteen_pixel_bird_is_placed_by_hand() {
-    let at = |shape: Shape, x: usize, y: usize| {
+fn the_sixteen_pixel_bird_is_drawn_smooth() {
+    // 0.10.0 placed it pixel by pixel with no anti-aliasing, and it looked
+    // pixelated beside the other icons in the bar: its edges are soft again,
+    // as at every other size.
+    let smallest = SMALL[0];
+    for shape in [Shape::Listening, Shape::Off, Shape::Trouble] {
         let (_, data) = ICONS[shape.index()]
             .small
             .iter()
-            .find(|(size, _)| *size == GRID)
+            .find(|(size, _)| *size == smallest)
             .unwrap();
-        data[(y * GRID as usize + x) * 4]
-    };
-    // The eye a 2×2 hole with ink before it, the bill's tip a pixel.
-    assert_eq!(at(Shape::Listening, 7, 3), 0);
-    assert_eq!(at(Shape::Listening, 8, 4), 0);
-    assert_eq!(at(Shape::Listening, 6, 3), 255);
-    assert_eq!(at(Shape::Listening, 14, 4), 255);
-    assert_eq!(at(Shape::Listening, 15, 4), 0);
-    // The badge's gap doesn't reach the eye: ink between them.
-    assert_eq!(at(Shape::Trouble, 5, 3), 0);
-    assert_eq!(at(Shape::Trouble, 6, 3), 255);
-    assert_eq!(at(Shape::Trouble, 7, 3), 0);
-    // Asleep is sunk and dim; connecting keeps the bill's tip.
-    assert_eq!(at(Shape::Off, 5, 2), 0);
-    assert!(at(Shape::Off, 5, 8) < 150 && at(Shape::Off, 5, 8) > 50);
-    assert_eq!(at(Shape::Connecting, 14, 4), 255);
-    assert_eq!(at(Shape::Connecting, 8, 8), 0);
+        let soft = data
+            .chunks(4)
+            .filter(|p| p[0] > 0 && p[0] < u8::MAX)
+            .count();
+        assert!(soft > 10, "{shape:?}: {soft} soft edge pixels");
+    }
 }
 
 #[test]
