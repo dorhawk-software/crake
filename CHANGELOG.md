@@ -11,6 +11,15 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Tunnel detail reads as its screen.** Pin and Forget are quiet bordered buttons again (they had
+  become bare bold words), "last used" lines up on the right, a pinned host shows nothing there
+  (its line says it's kept), and the title row says "Switch off", the words used everywhere else.
+
+- **The log's empty day says it once.** "Nothing to tell today. No host needed a decision." under
+  the day's chart, instead of a summary of zeros and "Nothing matches today"; a host left alone has
+  no badge any more; the "Scroll to zoom · drag to move" hint shows only while you point at the
+  chart.
+
 - **Settings is quieter.** "Remove…" and "Clear log…" are plain buttons until you point at them
   (red is for something that stopped, or for the question "Remove ACME?" itself); the "?" marks
   stay only where their card says more than the line under the setting; the row that only means

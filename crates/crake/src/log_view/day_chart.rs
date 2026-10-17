@@ -202,6 +202,7 @@ impl Log {
 
         div()
             .mt(px(10.))
+            .group("day-chart")
             .child(
                 div()
                     .id("day-chart")
@@ -287,11 +288,15 @@ impl Log {
                     .items_baseline()
                     .child(under),
             )
+            // The hint only while the pointer is over the chart: a permanent
+            // instruction line under it read as clutter.
             .child(
                 div()
                     .mt(px(6.))
                     .text_size(px(12.))
                     .text_color(t.muted)
+                    .opacity(0.)
+                    .group_hover("day-chart", |s| s.opacity(1.))
                     .child("Scroll to zoom \u{b7} drag to move"),
             )
     }

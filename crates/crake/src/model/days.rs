@@ -80,7 +80,8 @@ impl Model {
         days.into_iter().map(|(_, d)| d).collect()
     }
 
-    /// "7 hosts routed, 1 left alone, 1 undone" for today.
+    /// "7 hosts routed, 1 left alone, 1 undone" for today; nothing when
+    /// there's nothing to count (the empty day says so once).
     pub fn today_summary(&self) -> String {
         let today = jiff::Zoned::now().date();
         let tz = jiff::tz::TimeZone::system();
@@ -100,6 +101,9 @@ impl Model {
             }
         }
         let hosts = if routed == 1 { "host" } else { "hosts" };
+        if routed + left + undone == 0 {
+            return String::new();
+        }
         format!("{routed} {hosts} routed, {left} left alone, {undone} undone")
     }
 

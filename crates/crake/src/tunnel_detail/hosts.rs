@@ -237,7 +237,7 @@ impl TunnelDetail {
                 1 => "Yesterday".to_owned(),
                 d => format!("{d} days ago"),
             },
-            None => "\u{2014}".to_owned(),
+            None => String::new(),
         };
         let (target, pin_target) = (r.target.clone(), r.target.clone());
         let (danger, surface) = (t.danger, t.surface);
@@ -324,10 +324,14 @@ pub(super) fn host_text(
         .child(div().text_size(px(13.)).text_color(t.muted).child(how))
 }
 
+/// When the host was last used, right-aligned to one edge; a pinned host
+/// shows nothing here (its line says it's kept).
 pub(super) fn used_text(used: String, t: &Theme) -> impl IntoElement {
     div()
         .w(px(120.))
         .flex_none()
+        .flex()
+        .justify_end()
         .text_size(px(13.))
         .text_color(t.muted)
         .child(used)
@@ -460,6 +464,8 @@ impl TunnelDetail {
 /// A host's action: quiet, no border, so the host leads; still there at
 /// rest for a screen share. Its caller fills it when pointed at (Forget
 /// turns red too; design/proposals/critique-2026-10-15, 5).
+/// Pin, Unpin, Forget: quiet bordered buttons, as the screen draws them
+/// (tunnel-detail.html; bare bold text had weighed as much as the host).
 pub(super) fn row_button(
     id: impl Into<gpui_kit::ElementId>,
     label: &'static str,
@@ -468,10 +474,13 @@ pub(super) fn row_button(
     div()
         .id(id)
         .h(px(34.))
-        .px(px(8.))
+        .px(px(12.))
         .flex()
         .items_center()
+        .border_1()
+        .border_color(t.line)
         .rounded(px(6.))
+        .bg(t.panel)
         .text_color(t.ink)
         .font_weight(FontWeight::SEMIBOLD)
         .cursor_pointer()

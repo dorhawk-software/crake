@@ -65,11 +65,11 @@ button,input,select{font:inherit}
 <span class="mono" style="font-size: 13px; color: {{c.muted}}; padding-top: 1px">{{e.t}}</span>
 <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="margin-top: 1px"><path d="{{e.icon}}" stroke="{{e.iconColor}}" stroke-width="2.4" stroke-linecap="round" fill="none"></path></svg>
 <div style="min-width: 0"><div>{{e.text}}</div><div style="font-size: 13px; color: {{c.muted}}">{{e.why}}</div></div>
-<span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}; white-space: nowrap">{{e.tunnel}}</span>
+<sc-if value="{{e.chip}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}; white-space: nowrap">{{e.tunnel}}</span></sc-if><sc-if value="{{e.noChip}}" hint-placeholder-val="{{false}}"><span></span></sc-if>
 </div>
 </sc-for>
 <sc-if value="{{emptyToday}}" hint-placeholder-val="{{false}}">
-<div style="padding: 20px 0; border-top: 1px solid {{c.line}}; color: {{c.muted}}">Nothing matches today.</div>
+<div style="padding: 20px 0; border-top: 1px solid {{c.line}}; color: {{c.muted}}">Nothing to tell today. No host needed a decision.</div>
 </sc-if>
 </div>
 
@@ -82,7 +82,7 @@ button,input,select{font:inherit}
 <span class="mono" style="font-size: 13px; color: {{c.muted}}; padding-top: 1px">{{e.t}}</span>
 <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="margin-top: 1px"><path d="{{e.icon}}" stroke="{{e.iconColor}}" stroke-width="2.4" stroke-linecap="round" fill="none"></path></svg>
 <div style="min-width: 0"><div>{{e.text}}</div><div style="font-size: 13px; color: {{c.muted}}">{{e.why}}</div></div>
-<span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}; white-space: nowrap">{{e.tunnel}}</span>
+<sc-if value="{{e.chip}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}; white-space: nowrap">{{e.tunnel}}</span></sc-if><sc-if value="{{e.noChip}}" hint-placeholder-val="{{false}}"><span></span></sc-if>
 </div>
 </sc-for>
 <button type="button" style="margin-top: 8px; height: 38px; padding: 0 14px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Show earlier days</button>
@@ -129,7 +129,7 @@ class Component extends DCLogic {
     const st = this.state;
     const q = (st.q || '').toLowerCase().trim();
     const keep = (k, text, tunnel) => (st.kind === 'all' || st.kind === k) && (!q || (text + ' ' + tunnel).toLowerCase().includes(q));
-    const mk = r => ({ t: r[0], icon: ic[r[1]], iconColor: col[r[1]], text: r[2], why: r[3], tunnel: r[4] });
+    const mk = r => ({ t: r[0], icon: ic[r[1]], iconColor: col[r[1]], text: r[2], why: r[3], tunnel: r[4], chip: r[4] !== '—', noChip: r[4] === '—' });
     const today = T.filter(r => keep(r[1], r[2], r[4])).map(mk);
     const yesterday = Y.filter(r => keep(r[1], r[2], r[4])).map(mk);
     const X = h => h / 14 * 940 * (14 / 13.4) * (13.4 / 14);
@@ -159,7 +159,7 @@ class Component extends DCLogic {
       c, kinds, today, yesterday, q: st.q,
       emptyToday: today.length === 0,
       chart: { bars, ticks: ticks || 'M0 0', holes: holes || 'M0 0' },
-      todaySummary: routedCount + ' hosts routed, 1 left alone, 1 undone',
+      todaySummary: today.length ? routedCount + ' hosts routed, 1 left alone, 1 undone' : '',
       onQ: e => this.setState({ q: e.target.value })
     };
   }

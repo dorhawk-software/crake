@@ -82,7 +82,11 @@ impl Render for Log {
                     .child(self.today_head(&model, &t, cx))
                     .child(self.day_chart(&model, &t, cx)),
             )
-            .child(rows(today_rows, "Nothing matches today.", &t));
+            .child(rows(
+                today_rows,
+                "Nothing to tell today. No host needed a decision.",
+                &t,
+            ));
 
         let mut rest: Vec<Day> = days.collect();
         let more = rest.len() > 1;

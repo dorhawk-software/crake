@@ -60,18 +60,21 @@ pub(super) fn row(r: Row, t: &Theme) -> AnyElement {
                 .child(r.text)
                 .child(div().text_size(px(13.)).text_color(t.muted).child(r.why)),
         )
-        .child(
-            div()
-                .flex_none()
-                .px(px(8.))
-                .py(px(2.))
-                .rounded(px(4.))
-                .bg(t.surface)
-                .text_color(t.muted)
-                .text_size(px(12.))
-                .line_height(px(16.))
-                .font_weight(FontWeight::SEMIBOLD)
-                .child(r.badge),
-        )
+        // A host left alone has no chip: a badge holding a dash said nothing.
+        .when(r.badge != "\u{2014}", |row| {
+            row.child(
+                div()
+                    .flex_none()
+                    .px(px(8.))
+                    .py(px(2.))
+                    .rounded(px(4.))
+                    .bg(t.surface)
+                    .text_color(t.muted)
+                    .text_size(px(12.))
+                    .line_height(px(16.))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(r.badge),
+            )
+        })
         .into_any_element()
 }

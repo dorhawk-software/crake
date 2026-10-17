@@ -168,7 +168,8 @@ impl Render for TunnelDetail {
                     .border_1()
                     .border_color(t.line)
                     .bg(t.panel)
-                    .child(if on { "Disconnect" } else { "Connect" })
+                    // The word every other place uses.
+                    .child(if on { "Switch off" } else { "Switch on" })
                     .keys()
                     .on_click(cx.listener(move |this, _, _, _| {
                         let _ = this
