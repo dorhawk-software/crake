@@ -203,6 +203,14 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
                         }
                     }
                     live.add(crate::model::live::demo(second), now);
+                    // Opened at different times, as real connections are.
+                    let mut keys: Vec<_> = live.first_seen.keys().cloned().collect();
+                    keys.sort();
+                    for (i, k) in keys.into_iter().enumerate() {
+                        if let Some(at) = now.checked_sub(DEMO_OPEN_FOR[i % DEMO_OPEN_FOR.len()]) {
+                            live.first_seen.insert(k, at);
+                        }
+                    }
                     cx.notify();
                 });
             } else {
@@ -334,6 +342,20 @@ fn demo_clock() -> std::time::Instant {
     *START.get_or_init(std::time::Instant::now)
 }
 const DEMO_HEAD_START: u64 = 300;
+// literal: the sample's connections, open for a dozen seconds to an hour
+/// How long each of the demo's connections has been open.
+const DEMO_OPEN_FOR: [std::time::Duration; 10] = [
+    std::time::Duration::from_secs(12),
+    std::time::Duration::from_secs(4 * 60),
+    std::time::Duration::from_secs(3600),
+    std::time::Duration::from_secs(2 * 60),
+    std::time::Duration::from_secs(25 * 60),
+    std::time::Duration::from_secs(7),
+    std::time::Duration::from_secs(90),
+    std::time::Duration::from_secs(15 * 60),
+    std::time::Duration::from_secs(40),
+    std::time::Duration::from_secs(6 * 60),
+];
 const DEMO_LOOK_EVERY: usize = 5;
 
 /// Each tunnel's OpenVPN 3 session: its openvpn3 path and its control.

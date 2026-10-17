@@ -133,6 +133,12 @@ fn the_tabs_list_connections_and_rules(cx: &mut TestAppContext) {
         .read_with(cx, |m, _| tables::right_now(m, Instant::now()));
     assert_eq!(rows.len(), 10, "the sample's connections");
     assert_eq!(rows[0].dest, "git.acme.internal:443", "busiest first");
+    // Crake learned it: the row and the graph wear the two-stroke tick; a
+    // direct destination gets a dot (design/proposals/audit-2026-10-17.html, 1).
+    assert!(rows[0].learned);
+    assert!(rows.iter().any(|r| r.goes == "direct" && !r.learned));
+    assert!(w.shows(name("tick:ACME:git.acme.internal"), cx));
+    assert!(!w.shows(name("tick:Direct:teams.microsoft.com"), cx));
     // The rate shown is the one they're ordered by: never more than above.
     let bytes = |s: &str| {
         let (n, unit) = s.split_once(' ').unwrap();

@@ -38,7 +38,10 @@ const POLL: Duration = Duration::from_secs(1);
 const HOSTS_EVERY: u32 = 5;
 /// Where a destination's rate ends (right-aligned).
 const RATE_RIGHT: f32 = 900.;
-const RATE_W: f32 = 76.;
+const RATE_W: f32 = 64.;
+/// The two-stroke tick before a learned destination, and its gap.
+const TICK_W: f32 = 14.;
+const TICK_GAP: f32 = 4.;
 const SIDE: f32 = 28.;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -122,7 +125,9 @@ impl Traffic {
     fn graph(&mut self, model: &Model, t: &Theme, window: &mut Window) -> Stateful<Div> {
         let ways = graph::ways(model);
         let l = graph::layout(&ways);
-        let paths = graph::paths(&ways, &l, t.accent, t.muted);
+        // Every path one grey: a way is told by its name, a decision by the
+        // tick (design/proposals/audit-2026-10-17.html, 1).
+        let paths = graph::paths(&ways, &l, t.muted);
         let moving = crate::motion::enabled();
         let now = Instant::now();
         self.flows.step(&paths, now, moving);
@@ -206,6 +211,25 @@ impl Traffic {
                     .test_support(),
             );
             for (dest, hy) in way.hosts.iter().zip(hosts) {
+                if dest.learned {
+                    g = g.child(
+                        div()
+                            .id(gpui_kit::ElementId::Name(
+                                format!("tick:{}:{}", way.label, dest.label).into(),
+                            ))
+                            .absolute()
+                            .left(px(HOST_X - TICK_W - TICK_GAP))
+                            .top(px(hy - TICK_W / 2.))
+                            .size(px(TICK_W))
+                            .child(
+                                gpui_kit::svg()
+                                    .path("crake/mark-routed.svg")
+                                    .size(px(TICK_W))
+                                    .text_color(t.accent),
+                            )
+                            .test_support(),
+                    );
+                }
                 g = g
                     .child(
                         div()
@@ -399,13 +423,13 @@ impl Traffic {
                 None => body.child(note("Looking\u{2026}", t)),
                 Some(true) if now.is_empty() => body.child(note("No connections open.", t)),
                 Some(true) => body.child(tables::table(
-                    &["Destination", "Goes", "Now", "Since"],
+                    &["Destination", "Way", "Now", "Since"],
                     now,
                     t,
                     cx,
                 )),
             },
-            Tab::Rules => body.child(tables::table(&["Destination", "Goes", "Why"], rules, t, cx)),
+            Tab::Rules => body.child(tables::table(&["Destination", "Way", "Why"], rules, t, cx)),
         }
     }
 }

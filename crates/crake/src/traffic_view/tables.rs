@@ -6,7 +6,7 @@
 use std::time::{Duration, Instant};
 
 use gpui_kit::prelude::*;
-use gpui_kit::{Div, FontWeight, Rgba, div, px};
+use gpui_kit::{Div, FontWeight, div, px, svg};
 
 use crate::model::Model;
 use crate::theme::{Theme, fonts};
@@ -23,15 +23,18 @@ const NUMBER_COL: f32 = 90.;
 const HOUR: u64 = 60 * MINUTE;
 /// A destination's name in a row (px).
 const DEST_SIZE: f32 = 13.;
+/// The way's mark: the tick's box, or the dot in it.
+const TICK_W: f32 = 14.;
+const DOT: f32 = 8.;
 
 /// A row: destination (and the address under a name), the way, and the
 /// two right-hand columns.
 pub struct Row {
     pub dest: String,
     pub under: Option<String>,
-    /// None: direct.
-    pub tunnel: Option<String>,
     pub goes: String,
+    /// Crake learned the host for this way: the tick, not a dot.
+    pub learned: bool,
     pub cols: Vec<String>,
 }
 
@@ -51,6 +54,8 @@ pub fn right_now(model: &Model, now: Instant) -> Vec<Row> {
             .total_cmp(&model.live.standing(&a.0))
             .then_with(|| a.0.key().cmp(&b.0.key()))
     });
+    let mut learned: std::collections::HashMap<Option<String>, std::collections::HashSet<String>> =
+        std::collections::HashMap::new();
     conns
         .into_iter()
         .map(|(c, _)| Row {
@@ -60,8 +65,11 @@ pub fn right_now(model: &Model, now: Instant) -> Vec<Row> {
                 c.dport
             ),
             under: None,
-            tunnel: c.tunnel.clone(),
             goes: way_label(model, c.tunnel.as_deref()),
+            learned: learned
+                .entry(c.tunnel.clone())
+                .or_insert_with(|| super::graph::learned_labels(model, c.tunnel.as_deref()))
+                .contains(&c.name.clone().unwrap_or_else(|| c.dst.to_string())),
             cols: vec![
                 rate(model.live.standing(c)),
                 model.live.open_for(c, now).map(since).unwrap_or_default(),
@@ -84,6 +92,7 @@ pub fn where_things_go(model: &Model) -> Vec<Row> {
                     crate::tunnel_detail::learned_how(r),
                 ),
             };
+            let learned = !matches!(r.kind.as_str(), "direct" | "pinned");
             rows.push(Row {
                 dest: r.name.clone().unwrap_or_else(|| r.target.clone()),
                 under: r.name.as_ref().map(|_| r.target.clone()),
@@ -91,7 +100,7 @@ pub fn where_things_go(model: &Model) -> Vec<Row> {
                     Some(_) => format!("through {}", tunnel.display),
                     None => "direct".into(),
                 },
-                tunnel: way,
+                learned,
                 cols: vec![why],
             });
         }
@@ -100,8 +109,8 @@ pub fn where_things_go(model: &Model) -> Vec<Row> {
         rows.push(Row {
             dest: never,
             under: None,
-            tunnel: None,
             goes: "direct".into(),
+            learned: false,
             cols: vec!["Never through a tunnel (Settings \u{2192} Learning)".into()],
         });
     }
@@ -112,8 +121,8 @@ pub fn where_things_go(model: &Model) -> Vec<Row> {
     rows.push(Row {
         dest: "Everything else".into(),
         under: None,
-        tunnel: full.map(|t| t.name.clone()),
         goes: full.map_or("direct".into(), |t| format!("through {}", t.display)),
+        learned: false,
         cols: vec![match full {
             Some(t) => format!("{} is a full tunnel", t.display),
             None => "Crake sends a host through a tunnel only when it needs one".into(),
@@ -174,11 +183,6 @@ pub fn table(heads: &[&'static str], rows: &[Row], t: &Theme, cx: &gpui_kit::App
     );
     let mut body = div().flex().flex_col().child(head);
     for (i, r) in rows.iter().take(MOST_ROWS).enumerate() {
-        let dot = if r.tunnel.is_some() {
-            t.accent
-        } else {
-            t.muted
-        };
         let mut line = div()
             .flex()
             .items_center()
@@ -201,7 +205,7 @@ pub fn table(heads: &[&'static str], rows: &[Row], t: &Theme, cx: &gpui_kit::App
                         d.child(div().text_size(px(12.)).text_color(t.muted).child(under))
                     }),
             )
-            .child(cell(WAY_COL).child(way(&r.goes, dot)));
+            .child(cell(WAY_COL).child(way(&r.goes, r.learned, t)));
         for c in &r.cols {
             line = line.child(
                 right(
@@ -238,14 +242,29 @@ fn right(d: Div, right_cols: usize) -> Div {
     }
 }
 
-/// A way: a dot in its colour and its name.
-fn way(label: &str, color: Rgba) -> Div {
+/// A way: its name, after the two-stroke tick when Crake learned the host
+/// for it (a decision), else a dot.
+fn way(label: &str, learned: bool, t: &Theme) -> Div {
+    let mark = div()
+        .size(px(TICK_W))
+        .flex()
+        .items_center()
+        .justify_center();
     div()
         .flex()
         .items_center()
         .gap(px(6.))
         .font_weight(FontWeight::SEMIBOLD)
-        .child(div().size(px(8.)).rounded_full().bg(color))
+        .child(if learned {
+            mark.child(
+                svg()
+                    .path("crake/mark-routed.svg")
+                    .size(px(TICK_W))
+                    .text_color(t.accent),
+            )
+        } else {
+            mark.child(div().size(px(DOT)).rounded_full().bg(t.muted))
+        })
         .child(label.to_owned())
 }
 

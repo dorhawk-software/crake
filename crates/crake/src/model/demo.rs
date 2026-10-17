@@ -176,6 +176,13 @@ pub fn demo() -> Model {
         .into_iter()
         .map(|(k, v)| (k.to_owned(), v.to_owned()))
         .collect(),
+        // ACME's hosts, as tunnel detail and Traffic list them.
+        host_rows: [(
+            "acme".to_owned(),
+            acme_hosts(jiff::Timestamp::now().as_second() as u64),
+        )]
+        .into_iter()
+        .collect(),
         ..Default::default()
     }
 }
@@ -226,6 +233,40 @@ pub fn demo_openvpn3(mut m: Model) -> Model {
 /// `CRAKE_DEMO=1 CRAKE_SHOW=detail:acme`: ACME connected for 4 h 53 min,
 /// its five learned hosts (wiki pinned), its DNS and pushed network, and
 /// traffic since the morning, all relative to now.
+// literal: the design's sample data (design/screens/tunnel-detail.html)
+/// ACME's hosts in the sample: (target, name, minutes since learned, how,
+/// minutes since used, pinned).
+const ACME_HOSTS: [(&str, &str, u64, &str, u64, bool); 5] = [
+    ("10.40.3.21", "git.acme.internal", 3, "probe", 0, false),
+    ("10.62.0.18", "", 157, "probe", 12, false),
+    ("10.40.8.4", "wiki.acme.internal", 250, "dns", 60, true),
+    ("10.40.8.9", "jira.acme.internal", 252, "dns", 3, false),
+    (
+        "10.40.9.30",
+        "builds.acme.example",
+        284,
+        "split",
+        120,
+        false,
+    ),
+];
+
+/// ACME's host rows as craked would list them, `now` seconds since the epoch.
+// literal: minutes to seconds
+fn acme_hosts(now: u64) -> Vec<HostRow> {
+    ACME_HOSTS
+        .iter()
+        .map(|(target, name, learned, how, used, pinned)| HostRow {
+            target: (*target).into(),
+            name: (!name.is_empty()).then(|| (*name).into()),
+            kind: if *pinned { "pinned" } else { "learned" }.into(),
+            learned: Some((now - learned * 60, (*how).into())),
+            used_ago: (!pinned).then_some(used * 60),
+        })
+        .collect()
+}
+
+// literal: the design's sample data (design/screens/tunnel-detail.html)
 pub fn demo_detail() -> Model {
     let mut m = demo();
     let now = jiff::Timestamp::now().as_second() as u64;
@@ -237,34 +278,8 @@ pub fn demo_detail() -> Model {
         acme.split_include = vec!["10.40.0.0/16".into()];
         acme.hosts = 6;
     }
-    // (target, name, minutes since learned, how, minutes since used, pinned)
-    let hosts = [
-        ("10.40.3.21", "git.acme.internal", 3, "probe", 0, false),
-        ("10.62.0.18", "", 157, "probe", 12, false),
-        ("10.40.8.4", "wiki.acme.internal", 250, "dns", 60, true),
-        ("10.40.8.9", "jira.acme.internal", 252, "dns", 3, false),
-        (
-            "10.40.9.30",
-            "builds.acme.example",
-            284,
-            "split",
-            120,
-            false,
-        ),
-    ];
-    m.host_rows.insert(
-        "acme".into(),
-        hosts
-            .iter()
-            .map(|(target, name, learned, how, used, pinned)| HostRow {
-                target: (*target).into(),
-                name: (!name.is_empty()).then(|| (*name).into()),
-                kind: if *pinned { "pinned" } else { "learned" }.into(),
-                learned: Some((now - learned * 60, (*how).into())),
-                used_ago: (!pinned).then_some(used * 60),
-            })
-            .collect(),
-    );
+    m.host_rows.insert("acme".into(), acme_hosts(now));
+    let hosts = ACME_HOSTS;
     // Busy since about 4 h 54 min ago, as the design's 8:30 to 13:24.
     let minute = now / 60;
     let mut walk = Walk(9);

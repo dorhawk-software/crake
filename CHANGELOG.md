@@ -11,6 +11,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Traffic shows its decisions, not its tunnels, in teal.** The packets moving through the graph
+  are grey on every way now; the two-stroke tick marks each destination Crake learned, in the
+  graph and in the table's "Way" column (it was "Goes"), the same tick as under the chart. Long
+  names aren't cut short any more.
+
 - **A new bird.** The one in the bar was a plain head; now it's a crake with its head raised,
   calling: a short bill parted at the tip, a square eye, the folded wing one cut across the
   breast. It opens its bill when it calls (a host sent through a tunnel), and drops its head to

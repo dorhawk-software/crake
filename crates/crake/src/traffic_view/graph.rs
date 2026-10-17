@@ -8,7 +8,7 @@
 //! With animations off, the dots stand still and a path's thickness says
 //! its rate instead.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use gpui_kit::{Bounds, PathBuilder, Pixels, Point, Rgba, Window, point, px, size};
@@ -77,6 +77,29 @@ pub struct Dest {
     pub label: String,
     pub rate: f64,
     pub more: bool,
+    /// Crake learned this host for the way (a decision: it wears the
+    /// two-stroke tick); pinned and full-tunnel destinations don't.
+    pub learned: bool,
+}
+
+/// The names and addresses `tunnel` learned (not pinned, not sent direct).
+pub fn learned_labels(model: &Model, tunnel: Option<&str>) -> HashSet<String> {
+    let Some(tunnel) = tunnel else {
+        return HashSet::new();
+    };
+    model
+        .host_rows
+        .get(tunnel)
+        .into_iter()
+        .flatten()
+        .filter(|r| r.kind == "learned")
+        .flat_map(|r| {
+            r.name
+                .iter()
+                .cloned()
+                .chain(std::iter::once(r.target.clone()))
+        })
+        .collect()
 }
 
 /// The ways out right now: each tunnel that's up, in the order traffic
@@ -121,6 +144,10 @@ pub fn ways(model: &Model) -> Vec<Way> {
             }
         }
         way.hosts = busiest(by_dest);
+        let learned = learned_labels(model, way.tunnel.as_deref());
+        for host in &mut way.hosts {
+            host.learned = !host.more && learned.contains(&host.label);
+        }
     }
     ways
 }
@@ -138,6 +165,7 @@ fn busiest(by_dest: HashMap<String, (f64, f64)>) -> Vec<Dest> {
                     label,
                     rate,
                     more: false,
+                    learned: false,
                 },
                 standing,
             )
@@ -157,6 +185,7 @@ fn busiest(by_dest: HashMap<String, (f64, f64)>) -> Vec<Dest> {
         label: format!("and {} more", rest.len()),
         rate: rest.iter().map(|d| d.rate).sum(),
         more: true,
+        learned: false,
     });
     all
 }
@@ -436,11 +465,11 @@ pub fn rate(bytes: f64) -> String {
 }
 
 /// The paths for `ways` laid out as `l`: computer to way, way to each
-/// destination, in `tunnel`/`direct` colours.
-pub fn paths(ways: &[Way], l: &Layout, tunnel: Rgba, direct: Rgba) -> Vec<Path> {
+/// destination, all in `color`: a way is told by its name, a decision by
+/// the tick (design/proposals/audit-2026-10-17.html, 1).
+pub fn paths(ways: &[Way], l: &Layout, color: Rgba) -> Vec<Path> {
     let mut out = Vec::new();
     for (way, (cy, hosts)) in ways.iter().zip(&l.ways) {
-        let color = if way.tunnel.is_some() { tunnel } else { direct };
         out.push(Path {
             key: format!("way:{}", way.label),
             curve: Curve::new((ME_X + ME_W / 2., l.me), (WAY_X - WAY_W / 2., *cy)),
@@ -563,6 +592,7 @@ mod tests {
                     label: i.to_string(),
                     rate: 0.,
                     more: false,
+                    learned: false,
                 })
                 .collect(),
         };
