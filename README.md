@@ -86,7 +86,7 @@ Beta: openconnect speaks it, but Crake hasn't been used against a real gateway o
 | Tunnels | New tunnel | Sign-in |
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/tunnels-light.webp" width="300"> | <img src="docs/screenshots/newtunnel-light.webp" width="260"> | <img src="docs/screenshots/signin-light.webp" width="260"> |
-| In the order traffic tries them, drag to change it. A full tunnel waits underneath. | Type the gateway: Crake asks it what it speaks and which groups it offers. | Your certificate's password from the keyring next time; browser sign-in for SSO. |
+| In the order traffic tries them, drag to change it. A full tunnel waits underneath. | Type the gateway: Crake asks it what it speaks and which groups it offers. | The gateway's questions in plain words. Browser sign-in for SSO; a certificate's password from the keyring. |
 
 | Traffic | An OpenVPN 3 profile | Is it safe? |
 |:---:|:---:|:---:|
@@ -324,7 +324,8 @@ scripts/vm-test.sh [release]                  # the same in a throwaway VM: AppA
 ```
 
 - **Needs:** openconnect, nftables, iproute2, systemd-resolved, and a tray: GNOME with the
-  AppIndicator extension, or KDE. OpenVPN 3 for its profiles.
+  AppIndicator extension, or KDE (without one, Crake says what would bring the bird back). OpenVPN 3
+  for its profiles.
 - **Config:** `packaging/craked.toml.example`.
 - **The design:** `design/DESIGN.md` and the approved screens in `design/screens/`, open in a browser.
 
@@ -356,7 +357,10 @@ forgotten so the app's next try goes through.
 - ✅ Gateways that only admit Cisco's client, said openly
 - ✅ OpenVPN 3 profiles, including sessions started elsewhere, edited in place
 - ✅ Traffic: a live view of what goes direct and what goes through each tunnel
-- ✅ Tray, panel, log, settings, new tunnel, sign-in, tunnel detail; light and dark
+- ✅ Tray, panel, log, settings, new tunnel, sign-in, tunnel detail; light and dark; usable from
+  the keyboard
+- ✅ A desktop that shows no tray icons: said so, with the extension switched on in one click
+  where it can be
 - ✅ Networks that block UDP: noticed, run over TCP on the same session, and remembered for next
   time — tested on a real network that blocks it
 - 🟡 GlobalProtect, Ivanti/Pulse, Juniper, Fortinet, F5 and Array: spoken through openconnect,
@@ -372,7 +376,7 @@ forgotten so the app's next try goes through.
 - ✅ NixOS: a flake with the package and a module (`services.crake.enable`), tested in NixOS VMs
 - ✅ IPv6 alongside IPv4: learned, routed, kept from going around a full tunnel
 - 🟡 Windows 11: an installer with openconnect included, tested in a VM against a real gateway
-  (not code-signed yet)
+  (not code-signed yet: applied for)
 - 🟡 macOS on Apple Silicon and Intel: a signed and notarized installer, tested on GitHub's Macs
   and first tried on a real Mac against a real gateway
 
