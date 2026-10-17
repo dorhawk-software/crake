@@ -30,7 +30,7 @@ only answers from inside, and then routes just that host and tells you why, in o
 ago. Neither knows what you actually open.**
 
 <p align="center">
-  <a href="https://youtu.be/snQUfK75huY"><img src="docs/media/video.jpg" alt="Crake in ninety seconds: a narrated video on YouTube. Watch where everything goes. Most of it, straight out." width="760" /></a>
+  <a href="https://youtu.be/VRwNp1UAEfM"><img src="docs/media/video.jpg" alt="Crake in ninety seconds: a narrated video on YouTube. Watch where everything goes. Most of it, straight out." width="760" /></a>
 </p>
 
 |        | Step                 | How                                                                                       |
