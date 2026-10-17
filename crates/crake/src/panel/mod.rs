@@ -143,7 +143,7 @@ fn header_marks(model: &Model, t: &Theme) -> Vec<gpui_kit::Svg> {
         ],
         Some(crate::tray::Badge::Warning) => vec![
             layer("crake/bird-badge-warning.svg", t.warning),
-            layer("crake/bird-badge-mark.svg", t.on_warning),
+            layer("crake/bird-badge-warning-mark.svg", t.on_warning),
         ],
         None => vec![layer("crake/call.svg", t.accent)],
     }

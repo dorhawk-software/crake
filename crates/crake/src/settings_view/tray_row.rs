@@ -63,8 +63,8 @@ const BADGE: f32 = 18.;
 const BADGE_HEAD: f32 = 14.;
 const LEGEND_BADGE: f32 = 24.;
 const LEGEND_HEAD: f32 = 20.;
-/// Drawn this many times the head's 16 px, so it stays sharp at 2x.
-const DRAWN_AT: &str = r#"width="48" height="48""#;
+/// Drawn at this size (the drawing's own is 32 px), so it stays sharp at 2x.
+const DRAWN_AT: &str = r#"width="64" height="64""#;
 
 /// The bar Crake's bird sits in here is light.
 fn light_bar() -> bool {
@@ -80,7 +80,7 @@ fn light_bar() -> bool {
 
 /// A look of the bird as the tray draws it, for this system's bar.
 fn drawing(shape: Shape, light: bool) -> Arc<Image> {
-    let svg = crate::tray::resting_svg(shape).replacen(r#"width="16" height="16""#, DRAWN_AT, 1);
+    let svg = crate::tray::resting_svg(shape).replacen(r#"width="32" height="32""#, DRAWN_AT, 1);
     let svg = if light {
         svg.replace("#ffffff", INK_ON_LIGHT)
     } else {
@@ -192,7 +192,7 @@ mod tests {
         for (shape, meaning) in LEGEND {
             assert!(meaning.ends_with('.'), "{meaning}");
             let svg = crate::tray::resting_svg(shape);
-            assert!(svg.contains(r#"width="16" height="16""#), "{shape:?}");
+            assert!(svg.contains(r#"width="32" height="32""#), "{shape:?}");
         }
         // The light bar's head is dark; the teal marks stay teal.
         let light = String::from_utf8(drawing(Shape::Routed, true).bytes().to_vec()).unwrap();

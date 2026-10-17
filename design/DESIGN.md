@@ -193,37 +193,69 @@ slash = full tunnel required, lock = managed.
 
 ### Tray icon
 
-**In the bar: the head alone** (`design/icons/tray-head-*.svg`). Top bars are
-small and app icons beside it are solid squares, so the tray icon is the
-crake's head, solid, with the eye cut out (the bar shows through), cropped
-square so it fills the slot. White; the states:
+**In the bar: the crake, calling** (design/proposals/bird-calling.html,
+chosen 2026-10-17 after four rounds: richer-bird.html, bird-redrawn.html).
+Top bars are small and app icons beside it are solid squares, so the tray
+icon is the bird's bust, solid, filling the slot: the head raised in the
+corncrake's call, a short stout bill parted at the tip (a mouth, even at
+bar size), the eye a square hole on whole pixels (the bar shows through),
+the folded wing one straight cut across the breast, the base running off
+the bottom edge. Its richness is cuts, not shading, and each cut is a
+feature: the mouth, the eye, the wing. One geometry, drawn by
+`crates/crake/src/tray/art.rs` at every size a tray asks for with the eye
+snapped to that size's pixels; 16 px is placed pixel by pixel
+(`tray/grid.rs`; the spec copies are `design/icons/tray-head-*.svg`).
+White; the states:
 
 | State | Shape |
 | --- | --- |
-| off | asleep: the head tipped down 25° and dimmed to 45 %, eye closed (an eye alone was too small a difference at 16 px; design/proposals/tray-off-vs-on.html, D) |
-| connecting | the head drawn dashed |
-| listening | eye open |
-| routed (a few seconds) | the two call marks over the corner, **teal** |
-| trouble | a **red** badge with "!" over the corner of the head as it would be without it: asleep when nothing is up, dashed while another tunnel connects, awake while one is up (design/proposals/dismiss-trouble.html) |
-| needs you | an **amber** triangle with "!" in the same corner, on the head as it is (`tray-head-warning.svg`, `-off-`, `-connecting-`): an OpenVPN 3 process left running, until it ends or "Got it" (design/proposals/leftover-warning.html). Red wins: a tunnel that stopped shows trouble's badge instead |
+| off | asleep: the head drops on its neck to 25° below level, the eye a slit, the ink dimmed to 45 % (an eye alone was too small a difference at 16 px; design/proposals/tray-off-vs-on.html, D; the base stays put, so nothing swings out of the slot) |
+| connecting | the outline dashed, the bill shut |
+| listening | the bird, eye open, bill parted |
+| routed (a few seconds) | the bill open in the call, the two call marks in front of it, **teal** |
+| trouble | a **red** badge with "!" behind the head, clear of the eye and the bill, on the bird as it would be without it: asleep when nothing is up, dashed while another tunnel connects, awake while one is up (design/proposals/dismiss-trouble.html) |
+| needs you | an **amber** triangle with "!" in the same place, on the bird as it is: an OpenVPN 3 process left running, until it ends or "Got it" (design/proposals/leftover-warning.html). Red wins: a tunnel that stopped shows trouble's badge instead |
 
-The head changes shape, never colour; only the state marks are coloured
-(dark-mode accent, danger and warning, the bar is dark), with a gap cut into the head
-around them so they read on any bar colour. The whole bird with grass
-(`crake-*-symbolic.svg`) stays for places with room; `CRAKE_TRAY=bird` shows
-it in the bar.
+The bird changes shape, never colour; only the state marks are coloured
+(dark-mode accent, danger and warning, the bar is dark), with a gap cut
+into the bird around them so they read on any bar colour. Motion
+(`tray/motion.rs`): routed, the bill opens as the first mark draws and the
+second follows, twice (crex, crex); going to sleep, the eye closes, then
+the head drops and dims. The whole bird with grass
+(`crake-*-symbolic.svg`: the same bust standing in the grass) stays for
+places with room; `CRAKE_TRAY=bird` shows it in the bar.
+
+Rejected for the bar (bird-calling.html and the rounds before it): detail
+on the old dome (cut lines, a shaded throat, nape streaks, feather
+chevrons: still a ghost, thin cuts grey at 16 px); a bust with the bill
+level (a penguin in one ink); long straight cuts along straight edges (a
+door frame with a play button: cuts have to cross curves); bars across the
+wing for the barred flank (stripes on a sail at real size); the head raised
+at 16 px (the grid can't hold the angle); tipping the whole bird to sleep
+(its base swung out of the slot); the bird in the corncrake's colours in
+the bar (the bill fades into the breast, a light bar needs a second colour
+rule, and the one-ink rule above goes). Colour belongs on the app icon.
 
 Whole bird (larger places):
 
 | State | Shape |
 | --- | --- |
 | off | grass only |
-| connecting | head drawn dashed |
-| listening | head up, eye |
-| routed (a few seconds) | head plus two call marks at the beak |
-| trouble | head plus "!" at top left |
+| connecting | the outline dashed |
+| listening | the bird in the grass |
+| routed (a few seconds) | the bird calling, two marks in front of the bill |
+| trouble | the bird plus "!" at top left |
 
-The panel header uses the listening bird with the call marks in accent.
+**One drawing everywhere.** The panel header's bird (`bird.svg`, with the
+call marks in accent or the bar's badge over it), the leftover notice's
+head with the triangle cut out, the first-run bird that rises from the
+grass, About's bird, the whole-bird symbolic icons and the app icon all
+come from the tray's geometry: `cargo test -p crake write_bird_assets --
+--ignored` writes the files and `the_bird_assets_are_current` keeps them
+so. The app icon (`assets/icons/app/crake.svg`, then `scripts/make-icons.sh`)
+is the bird in the corncrake's own colours, a buff-chestnut crown and back,
+a blue-grey face and breast, a flesh-pink bill, standing in four reeds (an
+olive used nowhere else) on the dark panel tile, calling in accent.
 
 ## Copy voice
 

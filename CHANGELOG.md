@@ -11,6 +11,12 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **A new bird.** The one in the bar was a plain head; now it's a crake with its head raised,
+  calling: a short bill parted at the tip, a square eye, the folded wing one cut across the
+  breast. It opens its bill when it calls (a host sent through a tunnel), and drops its head to
+  sleep. The same bird is in the panel, in Settings and on the app icon, where it wears the
+  corncrake's own colours.
+
 - **Crake says so when your desktop shows no tray icons.** Stock GNOME on Fedora and Debian
   shows none without its AppIndicator extension, and Crake used to start with nothing on screen.
   Now its panel opens with a note when you start it, and at login it sends one notification. Where

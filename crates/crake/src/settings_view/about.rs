@@ -39,7 +39,7 @@ pub(super) fn about(t: &Theme, cx: &mut Context<Settings>) -> impl IntoElement {
                 .flex()
                 .gap(px(16.))
                 .items_center()
-                .child(bird(px(56.), "crake/bird-thin.svg", "crake/call-thin.svg", t))
+                .child(bird(px(56.), "crake/bird.svg", "crake/call.svg", t))
                 .child(
                     div()
                         .child(
