@@ -75,23 +75,35 @@ pub(super) fn toggle(id: &'static str, on: bool, t: &Theme) -> Stateful<Div> {
     crate::panel::switch(id, on, t)
 }
 
-/// A button with a coloured outline.
+/// A button with a coloured outline. `armed`: the colour it takes when
+/// pointed at (a destructive action is quiet until then).
 pub(super) fn outline(
     id: &'static str,
     label: &'static str,
     border: gpui_kit::Rgba,
     ink: gpui_kit::Rgba,
+    armed: Option<gpui_kit::Rgba>,
     icon: Option<&'static str>,
 ) -> Stateful<Div> {
     div()
         .id(id)
+        .group(label)
+        .when_some(armed, |b, c| {
+            b.hover(move |b| b.border_color(c).text_color(c))
+        })
         .h(px(38.))
         .px(px(14.))
         .flex()
         .items_center()
         .gap(px(8.))
         .when_some(icon, |b, path| {
-            b.child(svg().path(path).size(px(16.)).text_color(ink))
+            b.child(
+                svg()
+                    .path(path)
+                    .size(px(16.))
+                    .text_color(ink)
+                    .when_some(armed, |s, c| s.group_hover(label, move |s| s.text_color(c))),
+            )
         })
         .border_1()
         .border_color(border)
@@ -103,16 +115,23 @@ pub(super) fn outline(
 }
 
 /// A 32 px button with an outline (Edit, Remove…), maybe with an icon.
+/// `armed`: the colour it takes when pointed at (a destructive action is
+/// quiet until then; design/proposals/audit-2026-10-17.html, 2).
 pub(super) fn small_button(
     id: impl Into<gpui_kit::ElementId>,
     label: &'static str,
     icon: Option<&'static str>,
     border: gpui_kit::Rgba,
     ink: gpui_kit::Rgba,
+    armed: Option<gpui_kit::Rgba>,
     t: &Theme,
 ) -> Stateful<Div> {
     div()
         .id(id)
+        .group(label)
+        .when_some(armed, |b, c| {
+            b.hover(move |b| b.border_color(c).text_color(c))
+        })
         .h(px(32.))
         .px(px(12.))
         .flex()
@@ -130,7 +149,13 @@ pub(super) fn small_button(
             cx.stop_propagation()
         })
         .when_some(icon, |b, path| {
-            b.child(svg().path(path).size(px(14.)).text_color(ink))
+            b.child(
+                svg()
+                    .path(path)
+                    .size(px(14.))
+                    .text_color(ink)
+                    .when_some(armed, |s, c| s.group_hover(label, move |s| s.text_color(c))),
+            )
         })
         .child(label)
 }

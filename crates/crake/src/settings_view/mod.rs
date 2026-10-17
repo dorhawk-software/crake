@@ -304,18 +304,11 @@ impl Render for Settings {
 }
 
 /// What a setting means, in plain words with an example: shown from the
-/// "?" next to its name. Paragraphs are separated by a blank line.
+/// "?" next to its name. Only where the card says more than the line under
+/// the title (design/proposals/audit-2026-10-17.html, 7): a "?" on every
+/// row marked nothing. Paragraphs are separated by a blank line.
 fn help(label: &str) -> Option<&'static str> {
     Some(match label {
-        "Tell me when there\u{2019}s a new version" => {
-            "Once a day Crake asks dorhawk.software which version is the newest. It sends nothing about you, this computer or your tunnels; the site sees an address asking, as with any web page.\n\nWhen a newer Crake is out, the panel says so, with its download page.\n\nOff: nothing is asked; check the website yourself."
-        }
-        "Start when you log in" => {
-            "When you log in to your computer, Crake starts by itself: the bird is there, ready. It doesn't connect anything on its own unless you also switch on the setting below it."
-        }
-        "Switch on the tunnels you left on" => {
-            "At login, Crake switches back on the VPNs that were on when you last used it.\n\nExample: ACME was on when you shut down yesterday, so it comes back on today. You may be asked to sign in again.\n\nOff: Crake starts with every VPN off, and you switch on what you need."
-        }
         tray_row::TITLE => tray_row::HELP.as_str(),
         "When Crake routes a host" => {
             "Each time Crake decides something needs a VPN, it can tell you.\n\nExample: you open wiki.acme.internal. Crake sends it through ACME and says \u{201c}Sent wiki.acme.internal through ACME\u{201d}, with Undo."
@@ -331,9 +324,6 @@ fn help(label: &str) -> Option<&'static str> {
         }
         "Forget hosts unused for" => {
             "Crake remembers what needs a VPN. If you don't use something for this long, Crake forgets it, and next time tries it the normal way first.\n\nExample: with 7 days, a server you used for one project is forgotten a week later."
-        }
-        "Never send through a tunnel" => {
-            "Things that always go the normal way, never through a VPN, even if they don't answer.\n\nExamples: your bank, *.mybank.cz (the * means \u{201c}anything ending in\u{201d}), or your home network, 192.168.1.0/24."
         }
         "Ask a tunnel\u{2019}s DNS for these names" => {
             "DNS is the internet's phone book: it turns a name like wiki.acme.internal into an address.\n\nYour VPNs bring their own phone book for company names. Names ending like these are looked up in that VPN's book."

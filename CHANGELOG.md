@@ -11,6 +11,12 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Settings is quieter.** "Remove…" and "Clear log…" are plain buttons until you point at them
+  (red is for something that stopped, or for the question "Remove ACME?" itself); the "?" marks
+  stay only where their card says more than the line under the setting; the row that only means
+  something when Crake starts at login is dimmed less, so it can still be read; and Privacy's
+  statement sits on a plain surface.
+
 - **Traffic shows its decisions, not its tunnels, in teal.** The packets moving through the graph
   are grey on every way now; the two-stroke tick marks each destination Crake learned, in the
   graph and in the table's "Way" column (it was "Goes"), the same tick as under the chart. Long

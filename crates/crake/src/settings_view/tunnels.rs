@@ -310,6 +310,7 @@ impl Settings {
                             None,
                             t.line,
                             t.ink,
+                            None,
                             t,
                         )
                         .keys()
@@ -321,12 +322,15 @@ impl Settings {
                         .test_support(),
                     )
                     .child(
+                        // Red only when it's armed: pointed at, or in the
+                        // confirm step (design/proposals/audit-2026-10-17.html, 2).
                         small_button(
                             ("remove", position.unwrap_or(UNPLACED)),
                             "Remove\u{2026}",
                             Some("crake/trash.svg"),
-                            t.danger,
-                            t.danger,
+                            t.line,
+                            t.muted,
+                            Some(t.danger),
                             t,
                         )
                         .keys()
@@ -386,7 +390,7 @@ impl Settings {
                         )),
                 )
                 .child(
-                    small_button("keep-tunnel", "Keep it", None, t.line, t.ink, t)
+                    small_button("keep-tunnel", "Keep it", None, t.line, t.ink, None, t)
                         .keys()
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.removing = None;
@@ -401,6 +405,7 @@ impl Settings {
                         Some("crake/trash.svg"),
                         t.danger,
                         t.panel,
+                        None,
                         t,
                     )
                     .bg(t.danger)

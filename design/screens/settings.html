@@ -127,8 +127,8 @@ button,input,select{font:inherit}
 </sc-if>
 
 <sc-if value="{{is.privacy}}" hint-placeholder-val="{{false}}">
-<div style="margin-top: 22px; display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 8px; background: {{c.accentSoft}}">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{c.accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 auto; margin-top: 1px"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"></path></svg>
+<div style="margin-top: 22px; display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 8px; background: {{c.surface}}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{c.ink}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 auto; margin-top: 1px"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"></path></svg>
 <div><div style="font-weight: 700">Everything Crake decides stays on this machine.</div><div style="font-size: 13px; color: {{c.muted}}">It sends nothing to anyone, including us. Your tunnels’ gateways see what passes through them, as with any VPN.</div></div>
 </div>
 <div style="margin-top: 16px; border: 1px solid {{c.line}}; border-radius: 8px">
@@ -142,7 +142,7 @@ button,input,select{font:inherit}
 </div>
 <div style="display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-top: 1px solid {{c.line}}">
 <div style="flex: 1 1 auto"><div style="font-weight: 600">Clear the log</div><div style="font-size: 13px; color: {{c.muted}}">Learned hosts stay. Only the history goes.</div></div>
-<button type="button" style="height: 38px; padding: 0 14px; border: 1px solid {{c.danger}}; border-radius: 6px; background: transparent; color: {{c.danger}}; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 22l-1-4M19 14a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2h-3a1 1 0 0 1-1-1V4a2 2 0 0 0-4 0v5a1 1 0 0 1-1 1H6a2 2 0 0 0-2 2v1a1 1 0 0 0 1 1M5 14h14l1.97 6.77A1 1 0 0 1 20 22H4a1 1 0 0 1-.97-1.23zM8 22l1-4"></path></svg>Clear log…</button>
+<button type="button" style="height: 38px; padding: 0 14px; border: 1px solid {{c.line}}; border-radius: 6px; background: transparent; color: {{c.muted}}; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px" onmouseover="this.style.borderColor=this.style.color='{{c.danger}}'" onmouseout="this.style.borderColor='{{c.line}}'; this.style.color='{{c.muted}}'"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 22l-1-4M19 14a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2h-3a1 1 0 0 1-1-1V4a2 2 0 0 0-4 0v5a1 1 0 0 1-1 1H6a2 2 0 0 0-2 2v1a1 1 0 0 0 1 1M5 14h14l1.97 6.77A1 1 0 0 1 20 22H4a1 1 0 0 1-.97-1.23zM8 22l1-4"></path></svg>Clear log…</button>
 </div>
 </div>
 </sc-if>

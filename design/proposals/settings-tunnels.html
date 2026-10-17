@@ -39,7 +39,8 @@
   .grow { flex: 1; min-width: 0; }
   .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink);
     font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-  .btn.danger { border-color: var(--danger); color: var(--danger); background: transparent; }
+  .btn.danger { border-color: var(--line); color: var(--muted); background: transparent; } /* red only when armed: pointed at, or confirming (audit-2026-10-17.html, 2) */
+  .btn.danger:hover { border-color: var(--danger); color: var(--danger); }
   .btn.solid-danger { border-color: var(--danger); background: var(--danger); color: var(--panel); }
   .who { font-size: 13px; color: var(--muted); }
   .chev { color: var(--muted); flex: none; }

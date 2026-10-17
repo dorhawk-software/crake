@@ -30,7 +30,7 @@ impl Settings {
                 .flex()
                 .gap(px(8.))
                 .child(
-                    outline("cancel-clear", "Keep it", t.line_strong, t.ink, None)
+                    outline("cancel-clear", "Keep it", t.line_strong, t.ink, None, None)
                         .keys()
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.confirm_clear = false;
@@ -44,6 +44,7 @@ impl Settings {
                         "Clear log",
                         t.danger,
                         t.panel,
+                        None,
                         Some("crake/broom.svg"),
                     )
                     .bg(t.danger)
@@ -57,11 +58,14 @@ impl Settings {
                 )
                 .into_any_element()
         } else {
+            // Red only when it's armed: pointed at, or in the confirm step
+            // (design/proposals/audit-2026-10-17.html, 2).
             outline(
                 "clear-log",
                 "Clear log\u{2026}",
-                t.danger,
-                t.danger,
+                t.line,
+                t.muted,
+                Some(t.danger),
                 Some("crake/broom.svg"),
             )
             .keys()
@@ -82,14 +86,15 @@ impl Settings {
                     .py(px(14.))
                     .px(px(16.))
                     .rounded(px(8.))
-                    .bg(t.accent_soft)
+                    // A statement, not a decision: surface, an ink shield.
+                    .bg(t.surface)
                     .child(
                         svg()
                             .path("crake/section-privacy.svg")
                             .size(px(20.))
                             .flex_none()
                             .mt(px(1.))
-                            .text_color(t.accent),
+                            .text_color(t.ink),
                     )
                     .child(
                         div()

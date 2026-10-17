@@ -307,3 +307,29 @@ fn the_bird_row_says_what_would_bring_it_back(cx: &mut TestAppContext) {
     w.click("bird", cx);
     assert!(matches!(w.request(), Request::ShowBird(on) if on == !bird));
 }
+
+/// A "?" only where its card says more than the line under the title
+/// (design/proposals/audit-2026-10-17.html, 7).
+#[test]
+fn a_question_mark_only_where_its_card_says_more() {
+    for kept in [
+        super::tray_row::TITLE,
+        "When Crake routes a host",
+        "Wait for a direct answer",
+        "When two tunnels answer",
+        "Forget hosts unused for",
+        "Keep internal names private",
+        "Keep the log for",
+    ] {
+        assert!(super::help(kept).is_some(), "{kept}");
+    }
+    for dropped in [
+        "Start when you log in",
+        "Switch on the tunnels you left on",
+        "Tell me when there\u{2019}s a new version",
+        "Never send through a tunnel",
+        "Appearance",
+    ] {
+        assert!(super::help(dropped).is_none(), "{dropped}");
+    }
+}

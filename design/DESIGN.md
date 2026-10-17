@@ -81,7 +81,7 @@ triangle; never an edge on one side of a box, never decoration.
 | accent | `#0F766E` | `#2DD4BF` | decisions, on-state, primary button |
 | accentInk | `#FFFFFF` | `#0B1514` | text on accent |
 | accentSoft | `#E2F1EF` | `#17332F` | selected row background |
-| danger | `#B42318` | `#F97066` | destructive actions, failed step; a window's × pointed at |
+| danger | `#B42318` | `#F97066` | a destructive action when it's armed (pointed at, or in its confirm step; quiet until then), a failed step; a window's × pointed at |
 | onDanger | `#FFFFFF` | `#0B1514` | the × on danger |
 | warning | `#E39A1B` | `#F5B740` | the triangle on the bird's head: needs you |
 | warningSoft | `#FCF4E4` | `#2C2618` | a notice that needs you: its tint |

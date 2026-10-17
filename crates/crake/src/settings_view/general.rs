@@ -3,7 +3,9 @@
 use super::*;
 
 /// A row that doesn't apply yet.
-const DIMMED: f32 = 0.45;
+/// A row that doesn't apply right now: dimmed, still readable (at 0.45 its
+/// words fell to 2:1 against the panel; design/proposals/audit-2026-10-17.html, 9).
+const DIMMED: f32 = 0.6;
 
 impl Settings {
     pub(super) fn general(&self, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {
