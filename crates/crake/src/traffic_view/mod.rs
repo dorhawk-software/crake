@@ -42,7 +42,9 @@ const RATE_W: f32 = 64.;
 /// The two-stroke tick before a learned destination, and its gap.
 const TICK_W: f32 = 14.;
 const TICK_GAP: f32 = 4.;
-const SIDE: f32 = 28.;
+/// The window's inset: the title row and its columns start where every
+/// other window's do (design/proposals/audit-2026-10-17.html, 10).
+const SIDE: f32 = 20.;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Tab {

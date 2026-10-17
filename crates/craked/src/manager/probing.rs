@@ -288,7 +288,7 @@ impl Manager {
                     name,
                     &format!("Left {shown} alone."),
                     format!(
-                        "{} Neither did {others} other hosts just now, not even through a tunnel: the network itself seems to be in trouble. Through {label} it answered in {ms} ms; Crake tries again in a minute.",
+                        "{} Neither did {others} other hosts just now, not even through a tunnel: the network itself seems to be in trouble. Through {label} it answered in {ms}\u{a0}ms; Crake tries again in a minute.",
                         why.said()
                     ),
                     vec![dst.to_string()],
@@ -303,7 +303,7 @@ impl Manager {
                     name,
                     &format!("Left {shown} alone."),
                     format!(
-                        "{} It answered directly when Crake tried again ({} ms): nothing to send through {label}.",
+                        "{} It answered directly when Crake tried again ({}\u{a0}ms): nothing to send through {label}.",
                         why.said(),
                         direct.as_millis().max(1)
                     ),
@@ -313,7 +313,10 @@ impl Manager {
             }
             if self.asks(name) {
                 let ms = took.as_millis().max(1);
-                let why = format!("{} Through {label} it answered in {ms} ms.", why.said());
+                let why = format!(
+                    "{} Through {label} it answered in {ms}\u{a0}ms.",
+                    why.said()
+                );
                 self.ask_first(name, label, &shown, why, &[dst]);
                 return false;
             }
@@ -334,7 +337,10 @@ impl Manager {
                 let _ = tokio::task::spawn_blocking(move || crate::conntrack::delete(flow)).await;
             }
             let ms = took.as_millis().max(1);
-            let mut reason = format!("{} Through {label} it answered in {ms} ms.", why.said());
+            let mut reason = format!(
+                "{} Through {label} it answered in {ms}\u{a0}ms.",
+                why.said()
+            );
             if both == crate::settings::Both::Faster
                 && results
                     .iter()
@@ -644,7 +650,7 @@ impl Manager {
                 Some(name),
                 format!("{shown} goes direct again."),
                 Some(format!(
-                    "It answers directly ({} ms): an older Crake had sent it through {label} when one connection to it failed.",
+                    "It answers directly ({}\u{a0}ms): an older Crake had sent it through {label} when one connection to it failed.",
                     took.as_millis()
                 )),
             );

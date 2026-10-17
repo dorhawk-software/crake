@@ -212,3 +212,17 @@ fn a_wrong_password_can_be_tried_again(cx: &mut TestAppContext) {
     w.click("cancel", cx);
     assert!(w.closed.get(), "Cancel closes the window");
 }
+
+/// A gateway's field name in Crake's words; one it doesn't know keeps
+/// the gateway's word (design/proposals/audit-2026-10-17.html, 8).
+#[test]
+fn a_gateways_field_is_asked_for_in_words() {
+    use super::widgets::asks_for;
+    assert_eq!(asks_for("GROUP"), Some("your group"));
+    assert_eq!(asks_for("Group:"), Some("your group"));
+    assert_eq!(asks_for("Password"), Some("your password"));
+    assert_eq!(asks_for("OTP"), Some("a code"));
+    assert_eq!(asks_for("Second password"), Some("your second password"));
+    assert_eq!(asks_for("PIN"), Some("your PIN"));
+    assert_eq!(asks_for("Realm"), None);
+}

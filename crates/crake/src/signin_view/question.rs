@@ -1,5 +1,6 @@
 //! Sign-in: a question from the gateway or openconnect, and its answer.
 
+use super::widgets::asks_for;
 use super::*;
 
 impl SignIn {
@@ -39,7 +40,10 @@ impl SignIn {
             }
             Ask::Choice(options) => {
                 body = body
-                    .child(title(format!("{display} asks: {}", prompt.label)))
+                    .child(title(match asks_for(&prompt.label) {
+                        Some(what) => format!("{display} asks for {what}"),
+                        None => format!("{display} asks: {}", prompt.label),
+                    }))
                     .when_some(prompt.words.clone(), |b, w| {
                         b.child(para(
                             format!("The gateway\u{2019}s own words: \u{201c}{w}\u{201d}"),
@@ -86,7 +90,8 @@ impl SignIn {
                 body = body
                     .child(title(format!(
                         "{display} asks for {}",
-                        lower_first(&prompt.label)
+                        asks_for(&prompt.label)
+                            .map_or_else(|| lower_first(&prompt.label), str::to_owned)
                     )))
                     .when_some(prompt.words.clone(), |b, w| {
                         b.child(para(

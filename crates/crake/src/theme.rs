@@ -51,7 +51,9 @@ impl Theme {
             danger: rgb(0xB42318),
             on_danger: rgb(0xFFFFFF),
             nav_hover: rgb(0xF9F9F7),
-            warning: rgb(0xE39A1B),
+            // 3.4:1 on the panel, 3.0:1 on surface, where #E39A1B had 2.4
+            // (design/proposals/audit-2026-10-17.html, 9).
+            warning: rgb(0xBF7E12),
             warning_soft: rgb(0xFCF4E4),
             warning_line: rgb(0xEFD9AE),
             on_warning: rgb(0x1A1C1E),

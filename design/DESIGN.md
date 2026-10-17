@@ -83,7 +83,7 @@ triangle; never an edge on one side of a box, never decoration.
 | accentSoft | `#E2F1EF` | `#17332F` | selected row background |
 | danger | `#B42318` | `#F97066` | a destructive action when it's armed (pointed at, or in its confirm step; quiet until then), a failed step; a window's × pointed at |
 | onDanger | `#FFFFFF` | `#0B1514` | the × on danger |
-| warning | `#E39A1B` | `#F5B740` | the triangle on the bird's head: needs you |
+| warning | `#BF7E12` | `#F5B740` | the triangle on the bird's head: needs you (light was #E39A1B, 2.4:1 on the panel; audit-2026-10-17, 9) |
 | warningSoft | `#FCF4E4` | `#2C2618` | a notice that needs you: its tint |
 | warningLine | `#EFD9AE` | `#5C4A22` | its hairline, and the border of a field in it |
 | onWarning | `#1A1C1E` | `#1A1408` | the "!" on the triangle |

@@ -14,6 +14,23 @@ pub(super) fn para(text: String, color: gpui_kit::Rgba) -> Div {
     div().mt(px(6.)).text_color(color).child(text)
 }
 
+/// What a gateway's field is called in Crake's sentence: "ACME asks for
+/// your group". A name not in the table gets none, and the title keeps the
+/// gateway's word (design/proposals/audit-2026-10-17.html, 8).
+pub(super) fn asks_for(label: &str) -> Option<&'static str> {
+    let l = label.trim().trim_end_matches(':').to_ascii_lowercase();
+    Some(match l.as_str() {
+        "group" => "your group",
+        "username" | "user name" | "user" | "login" => "your username",
+        "password" => "your password",
+        "passcode" | "otp" | "token" | "code" | "one-time password" | "one-time code"
+        | "verification code" => "a code",
+        "second password" | "secondary password" | "password 2" => "your second password",
+        "pin" => "your PIN",
+        _ => return None,
+    })
+}
+
 pub(super) fn lower_first(s: &str) -> String {
     let mut c = s.chars();
     c.next()

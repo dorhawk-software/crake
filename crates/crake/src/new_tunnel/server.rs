@@ -88,9 +88,9 @@ impl NewTunnel {
                     .text_color(t.muted)
                     .child(
                         svg()
-                            .path("crake/mark-routed.svg")
+                            .path("crake/check.svg")
                             .size(px(16.))
-                            .text_color(t.accent),
+                            .text_color(t.muted),
                     )
                     .child(said.clone()),
             ),
@@ -176,9 +176,9 @@ impl NewTunnel {
                         .when(found, |d| {
                             d.child(
                                 svg()
-                                    .path("crake/mark-routed.svg")
+                                    .path("crake/check.svg")
                                     .size(px(16.))
-                                    .text_color(t.accent),
+                                    .text_color(t.muted),
                             )
                         })
                         .when_some(asking, |d, since| d.child(asking_head(t.accent, since)))

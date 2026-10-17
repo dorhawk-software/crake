@@ -43,7 +43,6 @@ const DETECT_TIMEOUT: Duration = Duration::from_secs(12);
 
 // What the steps share, and what the rest of the app uses.
 pub use self::server::{beta, beta_tag};
-use self::sign_in::default_browser;
 use self::widgets::{card, checkbox, field, heading, label, radio};
 
 pub const WIDTH: f32 = 720.;
@@ -178,8 +177,6 @@ pub struct NewTunnel {
     open_select: Option<&'static str>,
     /// What's missing, said where Continue was pressed.
     problem: Option<String>,
-    /// The default browser's name, when known.
-    browser: Option<String>,
     /// The tallest the window may get (the screen, less some room).
     max_height: f32,
     /// OpenVPN 3 profiles on this computer (loaded when the window opens),
@@ -323,7 +320,8 @@ impl NewTunnel {
             .as_deref()
             .and_then(|v| v.strip_prefix("newtunnel:"))
             .and_then(|s| s.split(':').next()?.parse().ok())
-            .unwrap_or(1);
+            .unwrap_or(1)
+            .min(LAST_STEP);
         let shown_protocol = shown
             .as_deref()
             .and_then(|v| v.split(':').nth(2))
@@ -404,7 +402,6 @@ impl NewTunnel {
             forget,
             open_select: None,
             problem: None,
-            browser: default_browser(),
             max_height: crate::place::max_window_height(),
             profiles: Vec::new(),
             engines: demo.then_some(crate::engines::Engines::ALL),

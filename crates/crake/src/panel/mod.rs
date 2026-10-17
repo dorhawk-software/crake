@@ -453,6 +453,9 @@ impl Panel {
 
     fn header(&self, model: &Model, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {
         let listening = model.status() == "Listening";
+        // The dot says what the bird says: red while a tunnel stopped
+        // (design/proposals/audit-2026-10-17.html, 6).
+        let trouble = matches!(model.shape().badged().1, Some(crate::tray::Badge::Trouble));
         div()
             .id("header")
             .flex()
@@ -492,7 +495,9 @@ impl Panel {
                     .ml(px(6.))
                     .text_size(px(13.))
                     .text_color(t.muted)
-                    .child(div().size(px(8.)).rounded_full().bg(if listening {
+                    .child(div().size(px(8.)).rounded_full().bg(if trouble {
+                        t.danger
+                    } else if listening {
                         t.accent
                     } else {
                         t.line_strong

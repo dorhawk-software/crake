@@ -220,43 +220,7 @@ impl NewTunnel {
                     }),
                 )
                 .mt(px(18.)))
-                .child(
-                    div()
-                        .mt(px(6.))
-                        .ml(px(28.))
-                        .text_size(px(13.))
-                        .text_color(t.muted)
-                        .child(match &self.browser {
-                            Some(b) => format!("Opens in {b}, your default browser."),
-                            None => "Opens in your default browser.".to_owned(),
-                        }),
-                )
                 .into_any_element(),
         }
     }
-}
-
-/// The default browser's name ("Firefox"), for the browser sign-in's note.
-pub(super) fn default_browser() -> Option<String> {
-    let id = std::process::Command::new("xdg-settings")
-        .args(["get", "default-web-browser"])
-        .output()
-        .ok()
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
-        .unwrap_or_default();
-    let id = id.trim_end_matches(".desktop").to_ascii_lowercase();
-    let known = [
-        ("firefox", "Firefox"),
-        ("chromium", "Chromium"),
-        ("google-chrome", "Google Chrome"),
-        ("brave", "Brave"),
-        ("vivaldi", "Vivaldi"),
-        ("opera", "Opera"),
-        ("microsoft-edge", "Microsoft Edge"),
-        ("epiphany", "Web"),
-    ];
-    known
-        .iter()
-        .find(|(k, _)| id.contains(k))
-        .map(|(_, n)| (*n).to_owned())
 }

@@ -11,6 +11,17 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Sign-in asks in words.** "ACME asks for your group", "…for a code", "…for your username",
+  with the gateway's own words quoted under it, instead of "ACME asks: GROUP". A field Crake
+  doesn't know keeps the gateway's word.
+
+- **Small things in the panel and New tunnel.** A notice's "Got it" is the same bordered button
+  everywhere; the dot next to "Trouble" is red, as the bird's badge is; "Found a Cisco AnyConnect
+  gateway" wears a plain check (the two-stroke tick is for hosts Crake routed); the note under
+  "Stay signed in" about your browser is gone (the sign-in card says it); a number and its unit
+  ("38 ms") no longer part at a line's end; the Traffic window's margins match the other windows'.
+  The amber of "needs you" is a touch deeper in the light theme, so it reads against the panel.
+
 - **Tunnel detail reads as its screen.** Pin and Forget are quiet bordered buttons again (they had
   become bare bold words), "last used" lines up on the right, a pinned host shows nothing there
   (its line says it's kept), and the title row says "Switch off", the words used everywhere else.

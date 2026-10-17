@@ -113,7 +113,7 @@ pub fn demo() -> Model {
                 LogKind::Routed,
                 "nord",
                 "Sent sftp.nordbank.example through Nordbank.",
-                "Refused directly. Through Nordbank it answered in 61 ms.",
+                "Refused directly. Through Nordbank it answered in 61\u{a0}ms.",
                 &["10.20.0.4"],
             ),
             entry(
@@ -129,7 +129,7 @@ pub fn demo() -> Model {
                 LogKind::Routed,
                 "acme",
                 "Sent git.acme.internal through ACME.",
-                "It didn\u{2019}t answer directly. Through ACME it answered in 38 ms.",
+                "It didn\u{2019}t answer directly. Through ACME it answered in 38\u{a0}ms.",
                 &["10.40.1.20"],
             ),
         ]
@@ -364,7 +364,7 @@ fn log_until(until: jiff::Timestamp) -> Model {
             Routed,
             Some("nord"),
             "Sent 172.22.8.4 through Nordbank.",
-            "No answer directly. Nordbank answered in 66 ms.",
+            "No answer directly. Nordbank answered in 66\u{a0}ms.",
         ),
         row(
             1,
@@ -396,7 +396,7 @@ fn log_until(until: jiff::Timestamp) -> Model {
             Routed,
             Some("acme"),
             "Sent builds.acme.example through ACME.",
-            "Public name, private address. ACME answered in 47 ms.",
+            "Public name, private address. ACME answered in 47\u{a0}ms.",
         ),
         row(
             0,
@@ -428,7 +428,7 @@ fn log_until(until: jiff::Timestamp) -> Model {
             Routed,
             Some("acme"),
             "Sent 10.62.0.18 through ACME.",
-            "No answer directly. ACME answered in 52 ms.",
+            "No answer directly. ACME answered in 52\u{a0}ms.",
         ),
         row(
             0,
@@ -436,7 +436,7 @@ fn log_until(until: jiff::Timestamp) -> Model {
             Routed,
             Some("nord"),
             "Sent sftp.nordbank.example through Nordbank.",
-            "Refused directly. Nordbank answered in 61 ms.",
+            "Refused directly. Nordbank answered in 61\u{a0}ms.",
         ),
         row(
             0,
@@ -444,7 +444,7 @@ fn log_until(until: jiff::Timestamp) -> Model {
             Routed,
             Some("nord"),
             "Sent 172.22.8.4 through Nordbank.",
-            "No answer directly. Nordbank answered in 70 ms.",
+            "No answer directly. Nordbank answered in 70\u{a0}ms.",
         ),
         row(
             0,
@@ -460,7 +460,7 @@ fn log_until(until: jiff::Timestamp) -> Model {
             Routed,
             Some("acme"),
             "Sent git.acme.internal through ACME.",
-            "No answer directly. ACME answered in 38 ms.",
+            "No answer directly. ACME answered in 38\u{a0}ms.",
         ),
     ];
     log.retain(|e| e.ts.parse::<jiff::Timestamp>().is_ok_and(|t| t <= until));
