@@ -36,6 +36,9 @@ pub const WAY_H: f32 = 44.;
 /// before the text).
 pub const HOST_X: f32 = 640.;
 const HOST_GAP: f32 = 8.;
+/// The two-stroke tick before a learned destination, and its gap.
+pub const TICK_W: f32 = 14.;
+pub const TICK_GAP: f32 = 4.;
 
 /// Packets: speed in px/s is SPEED_BASE + SPEED_PER_DECADE × log10(1 +
 /// KB/s); one dot per DOT_KB, at least DOTS_MIN and at most DOTS_MAX a
@@ -464,6 +467,13 @@ pub fn rate(bytes: f64) -> String {
     }
 }
 
+/// Where a destination's path ends: before its name, or before its tick
+/// with the same gap, so no line or packet runs under the tick.
+fn end(dest: &Dest) -> f32 {
+    let tick = if dest.learned { TICK_W + TICK_GAP } else { 0. };
+    HOST_X - tick - HOST_GAP
+}
+
 /// The paths for `ways` laid out as `l`: computer to way, way to each
 /// destination, all in `color`: a way is told by its name, a decision by
 /// the tick (design/proposals/audit-2026-10-17.html, 1).
@@ -479,7 +489,7 @@ pub fn paths(ways: &[Way], l: &Layout, color: Rgba) -> Vec<Path> {
         for (dest, hy) in way.hosts.iter().zip(hosts) {
             out.push(Path {
                 key: format!("dest:{}:{}", way.label, dest.label),
-                curve: Curve::new((WAY_X + WAY_W / 2., *cy), (HOST_X - HOST_GAP, *hy)),
+                curve: Curve::new((WAY_X + WAY_W / 2., *cy), (end(dest), *hy)),
                 rate: dest.rate,
                 color,
             });
@@ -606,6 +616,37 @@ mod tests {
         );
         assert!(l.ways[1].0 > c0 + MIN_BLOCK, "the next way below");
         assert_eq!(l.me, l.height / 2.);
+    }
+
+    #[test]
+    fn no_line_or_packet_runs_under_a_tick() {
+        let dest = |learned: bool| Dest {
+            label: if learned { "learned" } else { "pinned" }.into(),
+            rate: 1.,
+            more: false,
+            learned,
+        };
+        let ways = [Way {
+            tunnel: Some("acme".into()),
+            label: "ACME".into(),
+            rate: 1.,
+            hosts: vec![dest(true), dest(false)],
+        }];
+        let paths = paths(&ways, &layout(&ways), Rgba::default());
+        let end_of = |key: &str| {
+            let p = paths.iter().find(|p| p.key == key).unwrap();
+            p.curve.at(p.curve.length()).0
+        };
+        // The tick's left edge, as the window places it.
+        let tick = HOST_X - TICK_W - TICK_GAP;
+        assert!(
+            end_of("dest:ACME:learned") < tick,
+            "the line stops short of the tick"
+        );
+        assert!(
+            end_of("dest:ACME:pinned") > tick,
+            "no tick, the line runs to the name"
+        );
     }
 
     #[test]

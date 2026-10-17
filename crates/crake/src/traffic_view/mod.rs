@@ -26,7 +26,7 @@ mod tables;
 #[cfg(test)]
 mod tests;
 
-use self::graph::{Flows, HOST_X, ME_H, ME_W, ME_X, WAY_H, WAY_W, WAY_X, rate};
+use self::graph::{Flows, HOST_X, ME_H, ME_W, ME_X, TICK_GAP, TICK_W, WAY_H, WAY_W, WAY_X, rate};
 use crate::focus::Keys as _;
 
 pub const WIDTH: f32 = 920.;
@@ -39,9 +39,6 @@ const HOSTS_EVERY: u32 = 5;
 /// Where a destination's rate ends (right-aligned).
 const RATE_RIGHT: f32 = 900.;
 const RATE_W: f32 = 64.;
-/// The two-stroke tick before a learned destination, and its gap.
-const TICK_W: f32 = 14.;
-const TICK_GAP: f32 = 4.;
 /// The window's inset: the title row and its columns start where every
 /// other window's do (design/proposals/audit-2026-10-17.html, 10).
 const SIDE: f32 = 20.;
