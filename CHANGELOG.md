@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.10.3 (2026-10-17)
+
 - **The panel stays above the bar.** With long names in "What Crake did" (an Azure cluster's
   private-link name, say), the panel opened from a bottom bar could grow down under it, hiding the
   last tunnel and the buttons. It grows upward again, and long names break after a dot instead of
