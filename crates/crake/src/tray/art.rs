@@ -286,34 +286,6 @@ pub(super) fn badge(
     }
 }
 
-/// The resting bird's outline at `s` times the drawing (the app icon).
-#[cfg(test)]
-pub(super) fn resting_outline(s: f32) -> String {
-    outline(&AT_REST, RAISED, s)
-}
-
-/// The resting bird's eye hole at `s` times the drawing (the app icon).
-#[cfg(test)]
-pub(super) fn resting_eye(s: f32) -> String {
-    let (ex, ey) = rot(EYE, RAISED);
-    let side = (EYE_SIDE * s).round().max(2.);
-    format!(
-        r##"<rect x="{:.0}" y="{:.0}" width="{side:.0}" height="{side:.0}" fill="#000"/>"##,
-        (ex * s - side / 2.).round(),
-        (ey * s - side / 2.).round()
-    )
-}
-
-#[cfg(test)]
-pub(super) fn pivot() -> P {
-    PIVOT
-}
-
-#[cfg(test)]
-pub(super) fn raised() -> f32 {
-    RAISED
-}
-
 /// The parts of the bird as SVG at `n` px: what goes in `<defs>`, the ink
 /// (masked for the holes and the gaps), and the coloured marks over it.
 pub(super) struct Parts {

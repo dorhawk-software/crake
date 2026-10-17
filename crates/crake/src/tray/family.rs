@@ -1,10 +1,9 @@
 //! The bird everywhere else, drawn from the same geometry as the tray's:
 //! the spec copies of the tray icons (design/icons), the panel header and
 //! its badges, the leftover notice's head, the first-run bird, the
-//! whole-bird symbolic icons (CRAKE_TRAY=bird) and the app icon in the
-//! corncrake's colours. `tests::the_bird_assets_are_current` checks the
-//! committed files against these; `cargo test -p crake write_bird_assets
-//! -- --ignored` writes them.
+//! whole-bird symbolic icons (CRAKE_TRAY=bird) and the app icon.
+//! `tests::the_bird_assets_are_current` checks the committed files against
+//! these; `cargo test -p crake write_bird_assets -- --ignored` writes them.
 
 use std::path::PathBuf;
 
@@ -17,13 +16,9 @@ const SYMBOLIC: &str = "#2e3436";
 const FAMILY: u32 = 24;
 /// Draw-time colour: the app recolours each SVG, so black is "the colour".
 const BLACK: &str = "#000";
-/// The corncrake's colours and its meadow, on the app icon only: a
-/// buff-chestnut crown and back, a blue-grey face and breast, a flesh-pink
-/// bill, reeds in an olive used nowhere else.
-const CHESTNUT: &str = "#C99A5B";
-const BLUE_GREY: &str = "#C4CFD6";
-const PINK: &str = "#F0B39A";
-const OLIVE: &str = "#6F7D55";
+/// The app icon's bird: DESIGN.md's dark text colour, one ink on the
+/// tile like the bird everywhere else.
+const LIGHT_INK: &str = "#ECEDEE";
 /// The tile behind the app icon (DESIGN.md's dark panel).
 const TILE: &str = "#1E2022";
 const ACCENT: &str = "#2DD4BF";
@@ -69,27 +64,13 @@ fn symbolic(shape: Shape) -> String {
     )
 }
 
-/// The app icon: the bird in the corncrake's colours on the dark tile,
-/// standing in reeds, calling (design/proposals/bird-calling.html).
+/// The app icon: the bird on the dark tile in one light ink, its eye and
+/// wing cut, calling in accent, as the panel's header draws it.
 fn app_icon() -> String {
-    let s = 1.;
-    let outline = art::resting_outline(s);
-    let eye = art::resting_eye(s);
-    let (_, marks) = art::marks(s, 1., 1., 1., ACCENT);
-    let (pivot, tilt) = (art::pivot(), art::raised());
-    let turn = format!(
-        r#"transform="rotate({tilt:.1} {:.2} {:.2})""#,
-        pivot.0, pivot.1
-    );
-    // The wing and the back, the crown, and the bill, each clipped to the bird.
-    let bird = format!(
-        r##"<svg x="3.75" y="4.1" width="16.5" height="16.5" viewBox="0 0 32 32"><defs><clipPath id="bird"><path d="{outline}"/></clipPath><mask id="eye" maskUnits="userSpaceOnUse" x="-8" y="-8" width="48" height="48"><rect x="-8" y="-8" width="48" height="48" fill="#fff"/>{eye}</mask></defs><g mask="url(#eye)"><g clip-path="url(#bird)"><rect x="-8" y="-8" width="48" height="48" fill="{BLUE_GREY}"/><path d="M0 13H8.5L15 32H0Z" fill="{CHESTNUT}"/><rect x="-8" y="-8" width="48" height="14.5" fill="{CHESTNUT}" {turn}/><rect x="22.3" y="-8" width="32" height="48" fill="{PINK}" {turn}/></g></g>{marks}</svg>"##
-    );
-    let reeds = format!(
-        r##"<g stroke="{OLIVE}" stroke-width="1.13" stroke-linecap="round" fill="none"><path d="M2.63 25.1l.75-6.75M5.63 25.1l.38-4.5M18.75 25.1l1.13-5.63M22.13 25.1l1.13-7.13"/></g>"##
-    );
+    let art::Parts { defs, ink, .. } = rest(Shape::Listening).parts(FAMILY, LIGHT_INK);
+    let (_, call) = art::marks(FAMILY as f32 / 32., 1., 1., 1., ACCENT);
     format!(
-        r##"<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 24 24"><defs><clipPath id="tile"><rect width="24" height="24" rx="5.5"/></clipPath></defs><g clip-path="url(#tile)"><rect width="24" height="24" rx="5.5" fill="{TILE}"/>{reeds}{bird}</g></svg>"##
+        r##"<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 24 24"><rect width="24" height="24" rx="5.5" fill="{TILE}"/><svg x="3" y="3.5" width="18" height="18" viewBox="0 0 24 24"><defs>{defs}</defs>{ink}{call}</svg></svg>"##
     )
 }
 

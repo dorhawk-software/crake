@@ -1,6 +1,7 @@
 #!/bin/sh
-# Crake's app icon (assets/icons/app/crake.svg: the bird in the grass, as
-# on dorhawk.software/crake) rendered for the icon themes, Windows and
+# Crake's app icon (assets/icons/app/crake.svg: the bird on the dark tile,
+# as on dorhawk.software/crake; written by `cargo test -p crake
+# write_bird_assets -- --ignored`) rendered for the icon themes, Windows and
 # macOS: crake-<size>.png for hicolor, crake.ico for the .exe files,
 # crake.icns for Crake.app (the rounded square at 824 of macOS' 1024-point
 # grid, the margin macOS' own icons keep). Run after

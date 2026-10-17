@@ -11,6 +11,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **The app icon is the bird in one ink.** The corncrake's colours are gone from the icon: it's
+  the same light bird as in the panel and the bar, calling in teal, on the dark tile.
+
 ## 0.10.0 (2026-10-17)
 
 - **Sign-in asks in words.** "ACME asks for your group", "…for a code", "…for your username",

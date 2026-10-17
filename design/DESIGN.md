@@ -252,9 +252,10 @@ level (a penguin in one ink); long straight cuts along straight edges (a
 door frame with a play button: cuts have to cross curves); bars across the
 wing for the barred flank (stripes on a sail at real size); the head raised
 at 16 px (the grid can't hold the angle); tipping the whole bird to sleep
-(its base swung out of the slot); the bird in the corncrake's colours in
+(its base swung out of the slot); the bird in the corncrake's colours, in
 the bar (the bill fades into the breast, a light bar needs a second colour
-rule, and the one-ink rule above goes). Colour belongs on the app icon.
+rule, and the one-ink rule above goes) and on the app icon (dropped by the
+user 2026-10-17: one ink everywhere).
 
 Whole bird (larger places):
 
@@ -273,9 +274,9 @@ grass, About's bird, the whole-bird symbolic icons and the app icon all
 come from the tray's geometry: `cargo test -p crake write_bird_assets --
 --ignored` writes the files and `the_bird_assets_are_current` keeps them
 so. The app icon (`assets/icons/app/crake.svg`, then `scripts/make-icons.sh`)
-is the bird in the corncrake's own colours, a buff-chestnut crown and back,
-a blue-grey face and breast, a flesh-pink bill, standing in four reeds (an
-olive used nowhere else) on the dark panel tile, calling in accent.
+is the panel header's bird in the dark theme's text colour (#ECEDEE) on
+the dark panel tile, its eye and wing cut, calling in accent: the same
+mark as dorhawk.software/crake's.
 
 ## Copy voice
 
