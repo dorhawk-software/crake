@@ -252,13 +252,25 @@ jobs:
           v=$(curl -sf https://static.rust-lang.org/dist/channel-rust-stable.toml \
             | sed -n '/^\[pkg.rust\]/{n;s/^version = "\([0-9.]*\) .*/\1/p;}')
           echo "rust=$(echo "${v:-0}" | tr . -)" >> "$GITHUB_OUTPUT"
+      # And Arch's own rust package, which the Arch build gets from pacman:
+      # it changes apart from rustup's (2026-10-16: Arch rebuilt 1.99.0 as
+      # pkgrel 3, the cached Arch build was by the old compiler, and every
+      # run rebuilt it from scratch, 18 min instead of 4). Epoch, version
+      # and release, dashes only.
+      - name: Arch's Rust version
+        id: arch
+        run: |
+          v=$(curl -sf https://archlinux.org/packages/extra/x86_64/rust/json/ \
+            | jq -r '"\(.epoch)-\(.pkgver)-\(.pkgrel)"' || true)
+          echo "rust=$(echo "${v:-0}" | tr . -)" >> "$GITHUB_OUTPUT"
       # rustup, Cargo's downloads and both builds (the .deb's on 22.04 and
       # Arch's with Arch's Rust), as the Windows and check jobs keep theirs.
       - uses: actions/cache/restore@v6
         with:
           path: ~/crake-cache
-          key: packages-${{ steps.week.outputs.week }}-${{ steps.rust.outputs.rust }}-${{ hashFiles('Cargo.lock') }}
+          key: packages-${{ steps.week.outputs.week }}-${{ steps.rust.outputs.rust }}-${{ steps.arch.outputs.rust }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
+            packages-${{ steps.week.outputs.week }}-${{ steps.rust.outputs.rust }}-${{ steps.arch.outputs.rust }}-
             packages-${{ steps.week.outputs.week }}-${{ steps.rust.outputs.rust }}-
             packages-${{ steps.week.outputs.week }}-
             packages-
@@ -275,7 +287,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           path: ~/crake-cache
-          key: packages-${{ steps.week.outputs.week }}-${{ steps.rust.outputs.rust }}-${{ hashFiles('Cargo.lock') }}
+          key: packages-${{ steps.week.outputs.week }}-${{ steps.rust.outputs.rust }}-${{ steps.arch.outputs.rust }}-${{ hashFiles('Cargo.lock') }}
       - uses: actions/upload-artifact@v7
         with:
           name: crake-packages
