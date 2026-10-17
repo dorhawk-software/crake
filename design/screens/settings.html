@@ -8,10 +8,10 @@
 <body>
 <x-dc>
 <helmet>
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
 <style>
 body{margin:0}
-a{color:#0F766E}a:hover{color:#0B5D57}
+a{color:#0F766E}a:hover{text-decoration:underline}
 button,input,select{font:inherit}
 .mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}
 </style>
@@ -189,10 +189,10 @@ class Component extends DCLogic {
   renderVals() {
     const dark = this.props.dark ?? false;
     const c = dark ? {
-      desk: '#121314', panel: '#1E2022', surface: '#26292C', line: '#33363A', lineStrong: '#4A4E53',
+      desk: '#121314', panel: '#1E2022', surface: '#2A2D30', line: '#33363A', lineStrong: '#4A4E53',
       ink: '#ECEDEE', muted: '#A9AEB4', accent: '#2DD4BF', accentInk: '#0B1514', accentSoft: '#17332F', track: '#4A4E53', danger: '#F97066'
     } : {
-      desk: '#DCDCD8', panel: '#FFFFFF', surface: '#F3F3F0', line: '#E2E2DE', lineStrong: '#BDBDB8',
+      desk: '#DCDCD8', panel: '#FFFFFF', surface: '#F1F1EE', line: '#E2E2DE', lineStrong: '#BDBDB8',
       ink: '#1A1C1E', muted: '#5A5F64', accent: '#0F766E', accentInk: '#FFFFFF', accentSoft: '#E2F1EF', track: '#BDBDB8', danger: '#B42318'
     };
     const st = this.state;

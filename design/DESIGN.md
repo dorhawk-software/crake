@@ -60,13 +60,29 @@ Don't drift back into these. Each was tried and dropped for a reason.
 
 ## Colour
 
-One accent. Teal means **"Crake made a decision"**, nothing else. Two status
-colours, each with one meaning too: red, **something stopped or failed**;
+One accent. Teal means **"Crake made a decision"**: the ticks, "Sent …
+through"; and with it the **on or chosen state** of a control (a switch, the
+Listening dot, a chosen filter or step card, "Recommended") and the **one
+primary action**. Never information: a path in a graph, an acknowledgement
+("Got it"), a confirmation ("Found a gateway" wears a plain check). Where
+a way is told apart, it's by its name (the audit of 2026-10-17,
+design/proposals/audit-2026-10-17.html, settled this: the Traffic graph's
+teal paths had made teal mean "through a tunnel"). Two status colours,
+each with one meaning too: red, **something stopped or failed**, and a
+destructive action only when it's **armed** (pointed at, or in its confirm
+step; quiet until then);
 amber, **it needs you, nothing has broken yet** (relaxed 2026-10-15, asked for
 by the user: "it must be tasteful, but maybe some colour, and an icon here
 and there"; design/proposals/leftover-warning.html). Amber colours a whole
 notice (its tint, its hairline) and its icon, the bird's head with an amber
 triangle; never an edge on one side of a box, never decoration.
+
+**Notices** (the leftover process, "acting as AnyConnect", no tray, a new
+version, the service's approval on macOS) share one shape: a title at 600,
+a body, and an actions row of a bordered action and a muted text dismiss
+("Not now"); "Got it" is that bordered button. The leftover notice's
+command line, with Copy and Got it on it, is the user's choice (A2,
+2026-10-15) and stays.
 
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |
@@ -104,6 +120,10 @@ told apart by name, not colour.
 ## Shape
 
 - Window 12 px radius, panel 10, groups and cards 8, controls 6, badges 4.
+- **One title row.** Every window's starts 20 px from the left and its
+  hairline sits at 56; the same × in the same corner; a window differs
+  only in its actions (measured 2026-10-17: the app's windows had begun
+  at 20, 22, 24, 22, 25, 23 and 29).
 - 1 px hairlines. No heavy borders, no offset shadows, no gradients.
 - Switches are the standard rounded pill; that's the platform's language.
 - The internet is never drawn. There's no map; the log and charts carry it.
