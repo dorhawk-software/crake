@@ -31,7 +31,12 @@ Changes in `src/linux/x11/window.rs` (and, for 3, `client.rs`), marked
    other: twice the size after undocking, once the pointer was over
    anything that sets its own cursor. When Xcursor.size, Xcursor.theme or
    Xft.dpi change, the theme is loaded again, the cached cursors are freed
-   and every window's cursor is set again.
+   and every window's cursor is set again. And a window gets GPUI's arrow
+   when it's created: upstream leaves it with no cursor of its own (the
+   root's shows, under XWayland at another size) and, taking a window it
+   has no record of for an arrow already, never sets one until another
+   cursor (a hand) has been shown; the user saw the arrow too big until
+   then.
    Tested on a real X server: `crates/crake/tests/x11_scale.rs`
    (`scripts/x11-test.sh`, Xvfb with a software GPU; the cursor's size is
    read back with XFixes).

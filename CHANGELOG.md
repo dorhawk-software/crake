@@ -16,6 +16,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
   last tunnel and the buttons. It grows upward again, and long names break after a dot instead of
   in the middle of a word, in the panel and the log.
 
+- **The pointer is its right size from the start.** Over Crake's windows the arrow could be too
+  big until the pointer had been over a button once. Each window now has its own arrow from the
+  moment it opens.
+
 ## 0.10.2 (2026-10-17)
 
 - **"Keep internal names private" says when it can't.** If another DNS server on your computer

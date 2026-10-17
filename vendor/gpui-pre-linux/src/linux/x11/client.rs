@@ -1794,6 +1794,24 @@ impl X11Client {
             ),
         )
         .log_err();
+        // CRAKE PATCH: the window shows GPUI's arrow from the start. A window
+        // with no cursor of its own showed the root's (under XWayland, at
+        // another size) until something set one, and the arrow never did:
+        // `cursor_styles` takes a window it doesn't know for an arrow already.
+        if let Some(cursor) = state.get_cursor_icon(CursorStyle::Arrow) {
+            check_reply(
+                || "Failed to set the window's first cursor",
+                state.xcb_connection.change_window_attributes(
+                    x_window,
+                    &ChangeWindowAttributesAux {
+                        cursor: Some(cursor),
+                        ..Default::default()
+                    },
+                ),
+            )
+            .log_err();
+            state.cursor_styles.insert(x_window, CursorStyle::Arrow);
+        }
         xcb_flush(&state.xcb_connection);
 
         let window_ref = WindowRef {

@@ -91,7 +91,32 @@
                  let window = self.get_window(event.window)?;
                  window
                      .property_notify(event)
-@@ -2085,6 +2141,49 @@
+@@ -1738,6 +1794,24 @@
+             ),
+         )
+         .log_err();
++        // CRAKE PATCH: the window shows GPUI's arrow from the start. A window
++        // with no cursor of its own showed the root's (under XWayland, at
++        // another size) until something set one, and the arrow never did:
++        // `cursor_styles` takes a window it doesn't know for an arrow already.
++        if let Some(cursor) = state.get_cursor_icon(CursorStyle::Arrow) {
++            check_reply(
++                || "Failed to set the window's first cursor",
++                state.xcb_connection.change_window_attributes(
++                    x_window,
++                    &ChangeWindowAttributesAux {
++                        cursor: Some(cursor),
++                        ..Default::default()
++                    },
++                ),
++            )
++            .log_err();
++            state.cursor_styles.insert(x_window, CursorStyle::Arrow);
++        }
+         xcb_flush(&state.xcb_connection);
+ 
+         let window_ref = WindowRef {
+@@ -2085,6 +2159,49 @@
              .expect("Failed to initialize window refresh timer")
      }
  
@@ -141,7 +166,7 @@
      fn get_cursor_icon(&mut self, style: CursorStyle) -> Option<xproto::Cursor> {
          if let Some(cursor) = self.cursor_cache.get(&style) {
              return *cursor;
-@@ -2219,6 +2318,12 @@
+@@ -2219,6 +2336,12 @@
  
  // Adapted from:
  // https://docs.rs/winit/0.29.11/src/winit/platform_impl/linux/x11/monitor.rs.html#103-111

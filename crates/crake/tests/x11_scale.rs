@@ -26,6 +26,7 @@ mod x11 {
 
     const FIRST: &str = "crake x11 scale test";
     const SECOND: &str = "crake x11 scale test, opened later";
+    const PLAIN: &str = "crake x11 scale test, no cursor of its own";
     /// The window's size in logical pixels.
     const WIDTH: f32 = 400.;
     const HEIGHT: f32 = 300.;
@@ -42,6 +43,15 @@ mod x11 {
                 .size_full()
                 .bg(gpui_kit::rgb(0x2DD4BF))
                 .cursor_pointer()
+        }
+    }
+
+    /// A window that never asks for a cursor: GPUI's arrow, from the start.
+    struct Plain;
+
+    impl Render for Plain {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div().size_full().bg(gpui_kit::rgb(0x2DD4BF))
         }
     }
 
@@ -165,6 +175,14 @@ mod x11 {
     }
 
     fn open(cx: &mut App, title: &'static str) -> WindowHandle<Blank> {
+        open_with(cx, title, || Blank)
+    }
+
+    fn open_with<V: Render>(
+        cx: &mut App,
+        title: &'static str,
+        view: impl FnOnce() -> V + 'static,
+    ) -> WindowHandle<V> {
         let bounds = Bounds::new(point(px(100.), px(100.)), size(px(WIDTH), px(HEIGHT)));
         cx.open_window(
             WindowOptions {
@@ -176,7 +194,7 @@ mod x11 {
                 is_resizable: false,
                 ..Default::default()
             },
-            |_, cx| cx.new(|_| Blank),
+            |_, cx| cx.new(|_| view()),
         )
         .expect("open a window")
     }
@@ -271,7 +289,16 @@ mod x11 {
                 check_cursor(cx, &conn, |w| w == small, step).await;
                 // The cursor's size alone (Accessibility's "Large cursor").
                 set_scale(&conn, root, 96, 48);
-                check_cursor(cx, &conn, |w| w > small, "a larger cursor, same scale").await;
+                let large =
+                    check_cursor(cx, &conn, |w| w > small, "a larger cursor, same scale").await;
+                // A window that sets no cursor (the panel's plain parts): the
+                // theme's arrow at its size, not the server's own cursor (under
+                // XWayland at another size, until a hand replaced it).
+                cx.update(|cx| open_with(cx, PLAIN, || Plain));
+                cx.background_executor().timer(PATIENCE / 10).await;
+                point_at(&conn, root, PLAIN);
+                let step = "a window with no cursor of its own shows the theme's arrow";
+                check_cursor(cx, &conn, |w| w == large, step).await;
                 println!("x11_scale: ok");
                 std::process::exit(0);
             })
