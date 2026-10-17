@@ -13,6 +13,15 @@ B=$PWD/target/arch
 rm -rf "$B" && mkdir -p "$B/build"
 git archive --format=tar.gz --prefix="crake-$VERSION/" HEAD > "$B/build/crake-$VERSION.tar.gz"
 cp packaging/arch/PKGBUILD packaging/arch/crake.install "$B/build/"
+cp scripts/sweep-target.sh "$B/"
+# The PKGBUILD is the AUR's, as is: inside the container its cargo build
+# is asked for JSON (what it used, for sweep-target.sh), in makepkg's own
+# environment, by this cargo first on PATH.
+cat > "$B/cargo-json" <<'EOF'
+#!/bin/sh
+[ "$1" = build ] || exec /usr/bin/cargo "$@"
+exec /usr/bin/cargo "$@" --message-format=json-render-diagnostics >> /arch/cargo.json
+EOF
 # Cargo's downloads and build: Docker volumes here, a folder when CRAKE_CACHE
 # names one (CI keeps it between runs).
 if [ -n "${CRAKE_CACHE:-}" ]; then
@@ -28,8 +37,10 @@ docker run --rm -v "$B:/arch" $CACHES -e HOST_UID="$(id -u)" -e HOST_GID="$(id -
       libxcb libxkbcommon libxkbcommon-x11 nftables iproute2 polkit >/dev/null 2>&1
     useradd -m builder
     chown -R builder /arch /cargo /cargo-target
+    install -m755 /arch/cargo-json /usr/local/bin/cargo
     su builder -c "cd /arch/build && CARGO_HOME=/cargo CARGO_TARGET_DIR=/cargo-target CARGO_INCREMENTAL=0 makepkg -f --noconfirm --skipchecksums" >/arch/makepkg.log 2>&1 \
       || { tail -n 40 /arch/makepkg.log; exit 1; }
+    sh /arch/sweep-target.sh /cargo-target /cargo /arch/cargo.json
     mv /arch/build/*.pkg.tar.zst /arch/
     chown -R "$HOST_UID:$HOST_GID" /arch'
 ls "$B"/*.pkg.tar.zst

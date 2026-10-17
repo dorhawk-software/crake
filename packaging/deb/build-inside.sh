@@ -15,17 +15,20 @@ rustup update stable >/dev/null 2>&1 || true
 # No incremental files: nothing here is rebuilt a line at a time, and they'd
 # bloat the cache CI keeps.
 export CARGO_INCREMENTAL=0
+# Cargo's JSON lists what each build used, for scripts/sweep-target.sh.
 CARGO_TARGET_DIR=/target CARGO_PROFILE_RELEASE_STRIP=symbols \
-  cargo build --release --locked --manifest-path /src/Cargo.toml -p crake -p craked
+  cargo build --release --locked --manifest-path /src/Cargo.toml -p crake -p craked \
+  --message-format=json-render-diagnostics > /tmp/release.json
 
 # The journey's test binary, built here like the packages so it runs on
 # every system they're tested on (scripts/deb-test.sh, its journey phase).
 # Without debug info: smaller and quicker, and it's never debugged here.
 CARGO_TARGET_DIR=/target CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 \
   cargo test --locked --manifest-path /src/Cargo.toml -p crake \
-  --no-run --message-format=json 2>/dev/null \
+  --no-run --message-format=json 2>/dev/null | tee /tmp/journey.json \
   | sed -n 's/.*"executable":"\([^"]*\/deps\/crake-[^"]*\)".*/\1/p' | head -n1 > /tmp/journey-bin
 cp "$(cat /tmp/journey-bin)" /out/journey && strip /out/journey && chown "$HOST_UID:$HOST_GID" /out/journey
+sh /src/scripts/sweep-target.sh /target /root/.cargo /tmp/release.json /tmp/journey.json
 
 root=$(mktemp -d)/crake
 install -Dm755 /target/release/crake "$root/usr/bin/crake"

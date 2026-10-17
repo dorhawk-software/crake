@@ -1284,7 +1284,18 @@ The user doesn't want development builds installed on their machine.
   ones stayed, and together they pushed out the packages cache, so 0.7.0's
   .deb was built from scratch (17 min instead of 7). CI's `caches` job, on
   main after the jobs that save, runs `scripts/prune-caches.sh`: per kind
-  (the key without its trailing hashes and dates) only the newest stays. Setup (done
+  (the key without its trailing hashes and dates) only the newest stays.
+  **The package cache is swept before it's saved (2026-10-17):** it had
+  grown to 6 GB (from 2.6) and pushed out the macOS cache (macOS then
+  built from scratch every run): its restore keys carry it on from week
+  to week, and nothing was ever removed from the two target folders in
+  it, so each compiler (rustup's 1.99.0 and 1.99.1 side by side, Arch's
+  rebuilds), each version of Crake's own crates and each replaced crate
+  stayed. `scripts/sweep-target.sh`, run by both package builds in their
+  containers, keeps only the units Cargo's JSON says the build used
+  (fresh ones included; the Arch build's PKGBUILD stays the AUR's, a
+  `cargo` wrapper first on PATH asks for the JSON) and drops the unpacked
+  registry sources. Setup (done
   with the user): a Cachix account, a public cache named `crake`, an auth
   token as the repo secret `CACHIX_AUTH_TOKEN`. Cachix's free plan holds
   5 GB and then evicts the least recently used paths (a warning email at
