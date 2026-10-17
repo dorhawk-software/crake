@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.10.1 (2026-10-17)
+
 - **The pointer keeps its size.** After the display's scale changed while Crake ran (a laptop
   docked to a large monitor, or undocked), pointing at a button or a field in Crake's windows
   showed a pointer twice (or half) its size. It follows the scale now, and the cursor size set in
