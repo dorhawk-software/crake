@@ -154,3 +154,38 @@ pub mod fonts {
             .expect("bundled fonts are valid");
     }
 }
+
+/// Where GPUI may break a line, a long host name was broken mid-label
+/// ("…germanywestcentral.a" / "zmk8s.io"): a zero-width space after each
+/// dot inside a name lets it break after the dot instead. Addresses
+/// (a digit before the dot) stay whole. Only for drawing: copied text
+/// comes from the model.
+pub fn breakable(text: &str) -> String {
+    const BREAK: char = '\u{200B}';
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    let mut prev = ' ';
+    while let Some(c) = chars.next() {
+        out.push(c);
+        let next = chars.peek().copied().unwrap_or(' ');
+        if c == '.' && (prev.is_alphabetic() || prev == '-') && next.is_alphanumeric() {
+            out.push(BREAK);
+        }
+        prev = c;
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn long_names_may_break_after_a_dot_only() {
+        assert_eq!(
+            super::breakable("Sent aks-a.prod.privatelink.azmk8s.io through ACME."),
+            "Sent aks-a.\u{200B}prod.\u{200B}privatelink.\u{200B}azmk8s.\u{200B}io through ACME."
+        );
+        // Addresses, sentences' full stops and decimals stay as they are.
+        let plain = "DNS did (10.0.161.4). Routed in 3.5 s. Done.";
+        assert_eq!(super::breakable(plain), plain);
+    }
+}

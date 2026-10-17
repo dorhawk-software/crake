@@ -373,6 +373,26 @@ fn fit_window(upward: bool) -> impl IntoElement {
                     } else if crate::sys::resize_upward(window, f32::from(want.height)) {
                         // The height is kept for the next time it opens.
                         crate::windows::panel_height(height, cx);
+                        // Once more when the window system has surely placed
+                        // it: a resize before that can leave it grown down.
+                        window
+                            .spawn(cx, async move |cx| {
+                                for wait in crate::windows::REFIT_AGAIN {
+                                    cx.background_executor().timer(wait).await;
+                                    // The newest height: it may have grown again since.
+                                    let again = cx.update(|window, cx| {
+                                        let height = cx
+                                            .global::<crate::Shell>()
+                                            .panel_height
+                                            .unwrap_or(height);
+                                        crate::sys::resize_upward(window, height + 2. * MARGIN)
+                                    });
+                                    if again.is_err() {
+                                        break;
+                                    }
+                                }
+                            })
+                            .detach();
                     } else {
                         crate::refit_panel(height, cx);
                     }

@@ -198,14 +198,20 @@ impl Panel {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .child(div().text_size(px(14.)).child(d.entry.message.clone()))
+                    .child(
+                        div()
+                            .text_size(px(14.))
+                            .child(crate::theme::breakable(&d.entry.message)),
+                    )
                     .child(
                         div()
                             .mt(px(2.))
                             .text_size(px(12.5))
                             .line_height(px(17.))
                             .text_color(t.muted)
-                            .child(d.entry.reason.clone().unwrap_or_default()),
+                            .child(crate::theme::breakable(
+                                d.entry.reason.as_deref().unwrap_or_default(),
+                            )),
                     ),
             )
             .child(right)

@@ -407,6 +407,8 @@ fn main() {
                 Ok("expired") => model::demo_expired(model),
                 Ok("openvpn3") => model::demo_openvpn3(model),
                 Ok("leftover") => model::demo_leftover(model),
+                // CRAKE_DEMO=long: names that take two lines in the panel.
+                Ok("long") => model::demo_long_names(model),
                 _ => model,
             };
             let mut model = model;

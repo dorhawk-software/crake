@@ -109,8 +109,11 @@ pub fn resize_upward(window: &gpui_kit::Window, height: f32) -> bool {
         return false;
     };
     let new_height = (height * window.scale_factor()).round().max(1.) as u32;
-    let top =
-        crate::place::top_keeping_bottom(i32::from(at.dst_y), u32::from(size.height), new_height);
+    let bottom = anchored_bottom(
+        id,
+        crate::place::top_keeping_bottom(i32::from(at.dst_y), u32::from(size.height), 0),
+    );
+    let top = crate::place::top_keeping_bottom(bottom, 0, new_height);
     let moved = conn.configure_window(
         id,
         &ConfigureWindowAux::new()
@@ -119,6 +122,31 @@ pub fn resize_upward(window: &gpui_kit::Window, height: f32) -> bool {
             .height(new_height),
     );
     moved.is_ok() && conn.flush().is_ok()
+}
+
+/// Where the panel's bottom belongs while it's being fitted: GNOME Shell
+/// places a new window only once its first frame is drawn, and a resize
+/// that came before that kept the window's first top with the new height,
+/// so the panel grew down under the bar (seen 2026-10-17 with two long
+/// names in "What Crake did"). Asked again a moment later (`fit_window`),
+/// the bottom comes from here, not from where the window ended up.
+static ANCHOR: std::sync::Mutex<Option<(u32, i32, std::time::Instant)>> =
+    std::sync::Mutex::new(None);
+
+/// The bottom kept for window `id`, or `bottom` (where it is now) once the
+/// last fit is past `crate::windows::REFIT_FOR` (the panel may have been
+/// dragged since).
+fn anchored_bottom(id: u32, bottom: i32) -> i32 {
+    let now = std::time::Instant::now();
+    let Ok(mut anchor) = ANCHOR.lock() else {
+        return bottom;
+    };
+    let kept = match *anchor {
+        Some((was, kept, at)) if was == id && now - at < crate::windows::REFIT_FOR => kept,
+        _ => bottom,
+    };
+    *anchor = Some((id, kept, now));
+    kept
 }
 
 /// A folder only this user can read, for files that live as long as a
@@ -180,5 +208,18 @@ mod tests {
             in_logical_pixels(xrandr, 1.),
             vec![rect(0., 0., 1920., 1080.)]
         );
+    }
+
+    /// GNOME Shell may place the panel after it has grown, keeping its
+    /// first top: fitting again a moment later puts its bottom back where
+    /// it was before it grew, not where the window ended up.
+    #[test]
+    fn a_panel_fitted_again_keeps_its_first_bottom() {
+        const PANEL: u32 = 0x60_0001;
+        assert_eq!(super::anchored_bottom(PANEL, 1270), 1270);
+        // Grown down by 112 px instead of up.
+        assert_eq!(super::anchored_bottom(PANEL, 1382), 1270);
+        // Another window starts afresh.
+        assert_eq!(super::anchored_bottom(PANEL + 1, 900), 900);
     }
 }

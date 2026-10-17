@@ -207,6 +207,36 @@ pub fn demo_expired(mut m: Model) -> Model {
     m
 }
 
+/// The demo with two names too long for one line in "What Crake did"
+/// (CRAKE_DEMO=long): Azure's private-link names, as a cluster's are.
+pub fn demo_long_names(mut m: Model) -> Model {
+    let Some(mut newest) = m.log.last().cloned() else {
+        return m;
+    };
+    for (name, address) in [
+        // literal: the demo's sample (made-up private-link names and addresses)
+        (
+            "aks-acme-nonprod.nonprod.privatelink.westeurope.azmk8s.io",
+            "10.40.97.4",
+        ),
+        // literal: the demo's sample
+        (
+            "aks-acme-prod.prod.privatelink.westeurope.azmk8s.io",
+            "10.40.161.4",
+        ),
+    ] {
+        newest.kind = LogKind::Routed;
+        newest.tunnel = Some("acme".into());
+        newest.message = format!("Sent {name} through ACME.");
+        newest.reason = Some(format!(
+            "Public DNS didn\u{2019}t know it; ACME\u{2019}s DNS did ({address}). Routed before the first packet."
+        ));
+        newest.hosts = vec![address.into()];
+        m.log.push(newest.clone());
+    }
+    m
+}
+
 /// The demo with a process OpenVPN 3 left running (CRAKE_DEMO=leftover;
 /// design/proposals/leftover-warning.html).
 pub fn demo_leftover(mut m: Model) -> Model {

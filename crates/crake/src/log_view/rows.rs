@@ -57,8 +57,13 @@ pub(super) fn row(r: Row, t: &Theme) -> AnyElement {
             div()
                 .flex_1()
                 .min_w_0()
-                .child(r.text)
-                .child(div().text_size(px(13.)).text_color(t.muted).child(r.why)),
+                .child(crate::theme::breakable(&r.text))
+                .child(
+                    div()
+                        .text_size(px(13.))
+                        .text_color(t.muted)
+                        .child(crate::theme::breakable(&r.why)),
+                ),
         )
         // A host left alone has no chip: a badge holding a dash said nothing.
         .when(r.badge != "\u{2014}", |row| {
