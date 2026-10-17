@@ -406,6 +406,18 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    keeps the name it was first seen with while fresh, `keep_name`: one
    stray wpad lookup had renamed GitLab) and "Where things go" (every tunnel's learned, pinned and
    undone hosts from HostDetails, the never list, then everything else).
+   **The audit of 2026-10-17** (design/proposals/audit-2026-10-17.html,
+   every window captured and read against DESIGN.md by two assessments;
+   the user took it all): the graph's packets are grey on every way and
+   the two-stroke tick marks each learned destination, in the graph and
+   the table's "Way" column (teal had come to mean "through a tunnel"
+   there); Settings' Remove…/Clear log… are quiet until pointed at; the
+   "?" only where its card says more; tunnel detail's buttons and
+   columns as its screen; the log's empty day said once; sign-in asks
+   "for your group" from a field-name table; the light amber #BF7E12;
+   DESIGN.md's Colour section states the teal rule, the notice shape and
+   the one title row. Headless captures of every window: the x11 test
+   image plus xwd (see the memory note design-proposals-impeccable).
    craked's D-Bus `Live` (asked once a second while the window is open,
    polkit-guarded like changes: it says where the computer connects):
    the physical and per-tunnel device counters (`Traffic::now`) and the
