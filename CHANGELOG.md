@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.10.0 (2026-10-17)
+
 - **Sign-in asks in words.** "ACME asks for your group", "…for a code", "…for your username",
   with the gateway's own words quoted under it, instead of "ACME asks: GROUP". A field Crake
   doesn't know keeps the gateway's word.
