@@ -410,9 +410,11 @@ mod service {
 
     fn service_main(_: Vec<OsString>) {
         let log = std::path::Path::new(super::DEFAULT_CONFIG).with_file_name("craked.log");
-        if let Some(dir) = log.parent() {
-            let _ = std::fs::create_dir_all(dir);
-        }
+        // ProgramData lets every user read what's in it: craked's folder
+        // (its log, the hosts each tunnel learned, its settings) is
+        // SYSTEM's and administrators' alone, and what an older Crake
+        // left there with it.
+        let locked = log.parent().map(craked::sys::create_private_dir);
         super::log_to(
             std::fs::OpenOptions::new()
                 .create(true)
@@ -420,6 +422,9 @@ mod service {
                 .open(&log)
                 .ok(),
         );
+        if let Some(Err(e)) = locked {
+            tracing::error!("craked's folder isn't locked: {e}");
+        }
         if let Err(e) = serve() {
             tracing::error!("craked: {e:#}");
         }

@@ -109,6 +109,19 @@ Check "craked stops cleanly" {
     -not (Get-Process openconnect -ErrorAction SilentlyContinue) -and
         -not (Get-Process openvpn -ErrorAction SilentlyContinue)
 }
+# craked's folder, and what's in it, for SYSTEM and administrators alone:
+# ProgramData lets every user read (BUILTIN\Users, S-1-5-32-545).
+Check "users can't read craked's folder, its log or its hosts" {
+    $users = 'S-1-5-32-545'
+    $open = foreach ($p in "$env:ProgramData\Crake", "$env:ProgramData\Crake\log", "$env:ProgramData\Crake\hosts.json") {
+        if (-not (Test-Path $p)) { "$p missing"; continue }
+        (Get-Acl $p).Access | Where-Object {
+            $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -in $users, 'S-1-1-0', 'S-1-5-11'
+        } | ForEach-Object { "$p $($_.IdentityReference)" }
+    }
+    if ($open) { $open | ForEach-Object { Say "        open: $_" } }
+    -not $open
+}
 Check "no crake adapters left" { -not (Get-NetAdapter -Name 'crake-*' -ErrorAction SilentlyContinue) }
 Check "no DNS rules left" {
     -not (Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters\DnsPolicyConfig' -ErrorAction SilentlyContinue |
