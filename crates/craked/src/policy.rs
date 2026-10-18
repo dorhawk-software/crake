@@ -12,6 +12,17 @@
 //! # or: full_tunnel = true
 //! ```
 //!
+//! An OpenVPN tunnel names its profile instead of a gateway (beside the
+//! file, or a whole path), read against the same allowlist as one imported
+//! in the app; the gateway is the one it names:
+//!
+//! ```toml
+//! display_name = "Initech"
+//! protocol = "openvpn"
+//! profile = "initech.ovpn"
+//! learn = ["*.initech.internal"]
+//! ```
+//!
 //! The user can switch a managed tunnel on and off, but can't edit it or
 //! widen its scope: hosts outside `learn` are never sent through it, by
 //! learning or by hand.
@@ -130,9 +141,12 @@ struct ManagedFile {
     name: Option<String>,
     display_name: Option<String>,
     organisation: Option<String>,
-    gateway: String,
+    /// Not for OpenVPN, whose profile names it.
+    gateway: Option<String>,
     #[serde(default = "anyconnect")]
     protocol: Protocol,
+    /// OpenVPN's profile: beside this file, or a whole path.
+    profile: Option<PathBuf>,
     group: Option<String>,
     user: Option<String>,
     sign_in: Option<String>,
@@ -159,7 +173,7 @@ pub fn load_file(path: &Path) -> Result<TunnelConfig> {
         std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
     let f: ManagedFile =
         toml::from_str(&text).with_context(|| format!("parsing {}", path.display()))?;
-    let name = match f.name {
+    let name = match f.name.clone() {
         Some(n) => n,
         None => path
             .file_stem()
@@ -202,6 +216,7 @@ pub fn load_file(path: &Path) -> Result<TunnelConfig> {
         );
     }
     let display = f.display_name.clone().unwrap_or_else(|| name.clone());
+    let (gateway, profile) = gateway_of(path, &f, &display)?;
     let mut auth_args = Vec::new();
     if let Some(g) = &f.group {
         auth_args.push(format!("--authgroup={g}"));
@@ -215,13 +230,14 @@ pub fn load_file(path: &Path) -> Result<TunnelConfig> {
     Ok(TunnelConfig {
         name,
         display_name: f.display_name,
-        gateway: f.gateway,
+        gateway,
         protocol: f.protocol,
         user: f.user,
         passwd_file: None,
         dns_domains: f.dns_domains,
         auth_args,
         extra_args: f.extra_args,
+        profile,
         managed: Some(Managed {
             file: path.to_owned(),
             organisation: f.organisation.unwrap_or_else(|| format!("{display} IT")),
@@ -230,6 +246,34 @@ pub fn load_file(path: &Path) -> Result<TunnelConfig> {
         }),
         own: None,
     })
+}
+
+/// A managed tunnel's gateway, and an OpenVPN tunnel's profile (read and
+/// checked now: one Crake can't run is refused here, with the file).
+fn gateway_of(path: &Path, f: &ManagedFile, display: &str) -> Result<(String, Option<PathBuf>)> {
+    if f.protocol != Protocol::Openvpn {
+        if f.profile.is_some() {
+            bail!("{}: a profile is for OpenVPN tunnels", path.display());
+        }
+        let gateway = f
+            .gateway
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("{}: no gateway", path.display()))?;
+        return Ok((gateway, None));
+    }
+    let Some(profile) = &f.profile else {
+        bail!(
+            "{}: an OpenVPN tunnel names its profile (profile = \"{}.ovpn\")",
+            path.display(),
+            path.file_stem().and_then(|s| s.to_str()).unwrap_or("its")
+        );
+    };
+    let profile = path.parent().unwrap_or(Path::new(".")).join(profile);
+    let text = std::fs::read_to_string(&profile)
+        .with_context(|| format!("reading {}", profile.display()))?;
+    let checked = crake_proto::openvpn_profile::check(&text)
+        .map_err(|r| anyhow::anyhow!("{}: {}", profile.display(), r.said(display)))?;
+    Ok((f.gateway.clone().unwrap_or(checked.remote), Some(profile)))
 }
 
 /// Every `*.toml` in the directory, in name order. A broken file is skipped
@@ -254,6 +298,55 @@ mod tests {
         let p = dir.join(name);
         std::fs::write(&p, text).unwrap();
         p
+    }
+
+    #[test]
+    fn an_openvpn_tunnel_names_its_profile() {
+        let dir = tempfile::tempdir().unwrap();
+        write(
+            dir.path(),
+            "initech.ovpn",
+            "client\ndev tun\nremote vpn.initech.example 1194\nauth-user-pass\n<ca>\nx\n</ca>\n",
+        );
+        let p = write(
+            dir.path(),
+            "initech.toml",
+            "display_name = \"Initech\"\nprotocol = \"openvpn\"\nprofile = \"initech.ovpn\"\nlearn = [\"10.40.0.0/16\"]\n",
+        );
+        let t = load_file(&p).unwrap();
+        assert_eq!(t.gateway, "vpn.initech.example", "the profile's gateway");
+        assert_eq!(
+            t.profile.as_deref(),
+            Some(dir.path().join("initech.ovpn").as_path())
+        );
+        assert!(t.managed.is_some());
+        // Without one, or with one Crake won't run: refused, saying why.
+        let none = write(dir.path(), "globex.toml", "protocol = \"openvpn\"\n");
+        let why = load_file(&none).unwrap_err().to_string();
+        assert!(
+            why.contains("names its profile (profile = \"globex.ovpn\")"),
+            "{why}"
+        );
+        write(
+            dir.path(),
+            "bad.ovpn",
+            "client\nremote vpn.bad.example\nplugin x.so\n",
+        );
+        let bad = write(
+            dir.path(),
+            "bad.toml",
+            "protocol = \"openvpn\"\nprofile = \"bad.ovpn\"\n",
+        );
+        let why = format!("{:#}", load_file(&bad).unwrap_err());
+        assert!(why.contains("bad.ovpn") && why.contains("plugin"), "{why}");
+        // A profile is OpenVPN's alone; another protocol needs a gateway.
+        let mixed = write(
+            dir.path(),
+            "mixed.toml",
+            "gateway = \"g\"\nprofile = \"initech.ovpn\"\n",
+        );
+        assert!(load_file(&mixed).is_err());
+        assert!(load_file(&write(dir.path(), "empty.toml", "\n")).is_err());
     }
 
     #[test]

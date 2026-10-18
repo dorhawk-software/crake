@@ -113,7 +113,12 @@ impl Manager {
         stop_rx: &mut oneshot::Receiver<Stop>,
     ) -> Result<Run> {
         let name = &config.name;
-        let stored = openvpn::profile_path(&self.cfg.state_path, name);
+        // IT's (or craked.toml's) where the tunnel names one, else the
+        // copy craked keeps of one added in the app.
+        let stored = config
+            .profile
+            .clone()
+            .unwrap_or_else(|| openvpn::profile_path(&self.cfg.state_path, name));
         let text = tokio::fs::read_to_string(&stored)
             .await
             .with_context(|| format!("reading {}", stored.display()))?;

@@ -469,17 +469,9 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
         apply_network: true,
         managed_dir: dir.path().join("managed.d"),
         tunnels: vec![TunnelConfig {
-            name: "acme".into(),
             display_name: Some("ACME".into()),
-            gateway: "vpn.acme.example".into(),
-            protocol: Protocol::Anyconnect,
-            user: None,
-            passwd_file: None,
             dns_domains: vec!["corp.example".into()],
-            auth_args: vec![],
-            extra_args: vec![],
-            managed: None,
-            own: None,
+            ..TunnelConfig::new("acme", "vpn.acme.example", Protocol::Anyconnect)
         }],
         ..Config::default()
     };

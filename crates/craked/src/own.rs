@@ -262,6 +262,7 @@ impl OwnTunnel {
             dns_domains: Vec::new(),
             auth_args,
             extra_args,
+            profile: None,
             managed: None,
             own: Some(self.clone()),
         }

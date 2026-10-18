@@ -145,6 +145,11 @@ pub struct TunnelConfig {
     /// Arguments for both sign-in and the connection, e.g. `--useragent=...`.
     #[serde(default)]
     pub extra_args: Vec<String>,
+    /// An OpenVPN tunnel's profile, where it isn't craked's own copy (one
+    /// added in the app is kept in `profiles/`): IT's, beside its managed
+    /// file, or one craked.toml names. Read and checked at each start.
+    #[serde(default)]
+    pub profile: Option<PathBuf>,
     /// Set for tunnels from `managed_dir`: who decides, and what may go through.
     #[serde(skip)]
     pub managed: Option<crate::policy::Managed>,
@@ -154,6 +159,24 @@ pub struct TunnelConfig {
 }
 
 impl TunnelConfig {
+    /// A tunnel to `gateway` with nothing else set.
+    pub fn new(name: &str, gateway: &str, protocol: Protocol) -> Self {
+        Self {
+            name: name.to_owned(),
+            display_name: None,
+            gateway: gateway.to_owned(),
+            protocol,
+            user: None,
+            passwd_file: None,
+            dns_domains: Vec::new(),
+            auth_args: Vec::new(),
+            extra_args: Vec::new(),
+            profile: None,
+            managed: None,
+            own: None,
+        }
+    }
+
     pub fn display(&self) -> &str {
         self.display_name.as_deref().unwrap_or(&self.name)
     }

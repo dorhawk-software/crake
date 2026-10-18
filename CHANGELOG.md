@@ -37,6 +37,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
   version, Crake tries each public address a tunnel learned and forgets those that answer
   directly, as it already did on Linux.
 
+- **IT can set up OpenVPN tunnels too.** A managed profile in `/etc/crake/managed.d` can name a
+  `.ovpn` file beside it (`protocol = "openvpn"`, `profile = "initech.ovpn"`), with the same
+  learning policy as AnyConnect's; Crake checks the file as it does one you import, and says why
+  if it can't run it.
+
 - **OpenVPN on Windows and macOS too.** On Windows it comes with Crake, with its drivers; on a Mac
   it comes with Homebrew's cask (`brew install openvpn` otherwise).
 

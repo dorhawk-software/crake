@@ -51,6 +51,7 @@ pub(crate) fn config(dir: &std::path::Path) -> Config {
             dns_domains: vec![],
             auth_args: vec![],
             extra_args: vec![],
+            profile: None,
             managed: None,
             own: None,
         }],

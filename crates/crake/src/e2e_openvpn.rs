@@ -311,3 +311,98 @@ async fn a_password_sign_in_through_the_app() {
     })
     .await;
 }
+
+/// An OpenVPN tunnel IT set up (`managed.d`: its file names a profile
+/// beside it): craked reads it, the user signs in with a password, and IT's
+/// scope holds: a host inside goes through, one outside is refused.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_openvpn_tunnel_it_set_up() {
+    if !enabled() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let managed = dir.path().join("managed.d");
+    std::fs::create_dir_all(&managed).unwrap();
+    std::fs::write(managed.join("initech.ovpn"), password_profile()).unwrap();
+    std::fs::write(
+        managed.join("initech.toml"),
+        "display_name = \"Initech\"\nprotocol = \"openvpn\"\nprofile = \"initech.ovpn\"\n\
+         learn = [\"10.40.1.10/32\"]\n",
+    )
+    .unwrap();
+    let mut cfg = craked::config::Config {
+        managed_dir: managed,
+        ..config(dir.path())
+    };
+    // As craked.toml's loading does.
+    cfg.add_managed();
+    let hook_socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    mgr.init().await.unwrap();
+    craked::hook_server::serve(mgr.clone(), &hook_socket).unwrap();
+    let mut app = wire_tests::serve(mgr.clone(), dir.path());
+    app.until("IT's tunnel", |m| {
+        m.tunnels
+            .iter()
+            .any(|t| t.name == "initech" && t.protocol == "openvpn" && t.managed)
+    })
+    .await;
+    app.send(Command::Connect("initech".into()));
+    let answer = |ask: &HashMap<String, String>, text: &str| {
+        Command::Answer(
+            "initech".into(),
+            ask["id"].parse().unwrap(),
+            text.to_owned(),
+        )
+    };
+    let ask = app.asked("the username").await;
+    app.send(answer(&ask, "alice"));
+    let ask = app.asked("the password").await;
+    app.send(answer(&ask, "hunter2"));
+    app.within(WAIT, "connected", |m| {
+        m.tunnels
+            .iter()
+            .any(|t| t.name == "initech" && t.state == "connected")
+    })
+    .await;
+    // Inside IT's scope: through. Outside: refused, in IT's words.
+    app.send(Command::AddHosts(
+        "initech".into(),
+        vec!["10.40.1.10".into()],
+    ));
+    let git = until("git through the tunnel", || {
+        get("10.40.1.10", Duration::from_secs(1)).ok()
+    })
+    .await;
+    assert!(git.contains("crex"), "{git}");
+    app.send(Command::AddHosts(
+        "initech".into(),
+        vec!["10.40.1.11".into()],
+    ));
+    let refused = tokio::time::timeout(WAIT, async {
+        loop {
+            match app.updates.recv().await {
+                Ok(crate::client::Update::Failed(text)) => return text,
+                Ok(u) => {
+                    app.model.apply(u);
+                }
+                Err(_) => panic!("craked went away"),
+            }
+        }
+    })
+    .await
+    .expect("refused outside the scope");
+    assert!(
+        refused.starts_with("Initech IT only allows 10.40.1.10")
+            && refused.ends_with("through Initech."),
+        "{refused}"
+    );
+    app.send(Command::Disconnect("initech".into()));
+    app.within(WAIT, "off", |m| {
+        m.tunnels
+            .iter()
+            .any(|t| t.name == "initech" && t.state == "off")
+    })
+    .await;
+    mgr.shutdown().await;
+}

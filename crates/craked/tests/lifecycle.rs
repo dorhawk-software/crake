@@ -65,6 +65,7 @@ fn setup(dir: &std::path::Path, script: &str) -> Config {
             dns_domains: vec![],
             auth_args: vec![],
             extra_args: vec![],
+            profile: None,
             managed: None,
             own: None,
         }],

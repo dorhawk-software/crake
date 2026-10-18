@@ -359,17 +359,9 @@ async fn start_probe(race: bool) -> Probe {
         apply_network: true,
         managed_dir: dir.path().join("managed.d"),
         tunnels: vec![TunnelConfig {
-            name: "acme".into(),
             display_name: Some("ACME".into()),
-            gateway: "vpn.acme.example".into(),
-            protocol: Protocol::Anyconnect,
-            user: None,
-            passwd_file: None,
             dns_domains: vec!["acme.internal".into()],
-            auth_args: vec![],
-            extra_args: vec![],
-            managed: None,
-            own: None,
+            ..TunnelConfig::new("acme", "vpn.acme.example", Protocol::Anyconnect)
         }],
     };
     let socket = cfg.hook_socket.clone();

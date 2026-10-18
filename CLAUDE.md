@@ -140,6 +140,7 @@ are shared with passive probing (`try_tunnels`).
 - Read-only TOML in `/etc/crake/managed.d/*.toml`: gateway, protocol, group,
   sign-in method, and a learning policy (`learn = ["*.acme.internal",
   "10.40.0.0/16"]`, or `full_tunnel = true`).
+  An OpenVPN tunnel names its `.ovpn` profile instead of a gateway (7i).
 - The user can switch a managed tunnel on and off, but can't edit it or widen
   its scope. The UI shows the policy in plain words.
 
@@ -922,8 +923,7 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    off and on again with the gateway's token and nothing asked, an
    upgrade's handover with the token (a mutation that hands no token over
    fails it). Not yet (later slices): the app's side; AppArmor's rules
-   for openvpn and `profiles/`; OpenVPN tunnels from craked.toml or IT's
-   managed.d (they'd name a profile file); smart cards
+   for openvpn and `profiles/`; smart cards
    (`pkcs11-providers`, refused today) and Windows' certificate store
    (`cryptoapicert`); the DCO fallback has no test against a gateway that
    needs it (the user's real one does: CLAUDE.local.md).
@@ -952,6 +952,18 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    import and take-over, the sign-in window's questions, the notice),
    lifecycle (the move), e2e through the app's client, the journey's
    import step. Tunnels from craked.toml or IT that are OpenVPN 3 stay so.
+   **OpenVPN tunnels IT sets up, or craked.toml names (2026-10-18):** a
+   managed file says `protocol = "openvpn"` and `profile = "initech.ovpn"`
+   (beside it, or a whole path) in place of a gateway, which is read from
+   the profile; the profile is checked against the allowlist when the file
+   loads (one Crake can't run skips that tunnel, the reason in craked's
+   log, as a broken file is) and read and checked again at each start
+   from IT's file (`TunnelConfig::profile`; an app-added tunnel's is
+   craked's copy in `profiles/`). The learning scope and the rest of the
+   managed rules hold as for openconnect's; sign-in is the profile's
+   (questions through `Asking`). e2e: `an_openvpn_tunnel_it_set_up`
+   (IT's file and profile in managed.d, a password sign-in, a host inside
+   the scope through, one outside refused in IT's words).
    **The sign-in kept (2026-10-18):** a username and password typed for
    an OpenVPN tunnel are kept in the keyring once it's up
    (`openvpn/kept.rs`, `keyring::Kind::Username` beside `Password`), and
