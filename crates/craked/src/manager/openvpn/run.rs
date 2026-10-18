@@ -255,8 +255,10 @@ impl Manager {
         } else if crate::sys::NAMES_DEVICES {
             cmd.args(["--dev", &interface_name(name), "--dev-type", "tun"]);
         } else {
-            // macOS: the next free utun; the hook says which.
-            cmd.args(["--dev", "utun"]);
+            // macOS: the next free utun; the hook says which. openvpn
+            // takes tun or tap from a device's name, and "utun" says
+            // neither ("problem with tun vs. tap setting" at the push).
+            cmd.args(["--dev", "utun", "--dev-type", "tun"]);
         }
         cmd.args(["--route-noexec", "--ifconfig-noexec"])
             .args([
