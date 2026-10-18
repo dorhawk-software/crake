@@ -23,6 +23,10 @@ in {
   nodes.gateway = { pkgs, ... }: {
     virtualisation.memorySize = 2048;
     networking.firewall.enable = false;
+    # ocserv's tunnel devices are ocserv's: dhcpcd took vpns0 as a client
+    # connected ("waiting for 3rd party to configure IP address"), and the
+    # journey's first connection through it was reset (CLAUDE.md, Not now).
+    networking.dhcpcd.denyInterfaces = [ "vpns*" ];
     networking.nftables.enable = true;
     # From the LAN, ACME's network doesn't answer: only the tunnel reaches it.
     networking.nftables.tables.lan = {

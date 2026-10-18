@@ -1179,6 +1179,14 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   back: craked's log around the race (`race_held`: did direct "answer"
   with a reset from the gateway VM, which is also the client's default
   route?), and whether the app saw a reset or a refused connect.
+  **Again on 2026-10-18** (run 39135556942 on 8cba704, step 2 again,
+  "Connection reset by peer" 0.3 s after ACME connected). The gateway VM
+  drops what the LAN sends to ACME's network (no reset from there), and
+  its own dhcpcd had just taken ocserv's new vpns0 ("waiting for 3rd
+  party to configure IP address"), as dhcpcd once took the client's
+  crake-acme. The gateway VM now keeps dhcpcd off vpns* (test.nix). If
+  it comes back after that, the cause is elsewhere: the gateway's side
+  (ocserv's routes to the client right after connect) is next to look at.
 - **All unsafe code behind one safe layer (asked for by the user,
   2026-10-14).** About 100 unsafe uses today (craked 68 in 13 files, the
   app 32 in 7), nearly all in the `sys/` modules (system calls, netlink,
