@@ -25,6 +25,11 @@ use crate::test_app::{App, connected, enabled, gateway, get, off, sign_in};
 const WAIT: Duration = Duration::from_secs(60);
 /// A public address that answers anywhere: it must answer directly.
 const PUBLIC: &str = "1.1.1.1:443";
+/// A public name: "my internet stopped" is almost always names that stop
+/// resolving (craked stands in for the system's DNS while a tunnel is up).
+const PUBLIC_NAME: (&str, u16) = ("one.one.one.one", 443);
+/// How long the system gets to have its DNS back after craked's end.
+const BACK: Duration = Duration::from_secs(45);
 /// The test tunnels, gone before and after.
 const TUNNELS: [&str; 2] = ["acme", "initech"];
 
@@ -84,41 +89,16 @@ impl Crake {
             })
             .await;
         c.remove_tunnels().await;
-        let gateway = gateway();
-        c.add(&[
-            ("display_name", "ACME"),
-            ("gateway", &gateway),
-            ("protocol", "anyconnect"),
-            ("user", "alice"),
-        ])
-        .await;
+        add_acme(&mut c.app).await;
         c
     }
 
     async fn add(&mut self, fields: &[(&str, &str)]) {
-        let fields: HashMap<String, String> = fields
-            .iter()
-            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-            .collect();
-        let name = fields["display_name"].to_lowercase();
-        self.app.send(Command::AddTunnel(fields));
-        self.app
-            .until("added", |m| m.tunnels.iter().any(|t| t.name == name))
-            .await;
+        add(&mut self.app, fields).await;
     }
 
-    /// No test tunnel left (the service keeps them from run to run).
     async fn remove_tunnels(&mut self) {
-        for old in TUNNELS {
-            if self.app.model.tunnels.iter().any(|t| t.name == old) {
-                self.app.send(Command::RemoveTunnel(old.into()));
-                self.app
-                    .until("an old one gone", |m| {
-                        !m.tunnels.iter().any(|t| t.name == old)
-                    })
-                    .await;
-            }
-        }
+        remove_tunnels(&mut self.app).await;
     }
 
     /// The device `tunnel` runs on.
@@ -136,6 +116,46 @@ impl Crake {
         self.remove_tunnels().await;
         #[cfg(target_os = "macos")]
         self.mgr.shutdown().await;
+    }
+}
+
+/// A tunnel added as New tunnel adds one.
+async fn add(app: &mut App, fields: &[(&str, &str)]) {
+    let fields: HashMap<String, String> = fields
+        .iter()
+        .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+        .collect();
+    let name = fields["display_name"].to_lowercase();
+    app.send(Command::AddTunnel(fields));
+    app.until("added", |m| m.tunnels.iter().any(|t| t.name == name))
+        .await;
+}
+
+/// ACME's AnyConnect gateway.
+async fn add_acme(app: &mut App) {
+    let gateway = gateway();
+    add(
+        app,
+        &[
+            ("display_name", "ACME"),
+            ("gateway", &gateway),
+            ("protocol", "anyconnect"),
+            ("user", "alice"),
+        ],
+    )
+    .await;
+}
+
+/// No test tunnel left (the service keeps them from run to run).
+async fn remove_tunnels(app: &mut App) {
+    for old in TUNNELS {
+        if app.model.tunnels.iter().any(|t| t.name == old) {
+            app.send(Command::RemoveTunnel(old.into()));
+            app.until("an old one gone", |m| {
+                !m.tunnels.iter().any(|t| t.name == old)
+            })
+            .await;
+        }
     }
 }
 
@@ -185,6 +205,32 @@ fn route_device(ip: &str) -> String {
     .to_owned()
 }
 
+/// A public name looked up as an app looks it up, and its address
+/// answering: the internet works by name.
+fn public_name_answers() -> bool {
+    PUBLIC_NAME
+        .to_socket_addrs()
+        .ok()
+        .and_then(|mut a| a.find(SocketAddr::is_ipv4))
+        .is_some_and(|a| TcpStream::connect_timeout(&a, Duration::from_secs(5)).is_ok())
+}
+
+/// The internet works by name within `wait`.
+async fn names_work(what: &str, wait: Duration) {
+    let end = std::time::Instant::now() + wait;
+    while !tokio::task::spawn_blocking(public_name_answers)
+        .await
+        .unwrap()
+    {
+        assert!(
+            std::time::Instant::now() < end,
+            "{}: {what}",
+            "public names don't resolve"
+        );
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+}
+
 /// What a tunnel that's up must give: ACME's network through it, its names
 /// before the first packet, and the internet directly.
 async fn the_split_holds(crake: &Crake, tunnel: &str) {
@@ -224,6 +270,8 @@ async fn the_split_holds(crake: &Crake, tunnel: &str) {
         !way.is_empty() && way != device,
         "1.1.1.1 goes {way}, not through {device}"
     );
+    // 4. And by name: craked's DNS answers public names too.
+    names_work("while a tunnel is up", WAIT).await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -245,6 +293,7 @@ async fn anyconnect_through_cloudflare() {
     crake.app.send(Command::Disconnect("acme".into()));
     crake.app.within(WAIT, "ACME off", off).await;
     assert!(get("10.40.1.10", Duration::from_secs(2)).is_err());
+    names_work("switched off", WAIT).await;
     crake.stop().await;
 }
 
@@ -300,5 +349,91 @@ async fn openvpn_through_cloudflare() {
     })
     .await;
     assert!(get("10.40.1.10", Duration::from_secs(2)).is_err());
+    names_work("switched off", WAIT).await;
     crake.stop().await;
+}
+
+/// macOS: craked as a process of its own, serving the app where the
+/// installed one does (crake_proto::APP_SOCKET), its files in `dir`.
+#[cfg(target_os = "macos")]
+fn own_craked(dir: &std::path::Path) -> std::process::Child {
+    let hook = std::env::var("CRAKE_E2E_HOOK").expect("CRAKE_E2E_HOOK: craked's crake-hook");
+    let bin = std::env::var("CRAKE_E2E_CRAKED").expect("CRAKE_E2E_CRAKED: craked itself");
+    let cfg = dir.join("craked.toml");
+    std::fs::write(
+        &cfg,
+        format!(
+            "hook_path = {hook:?}\nhook_socket = {:?}\nlog_path = {:?}\nstate_path = {:?}\n\
+             managed_dir = {:?}\nprobe_wait_secs = 1\nrace_first_syn = false\n",
+            dir.join("hook.sock"),
+            dir.join("log"),
+            dir.join("hosts.json"),
+            dir.join("managed.d"),
+        ),
+    )
+    .unwrap();
+    Run::new(bin)
+        .arg("--config")
+        .arg(&cfg)
+        .stderr(std::fs::File::create(dir.join("craked.err")).unwrap())
+        .spawn()
+        .unwrap()
+}
+
+/// craked ending mid-connection (a crash, or killed): once it's started
+/// again (launchd and Windows' service manager restart it), the system's
+/// DNS is its own again and the internet works by name. macOS: craked as
+/// a process of its own, killed with SIGKILL and started again; Windows:
+/// the service's process killed, and Windows restarting it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_internet_survives_crakeds_end() {
+    if !enabled() {
+        return;
+    }
+    #[cfg(target_os = "macos")]
+    let dir = tempfile::tempdir().unwrap();
+    #[cfg(target_os = "macos")]
+    let mut craked = own_craked(dir.path());
+    let (tx, updates) = async_channel::unbounded();
+    let mut app = App::new(crate::client::start(tx), updates);
+    let reached = |m: &crate::model::Model| m.reachable == Some(true) && !m.settings.is_empty();
+    app.within(WAIT, "craked reached", reached).await;
+    remove_tunnels(&mut app).await;
+    add_acme(&mut app).await;
+    let session = sign_in().await;
+    app.send(Command::ConnectWithSession("acme".into(), session));
+    app.within(WAIT, "ACME connected", connected).await;
+    names_work("connected", WAIT).await;
+
+    // The end, and the start after it. openconnect, left without craked,
+    // is ended too: the start that follows knows nothing of it.
+    #[cfg(target_os = "macos")]
+    {
+        let _ = craked.kill();
+        let _ = craked.wait();
+        sh("pkill -9 openconnect");
+        craked = own_craked(dir.path());
+    }
+    #[cfg(windows)]
+    {
+        sh("Stop-Process -Name craked -Force");
+        sh("Stop-Process -Name openconnect -Force -ErrorAction SilentlyContinue");
+    }
+    names_work("after craked's end, started again", BACK).await;
+    #[cfg(target_os = "macos")]
+    {
+        let dns = sh("scutil --dns");
+        assert!(
+            !dns.contains("127.53.0.1"),
+            "macOS's DNS still points at craked's server:\n{dns}"
+        );
+    }
+
+    app.within(BACK, "craked reached again", reached).await;
+    remove_tunnels(&mut app).await;
+    #[cfg(target_os = "macos")]
+    {
+        sh(&format!("kill -TERM {}", craked.id()));
+        let _ = craked.wait();
+    }
 }

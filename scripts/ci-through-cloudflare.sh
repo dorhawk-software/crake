@@ -51,14 +51,15 @@ until curl -sk -o /dev/null https://127.0.0.1:8443; do
 done
 status=0
 if [ "$SYSTEM" = macos ]; then
-  cargo build -q --workspace --locked --bin crake-hook
+  cargo build -q --workspace --locked --bin crake-hook --bin craked
   HOOK=$PWD/target/debug/crake-hook
   BIN=$(cargo test --workspace --locked --no-run --message-format=json 2>/dev/null |
     jq -r 'select(.executable != null and .target.name == "crake" and .profile.test) | .executable' | head -n1)
   [ -n "$BIN" ] || { echo "could not build the tests" >&2; exit 1; }
   sudo env CRAKE_E2E=1 CRAKE_E2E_GATEWAY=https://127.0.0.1:8443 \
     CRAKE_GATEWAY_OPENVPN="127.0.0.1 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
-    CRAKE_E2E_HOOK="$HOOK" "$BIN" gateway_tests --test-threads=1 --nocapture || status=$?
+    CRAKE_E2E_HOOK="$HOOK" CRAKE_E2E_CRAKED="$PWD/target/debug/craked" \
+    "$BIN" gateway_tests --test-threads=1 --nocapture || status=$?
 else
   CRAKE_E2E=1 CRAKE_E2E_GATEWAY=https://127.0.0.1:8443 \
     CRAKE_GATEWAY_OPENVPN="127.0.0.1 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
