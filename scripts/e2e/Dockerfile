@@ -19,5 +19,5 @@ RUN mkdir -p /etc/openvpn/e2e && cd /etc/openvpn/e2e \
  && openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 3650 -extfile server.ext
 COPY ocserv.conf /etc/ocserv/ocserv.conf
 COPY openvpn.conf /etc/openvpn/e2e/server.conf
-COPY start.sh client.sh relay.py sso.py /
+COPY start.sh ci-start.sh client.sh relay.py sso.py /
 CMD ["/bin/sh", "/start.sh"]

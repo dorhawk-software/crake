@@ -87,7 +87,14 @@ jobs:
   # no Mac here.
   macos:
     runs-on: macos-latest
+    permissions:
+      contents: read
+      # The gateways job's artifact (its OpenVPN CA, once they're up).
+      actions: read
     env:
+      # Whether Cloudflare Tunnel is set up for this repository (7j): the
+      # real-gateway step runs only then (a fork's run has no secrets).
+      HAVE_TUNNEL: ${{ secrets.CF_ACCESS_CLIENT_ID != '' }}
       # Whether this run may sign (a fork's or Dependabot's has no
       # secrets): only that, the secrets themselves go to the steps that
       # need them, never to the builds (crates' build scripts run there).
@@ -116,6 +123,17 @@ jobs:
               jq -r "select(.executable != null and .target.name == \"$t\") | .executable")
             sudo CRAKE_MACOS_ROOT=1 "$BIN" --nocapture
           done
+      # ACME's gateways in the gateways job, carried here by Cloudflare
+      # Tunnel: AnyConnect and OpenVPN (over TCP) signed in to, a host only
+      # the tunnel reaches answers, the internet answers directly
+      # (CLAUDE.md, 7j; crates/crake/src/gateway_tests.rs).
+      - name: Real gateways, through Cloudflare
+        if: env.HAVE_TUNNEL == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: sh scripts/ci-through-cloudflare.sh
       - name: A keychain with the Developer ID certificates
         if: env.SIGNING == 'true'
         env:
@@ -162,6 +180,57 @@ jobs:
         with:
           name: crake-macos
           path: target/macos/Crake-*.pkg
+
+  # ACME's gateways (the e2e gateway's image: ocserv, and openvpn over
+  # TCP) for the Mac's job, published by Cloudflare Tunnel, up until that
+  # job is done with them (CLAUDE.md, 7j; scripts/ci-gateways.sh). Without
+  # the tunnel's secrets (a fork, or before it's set up) it does nothing.
+  gateways:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      # This run's jobs: whether the Mac's is done.
+      actions: read
+    env:
+      HAVE_TUNNEL: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN != '' }}
+    steps:
+      - name: Without Cloudflare Tunnel, nothing to do
+        if: env.HAVE_TUNNEL != 'true'
+        run: echo "No Cloudflare Tunnel secrets here; the real-gateway tests are skipped."
+      - uses: actions/checkout@v7
+        if: env.HAVE_TUNNEL == 'true'
+      - name: ACME's gateways
+        if: env.HAVE_TUNNEL == 'true'
+        run: scripts/ci-gateways.sh up "$RUNNER_TEMP/gateways"
+      - name: Published by Cloudflare Tunnel
+        if: env.HAVE_TUNNEL == 'true'
+        env:
+          CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+        run: |
+          sh scripts/cloudflared.sh linux "$RUNNER_TEMP/cloudflared"
+          nohup "$RUNNER_TEMP/cloudflared" tunnel --no-autoupdate run --token "$CLOUDFLARE_TUNNEL_TOKEN" \
+            > "$RUNNER_TEMP/cloudflared.log" 2>&1 &
+          for i in $(seq 60); do
+            grep -q "Registered tunnel connection" "$RUNNER_TEMP/cloudflared.log" && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/cloudflared.log"
+          exit 1
+      - uses: actions/upload-artifact@v7
+        if: env.HAVE_TUNNEL == 'true'
+        with:
+          name: gateways-ready
+          path: ${{ runner.temp }}/gateways/openvpn-ca.crt
+      - name: Up until the Mac's job is done with them
+        if: env.HAVE_TUNNEL == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/ci-gateways.sh wait macos
+      - name: What the gateways said
+        if: always() && env.HAVE_TUNNEL == 'true'
+        run: |
+          tail -n 20 "$RUNNER_TEMP/cloudflared.log" || true
+          scripts/ci-gateways.sh down "$RUNNER_TEMP/gateways"
 
   windows-build:
     runs-on: windows-latest

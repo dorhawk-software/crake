@@ -1008,6 +1008,36 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    installed Windows service unless the runner allows it.
    Setup with the user, once: a tunnel, a hostname and a service token in
    the Cloudflare dashboard.
+   **macOS: built, waiting on that setup (2026-10-18).** CI's `gateways`
+   job runs the e2e gateway's image with a network on the Linux runner
+   (`scripts/ci-gateways.sh`, `scripts/e2e/ci-start.sh`: ocserv on
+   127.0.0.1:8443, openvpn over TCP on 127.0.0.1:1194, ACME's network
+   answering only through a tunnel), `cloudflared tunnel run` publishes
+   them, an artifact (`gateways-ready`, the OpenVPN CA) says they're up,
+   and it stays until the `macos` job has finished. That job's last test
+   step (`scripts/ci-through-cloudflare.sh`) carries each to 127.0.0.1
+   with `cloudflared access tcp` and the service token and runs
+   `crates/crake/src/gateway_tests.rs` as root, craked in the test as the
+   e2e tests run it: AnyConnect signed in with the app's sign-in, OpenVPN
+   with its password asked through craked; connected, 10.40.1.10 answers
+   once probed (through the tunnel's device), wiki.acme.internal is asked
+   of macOS and routed before the first packet, 1.1.1.1 answers off the
+   tunnel's device (OpenVPN's gateway pushes redirect-gateway); off, ACME's
+   network is gone. cloudflared is pinned by version and checksum
+   (`scripts/cloudflared.sh`). Without the secrets every step skips.
+   In Cloudflare (Zero Trust): a tunnel whose token is the secret
+   CLOUDFLARE_TUNNEL_TOKEN, with two public hostnames,
+   crake-ci-anyconnect.dorhawk.software → tcp://localhost:8443 and
+   crake-ci-openvpn.dorhawk.software → tcp://localhost:1194; a
+   self-hosted Access application over both that admits only the service
+   token `crake-ci` (Service Auth), its ID and secret the secrets
+   CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET. One tunnel for every
+   run: a push cancels the branch's run still going, so two runs' gateways
+   meet only for a moment. Next: Windows (the installer built from the
+   run's crake-windows artifact, the service installed on the runner, the
+   same tests); later, OpenVPN's browser sign-in through Cloudflare (its
+   page, sso.py on 8080, needs a third hostname) and openconnect's fake
+   servers for the other protocols' sign-in.
 8. **Someday: other platforms** (see below). Not before Linux is solid.
 
 ## A newer Crake (built 2026-10-14; design/proposals/new-version.html)

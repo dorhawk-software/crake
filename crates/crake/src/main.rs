@@ -89,8 +89,11 @@ const LAST_HOST: u8 = 250;
 // With craked over its socket, openconnect and nftables: Linux.
 #[cfg(all(test, target_os = "linux"))]
 mod e2e_openvpn;
+// Real gateways through Cloudflare, on CI's Mac (CLAUDE.md, 7j).
 #[cfg(all(test, target_os = "linux"))]
 mod e2e_tests;
+#[cfg(all(test, target_os = "macos"))]
+mod gateway_tests;
 #[cfg(all(test, any(target_os = "linux", windows)))]
 mod journey_kit;
 // What the macOS package installs, read from packaging/macos: any system.
@@ -98,8 +101,8 @@ mod journey_kit;
 mod journey_tests;
 #[cfg(test)]
 mod macos_packaging_tests;
-// The app's side against a real craked: the Linux and Windows tests'.
-#[cfg(all(test, any(target_os = "linux", windows)))]
+// The app's side against a real craked: the Linux, Windows and macOS tests'.
+#[cfg(test)]
 mod test_app;
 mod traffic_view;
 mod tunnel_detail;

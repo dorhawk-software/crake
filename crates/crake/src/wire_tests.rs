@@ -8,13 +8,12 @@
 //! openconnect path is covered by craked's lifecycle tests.
 
 use std::collections::HashMap;
-use std::os::unix::fs::MetadataExt;
 use std::time::{Duration, Instant};
 
 use craked::config::{Config, Protocol, TunnelConfig};
 use craked::manager::Manager;
 
-use crate::client::{self, Command, Update};
+use crate::client::{Command, Update};
 use crate::test_app::App;
 
 fn config(dir: &std::path::Path) -> Config {
@@ -58,11 +57,7 @@ async fn start(dir: &std::path::Path) -> App {
 /// craked serving on a private socket in `dir`, and the app's client
 /// connected to it.
 pub(crate) fn serve(mgr: std::sync::Arc<Manager>, dir: &std::path::Path) -> App {
-    let socket = dir.join("crake.sock");
-    let owner = std::fs::metadata(dir).unwrap().uid();
-    craked::dbus::serve_p2p(mgr, &socket, owner).unwrap();
-    let (tx, updates) = async_channel::unbounded();
-    App::new(client::start_on(socket, tx), updates)
+    crate::test_app::serve(mgr, dir)
 }
 
 fn fields(pairs: &[(&str, &str)]) -> HashMap<String, String> {

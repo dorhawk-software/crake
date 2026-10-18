@@ -1,6 +1,7 @@
 //! The app's side in tests against a real craked: its model, fed by the
 //! app's own client, and the sign-in a person would do. Shared by the
-//! Linux tests (wire, e2e, journey) and Windows' (`windows_tests.rs`).
+//! Linux tests (wire, e2e, journey), Windows' (`windows_tests.rs`) and the
+//! real gateways' on CI's Mac (`gateway_tests.rs`).
 
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
@@ -74,6 +75,7 @@ impl App {
     }
 
     /// Apply whatever arrives for `wait`.
+    #[cfg(any(target_os = "linux", windows))]
     pub async fn settle(&mut self, wait: Duration) {
         let end = Instant::now() + wait;
         while let Ok(Ok(u)) = tokio::time::timeout(
@@ -86,6 +88,7 @@ impl App {
         }
     }
 
+    #[cfg(any(target_os = "linux", windows))]
     pub fn state(&self, tunnel: &str) -> Option<String> {
         self.model
             .tunnels
@@ -98,6 +101,18 @@ impl App {
     pub fn logged(&self, message: &str) -> bool {
         self.model.log.iter().any(|e| e.message == message)
     }
+}
+
+/// craked's `mgr` serving on a private socket in `dir`, and the app's
+/// client connected to it.
+#[cfg(unix)]
+pub(crate) fn serve(mgr: std::sync::Arc<craked::manager::Manager>, dir: &std::path::Path) -> App {
+    use std::os::unix::fs::MetadataExt as _;
+    let socket = dir.join("crake.sock");
+    let owner = std::fs::metadata(dir).unwrap().uid();
+    craked::dbus::serve_p2p(mgr, &socket, owner).unwrap();
+    let (tx, updates) = async_channel::unbounded();
+    App::new(crate::client::start_on(socket, tx), updates)
 }
 
 /// The test gateway: scripts/e2e's container, or wherever CRAKE_E2E_GATEWAY
