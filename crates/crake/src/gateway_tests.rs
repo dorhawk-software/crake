@@ -478,6 +478,30 @@ fn own_craked(dir: &std::path::Path) -> std::process::Child {
         .unwrap()
 }
 
+/// macOS: the app socket's file, as made by the craked serving it now.
+#[cfg(target_os = "macos")]
+fn socket_made() -> Option<u64> {
+    use std::os::unix::fs::MetadataExt as _;
+    std::fs::metadata(crake_proto::APP_SOCKET)
+        .ok()
+        .map(|m| m.ino())
+}
+
+/// macOS: a new craked has started, within BACK: it makes its app socket
+/// anew once its start has put the system right (`Manager::init`).
+#[cfg(target_os = "macos")]
+async fn started_again(before: Option<u64>) {
+    let end = std::time::Instant::now() + BACK;
+    while socket_made().is_none_or(|now| Some(now) == before) {
+        assert!(
+            std::time::Instant::now() < end,
+            "craked didn't start again within {} s",
+            BACK.as_secs()
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+}
+
 /// craked ending mid-connection (a crash, or killed): once it's started
 /// again (launchd and Windows' service manager restart it), the system's
 /// DNS is its own again and the internet works by name. macOS: craked as
@@ -507,10 +531,14 @@ async fn the_internet_survives_crakeds_end() {
     // is ended too: the start that follows knows nothing of it.
     #[cfg(target_os = "macos")]
     {
+        let before = socket_made();
         let _ = craked.kill();
         let _ = craked.wait();
         sh("pkill -9 openconnect");
         craked = own_craked(dir.path());
+        // The app hasn't noticed the end yet, and a name just looked up
+        // answers from macOS' cache: neither says the new craked started.
+        started_again(before).await;
     }
     #[cfg(windows)]
     {
@@ -518,8 +546,6 @@ async fn the_internet_survives_crakeds_end() {
         sh("Stop-Process -Name openconnect -Force -ErrorAction SilentlyContinue");
     }
     names_work("after craked's end, started again", BACK).await;
-    // craked serves the app once its start has put the system right.
-    app.within(BACK, "craked reached again", reached).await;
     #[cfg(target_os = "macos")]
     {
         // The system's own resolver (#1, every name), not the ones per
@@ -540,6 +566,7 @@ async fn the_internet_survives_crakeds_end() {
     // back the token the one that died held.
     no_nat_left("after craked's end, started again");
 
+    app.within(BACK, "craked reached again", reached).await;
     remove_tunnels(&mut app).await;
     #[cfg(target_os = "macos")]
     {
