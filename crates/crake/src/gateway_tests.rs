@@ -462,10 +462,18 @@ async fn the_internet_survives_crakeds_end() {
     names_work("after craked's end, started again", BACK).await;
     #[cfg(target_os = "macos")]
     {
+        // The system's own resolver (#1, every name), not the ones per
+        // domain: those may rightly be craked's (an off tunnel's domains,
+        // kept private, go to its server through /etc/resolver).
         let dns = sh("scutil --dns");
+        let primary = dns
+            .split("resolver #2")
+            .next()
+            .unwrap_or_default()
+            .to_owned();
         assert!(
-            !dns.contains("127.53.0.1"),
-            "macOS's DNS still points at craked's server:\n{dns}"
+            !primary.contains("127.53.0.1"),
+            "macOS's own DNS still points at craked's server:\n{dns}"
         );
     }
 
