@@ -57,6 +57,15 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## 0.10.4 (2026-10-17)
 
+- **Save a report when something's wrong.** In the log, "Save a report…" (where Export was) saves
+  one text file with what someone helping you needs to see: this computer's DNS and routes, what
+  Crake added to them, whether the internet and each tunnel's names answer right then, the last day
+  of Crake's decisions and its service's own log. Sign-ins, passwords and profiles are never in it.
+  With "Hide names and addresses when sharing" on (Settings → Privacy & log; it was "Hide host
+  names in helpdesk copies"), the hosts you reached are left out, IPv6 addresses too, and your
+  computer's own addresses stay, so the routes still make sense. Crake sends it nowhere. From a
+  terminal, `crake report` saves the same file.
+
 - **On a Mac, switching a tunnel off undoes all of it.** Crake turns on the Mac's packet filter
   while a tunnel is up, for connections that started before a host was routed. Switching the
   tunnel off, or quitting Crake, could leave the filter on, with Crake's rule for that tunnel

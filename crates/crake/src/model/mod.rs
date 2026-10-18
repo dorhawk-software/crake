@@ -12,6 +12,7 @@ mod days;
 mod demo;
 mod kept;
 pub mod live;
+mod scrub;
 // Which decisions still stand (undo, redo), for the charts.
 mod standing;
 
@@ -24,6 +25,7 @@ pub use self::demo::{
     demo, demo_detail, demo_expired, demo_leftover, demo_log, demo_long_names, demo_openvpn3,
     demo_staying,
 };
+pub use self::scrub::{Keep, scrub, scrub_keeping};
 
 /// How long the tray shows the "routed" shape after a decision.
 const ROUTED_SHAPE_FOR: Duration = Duration::from_secs(4);
@@ -187,41 +189,6 @@ pub struct Decision {
     /// "13:21", local time.
     pub time: String,
     pub action: Option<Action>,
-}
-
-/// Host names and addresses out, everything else kept: "Sent
-/// git.acme.internal through ACME." → "Sent a host through ACME."
-pub fn scrub(text: &str) -> String {
-    text.split(' ')
-        .map(|word| {
-            let start = word
-                .find(|c: char| c.is_ascii_alphanumeric())
-                .unwrap_or(word.len());
-            let end = word
-                .rfind(|c: char| c.is_ascii_alphanumeric())
-                .map_or(start, |i| i + 1);
-            let core = &word[start..end.max(start)];
-            let is_ip = core.parse::<std::net::Ipv4Addr>().is_ok()
-                || core
-                    .split_once('/')
-                    .is_some_and(|(a, _)| a.parse::<std::net::Ipv4Addr>().is_ok());
-            // A name: dotted labels, the last one letters (not "3.5", not "e.g").
-            let labels: Vec<&str> = core.split('.').collect();
-            let is_name = labels.len() >= 2
-                && labels.iter().all(|l| {
-                    !l.is_empty() && l.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
-                })
-                && labels
-                    .last()
-                    .is_some_and(|l| l.len() >= 2 && l.chars().all(|c| c.is_ascii_alphabetic()));
-            if is_ip || is_name {
-                format!("{}a host{}", &word[..start], &word[end.max(start)..])
-            } else {
-                word.to_owned()
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 /// Marks closer than this (minutes) merge into one.
@@ -681,7 +648,7 @@ impl Model {
 
     /// "Copy for helpdesk": a plain-text summary anyone can read.
     /// With `hide_hosts`, host names and addresses become "a host": tunnels
-    /// and timing only (Settings, "Hide host names in helpdesk copies").
+    /// and timing only (Settings, "Hide names and addresses when sharing").
     pub fn helpdesk(&self, hide_hosts: bool) -> String {
         let say = |t: &str| if hide_hosts { scrub(t) } else { t.to_owned() };
         let now = jiff::Zoned::now();
@@ -759,26 +726,6 @@ mod tests {
         assert!(
             !row("direct", Some("probe")).crakes_decision(),
             "sent direct"
-        );
-    }
-
-    #[test]
-    fn helpdesk_copies_can_leave_hosts_out() {
-        assert_eq!(
-            scrub("Sent git.acme.internal through ACME."),
-            "Sent a host through ACME."
-        );
-        assert_eq!(
-            scrub("Only ACME\u{2019}s DNS knows it (10.40.1.20). Routed before the first packet."),
-            "Only ACME\u{2019}s DNS knows it (a host). Routed before the first packet."
-        );
-        assert_eq!(
-            scrub("It didn't answer directly. Through ACME it answered in 38 ms."),
-            "It didn't answer directly. Through ACME it answered in 38 ms."
-        );
-        assert_eq!(
-            scrub("Pinned 10.40.0.0/16 to ACME."),
-            "Pinned a host to ACME."
         );
     }
 

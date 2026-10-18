@@ -6,6 +6,9 @@
 //! portable and reaches these by the same names on every system (lib.rs
 //! re-exports the modules: `crate::routing`, `crate::net`, ...).
 
+mod output;
+pub use output::command_lines;
+
 #[cfg(unix)]
 mod unix;
 #[cfg(unix)]

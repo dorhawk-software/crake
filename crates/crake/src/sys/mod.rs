@@ -30,6 +30,11 @@ mod macos;
 #[cfg(target_os = "macos")]
 pub use macos::*;
 
+/// A command's output goes to the console it was run from: Windows' own
+/// (`windows::attach_console`); elsewhere it always does.
+#[cfg(not(windows))]
+pub fn attach_console() {}
+
 // Crake's service as the system runs it (`crate::service`): on a Mac the
 // app registers it (SMAppService, `macos::service`); elsewhere the package
 // runs it, and there's nothing to ask.

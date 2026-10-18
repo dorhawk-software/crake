@@ -337,8 +337,8 @@ fn help(label: &str) -> Option<&'static str> {
         "Keep the log for" => {
             "Crake notes every decision: what went through which VPN, and why. This is how long it keeps those notes. They stay on this computer."
         }
-        "Hide host names in helpdesk copies" => {
-            "\u{201c}Copy for helpdesk\u{201d} copies a summary you can send to your IT helpdesk. With this on, server names become \u{201c}a host\u{201d}: you share which VPN and how fast, not where you went."
+        "Hide names and addresses when sharing" => {
+            "\u{201c}Copy for helpdesk\u{201d} copies a summary you can send to your IT helpdesk, and \u{201c}Save a report\u{2026}\u{201d} in the log saves a fuller one as a file. With this on, the names and addresses of the servers you reached become \u{201c}a host\u{201d}: you share which VPN and how fast, not where you went. A report keeps this computer's own addresses, its VPNs' and its router's, or its routes would say nothing."
         }
         _ => return None,
     })

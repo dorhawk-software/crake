@@ -36,6 +36,7 @@ mod naming;
 mod openvpn;
 mod outage;
 mod probing;
+mod report;
 mod routes;
 mod settings;
 mod tunnels;

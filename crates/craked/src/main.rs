@@ -55,18 +55,34 @@ fn main() -> Result<()> {
     run(args, None)
 }
 
-/// Log to stderr, or to `file` (a service has no console).
+/// Log to stderr, or to `file` (a service has no console); and the last
+/// of it to memory, for reports (`own_log`).
 fn log_to(file: Option<std::fs::File>) {
+    use tracing_subscriber::fmt;
+    use tracing_subscriber::prelude::*;
     let filter =
         tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
-    match file {
-        Some(file) => tracing_subscriber::fmt()
-            .with_env_filter(filter)
-            .with_ansi(false)
-            .with_writer(std::sync::Mutex::new(file))
-            .init(),
-        None => tracing_subscriber::fmt().with_env_filter(filter).init(),
-    }
+    let (to_file, to_stderr) = match file {
+        Some(file) => (
+            Some(
+                fmt::layer()
+                    .with_ansi(false)
+                    .with_writer(std::sync::Mutex::new(file)),
+            ),
+            None,
+        ),
+        None => (None, Some(fmt::layer())),
+    };
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(to_file)
+        .with(to_stderr)
+        .with(
+            fmt::layer()
+                .with_ansi(false)
+                .with_writer(craked::own_log::Line::default),
+        )
+        .init();
 }
 
 /// The daemon, until it's stopped: SIGTERM or Ctrl+C, or `external` (the

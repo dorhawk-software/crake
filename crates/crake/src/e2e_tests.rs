@@ -202,6 +202,47 @@ async fn a_real_gateway_end_to_end() {
     })
     .await;
 
+    // A report (the log's "Save a report…"), from this craked: ACME's
+    // name tried through ACME, its DNS route marked as Crake's, its
+    // nftables table; hidden, the hosts go and ACME's plumbing stays.
+    let report = crate::report::gather_from(Some(_dir.path().join("crake.sock"))).await;
+    let computer = report.computer.as_ref().expect("craked's side");
+    let acme = computer
+        .checks
+        .iter()
+        .find(|c| c.starts_with("ACME's names: wiki.acme.internal"))
+        .unwrap_or_else(|| panic!("ACME's name tried: {:?}", computer.checks));
+    assert!(
+        acme.contains("took") && acme.ends_with("through ACME."),
+        "{acme}"
+    );
+    let part = |title: &str| {
+        computer
+            .parts
+            .iter()
+            .find(|p| p.title.starts_with(title))
+            .unwrap_or_else(|| panic!("{title}: {:?}", computer.parts))
+            .lines
+            .join("\n")
+    };
+    let routes = part("Routes");
+    assert!(
+        routes.contains("10.40.0.2 dev crake-acme")
+            && routes.contains("\u{2190} Crake: ACME's DNS"),
+        "{routes}"
+    );
+    assert!(part("Crake's rules").contains("table inet crake"));
+    let now = jiff::Zoned::now();
+    let hidden = crate::report::text(&report, true, &now);
+    assert!(
+        !hidden.contains("wiki.acme.internal") && !hidden.contains("10.40.1.11"),
+        "{hidden}"
+    );
+    assert!(
+        hidden.contains("10.40.0.2 dev crake-acme"),
+        "ACME's DNS stays: {hidden}"
+    );
+
     // Switched off: the interface and its DNS route go.
     app.send(Command::Disconnect("acme".into()));
     app.within(Duration::from_secs(10), "ACME off", off).await;

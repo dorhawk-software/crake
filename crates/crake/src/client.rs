@@ -159,10 +159,22 @@ pub fn start_on(
     spawn(Some(socket), updates)
 }
 
+/// The socket the app's client was given (tests: their own craked's), so
+/// a report asks the same craked (`report::gather`).
+static SOCKET: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+/// The craked the app talks to: its socket, when it was given one.
+pub(crate) fn socket() -> Option<PathBuf> {
+    SOCKET.lock().ok().and_then(|s| s.clone())
+}
+
 fn spawn(
     socket: Option<PathBuf>,
     updates: async_channel::Sender<Update>,
 ) -> async_channel::Sender<Command> {
+    if let Ok(mut s) = SOCKET.lock() {
+        s.clone_from(&socket);
+    }
     let (commands, incoming) = async_channel::unbounded();
     std::thread::Builder::new()
         .name("craked-client".into())
@@ -187,7 +199,7 @@ fn dev_socket() -> Option<PathBuf> {
     p.exists().then_some(p)
 }
 
-async fn connect(socket: Option<&Path>) -> zbus::Result<(Connection, bool)> {
+pub(crate) async fn connect(socket: Option<&Path>) -> zbus::Result<(Connection, bool)> {
     match socket.map(Path::to_path_buf).or_else(dev_socket) {
         Some(path) => Ok((crate::sys::connect_dev(&path).await?, true)),
         None => crate::sys::connect_craked().await,
@@ -221,13 +233,13 @@ fn tracing_like(msg: &str) {
     }
 }
 
-struct Api {
-    conn: Connection,
-    p2p: bool,
+pub(crate) struct Api {
+    pub(crate) conn: Connection,
+    pub(crate) p2p: bool,
 }
 
 impl Api {
-    async fn call<B, R>(&self, method: &str, body: &B) -> zbus::Result<R>
+    pub(crate) async fn call<B, R>(&self, method: &str, body: &B) -> zbus::Result<R>
     where
         B: serde::Serialize + zbus::zvariant::DynamicType,
         R: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
@@ -246,7 +258,7 @@ impl Api {
     }
 
     /// craked's version (its `Version` property).
-    async fn version(&self) -> zbus::Result<String> {
+    pub(crate) async fn version(&self) -> zbus::Result<String> {
         let dest = (!self.p2p).then_some(BUS_NAME);
         let reply = self
             .conn
@@ -262,7 +274,7 @@ impl Api {
         String::try_from(value).map_err(zbus::Error::Variant)
     }
 
-    async fn log(&self, count: u32) -> zbus::Result<Vec<LogEntry>> {
+    pub(crate) async fn log(&self, count: u32) -> zbus::Result<Vec<LogEntry>> {
         let raw: Vec<String> = self.call("RecentLog", &(count,)).await?;
         Ok(raw
             .iter()

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod live;
 pub mod openvpn_profile;
+pub mod report;
 pub mod trouble;
 
 /// Where `craked` listens for the hook, unless configured otherwise.

@@ -8,6 +8,7 @@
 pub mod conntrack;
 pub mod dns_queue;
 pub mod net;
+pub mod report;
 pub mod resolved;
 pub mod routing;
 pub mod syn_queue;

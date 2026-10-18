@@ -581,6 +581,37 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    Helpdesk copies (panel, log) can leave host names out
    (`hide_hosts` in app.json, `model::scrub`); its switch arrives with the
    Settings screen, as does the "Managed by IT" settings section.
+   **Reports (requested 2026-10-18; design/proposals/report.html, option
+   A, "Save a report…", plumbing kept, the log only: the user's choices):**
+   the log window's Export became "Save a report…" (asks where, "Saving…"
+   while craked is asked, then "Saved <file> in <folder>." with Show in
+   folder, or "Couldn't save the report." with the system's reason, under
+   the title row until the window closes), and `crake report [file]
+   [--hide-hosts|--show-hosts]` writes the same file without a window
+   (`report.rs`; Windows attaches to the console it was run from). Always
+   the same parts: craked's tunnels, "This computer" (D-Bus `Report`,
+   authorized like Live: one.one.one.one looked up and connected to on
+   443/80 with the way it took, kept from probing so a report never
+   teaches a tunnel a public host; each tunnel's last-used named host, at
+   its learned address when the name doesn't resolve), the system's DNS,
+   routes and Crake's rules (`sys::<os>::report`: resolvectl status, ip
+   route/rule, nft; scutil --dns, netstat -rn, pf's anchor; the NRPT and
+   adapters' DNS, route print, the firewall group), lines whose
+   destination is Crake's marked "← Crake: ACME's DNS" / "learned
+   through ACME", the last 24 hours of decisions, and craked's own log
+   (the last hour, at most 200 lines, kept in memory by a tracing layer,
+   `own_log`). Never in it: lines with sign-in material, web addresses,
+   file paths (`crake_proto::report::private`). Hidden, `scrub_keeping`
+   removes names and IPv4/IPv6 addresses but the computer's plumbing
+   (craked's `keep`: its addresses and networks, the tunnels' addresses
+   and DNS servers, the routers, 127.53.0.1) and what's never a host
+   (loopback, link-local, multicast, netmasks); the setting is now "Hide
+   names and addresses when sharing". Without craked the file says why
+   and holds the rest. Tested: units, window tests (a stand-in craked,
+   `report::Gatherer`), the wire test, e2e against ocserv, both journeys,
+   the Mac and Windows gateway tests (each part on the real system), and
+   the package test (resolvectl under craked's AppArmor profile, which now
+   allows it; proven by vm-test.sh only).
 7b. **Networks that block UDP (requested). Built**, tested with a fake
    openconnect (lifecycle test). craked reads openconnect's output
    (`networks::udp_failed`: DTLS handshake timed out/failed, "using HTTPS
@@ -1160,7 +1191,11 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    pinned by commit, `limit-access-to-actor`: the starter's GitHub SSH
    keys only; detached, so the snapshots go on). The Mac builds the
    branch; Windows takes main's latest green CI installer and tests. CI's
-   and the Doctor's gateways jobs share one concurrency group.
+   and the Doctor's gateways jobs share one concurrency group. Its first
+   run (macOS, AnyConnect) found pf left on with Crake's NAT rule after
+   the tunnel was off and craked gone (macOS `down` gave up at the first
+   route a gone utun refused; fixed, and the gateway tests check the
+   anchor is empty since).
    Later: OpenVPN's browser sign-in through Cloudflare (its
    page, sso.py on 8080, needs a third hostname) and openconnect's fake
    servers for the other protocols' sign-in.

@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A report to send</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8;
+    --ink: #1A1C1E; --muted: #5A5F64; --accent: #0F766E; --accentSoft: #E2F1EF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+      --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; --accentSoft: #17332F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+    --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; --accentSoft: #17332F;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--desk); color: var(--ink);
+    font: 14px/1.45 'Atkinson Hyperlegible Next', system-ui, sans-serif; }
+  main { max-width: 1000px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  h2 { font-size: 17px; margin: 36px 0 6px; }
+  p { margin: 6px 0; max-width: 70ch; }
+  .muted { color: var(--muted); }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  .window { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    box-shadow: 0 30px 60px -30px rgba(0,0,0,0.35); margin-top: 12px; }
+  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px 10px 20px;
+    border-bottom: 1px solid var(--line); }
+  .head .title { font-size: 17px; font-weight: 700; }
+  .head .sub { font-size: 13px; color: var(--muted); }
+  .grow { flex: 1 1 auto; }
+  .btn { height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel);
+    color: var(--ink); font: inherit; font-weight: 600; white-space: nowrap; flex: none; cursor: pointer; }
+  .close { width: 32px; height: 32px; margin-left: 4px; border: none; border-radius: 50%; background: var(--surface);
+    color: var(--ink); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .saved-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--line);
+    font-size: 13px; color: var(--muted); }
+  .link { border: none; background: none; padding: 0; color: var(--ink); font: inherit; font-weight: 600; text-decoration: underline;
+    text-decoration-color: var(--lineStrong); text-underline-offset: 3px; cursor: pointer; }
+  .rows { padding: 14px 20px; color: var(--muted); font-size: 13px; }
+  .note { font-size: 13px; color: var(--muted); padding: 0 20px 14px; }
+  .saved { font-size: 13px; color: var(--muted); }
+  .option { margin-top: 20px; }
+  .option h3 { font-size: 15px; margin: 0 0 4px; }
+  .file { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px;
+    font: 13px/1.5 'Atkinson Hyperlegible Mono', ui-monospace, monospace; white-space: pre-wrap; overflow-x: auto;
+    margin-top: 10px; }
+  .file .sec { font-weight: 600; color: var(--ink); }
+  .file .dim { color: var(--muted); }
+  .settings { display: grid; grid-template-columns: 220px 1fr; min-height: 260px; }
+  .side { background: var(--surface); padding: 16px 12px; font-size: 14px; border-right: 1px solid var(--line); }
+  .side div { height: 40px; display: flex; align-items: center; padding: 0 10px; border-radius: 6px; }
+  .side .brand { font-size: 17px; font-weight: 700; height: 44px; }
+  .side .on { background: var(--panel); font-weight: 600; }
+  .pane { padding: 22px 28px; }
+  .pane-title { font-size: 26px; font-weight: 700; }
+  .group { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-top: 12px; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .row .t { font-weight: 600; }
+  .row .d { font-size: 13px; color: var(--muted); }
+  .rec { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 14px 16px; margin-top: 20px; }
+  code { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; font-size: 13px; }
+  ul { margin: 6px 0; padding-left: 20px; max-width: 70ch; }
+  li { margin: 4px 0; }
+  @media (max-width: 640px) { .settings { grid-template-columns: 1fr; } .side { display: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>A report to send when something's wrong</h1>
+  <p class="muted">Proposal, 2026-10-18. When someone writes "I connected and my internet stopped", the person helping them needs to see that computer: how its DNS and routes are set up right then, what Crake added, whether the internet answers, and what craked logged. Today Copy for helpdesk gives Crake's decisions and a line per tunnel, nothing of the computer, and Export saves the log rows shown, without a word once it's done. The report puts it all in one file someone can send, from the machine where it happened.</p>
+
+  <h2>Where it goes</h2>
+
+  <div class="option">
+    <h3>Today</h3>
+    <div class="window">
+      <div class="head">
+        <span class="title">Log</span><span class="sub">Kept for 30 days on this machine</span><span class="grow"></span>
+        <button class="btn" type="button">Copy for helpdesk</button><button class="btn" type="button">Export…</button>
+        <button class="close" type="button" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
+      </div>
+      <div class="rows">Search, the day's chart, the decisions…</div>
+    </div>
+  </div>
+
+  <div class="option">
+    <h3>A: Export becomes "Save a report…"</h3>
+    <p class="muted">Export's file, with the computer's side added. Two buttons, as today: a quick paste, and the file to send.</p>
+    <div class="window">
+      <div class="head">
+        <span class="title">Log</span><span class="sub">Kept for 30 days on this machine</span><span class="grow"></span>
+        <button class="btn" type="button">Copy for helpdesk</button><button class="btn" type="button">Save a report…</button>
+        <button class="close" type="button" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
+      </div>
+      <div class="rows">Search, the day's chart, the decisions…</div>
+    </div>
+    <p class="muted" style="margin-top:14px">While it gathers (a few seconds; longer when the internet is what's broken), the button reads "Saving…" and waits. Then, under the title row, until the window closes:</p>
+    <div class="window">
+      <div class="head">
+        <span class="title">Log</span><span class="sub">Kept for 30 days on this machine</span><span class="grow"></span>
+        <button class="btn" type="button">Copy for helpdesk</button><button class="btn" type="button">Save a report…</button>
+        <button class="close" type="button" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
+      </div>
+      <div class="saved-row"><span>Saved crake-report-2026-10-18.txt in Documents.</span><button class="link" type="button">Show in folder</button></div>
+      <div class="rows">Search, the day's chart, the decisions…</div>
+    </div>
+    <p class="muted" style="margin-top:10px">And when it can't write there: "Couldn't save the report." with the system's own reason, in the same place.</p>
+  </div>
+
+  <div class="option">
+    <h3>B: Export stays, "Save a report…" beside it</h3>
+    <p class="muted">Two buttons that both make a file, differing in a way no one should have to weigh.</p>
+    <div class="window">
+      <div class="head">
+        <span class="title">Log</span><span class="sub">Kept for 30 days on this machine</span><span class="grow"></span>
+        <button class="btn" type="button">Copy for helpdesk</button><button class="btn" type="button">Export…</button><button class="btn" type="button">Save a report…</button>
+        <button class="close" type="button" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
+      </div>
+      <div class="rows">Search, the day's chart, the decisions…</div>
+    </div>
+  </div>
+
+  <div class="option">
+    <h3>C: In Settings → About</h3>
+    <p class="muted">Where someone in trouble seldom looks. Sketched on settings.html's About section; the rest of the section as today.</p>
+    <div class="window">
+      <div class="settings">
+        <div class="side">
+          <div class="brand">Settings</div>
+          <div>Tunnels</div><div>General</div><div>Learning</div><div>Names</div><div>Privacy &amp; log</div><div>Managed by IT</div><div class="on">About</div>
+        </div>
+        <div class="pane">
+          <div class="pane-title">About</div>
+          <p class="muted" style="margin:4px 0 0">Named after the corncrake, <i>Crex crex</i>…</p>
+          <div class="group">
+            <div class="row">
+              <div class="grow"><div class="t">When something's wrong</div><div class="d">A file with what someone helping you needs to see: this computer's DNS and routes, what Crake added, whether the internet answers, and the logs.</div></div>
+              <button class="btn" type="button">Save a report…</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>What's in the file</h2>
+  <p>Plain text anyone can read, always the same parts, whatever the log window shows (its search and filters don't cut it down): the last 24 hours of Crake's decisions, and craked's own log for the last hour or 200 lines. Crake sends it nowhere: whoever saved it decides who gets it.</p>
+  <ul>
+    <li><b>Never in it, in any mode:</b> sign-ins (session cookies, OpenVPN's tokens, sign-in page addresses), usernames and passwords, keyring items, a profile's text, its keys and certificates, and their paths.</li>
+    <li><b>With hiding on</b> (Settings → Privacy &amp; log), names, domains and the addresses of the hosts reached, IPv4 and IPv6, become "a host" in every part, as Copy for helpdesk does; the tunnel names stay, and say whose they are. The computer's own plumbing stays: its own addresses, each tunnel's address and DNS server, the network's router, Crake's 127.53.0.1. Without them the routes and DNS parts say nothing. The setting gets a title to match: <b>"Hide names and addresses when sharing"</b>, "Copy for helpdesk and reports leave out the hosts you reached."</li>
+    <li><b>Other VPN clients:</b> the DNS part lists every resolver on the machine, another VPN client's (and its company's domains) too, as the system has them. Hidden, their domains go as well.</li>
+  </ul>
+  <p>A sample, from a Mac with ACME up, host names shown:</p>
+  <div class="file"><span class="sec">Crake report, 18 October 2026 17:52</span>
+Crake 0.10.4 on macOS 26.1. Host names and addresses: shown (Settings → Privacy &amp; log).
+
+<span class="sec">Tunnels</span>
+ACME: connected for 12 min on utun4, address 10.40.255.50, DNS 10.40.0.2 for acme.internal; 3 hosts learned, 1 pinned
+Nordbank: off
+
+<span class="sec">This computer</span>
+Public names: Crake stands in for the Mac's DNS and asks 192.168.1.1.
+The internet: one.one.one.one is 1.1.1.1 (DNS answered in 9 ms); a connection to it on 443 took 18 ms, direct through en0.
+ACME's names: git.acme.internal is 10.40.1.10; a connection on 443 took 31 ms, through ACME (utun4).
+
+DNS, as macOS has it <span class="dim">(scutil --dns)</span>
+  resolver #1  nameserver 127.53.0.1        <span class="dim">Crake, for every name</span>
+  resolver #8  acme.internal → 127.53.0.1   <span class="dim">Crake, for ACME</span>
+  …
+Routes <span class="dim">(netstat -rn; Crake's marked)</span>
+  default        192.168.1.1   en0
+  10.40.0.2      utun4         <span class="dim">Crake: ACME's DNS</span>
+  10.40.1.10     utun4         <span class="dim">Crake: learned 11 min ago</span>
+  …
+Crake's rules <span class="dim">(pf, anchor com.apple/250.Crake)</span>
+  nat on utun4 from ! 10.40.255.50 to any -> 10.40.255.50
+
+<span class="sec">What Crake did</span> <span class="dim">(the last 24 hours)</span>
+17:40  Sent git.acme.internal through ACME.  It didn't answer directly. Through ACME it answered in 31 ms.
+…
+
+<span class="sec">craked's own log</span> <span class="dim">(the last hour, at most 200 lines)</span>
+…</div>
+  <p>The same lines, hidden:</p>
+  <div class="file">ACME: connected for 12 min on utun4, address 10.40.255.50, DNS 10.40.0.2 for a host; 3 hosts learned, 1 pinned
+ACME's names: a host is a host; a connection on 443 took 31 ms, through ACME (utun4).
+  resolver #8  a host → 127.53.0.1          <span class="dim">Crake, for ACME</span>
+  a host         utun4         <span class="dim">Crake: learned 11 min ago</span></div>
+  <p class="muted">craked gathers the computer's part (it can read all of it); the app adds the rest. On Linux the DNS part is systemd-resolved's (<span class="mono">resolvectl status</span>) and the rules Crake's nftables table; on Windows the NRPT rules, the adapters' DNS and Crake's firewall rules.</p>
+  <p class="muted">When craked can't be asked (it isn't running, macOS still needs the service approved, or the user isn't the one at the screen), the file says so in that part ("craked isn't running: this computer's DNS, routes and Crake's rules weren't read.") and holds the rest: it always saves a file.</p>
+
+  <h2>From a terminal too</h2>
+  <p><code>crake report [file]</code> writes the same file (by default <span class="mono">crake-report-&lt;date&gt;.txt</span> in Documents) and prints where; <code>--hide-hosts</code> or <code>--show-hosts</code> overrides the setting. No window opens, no sudo is needed, and without craked it writes what it can, as the app does. For helping someone over chat ("type <code>crake report</code> and send me the file"), or when the app won't open.</p>
+
+  <h2>To decide</h2>
+  <ul>
+    <li><b>Placement:</b> A, B or C.</li>
+    <li><b>The button's words:</b> "Save a report…", or "Save for helpdesk…", which pairs with "Copy for helpdesk" and says who it's for.</li>
+    <li><b>Hidden, what stays:</b> the computer's own plumbing (its addresses, the tunnels' addresses and DNS servers, the router), as proposed, or every address hidden, as Copy for helpdesk hides them today.</li>
+    <li><b>The panel too?</b> Someone whose internet stopped opens the panel first; its footer could say "Save a report…" beside "Copy for helpdesk", or a tunnel in trouble could offer it. Today's proposal: the log only.</li>
+  </ul>
+
+  <div class="rec">
+    <h2 style="margin-top:0">Recommendation: A, "Save a report…", the log only</h2>
+    <p>People in trouble open the log, and Export already makes a file from it; a file with the computer's side is what the person helping them asks for next. One button changes its name and grows; nothing new to choose between. "Report" says what the file is, whoever it goes to (IT, a colleague, Crake's author), where "for helpdesk" names only one of them.</p>
+  </div>
+</main>
+</body>
+</html>

@@ -373,3 +373,13 @@ pub fn tray_icon_size() -> u32 {
         .filter(|s| *s > 0)
         .unwrap_or(SMALL_ICON)
 }
+
+/// A command run from a console (`crake report`): its output goes there.
+/// Release builds are windowed (no console of their own).
+pub fn attach_console() {
+    use windows_sys::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
+    // SAFETY: no arguments but a constant; failing (no parent console) is fine.
+    unsafe {
+        AttachConsole(ATTACH_PARENT_PROCESS);
+    }
+}

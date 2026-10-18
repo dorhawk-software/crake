@@ -176,7 +176,10 @@ fn no_nat_left(when: &str) {
     #[cfg(target_os = "macos")]
     {
         let nat = sh("pfctl -a com.apple/250.Crake -s nat 2>/dev/null");
-        assert!(!nat.contains("nat on"), "{when}, Crake's NAT stayed:\n{nat}");
+        assert!(
+            !nat.contains("nat on"),
+            "{when}, Crake's NAT stayed:\n{nat}"
+        );
     }
     #[cfg(windows)]
     let _ = when;
@@ -324,6 +327,42 @@ async fn the_split_holds(crake: &Crake, tunnel: &str) {
     );
     // 4. And by name: craked's DNS answers public names too.
     names_work("while a tunnel is up", WAIT).await;
+    // 5. A report (the log's "Save a report…") says so, part by part.
+    report_holds(tunnel).await;
+}
+
+/// The report while `tunnel` is up: the internet answered directly, ACME's
+/// name through the tunnel, this system's DNS with craked's server in it,
+/// its routes and Crake's rules. Printed whole for the run's log.
+async fn report_holds(tunnel: &str) {
+    let label = if tunnel == "acme" { "ACME" } else { "Initech" };
+    let report = crate::report::gather_from(None).await;
+    let text = crate::report::text(&report, false, &jiff::Zoned::now());
+    println!("{text}");
+    let computer = report.computer.as_ref().expect("craked's side");
+    let check = |start: &str| {
+        computer
+            .checks
+            .iter()
+            .find(|c| c.starts_with(start))
+            .cloned()
+            .unwrap_or_else(|| panic!("{start}…\n{text}"))
+    };
+    let internet = check("The internet: one.one.one.one is ");
+    assert!(internet.ends_with(", direct."), "{internet}");
+    let names = check(&format!("{label}'s names: "));
+    assert!(names.ends_with(&format!("through {label}.")), "{names}");
+    let part = |title: &str| {
+        computer
+            .parts
+            .iter()
+            .find(|p| p.title.starts_with(title))
+            .map(|p| p.lines.join("\n"))
+            .unwrap_or_else(|| panic!("{title}…\n{text}"))
+    };
+    assert!(part("DNS").contains("127.53.0.1"), "{text}");
+    assert!(part("Routes").contains("\u{2190} Crake: "), "{text}");
+    assert!(!part("Crake's rules").is_empty(), "{text}");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

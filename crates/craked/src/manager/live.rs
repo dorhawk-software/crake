@@ -53,7 +53,7 @@ impl Manager {
 
     /// The full tunnel that's up, if any, and every tunnel's gateway (which
     /// is reached directly, a full tunnel's too).
-    fn full_and_gateways(&self) -> (Option<String>, Vec<IpAddr>) {
+    pub(super) fn full_and_gateways(&self) -> (Option<String>, Vec<IpAddr>) {
         let tunnels = self.tunnels.lock().unwrap();
         let gateways = tunnels
             .values()
@@ -74,7 +74,7 @@ impl Manager {
     /// The tunnel `dst` goes through: the one that learned or pinned it,
     /// else a full tunnel (not for its gateway or the local network); None
     /// for direct.
-    fn way(
+    pub(super) fn way(
         &self,
         dst: IpAddr,
         full: Option<&str>,

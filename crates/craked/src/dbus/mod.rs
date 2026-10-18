@@ -436,6 +436,20 @@ impl Service {
         serde_json::to_string(&self.mgr.live().await).map_err(|e| fdo::Error::Failed(e.to_string()))
     }
 
+    /// The computer's side of a report (crake_proto::report::Computer, as
+    /// JSON): its DNS, routes and Crake's rules, the internet and each
+    /// tunnel's names tried now, craked's own log. It says where the
+    /// computer connects, so only those who may switch tunnels get it.
+    async fn report(
+        &self,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+    ) -> fdo::Result<String> {
+        self.authorize(&hdr, conn).await?;
+        serde_json::to_string(&self.mgr.report().await)
+            .map_err(|e| fdo::Error::Failed(e.to_string()))
+    }
+
     /// A new log entry (JSON), as it's written.
     #[zbus(signal)]
     async fn log_appended(emitter: &SignalEmitter<'_>, entry: &str) -> zbus::Result<()>;

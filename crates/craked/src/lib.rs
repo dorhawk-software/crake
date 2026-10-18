@@ -14,6 +14,7 @@ pub mod manager;
 pub mod networks;
 pub mod openvpn;
 pub mod own;
+pub mod own_log;
 pub mod packet;
 pub mod plan;
 pub mod policy;

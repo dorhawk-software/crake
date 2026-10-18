@@ -76,6 +76,9 @@ profile craked /usr/sbin/craked flags=(attach_disconnected) {
   /usr/share/iproute2/** r,
   /usr/lib/iproute2/** r,
   /etc/nftables.conf r,
+  # A report's DNS part (the log's "Save a report…"): resolved's own view,
+  # asked over the bus as above.
+  /{usr/,}bin/resolvectl ix,
 
   # One openconnect per tunnel, under this profile (craked.service sets
   # NoNewPrivileges, which rules out a profile of its own), and the hook it

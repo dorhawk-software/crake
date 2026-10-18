@@ -183,6 +183,26 @@ async fn the_app_and_craked_work_together_over_dbus() {
         .await;
     assert_eq!(app.model.live.lists_connections(), Some(false));
 
+    // A report (the log's "Save a report…"): craked's tunnels, its
+    // decisions and its side of the computer; this craked changes nothing,
+    // so it tries nothing and shows no system parts, but says what hiding
+    // keeps.
+    let report = crate::report::gather_from(Some(dir.path().join("crake.sock"))).await;
+    let computer = report.computer.expect("craked's side of the computer");
+    assert!(computer.checks.is_empty() && computer.parts.is_empty());
+    assert!(
+        computer.keep.iter().any(|k| k == "127.53.0.1"),
+        "{:?}",
+        computer.keep
+    );
+    assert!(
+        report.tunnels.iter().any(|t| t.starts_with("ACME")),
+        "{:?}",
+        report.tunnels
+    );
+    assert!(!report.decisions.is_empty(), "today's decisions");
+    assert_eq!(report.service, env!("CARGO_PKG_VERSION"));
+
     // A setting changed in Settings comes back changed.
     app.send(Command::SetSetting("probe_wait_secs".into(), "2".into()));
     app.until("the new wait", |m| m.setting("probe_wait_secs") == "2")

@@ -1,6 +1,6 @@
 //! The full log (design/screens/log.html): every decision as a sentence with
 //! its reason, by day, newest first; filters, search, the day's chart,
-//! Copy for helpdesk and Export.
+//! Copy for helpdesk and Save a report… (`crate::report`).
 
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::*;
@@ -42,6 +42,9 @@ pub struct Log {
     picking_tunnel: bool,
     earlier_days: bool,
     copied: bool,
+    /// Save a report…: where it stands, said under the title row until
+    /// the window closes.
+    report: Report,
     /// The day chart's zoom: (from, to) in minutes since midnight.
     view: Option<(f32, f32)>,
     /// Where the pointer is on the day chart, in minutes since midnight.
@@ -52,6 +55,20 @@ pub struct Log {
     chart_geometry: std::rc::Rc<std::cell::Cell<(f32, f32)>>,
     focus: FocusHandle,
     _subscriptions: Vec<Subscription>,
+}
+
+/// Save a report…'s state.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+enum Report {
+    #[default]
+    None,
+    /// craked is being asked (a few seconds; longer when the internet is
+    /// what's broken).
+    Saving,
+    /// Written: the file.
+    Saved(std::path::PathBuf),
+    /// Not written: the system's reason.
+    Failed(String),
 }
 
 /// Asks the app to close the window.
@@ -151,6 +168,7 @@ impl Render for Log {
                 }
             }))
             .child(self.header(&t, cx))
+            .children(self.report_row(&t))
             .child(self.filters(&model, &t, cx))
             .child(
                 div()
@@ -224,6 +242,14 @@ impl Log {
             picking_tunnel: false,
             earlier_days: false,
             copied: false,
+            report: if std::env::var("CRAKE_SHOW").as_deref() == Ok("log:saved") {
+                Report::Saved(
+                    crate::report::default_folder()
+                        .join(crate::report::file_name(&jiff::Zoned::now())),
+                )
+            } else {
+                Report::None
+            },
             view: std::env::var("CRAKE_SHOW").ok().and_then(|v| {
                 let (a, b) = v.strip_prefix("log@")?.split_once('-')?;
                 Some((a.parse().ok()?, b.parse().ok()?))
@@ -283,24 +309,103 @@ impl Log {
         .detach();
     }
 
-    /// Export…: the rows shown, as a text file wherever the user puts it.
-    fn export(&mut self, cx: &mut Context<Self>) {
-        let text = self.as_text(cx);
-        let home = std::env::var_os("HOME")
-            .map(std::path::PathBuf::from)
-            .unwrap_or_default();
-        let dir = [home.join("Documents"), home.clone()]
-            .into_iter()
-            .find(|d| d.is_dir())
-            .unwrap_or(home);
-        let name = format!("crake-log-{}.txt", jiff::Zoned::now().strftime("%Y-%m-%d"));
-        let chosen = cx.prompt_for_new_path(&dir, Some(&name));
-        cx.spawn(async move |_, _| {
-            if let Ok(Ok(Some(path))) = chosen.await {
-                let _ = std::fs::write(path, text);
-            }
+    /// Save a report…: where to, then craked asked (`report::gather`),
+    /// then the file, saying how it went under the title row.
+    fn save_report(&mut self, cx: &mut Context<Self>) {
+        if self.report == Report::Saving {
+            return;
+        }
+        let now = jiff::Zoned::now();
+        let chosen = cx.prompt_for_new_path(
+            &crate::report::default_folder(),
+            Some(&crate::report::file_name(&now)),
+        );
+        let hide = cx.global::<crate::prefs::Prefs>().hide_hosts;
+        let gatherer = cx.try_global::<crate::report::Gatherer>().cloned();
+        cx.spawn(async move |this, cx| {
+            let Ok(Ok(Some(path))) = chosen.await else {
+                return;
+            };
+            let _ = this.update(cx, |this, cx| {
+                this.report = Report::Saving;
+                cx.notify();
+            });
+            let gathered = gatherer
+                .map_or_else(crate::report::gather_apart, |g| (g.0)())
+                .recv()
+                .await;
+            let text = match gathered {
+                Ok(g) => crate::report::text(&g, hide, &now),
+                Err(_) => String::new(),
+            };
+            let done = if text.is_empty() {
+                Report::Failed("Crake couldn't ask its service.".into())
+            } else {
+                match crate::report::save(&path, &text) {
+                    Ok(()) => Report::Saved(path),
+                    Err(why) => Report::Failed(why),
+                }
+            };
+            let _ = this.update(cx, |this, cx| {
+                this.report = done;
+                cx.notify();
+            });
         })
         .detach();
+    }
+
+    /// "Saved crake-report-2026-10-18.txt in Documents. Show in folder", or
+    /// "Couldn't save the report." with the system's reason.
+    fn report_row(&self, t: &Theme) -> Option<impl IntoElement> {
+        let said = match &self.report {
+            Report::None | Report::Saving => return None,
+            Report::Saved(path) => {
+                let file = path.file_name().map(|f| f.to_string_lossy().into_owned());
+                let folder = path
+                    .parent()
+                    .and_then(|p| p.file_name())
+                    .map(|f| f.to_string_lossy().into_owned());
+                match (file, folder) {
+                    (Some(f), Some(d)) => format!("Saved {f} in {d}."),
+                    (Some(f), None) => format!("Saved {f}."),
+                    _ => "Saved.".to_owned(),
+                }
+            }
+            Report::Failed(why) => format!("Couldn't save the report. {why}"),
+        };
+        let path = match &self.report {
+            Report::Saved(p) => Some(p.clone()),
+            _ => None,
+        };
+        Some(
+            div()
+                .id("report-row")
+                .flex()
+                .flex_wrap()
+                .items_baseline()
+                .gap(px(10.))
+                .px(px(20.))
+                .py(px(10.))
+                .border_b_1()
+                .border_color(t.line)
+                .text_size(px(13.))
+                .text_color(t.muted)
+                .child(div().id("report-said").child(said).test_support())
+                .when_some(path, |row, path| {
+                    row.child(
+                        div()
+                            .id("report-show")
+                            .text_color(t.ink)
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .underline()
+                            .cursor_pointer()
+                            .child("Show in folder")
+                            .keys()
+                            .on_click(move |_, _, cx| cx.reveal_path(&path))
+                            .test_support(),
+                    )
+                }),
+        )
     }
 
     fn header(&self, t: &Theme, cx: &mut Context<Self>) -> impl IntoElement {
@@ -356,12 +461,24 @@ impl Log {
                 .on_click(cx.listener(|this, _, _, cx| this.copy_for_helpdesk(cx)))
                 .test_support(),
             )
-            .child(
-                outline_button("export", "Export\u{2026}", px(36.), t)
-                    .px(px(12.))
-                    .keys()
-                    .on_click(cx.listener(|this, _, _, cx| this.export(cx))),
-            )
+            .child({
+                let saving = self.report == Report::Saving;
+                outline_button(
+                    "report",
+                    if saving {
+                        "Saving\u{2026}"
+                    } else {
+                        "Save a report\u{2026}"
+                    },
+                    px(36.),
+                    t,
+                )
+                .px(px(12.))
+                .when(saving, |b| b.text_color(t.muted).cursor_default())
+                .keys()
+                .on_click(cx.listener(|this, _, _, cx| this.save_report(cx)))
+                .test_support()
+            })
             .when(!system, |header| {
                 header.child(
                     crate::chrome::close_button(t)

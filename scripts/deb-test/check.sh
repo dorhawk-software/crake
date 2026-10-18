@@ -109,6 +109,10 @@ tunnel() {
     check "resolved asks ACME's DNS for acme.internal" sh -c 'resolvectl query wiki.acme.internal | grep -q 10.40.1.11'
     check "the name's address is routed at once" sh -c 'curl -s -m 1 http://10.40.1.11/ | grep -q crex'
     check "both learned" sh -c "nft list set inet crake learned_acme | grep -q 10.40.1.10 && nft list set inet crake learned_acme | grep -q 10.40.1.11"
+    # A report (the log's "Save a report…"), the service's side: resolved's
+    # view of ACME's link (resolvectl, run under craked's profile), ACME's
+    # DNS route marked as Crake's, and Crake's own table.
+    check "a report has resolved's view, ACME's route and Crake's table" sh -c 'busctl --system --timeout=90 call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 Report > /tmp/report && grep -q "Link [0-9]* (crake-acme)" /tmp/report && grep -q "Crake: .* DNS" /tmp/report && grep -q "table inet crake" /tmp/report || { cat /tmp/report; false; }'
     # Another program rewriting the tunnel's DNS settings (openvpn3 does,
     # for all its devices, when one of its sessions reconnects): its domain
     # as a search domain, every name to it. craked puts its own back.

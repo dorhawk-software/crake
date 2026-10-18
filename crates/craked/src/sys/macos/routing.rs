@@ -323,7 +323,7 @@ impl Routing {
 }
 
 /// Crake's pf anchor.
-const ANCHOR: &str = "com.apple/250.Crake";
+pub(super) const ANCHOR: &str = "com.apple/250.Crake";
 /// pf's token while Crake holds pf on (craked's state folder).
 const PF_TOKEN: &str = "/var/db/crake/pf-token";
 

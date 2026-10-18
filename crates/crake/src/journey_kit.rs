@@ -190,3 +190,19 @@ pub(crate) fn sign_in(cx: &mut TestAppContext) {
     .unwrap();
     click(cx, w, "continue");
 }
+
+/// The log's "Save a report…": the file the platform's dialog gives,
+/// written once craked has said its part. Its text.
+pub(crate) fn save_a_report(cx: &mut TestAppContext, log: AnyWindowHandle) -> String {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("crake-report.txt");
+    click(cx, log, "report");
+    let chosen = file.clone();
+    cx.simulate_new_path_selection(move |_| Some(chosen));
+    // The internet tried, and each tunnel's name: seconds, more where
+    // nothing answers.
+    until(cx, "the report saved", Duration::from_secs(90), |_| {
+        file.exists()
+    });
+    std::fs::read_to_string(&file).unwrap()
+}

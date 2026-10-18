@@ -57,6 +57,7 @@ mod panel;
 mod place;
 
 mod prefs;
+mod report;
 
 mod service;
 
@@ -357,6 +358,10 @@ impl gpui_kit::AssetSource for Assets {
 }
 
 fn main() {
+    // `crake report`: the file, no window.
+    if let Some(code) = report::cli(&std::env::args().skip(1).collect::<Vec<_>>()) {
+        std::process::exit(code);
+    }
     // GNOME on Wayland doesn't let an app place its windows; through XWayland
     // the panel can open right at the tray icon. CRAKE_WAYLAND=1 keeps Wayland
     // (the panel then goes where the desktop puts it).
@@ -467,6 +472,11 @@ fn main() {
             // CRAKE_SHOW=settings[:<section>] (development): open Settings at start.
             if std::env::var("CRAKE_SHOW").is_ok_and(|v| v.starts_with("settings")) {
                 open_settings(cx);
+            }
+            // CRAKE_SHOW=log[:saved] (development): open the log; ":saved",
+            // with a report just saved (its row under the title).
+            if std::env::var("CRAKE_SHOW").is_ok_and(|v| v == "log" || v == "log:saved") {
+                open_log(cx);
             }
             // CRAKE_SHOW=traffic (development): open the Traffic window.
             if std::env::var("CRAKE_SHOW").is_ok_and(|v| v == "traffic") {

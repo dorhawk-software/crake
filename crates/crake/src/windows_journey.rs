@@ -219,6 +219,15 @@ fn a_day_with_crake_on_windows(cx: &mut TestAppContext) {
         .and_then(|c| c.text())
         .unwrap_or_default();
     assert!(copied.contains("Sent 10.40.1.10 through ACME."), "{copied}");
+    // Save a report…: the same decisions, and craked's side of the
+    // computer, ACME's name tried through ACME.
+    let report = crate::journey_kit::save_a_report(cx, l);
+    assert!(report.contains("Sent 10.40.1.10 through ACME."), "{report}");
+    assert!(
+        report.contains("\nThis computer\n  The internet: "),
+        "{report}"
+    );
+    assert!(report.contains("\n  ACME's names: "), "{report}");
 
     // 6. New tunnel: added in craked, listed in the app; Cancel at sign-in.
     request(cx, Request::NewTunnel(None));

@@ -181,15 +181,8 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
         .unwrap_or_default();
     assert!(copied.starts_with("10.40.1.1"), "copied {copied:?}");
 
-    // 5. The log, and Copy for helpdesk.
-    request(cx, Request::Log);
-    let (l, _) = wait_window::<crate::log_view::Log>(cx, "the log opens");
-    click(cx, l, "helpdesk");
-    let copied = cx
-        .read_from_clipboard()
-        .and_then(|c| c.text())
-        .unwrap_or_default();
-    assert!(copied.contains("Sent 10.40.1.10 through ACME."), "{copied}");
+    // 5. The log: Copy for helpdesk, Save a report….
+    the_log(cx);
 
     // 5b. Traffic, from the panel's footer.
     traffic_window(cx);
@@ -289,6 +282,27 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
         },
     );
     craked.rt.block_on(craked.mgr.shutdown());
+}
+
+/// The log, its Copy for helpdesk and its Save a report….
+fn the_log(cx: &mut TestAppContext) {
+    request(cx, Request::Log);
+    let (l, _) = wait_window::<crate::log_view::Log>(cx, "the log opens");
+    click(cx, l, "helpdesk");
+    let copied = cx
+        .read_from_clipboard()
+        .and_then(|c| c.text())
+        .unwrap_or_default();
+    assert!(copied.contains("Sent 10.40.1.10 through ACME."), "{copied}");
+    // Save a report…: the same decisions, and craked's side of the
+    // computer, ACME's name tried through ACME.
+    let report = crate::journey_kit::save_a_report(cx, l);
+    assert!(report.contains("Sent 10.40.1.10 through ACME."), "{report}");
+    assert!(
+        report.contains("\nThis computer\n  The internet: "),
+        "{report}"
+    );
+    assert!(report.contains("\n  ACME's names: "), "{report}");
 }
 
 /// Settings: Learning's wait, changed in craked and shown back.

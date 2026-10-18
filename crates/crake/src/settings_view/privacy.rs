@@ -1,4 +1,5 @@
-//! Settings, Privacy & log: retention, helpdesk copies, clearing the log.
+//! Settings, Privacy & log: retention, hiding hosts in what's shared,
+//! clearing the log.
 
 use super::*;
 
@@ -135,8 +136,8 @@ impl Settings {
                             )
                             .child(keep),
                     )
-                    .child(row(self.title("Hide host names in helpdesk copies", t, cx),
-                        Some("\u{201c}Copy for helpdesk\u{201d} replaces names with tunnel and timing only."),
+                    .child(row(self.title("Hide names and addresses when sharing", t, cx),
+                        Some("Copy for helpdesk and reports leave out the hosts you reached."),
                         toggle("hide-hosts", hide, t).on_click(cx.listener(move |_, _, _, cx| {
                             Self::pref(cx, |p| p.hide_hosts = !hide);
                         })).test_support(),

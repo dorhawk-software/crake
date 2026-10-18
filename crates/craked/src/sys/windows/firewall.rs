@@ -13,7 +13,7 @@ use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 use crate::hosts::Target;
 
 /// The rules' group: what's Crake's, found again after a crash.
-const GROUP: &str = "Crake";
+pub(super) const GROUP: &str = "Crake";
 /// There while a rule of Crake's may exist: only then does a start clean
 /// up (PowerShell's firewall module takes seconds to load, too long for a
 /// service starting).
