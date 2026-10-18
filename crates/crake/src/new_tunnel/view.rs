@@ -121,7 +121,12 @@ impl NewTunnel {
 }
 
 impl Render for NewTunnel {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // A name taken from an imported .ovpn (`import`): set here, where
+        // there's the window.
+        if let Some(name) = self.pending_name.take() {
+            self.name.update(cx, |f, cx| f.set_value(name, window, cx));
+        }
         let t = Theme::current(cx);
         let title = match &self.editing {
             Some(name) => format!("Edit {}", self.model.read(cx).display_of(Some(name))),

@@ -89,7 +89,10 @@ pub fn profiles() -> Vec<String> {
 
 /// Give openvpn3 a profile: `config` (self-contained, `ovpn_file::inline`)
 /// under `name`, kept (not single use), owned by the user. Blocking: call
-/// it off the UI thread. The error is openvpn3's, as it said it.
+/// it off the UI thread. The error is openvpn3's, as it said it. Only the
+/// profile tests import now: New tunnel takes profiles into Crake's own
+/// OpenVPN (7i).
+#[cfg(test)]
 pub fn import(name: &str, config: &str) -> Result<(), String> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -640,6 +643,7 @@ async fn answer(
                 ask: if hidden { Ask::Secret } else { Ask::Text },
                 label: label.trim_end_matches(':').trim().to_owned(),
                 words: None,
+                refused: false,
             };
             let _ = events.send(Event::Prompt(prompt)).await;
             match replies.recv().await {

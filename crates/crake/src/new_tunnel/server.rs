@@ -1,4 +1,4 @@
-//! New tunnel, step 1: where it connects (name, gateway or OpenVPN 3
+//! New tunnel, step 1: where it connects (name, gateway or OpenVPN
 //! profile) and the protocol, with what's Beta and what isn't installed.
 
 use super::*;
@@ -7,8 +7,9 @@ use super::*;
 const WIDE_COLUMN: f32 = 1.4;
 
 impl NewTunnel {
-    /// OpenVPN 3's Profile: the list, with "Import .ovpn…" in its label's
-    /// row; with no profiles at all, the import button in its place.
+    /// OpenVPN's Profile: OpenVPN 3's profiles to take over, with "Import
+    /// .ovpn…" in its label's row; with none, the import button in its
+    /// place (design/proposals/openvpn-tunnel.html, 2).
     fn profile_field(&self, t: &Theme, cx: &mut Context<Self>) -> Div {
         if self.profiles.is_empty() {
             return div().child(label("Profile")).child(
@@ -34,7 +35,14 @@ impl NewTunnel {
         let options: Vec<(String, String)> = self
             .profiles
             .iter()
-            .map(|p| (p.clone(), p.clone()))
+            .map(|p| {
+                let shown = if self.locked.contains(p) {
+                    format!("{p} \u{b7} locked: import its .ovpn file")
+                } else {
+                    p.clone()
+                };
+                (p.clone(), shown)
+            })
             .collect();
         div()
             .child(
@@ -65,13 +73,13 @@ impl NewTunnel {
                     None,
                     t,
                     cx,
-                    |this, v| this.profile = Some(v),
+                    |this, v, cx| this.take_over(v, cx),
                 ),
             )
     }
 
-    /// Under OpenVPN 3's fields: how an import went, or, with no profiles
-    /// yet, where to start.
+    /// Under OpenVPN's fields: how an import went, or, with no profiles to
+    /// take over, where to start.
     fn profile_line(&self, t: &Theme) -> Option<Div> {
         let line = || {
             div()
@@ -97,9 +105,11 @@ impl NewTunnel {
             Some(import::ProfileNote::Failed(said)) => {
                 Some(line().text_color(t.ink).child(said.clone()))
             }
-            None if self.profiles.is_empty() => Some(line().text_color(t.muted).child(
-                "No OpenVPN 3 profiles on this computer yet. Import the .ovpn file your IT team gave you.",
-            )),
+            None if self.profiles.is_empty() => Some(
+                line()
+                    .text_color(t.muted)
+                    .child("Import the .ovpn file your IT team gave you."),
+            ),
             None => None,
         }
     }
@@ -152,19 +162,21 @@ impl NewTunnel {
                     .child(
                         // 1 : 1.4, as the design's grid.
                         div().flex_basis(px(0.)).flex_grow(WIDE_COLUMN).min_w_0().child(
-                            if self.protocol == "openvpn3" {
-                                self.profile_field(t, cx).into_any_element()
-                            } else {
-                                div()
-                                    .child(label("Gateway"))
+                            match self.protocol {
+                                "openvpn" if self.shows_gateway() => {
+                                    self.kept_gateway(t, cx).into_any_element()
+                                }
+                                "openvpn" => self.profile_field(t, cx).into_any_element(),
+                                _ => div()
+                                    .child(self.import_row("Gateway", t, cx))
                                     .child(field(&self.gateway, true, t))
-                                    .into_any_element()
+                                    .into_any_element(),
                             },
                         ),
                     ),
             )
-            .when(self.protocol == "openvpn3", |d| d.children(self.profile_line(t)))
-            .when_some(line.filter(|_| self.protocol != "openvpn3"), |d, line| {
+            .when(self.protocol == "openvpn", |d| d.children(self.profile_line(t)))
+            .when_some(line.filter(|_| self.protocol != "openvpn"), |d, line| {
                 d.child(
                     div()
                         .flex()
@@ -214,9 +226,13 @@ impl NewTunnel {
                             .text_size(px(13.))
                             .line_height(px(19.))
                             .text_color(t.muted)
-                            .child(format!(
-                                "Beta: Crake hasn\u{2019}t been tried against a real {name} gateway yet. openconnect speaks it, so it should work. If it doesn\u{2019}t, Copy for helpdesk in the sign-in window says what happened."
-                            )),
+                            .child(if self.protocol == "openvpn" {
+                                "Beta: Crake hasn\u{2019}t run OpenVPN against a real gateway yet. If it doesn\u{2019}t connect, the sign-in window says what openvpn said, with Copy for helpdesk.".to_owned()
+                            } else {
+                                format!(
+                                    "Beta: Crake hasn\u{2019}t been tried against a real {name} gateway yet. openconnect speaks it, so it should work. If it doesn\u{2019}t, Copy for helpdesk in the sign-in window says what happened."
+                                )
+                            }),
                     )
                 },
             )
@@ -239,15 +255,32 @@ impl NewTunnel {
         };
         let answered = matches!(self.detect, Detect::Done(Found::AnyConnect { .. }))
             && self.protocol == "auto";
-        let folded = answered && !self.protocols_open;
+        // A .ovpn imported: OpenVPN, said so, the rest folded away.
+        let imported =
+            self.protocol == "openvpn" && self.ovpn.as_ref().is_some_and(|o| o.from_file);
+        let folded = (answered || imported) && !self.protocols_open;
         let mut protocols = div()
             .mt(px(8.))
             .border_1()
             .border_color(t.line)
             .rounded(px(8.))
-            .overflow_hidden()
-            .child(self.protocol_card(0, PROTOCOLS[0], auto_sub, t, cx));
-        if answered {
+            .overflow_hidden();
+        if imported {
+            let (i, p) = PROTOCOLS
+                .into_iter()
+                .enumerate()
+                .find(|(_, p)| p.0 == "openvpn")
+                .unwrap_or((0, PROTOCOLS[0]));
+            protocols = protocols
+                .child(self.protocol_card(i, p, "From the profile you imported", t, cx))
+                .child(self.choose_yourself(folded, t, cx));
+            if folded {
+                return protocols;
+            }
+        } else {
+            protocols = protocols.child(self.protocol_card(0, PROTOCOLS[0], auto_sub, t, cx));
+        }
+        if answered && !imported {
             protocols = protocols.child(self.choose_yourself(folded, t, cx));
         }
         if folded {
@@ -386,10 +419,67 @@ impl NewTunnel {
             .test_support()
     }
 
+    /// A field's label with "Import .ovpn…" in its row (ovpn-import.html,
+    /// A): beside Gateway it picks OpenVPN by itself.
+    fn import_row(&self, name: &'static str, t: &Theme, cx: &mut Context<Self>) -> Div {
+        div()
+            .flex()
+            .items_baseline()
+            .justify_between()
+            .child(label(name))
+            .child(
+                div()
+                    .id("import-ovpn")
+                    .text_size(px(13.))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(t.accent)
+                    .cursor_pointer()
+                    .child("Import .ovpn\u{2026}")
+                    .on_click(cx.listener(|this, _, _, cx| this.choose_ovpn(cx)))
+                    .test_support(),
+            )
+    }
+
+    /// OpenVPN shows the gateway its profile names: imported from a file,
+    /// or an OpenVPN tunnel edited without a new one.
+    pub(super) fn shows_gateway(&self) -> bool {
+        match &self.ovpn {
+            Some(o) => o.from_file,
+            None => self.editing_protocol == "openvpn",
+        }
+    }
+
+    /// The profile's gateway: shown, not typed (a surface fill, not an
+    /// input); a new .ovpn replaces the profile.
+    fn kept_gateway(&self, t: &Theme, cx: &mut Context<Self>) -> Div {
+        let gateway = self
+            .ovpn
+            .as_ref()
+            .map_or_else(|| self.kept_gateway.clone(), |o| o.remote.clone());
+        div().child(self.import_row("Gateway", t, cx)).child(
+            div()
+                .id("ovpn-gateway")
+                .h(px(42.))
+                .px(px(12.))
+                .flex()
+                .items_center()
+                .border_1()
+                .border_color(t.line)
+                .rounded(px(6.))
+                .bg(t.surface)
+                .font_family(fonts::MONO)
+                .text_size(px(14.))
+                .overflow_hidden()
+                .whitespace_nowrap()
+                .child(gateway)
+                .test_support(),
+        )
+    }
+
     /// The gateway's sign-in groups to choose from, when it offers more than one.
     fn group_row(&self, t: &Theme, cx: &mut Context<Self>) -> Option<Div> {
         let groups = self.groups();
-        (groups.len() > 1 && self.protocol != "openvpn3").then(|| {
+        (groups.len() > 1 && self.protocol != "openvpn").then(|| {
             let options: Vec<(String, String)> =
                 groups.iter().map(|g| (g.clone(), g.clone())).collect();
             div()
@@ -408,7 +498,7 @@ impl NewTunnel {
                             None,
                             t,
                             cx,
-                            |this, v| this.group = Some(v),
+                            |this, v, _| this.group = Some(v),
                         )),
                 )
                 .child(

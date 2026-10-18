@@ -68,7 +68,7 @@ impl Manager {
         let mut fields = fields.clone();
         let profile = take_profile(&mut fields, false)?;
         let own = crate::own::OwnTunnel::from_map(name, &fields)?;
-        let (was, routed) = {
+        let (was, routed, moved) = {
             let mut map = self.tunnels.lock().unwrap();
             let e = map
                 .get_mut(name)
@@ -79,9 +79,20 @@ impl Manager {
                     e.config.display()
                 );
             }
+            // From OpenVPN 3 to Crake's own OpenVPN (7i): not under a
+            // session that runs.
+            let moved = e.config.protocol == crate::config::Protocol::Openvpn3
+                && own.protocol == crate::config::Protocol::Openvpn;
+            if moved && !matches!(e.state, TunnelState::Off | TunnelState::Trouble) {
+                bail!(
+                    "Switch {} off first: it runs on OpenVPN 3 now.",
+                    e.config.display()
+                );
+            }
             let was = e.config.learning();
             e.config = own.to_config();
-            (was, e.routed)
+            e.attached = None;
+            (was, e.routed, moved)
         };
         if let Some(text) = &profile {
             self.keep_profile(name, text)?;
@@ -100,8 +111,19 @@ impl Manager {
             }
         }
         let _ = self.changes.send(name.to_owned());
-        self.log
-            .system(Some(name), format!("Changed {}.", own.display_name), None);
+        if moved {
+            self.log.system(
+                Some(name),
+                format!("{} now runs on Crake\u{2019}s own OpenVPN.", own.display_name),
+                Some(
+                    "Its profile was copied from OpenVPN 3, which keeps its own. Your sign-in is asked again the first time."
+                        .into(),
+                ),
+            );
+        } else {
+            self.log
+                .system(Some(name), format!("Changed {}.", own.display_name), None);
+        }
         Ok(())
     }
 
@@ -208,7 +230,7 @@ fn take_profile(fields: &mut HashMap<String, String>, adding: bool) -> Result<Op
         }
         return Ok(None);
     };
-    let profile = crate::openvpn::profile::check(&text)?;
+    let profile = crate::openvpn::profile::check(&text).map_err(anyhow::Error::msg)?;
     fields.insert("gateway".into(), profile.remote);
     Ok(Some(text))
 }

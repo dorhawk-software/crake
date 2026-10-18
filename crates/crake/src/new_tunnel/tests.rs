@@ -110,26 +110,41 @@ impl Opened {
     }
 }
 
-const OPENVPN3: usize = 8;
+const OPENVPN: usize = 8;
 const ANYCONNECT: usize = 1;
 
-/// The OpenVPN 3 path, where two bugs were: the chosen profile jumped back
-/// to "Detect automatically", and the routing step had no Continue.
+/// OpenVPN 3's profiles are taken over (design/proposals/openvpn-tunnel.html,
+/// 2): chosen in the Profile list, Crake takes a copy; a locked one says
+/// what to do instead.
 #[gpui_kit::test]
-fn an_openvpn3_profile_gets_added(cx: &mut TestAppContext) {
+fn an_openvpn3_profile_is_taken_over(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
     let w = open(cx);
     w.type_into(|t| t.name.clone(), "Initech", cx);
-    w.click(("protocol", OPENVPN3), cx);
-    assert_eq!(w.read(cx, |t| t.protocol), "openvpn3");
+    w.click(("protocol", OPENVPN), cx);
+    assert_eq!(w.read(cx, |t| t.protocol), "openvpn");
+    // Locked: said, and Continue says what's missing.
     w.click("profile", cx);
+    w.click(("profile", 0usize), cx);
+    cx.run_until_parked();
+    assert_eq!(
+        note(&w, cx).as_deref(),
+        Some("globex is locked in OpenVPN 3: import its .ovpn file instead.")
+    );
+    w.click("next", cx);
+    assert_eq!(w.read(cx, |t| t.step), 1);
     // The last of three: its menu row lies over the protocol list, where a
     // click once went through and picked "Detect automatically".
+    w.click("profile", cx);
     w.click(("profile", 2usize), cx);
+    cx.run_until_parked();
     assert_eq!(
-        w.read(cx, |t| t.profile.clone()).as_deref(),
-        Some("initech")
+        note(&w, cx).as_deref(),
+        Some(
+            "It connects to vpn.initech.example. Crake takes its own copy; OpenVPN 3 keeps its own."
+        )
     );
-    assert_eq!(w.read(cx, |t| t.protocol), "openvpn3", "the choice stays");
+    assert_eq!(w.read(cx, |t| t.protocol), "openvpn", "the choice stays");
 
     w.click("next", cx);
     assert_eq!(w.read(cx, |t| t.step), 2);
@@ -140,10 +155,11 @@ fn an_openvpn3_profile_gets_added(cx: &mut TestAppContext) {
 
     let fields = w.added();
     assert_eq!(fields["display_name"], "Initech");
-    assert_eq!(fields["protocol"], "openvpn3");
-    assert_eq!(
-        fields["gateway"], "initech",
-        "an OpenVPN 3 tunnel's gateway is its profile"
+    assert_eq!(fields["protocol"], "openvpn");
+    assert_eq!(fields["gateway"], "vpn.initech.example");
+    assert!(
+        fields["profile"].contains("remote vpn.initech.example"),
+        "the copy goes to craked"
     );
     assert_eq!(fields["group"], "");
     assert_eq!(fields["mode"], "learn");
@@ -207,12 +223,12 @@ fn an_incomplete_step_says_what_is_missing(cx: &mut TestAppContext) {
     );
 
     w.type_into(|t| t.name.clone(), "Initech", cx);
-    w.click(("protocol", OPENVPN3), cx);
+    w.click(("protocol", OPENVPN), cx);
     w.click("next", cx);
     assert_eq!(w.read(cx, |t| t.step), 1);
     assert_eq!(
         w.read(cx, |t| t.problem.clone()).as_deref(),
-        Some("Which OpenVPN 3 profile?")
+        Some("Which profile? Import its .ovpn file.")
     );
 
     w.click(("protocol", ANYCONNECT), cx);
@@ -311,85 +327,98 @@ fn note(w: &Opened, cx: &mut TestAppContext) -> Option<String> {
     })
 }
 
-/// design/proposals/ovpn-import.html, option A: "Import .ovpn…" in the
-/// Profile label's row; the imported file becomes the chosen profile and
-/// the tunnel's.
+/// design/proposals/openvpn-tunnel.html, 1: "Import .ovpn…" beside
+/// Gateway picks OpenVPN by itself, with the profile's gateway and a name
+/// from the file; the rest of the list folds away.
 #[gpui_kit::test]
-fn a_ovpn_file_becomes_the_profile(cx: &mut TestAppContext) {
+fn a_ovpn_file_picks_openvpn_by_itself(cx: &mut TestAppContext) {
     cx.executor().allow_parking();
     let w = open(cx);
-    w.type_into(|t| t.name.clone(), "Initech", cx);
-    w.click(("protocol", OPENVPN3), cx);
-    assert!(w.shown("import-ovpn", cx), "the import, in the label's row");
-    assert!(w.shown("profile", cx), "next to the list");
-    // The picker is the platform's; the file it gives is imported.
+    assert!(w.shown("import-ovpn", cx), "beside Gateway");
     w.click("import-ovpn", cx);
-    let (_dir, path) = ovpn("initech-office.ovpn", "client\nca ca.crt\n", false);
+    let (_dir, path) = ovpn(
+        "initech-office.ovpn",
+        "client\nremote vpn.initech.example 1194\nca ca.crt\n",
+        false,
+    );
     w.view.update(cx, |t, cx| t.import_ovpn(path, cx));
     cx.run_until_parked();
-    assert_eq!(
-        w.read(cx, |t| t.profile.clone()).as_deref(),
-        Some("initech-office")
-    );
-    assert!(w.read(cx, |t| t.profiles.contains(&"initech-office".to_owned())));
+    assert_eq!(w.read(cx, |t| t.protocol), "openvpn");
     assert_eq!(
         note(&w, cx).as_deref(),
-        Some("Imported initech-office.ovpn as your profile.")
+        Some(
+            "From initech-office.ovpn. Crake keeps its own copy, which only its service can read, so you can delete the file."
+        )
+    );
+    assert!(w.shown("ovpn-gateway", cx), "the profile's gateway, shown");
+    assert!(w.shown("protocols-more", cx), "the rest of the list folded");
+    assert_eq!(
+        w.view
+            .read_with(cx, |t, cx| t.name.read(cx).value().to_string()),
+        "Initech-office",
+        "a name from the file"
     );
     w.click("next", cx);
     w.click("next", cx);
     w.click("next", cx);
-    assert_eq!(w.added()["gateway"], "initech-office");
+    let fields = w.added();
+    assert_eq!(fields["protocol"], "openvpn");
+    assert_eq!(fields["gateway"], "vpn.initech.example");
+    assert!(
+        fields["profile"].contains("<ca>\n-----BEGIN CERTIFICATE-----"),
+        "its files go inline"
+    );
 }
 
-/// A name a profile has already gets a number; a file that points to one
-/// that isn't there, or that openvpn3 refuses, says why and chooses
-/// nothing.
+/// What Crake can't take is said at once, in its own words
+/// (design/proposals/openvpn-tunnel.html, 3), and nothing is chosen.
 #[gpui_kit::test]
 fn an_import_says_what_went_wrong(cx: &mut TestAppContext) {
     cx.executor().allow_parking();
     let w = open(cx);
-    w.click(("protocol", OPENVPN3), cx);
-    let (_a, taken) = ovpn("initech.ovpn", "client\n", true);
-    w.view.update(cx, |t, cx| t.import_ovpn(taken, cx));
-    cx.run_until_parked();
+    let tried = |w: &Opened, cx: &mut TestAppContext, name: &str, body: &str| {
+        let (_dir, path) = ovpn(name, body, true);
+        w.view.update(cx, |t, cx| t.import_ovpn(path, cx));
+        cx.run_until_parked();
+        note(w, cx).unwrap()
+    };
     assert_eq!(
-        w.read(cx, |t| t.profile.clone()).as_deref(),
-        Some("initech 2")
+        tried(
+            &w,
+            cx,
+            "globex.ovpn",
+            "client\nremote vpn.globex.example\nca ca.crt\n"
+        ),
+        "Couldn\u{2019}t import globex.ovpn: it points to ca.crt, which isn\u{2019}t next to it. Keep the files your IT team sent together and try again."
     );
     assert_eq!(
-        note(&w, cx).as_deref(),
-        Some("Imported initech.ovpn as your profile \u{201c}initech 2\u{201d}.")
+        tried(
+            &w,
+            cx,
+            "plugged.ovpn",
+            "client\nremote vpn.globex.example\nplugin /x.so\n"
+        ),
+        "Crake won\u{2019}t run plugged.ovpn: it loads a plugin (plugin), and Crake runs nothing a profile brings with it."
     );
-
-    w.view.update(cx, |t, _| t.profile = None);
-    let (_b, missing) = ovpn("globex.ovpn", "client\nca ca.crt\n", true);
-    w.view.update(cx, |t, cx| t.import_ovpn(missing, cx));
-    cx.run_until_parked();
     assert_eq!(
-        note(&w, cx).as_deref(),
-        Some(
-            "Couldn\u{2019}t import globex.ovpn: it points to ca.crt, which isn\u{2019}t next to it. Keep the files your IT team sent together and try again."
-        )
+        tried(
+            &w,
+            cx,
+            "new.ovpn",
+            "client\nremote vpn.globex.example\nshiny 1\n"
+        ),
+        "Crake can\u{2019}t run new.ovpn yet: it uses shiny, which Crake doesn\u{2019}t know."
     );
-    assert_eq!(w.read(cx, |t| t.profile.clone()), None);
-
-    let (_c, refused) = ovpn("bad.ovpn", "# openvpn3 refuses\n", true);
-    w.view.update(cx, |t, cx| t.import_ovpn(refused, cx));
-    cx.run_until_parked();
-    assert_eq!(
-        note(&w, cx).as_deref(),
-        Some(
-            "Couldn\u{2019}t import bad.ovpn: openvpn3 didn\u{2019}t take it (Configuration file contains errors)."
-        )
-    );
+    assert_eq!(w.read(cx, |t| t.protocol), "auto", "nothing chosen");
+    assert!(w.read(cx, |t| t.ovpn.is_none()));
 }
 
-/// No profiles on this computer: the list is the import button.
+/// No OpenVPN 3 profiles (Windows, macOS, Linux without it): the field is
+/// the import button.
 #[gpui_kit::test]
 fn with_no_profiles_the_list_is_the_import(cx: &mut TestAppContext) {
     let w = open(cx);
-    w.click(("protocol", OPENVPN3), cx);
+    w.click(("protocol", OPENVPN), cx);
     w.view.update(cx, |t, cx| {
         t.profiles.clear();
         cx.notify();

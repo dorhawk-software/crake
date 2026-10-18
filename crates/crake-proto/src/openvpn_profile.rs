@@ -1,11 +1,116 @@
-//! A profile (.ovpn) read before craked keeps it. craked runs openvpn as
-//! root, so only client options known to be harmless get in: nothing that
-//! runs a program, loads a library, or reads or writes a file outside the
-//! profile. What Crake does itself (the device, scripts, DNS, dropping
-//! privileges) is left out. Anything else is refused by name, so a real
-//! profile says what's missing here.
+//! A profile (.ovpn) read before craked keeps it, and by the app when one
+//! is chosen in New tunnel, to say at once what's wrong with it. craked
+//! runs openvpn as root, so only client options known to be harmless get
+//! in: nothing that runs a program, loads a library, or reads or writes a
+//! file outside the profile. What Crake does itself (the device, scripts,
+//! DNS, dropping privileges) is left out. Anything else is refused by name,
+//! so a real profile says what's missing here.
 
-use anyhow::{Result, bail};
+/// Why a profile can't be run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Refusal {
+    /// It runs a program, loads a library or reads and writes files as
+    /// root: never (the option's name).
+    Forbidden(String),
+    /// An option (or a block) Crake doesn't know yet.
+    Unknown(String),
+    /// An option that names a file instead of carrying it inline.
+    PointsAtFile(String),
+    /// An option with nothing after it that needs something.
+    Empty(String),
+    /// A setenv of one of Crake's own variables.
+    CrakesOwn(String),
+    /// A `<block>` that never ends.
+    Unended(String),
+    NotClient,
+    NoGateway,
+    TooLarge,
+}
+
+pub type Result<T> = std::result::Result<T, Refusal>;
+
+impl Refusal {
+    /// In the copy voice, about the profile called `file` (initech.ovpn).
+    pub fn said(&self, file: &str) -> String {
+        match self {
+            Self::Forbidden(name) => format!(
+                "Crake won\u{2019}t run {file}: it {} ({name}), and Crake runs nothing a profile brings with it.",
+                forbidden_does(name)
+            ),
+            Self::Unknown(name) => format!(
+                "Crake can\u{2019}t run {file} yet: it uses {name}, which Crake doesn\u{2019}t know."
+            ),
+            Self::PointsAtFile(name) => format!(
+                "Couldn\u{2019}t import {file}: its {name} points at a file. Import the profile in Crake, so its files come with it."
+            ),
+            Self::Empty(name) => format!("Couldn\u{2019}t import {file}: its {name} says nothing."),
+            Self::CrakesOwn(name) => {
+                format!(
+                    "Couldn\u{2019}t import {file}: it sets {name}, which is Crake\u{2019}s own."
+                )
+            }
+            Self::Unended(tag) => {
+                format!("Couldn\u{2019}t import {file}: its <{tag}> block never ends.")
+            }
+            Self::NotClient => {
+                format!("{file} isn\u{2019}t a client profile: it doesn\u{2019}t say client.")
+            }
+            Self::NoGateway => format!("{file} names no gateway (remote)."),
+            Self::TooLarge => format!("{file} is too large to be an OpenVPN profile."),
+        }
+    }
+}
+
+impl std::fmt::Display for Refusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.said("This profile"))
+    }
+}
+
+impl std::error::Error for Refusal {}
+
+/// What a forbidden option does, in a few words.
+fn forbidden_does(name: &str) -> &'static str {
+    match name {
+        "plugin" => "loads a plugin",
+        "engine" | "providers" | "provider-path" | "pkcs11-providers" => "loads a library",
+        "management" => "opens a management port",
+        "tls-verify"
+        | "auth-user-pass-verify"
+        | "client-connect"
+        | "client-disconnect"
+        | "learn-address"
+        | "iproute" => "runs a program",
+        _ => "reads or writes a file of its own",
+    }
+}
+
+/// Options that run a program, load a library, or read or write a file
+/// outside the profile: refused, whatever the profile is for.
+const FORBIDDEN: &[&str] = &[
+    "askpass",
+    "auth-user-pass-verify",
+    "cd",
+    "chroot",
+    "client-connect",
+    "client-disconnect",
+    "config",
+    "engine",
+    "iproute",
+    "learn-address",
+    "log",
+    "log-append",
+    "management",
+    "pkcs11-providers",
+    "plugin",
+    "provider-path",
+    "providers",
+    "status",
+    "tls-export-cert",
+    "tls-verify",
+    "tmp-dir",
+    "writepid",
+];
 
 /// Larger than any real profile.
 const MAX_SIZE: usize = 512 * 1024;
@@ -180,7 +285,7 @@ pub struct Profile {
 /// Read a profile; refuse it, saying why, if craked shouldn't run it.
 pub fn check(text: &str) -> Result<Profile> {
     if text.len() > MAX_SIZE {
-        bail!("That profile is too large to be an OpenVPN profile.");
+        return Err(Refusal::TooLarge);
     }
     let mut out = String::new();
     let mut remote = None;
@@ -210,12 +315,13 @@ pub fn check(text: &str) -> Result<Profile> {
                 t if INLINE.contains(&t) => {
                     out.push_str(&format!("<{t}>\n{body}</{t}>\n"));
                 }
-                t => bail!("The profile has a <{t}> block, which Crake can't use."),
+                t => return Err(Refusal::Unknown(format!("<{t}>"))),
             }
             continue;
         }
         let words = words(line);
-        let Some(name) = words.first().map(String::as_str) else {
+        // Nothing but quotes (`""`): a blank line, as openvpn reads it.
+        let Some(name) = words.first().map(String::as_str).filter(|n| !n.is_empty()) else {
             continue;
         };
         let name = name.strip_prefix("--").unwrap_or(name);
@@ -227,22 +333,25 @@ pub fn check(text: &str) -> Result<Profile> {
         if DROP.contains(&name) {
             continue;
         }
+        if FORBIDDEN.contains(&name) {
+            return Err(Refusal::Forbidden(name.to_owned()));
+        }
         if name == "auth-user-pass" {
             match words.get(1).map(String::as_str) {
                 None | Some("[inline]") => asks_password = true,
-                Some(_) => bail!(file_named(name)),
+                Some(_) => return Err(Refusal::PointsAtFile(name.to_owned())),
             }
             continue;
         }
         if INLINE.contains(&name) {
             match words.get(1).map(String::as_str) {
                 Some("[inline]") => continue,
-                Some(_) => bail!(file_named(name)),
-                None => bail!("The profile's {name} says nothing."),
+                Some(_) => return Err(Refusal::PointsAtFile(name.to_owned())),
+                None => return Err(Refusal::Empty(name.to_owned())),
             }
         }
         if name == "setenv" && words.get(1).is_some_and(|v| v.starts_with("CRAKE_")) {
-            bail!("The profile sets {}, which is Crake's own.", words[1]);
+            return Err(Refusal::CrakesOwn(words[1].clone()));
         }
         if matches!(name, "http-proxy" | "socks-proxy") {
             // Host and port; for HTTP, then "auto" (and how) for its own
@@ -255,19 +364,19 @@ pub fn check(text: &str) -> Result<Profile> {
                 _ => matches!(auth, None | Some("auto" | "auto-nct")),
             };
             if !harmless {
-                bail!(file_named(name));
+                return Err(Refusal::PointsAtFile(name.to_owned()));
             }
         } else if !KEEP.contains(&name) {
-            bail!("The profile uses {name}, which Crake doesn't run.");
+            return Err(Refusal::Unknown(name.to_owned()));
         }
         out.push_str(line);
         out.push('\n');
     }
     if !client {
-        bail!("That isn't a client profile: it doesn't say client.");
+        return Err(Refusal::NotClient);
     }
     let Some(remote) = remote else {
-        bail!("The profile names no gateway (remote).");
+        return Err(Refusal::NoGateway);
     };
     if asks_password {
         // craked answers it over the management interface.
@@ -278,12 +387,6 @@ pub fn check(text: &str) -> Result<Profile> {
         remote,
         credentials,
     })
-}
-
-fn file_named(name: &str) -> String {
-    format!(
-        "The profile's {name} points at a file. Import the profile in Crake, so its files come with it."
-    )
 }
 
 /// `<name>` opens a block.
@@ -303,7 +406,7 @@ fn block<'a>(lines: &mut impl Iterator<Item = &'a str>, tag: &str) -> Result<Str
         body.push_str(line);
         body.push('\n');
     }
-    bail!("The profile's <{tag}> block never ends.")
+    Err(Refusal::Unended(tag.to_owned()))
 }
 
 /// What a `<connection>` may say: where and how to reach the gateway.
@@ -337,7 +440,11 @@ fn check_connection(body: &str, remote: &mut Option<String>) -> Result<String> {
         let w = words(line);
         let name = w.first().map_or("", String::as_str);
         if !CONNECTION.contains(&name) {
-            bail!("A <connection> in the profile uses {name}, which Crake doesn't run.");
+            return Err(if FORBIDDEN.contains(&name) {
+                Refusal::Forbidden(name.to_owned())
+            } else {
+                Refusal::Unknown(name.to_owned())
+            });
         }
         if name == "remote" && remote.is_none() {
             *remote = w.get(1).cloned();
@@ -475,6 +582,64 @@ verb 3
         }
         let text = "client\nremote vpn.example\n<plugin>\nx\n</plugin>\n";
         assert!(check(text).is_err());
+    }
+
+    /// design/proposals/openvpn-tunnel.html, 3: what's refused for good and
+    /// what Crake doesn't know yet are said apart.
+    #[test]
+    fn refusals_say_why_in_their_own_words() {
+        let plugin = check("client\nremote vpn.example\nplugin /usr/lib/x.so\n").unwrap_err();
+        assert_eq!(plugin, Refusal::Forbidden("plugin".into()));
+        assert_eq!(
+            plugin.said("initech.ovpn"),
+            "Crake won\u{2019}t run initech.ovpn: it loads a plugin (plugin), and Crake runs nothing a profile brings with it."
+        );
+        let unknown = check("client\nremote vpn.example\nshiny-new-option 1\n").unwrap_err();
+        assert_eq!(
+            unknown.said("initech.ovpn"),
+            "Crake can\u{2019}t run initech.ovpn yet: it uses shiny-new-option, which Crake doesn\u{2019}t know."
+        );
+        assert_eq!(
+            check("client\nremote vpn.example\nca /etc/ssl/ca.pem\n").unwrap_err(),
+            Refusal::PointsAtFile("ca".into())
+        );
+        assert_eq!(plugin.to_string(), plugin.said("This profile"));
+    }
+
+    /// Every refusal has its sentence, and what each forbidden option does
+    /// is said in a few words.
+    #[test]
+    fn each_refusal_is_said() {
+        let said = |text: &str| check(text).unwrap_err().said("x.ovpn");
+        let ok = "client\nremote vpn.example\n";
+        assert!(said(&"#".repeat(MAX_SIZE + 1)).contains("too large"));
+        assert!(said(&format!("{ok}ca\n")).contains("its ca says nothing"));
+        assert!(said(&format!("{ok}setenv CRAKE_TUNNEL x\n")).contains("Crake\u{2019}s own"));
+        assert!(said(&format!("{ok}<ca>\nx\n")).contains("<ca> block never ends"));
+        assert!(said("remote vpn.example\n").contains("isn\u{2019}t a client profile"));
+        assert!(said("client\n").contains("names no gateway"));
+        assert!(said(&format!("{ok}http-proxy p 3128 /root/creds\n")).contains("points at a file"));
+        assert!(said(&format!("{ok}<plugin>\nx\n</plugin>\n")).contains("uses <plugin>"));
+        for (option, does) in [
+            ("plugin x", "loads a plugin"),
+            ("engine x", "loads a library"),
+            ("management 127.0.0.1 1", "opens a management port"),
+            ("tls-verify x", "runs a program"),
+            ("log /tmp/x", "reads or writes a file"),
+        ] {
+            assert!(said(&format!("{ok}{option}\n")).contains(does), "{option}");
+        }
+        // In a <connection> too; blank lines, comments and "--" spellings
+        // are read as openvpn reads them.
+        let conn = "client\n<connection>\n\n# x\nremote a 1\nplugin x\n</connection>\n";
+        assert_eq!(
+            check(conn).unwrap_err(),
+            Refusal::Forbidden("plugin".into())
+        );
+        let p =
+            check("\n; a comment\n--client\nremote vpn.example\n\"\"\nhttp-proxy p 3128 auto\n")
+                .unwrap();
+        assert!(p.text.contains("http-proxy p 3128 auto"));
     }
 
     #[test]

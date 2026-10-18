@@ -170,6 +170,51 @@ pub fn keep_root_cursor() {
         });
 }
 
+/// The default browser's name ("Firefox"), as its desktop entry says it,
+/// for the sign-in window ("Waiting for you in Firefox"); "your browser"
+/// when the desktop doesn't say.
+pub fn browser_name() -> String {
+    let fallback = || "your browser".to_owned();
+    if cfg!(test) {
+        return fallback();
+    }
+    let Ok(out) = std::process::Command::new("xdg-settings")
+        .args(["get", "default-web-browser"])
+        .output()
+    else {
+        return fallback();
+    };
+    let id = String::from_utf8_lossy(&out.stdout).trim().to_owned();
+    if !id.ends_with(".desktop") || id.contains('/') {
+        return fallback();
+    }
+    let home = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")));
+    let shared =
+        std::env::var("XDG_DATA_DIRS").unwrap_or_else(|_| "/usr/local/share:/usr/share".into());
+    home.into_iter()
+        .chain(shared.split(':').map(PathBuf::from))
+        .find_map(|dir| std::fs::read_to_string(dir.join("applications").join(&id)).ok())
+        .and_then(|entry| desktop_name(&entry))
+        .unwrap_or_else(fallback)
+}
+
+/// A desktop entry's name, without "Web Browser" after it ("Firefox Web
+/// Browser" is Firefox).
+fn desktop_name(entry: &str) -> Option<String> {
+    let mut main = false;
+    for line in entry.lines().map(str::trim) {
+        if line.starts_with('[') {
+            main = line == "[Desktop Entry]";
+        } else if main && let Some(name) = line.strip_prefix("Name=") {
+            let name = name.trim().trim_end_matches(" Web Browser").trim();
+            return (!name.is_empty()).then(|| name.to_owned());
+        }
+    }
+    None
+}
+
 /// A folder only this user can read, for files that live as long as a
 /// sign-in ($XDG_RUNTIME_DIR/crake, on tmpfs).
 pub fn private_dir() -> Result<PathBuf, String> {
@@ -220,6 +265,16 @@ mod tests {
             in_logical_pixels(xrandr, 2.),
             vec![rect(304., 1440., 1920., 1200.), rect(0., 0., 2560., 1440.)]
         );
+    }
+
+    #[test]
+    fn the_browsers_name_from_its_desktop_entry() {
+        let firefox = "[Desktop Entry]\nVersion=1.0\nName=Firefox Web Browser\nName[cs]=Webový prohlížeč\n\
+                       [Desktop Action new-window]\nName=New Window\n";
+        assert_eq!(desktop_name(firefox).as_deref(), Some("Firefox"));
+        let chrome = "[Desktop Action x]\nName=Other\n[Desktop Entry]\nName=Google Chrome\n";
+        assert_eq!(desktop_name(chrome).as_deref(), Some("Google Chrome"));
+        assert_eq!(desktop_name("[Desktop Entry]\nExec=x\n"), None);
     }
 
     #[test]

@@ -10,7 +10,8 @@ use serde::{Deserialize, Serialize};
 
 pub mod env;
 pub mod mgmt;
-pub mod profile;
+/// What may run (shared with the app, which checks a profile as it is chosen).
+pub use crake_proto::openvpn_profile as profile;
 
 /// The sign-in the gateway gave (`>PASSWORD:Auth-Token:`), sent as the
 /// password the next time, with the user name it was given for: switching

@@ -62,6 +62,12 @@ fn displays() -> Vec<(Rect, f64)> {
 
 /// A folder only this user can read, for files that live as long as a
 /// sign-in ($TMPDIR, which macOS gives each user, /crake).
+/// The default browser, for the sign-in window ("Waiting for you in your
+/// browser"): not looked up here yet (Linux reads its desktop entry).
+pub fn browser_name() -> String {
+    "your browser".to_owned()
+}
+
 pub fn private_dir() -> Result<PathBuf, String> {
     use std::os::unix::fs::DirBuilderExt;
     let dir = std::env::temp_dir().join("crake");

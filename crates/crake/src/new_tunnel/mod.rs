@@ -74,11 +74,13 @@ const PROTOCOLS: [(&str, &str, &str, &str); 9] = [
     ("fortinet", "Fortinet SSL VPN", "FortiGate", "fortinet"),
     ("f5", "F5 BIG-IP", "Access Policy Manager", "f5"),
     ("array", "Array Networks", "AG / vxAG", "array"),
+    // Crake runs it itself (CLAUDE.md, 7i); OpenVPN 3's profiles are
+    // taken over from its Profile field.
     (
-        "openvpn3",
-        "OpenVPN 3 profile",
-        "One of your openvpn3 profiles on this computer",
-        "openvpn3",
+        "openvpn",
+        "OpenVPN",
+        "A .ovpn profile from your IT team",
+        "openvpn",
     ),
 ];
 
@@ -180,13 +182,22 @@ pub struct NewTunnel {
     /// The tallest the window may get (the screen, less some room).
     max_height: f32,
     /// OpenVPN 3 profiles on this computer (loaded when the window opens),
-    /// and the one chosen.
+    /// those it keeps locked, and the one chosen.
     profiles: Vec<String>,
+    locked: Vec<String>,
     /// Which VPN engines are installed (None until looked; all in demo).
     engines: Option<crate::engines::Engines>,
     profile: Option<String>,
     /// How importing a .ovpn file went, under the Profile field.
     profile_note: Option<import::ProfileNote>,
+    /// OpenVPN: the profile chosen (a file's, or a copy of OpenVPN 3's).
+    ovpn: Option<import::Chosen>,
+    /// A name taken from an imported file, set in the field at the next
+    /// frame (which has the window).
+    pending_name: Option<String>,
+    /// Editing: the tunnel's protocol and gateway as they were.
+    editing_protocol: String,
+    kept_gateway: String,
     focus: FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
@@ -194,14 +205,22 @@ pub struct NewTunnel {
 /// Asks the app to close the window.
 pub struct Close;
 
-/// openvpn3's profiles on this computer and the installed engines. Tests get
-/// a fixed pair (three profiles, both engines), never this computer's.
-fn look_around() -> (Vec<String>, crate::engines::Engines) {
+/// openvpn3's profiles on this computer (and those it keeps locked) and
+/// the installed engines. Tests get fixed ones (three profiles, globex
+/// locked, every engine), never this computer's.
+fn look_around() -> (Vec<String>, Vec<String>, crate::engines::Engines) {
     if cfg!(test) {
         let all = crate::engines::Engines::ALL;
-        return (vec!["globex".into(), "acme".into(), "initech".into()], all);
+        let profiles = vec!["globex".into(), "acme".into(), "initech".into()];
+        return (profiles, vec!["globex".into()], all);
     }
-    (crate::ovpn3::profiles(), crate::engines::Engines::find())
+    let profiles = crate::ovpn3::profiles();
+    let locked = profiles
+        .iter()
+        .filter(|p| crate::ovpn3::profile::locked(p) == Some(true))
+        .cloned()
+        .collect();
+    (profiles, locked, crate::engines::Engines::find())
 }
 
 impl gpui_kit::EventEmitter<Close> for NewTunnel {}
@@ -228,15 +247,16 @@ impl NewTunnel {
     }
 
     /// Import a .ovpn file as the file picker would give it, and the
-    /// profile chosen then (the Linux journey: the picker is the platform's).
+    /// gateway it names then (the Linux journey: the picker is the
+    /// platform's).
     #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn import_for_tests(&mut self, path: std::path::PathBuf, cx: &mut Context<Self>) {
         self.import_ovpn(path, cx);
     }
 
     #[cfg(all(test, target_os = "linux"))]
-    pub(crate) fn profile_for_tests(&self) -> Option<String> {
-        self.profile.clone()
+    pub(crate) fn imported_for_tests(&self) -> Option<String> {
+        self.ovpn.as_ref().map(|o| o.remote.clone())
     }
 
     pub fn new(
@@ -330,12 +350,20 @@ impl NewTunnel {
         // openvpn3's profiles and the installed engines, without holding the
         // window up.
         cx.spawn(async move |this, cx| {
-            let (found, engines) = cx
+            let (found, locked, engines) = cx
                 .background_executor()
                 .spawn(async { look_around() })
                 .await;
             let _ = this.update(cx, |this: &mut Self, cx| {
                 this.profiles = found;
+                this.locked = locked;
+                // An OpenVPN 3 tunnel edited: its profile, taken over.
+                if this.protocol == "openvpn"
+                    && this.ovpn.is_none()
+                    && let Some(profile) = this.profile.clone()
+                {
+                    this.take_over(profile, cx);
+                }
                 let engines = *this.engines.get_or_insert(engines);
                 // A new tunnel where the browser can't sign in starts on the
                 // password instead (Ubuntu 22.04's openconnect).
@@ -357,6 +385,9 @@ impl NewTunnel {
             list_input,
             protocol: if let Some(p) = shown_protocol {
                 p
+            } else if field("protocol") == "openvpn3" {
+                // Moving to Crake's own OpenVPN (7i, decided 2026-10-18).
+                "openvpn"
             } else if editing.is_some() {
                 static_of(&PROTOCOLS, &field("protocol"), |p| p.0)
             } else {
@@ -404,11 +435,22 @@ impl NewTunnel {
             problem: None,
             max_height: crate::place::max_window_height(),
             profiles: Vec::new(),
+            locked: Vec::new(),
             engines: demo.then_some(crate::engines::Engines::ALL),
             profile: (field("protocol") == "openvpn3")
                 .then(|| field("gateway"))
                 .filter(|g| !g.is_empty()),
-            profile_note: None,
+            profile_note: (demo && shown_protocol == Some("openvpn")).then(|| {
+                import::ProfileNote::Imported("From initech.ovpn. Crake keeps its own copy, which only its service can read, so you can delete the file.".into())
+            }),
+            ovpn: (demo && shown_protocol == Some("openvpn")).then(|| import::Chosen {
+                text: String::new(),
+                remote: "vpn.initech.example".into(),
+                from_file: true,
+            }),
+            pending_name: (demo && shown_protocol == Some("openvpn")).then(|| "Initech".into()),
+            editing_protocol: field("protocol"),
+            kept_gateway: field("gateway"),
             focus,
             _subscriptions: subscriptions,
         }
@@ -479,7 +521,7 @@ impl NewTunnel {
     /// through them.
     fn tab_order(&self) -> Vec<Entity<InputState>> {
         match self.step {
-            1 if self.protocol == "openvpn3" => vec![self.name.clone()],
+            1 if self.protocol == "openvpn" => vec![self.name.clone()],
             1 => vec![self.name.clone(), self.gateway.clone()],
             2 => vec![self.user.clone()],
             _ => Vec::new(),
@@ -508,7 +550,7 @@ impl NewTunnel {
     fn check(&mut self, step: usize, cx: &Context<Self>) -> bool {
         if step == 2
             && self.method == "browser"
-            && self.protocol != "openvpn3"
+            && self.protocol != "openvpn"
             && let Some(why) = self.no_browser()
         {
             self.problem = Some(why);
@@ -517,10 +559,14 @@ impl NewTunnel {
         let problem = match step {
             1 if self.display_name(cx).is_empty() => Some("Give it a name."),
             1 if self.missing(self.protocol).is_some() => self.missing(self.protocol),
-            1 if self.protocol == "openvpn3" && self.profile.is_none() => {
-                Some("Which OpenVPN 3 profile?")
+            // A new one needs its profile; an OpenVPN 3 one moving over too.
+            1 if self.protocol == "openvpn"
+                && self.ovpn.is_none()
+                && self.editing_protocol != "openvpn" =>
+            {
+                Some("Which profile? Import its .ovpn file.")
             }
-            1 if self.protocol != "openvpn3" && self.gateway.read(cx).value().trim().is_empty() => {
+            1 if self.protocol != "openvpn" && self.gateway.read(cx).value().trim().is_empty() => {
                 Some("Which gateway? Its name or address, like vpn.example.com.")
             }
             1 if self.protocol().is_none() => match self.detect {
@@ -543,19 +589,23 @@ impl NewTunnel {
     fn fields(&self, cx: &Context<Self>) -> HashMap<String, String> {
         let mut f = HashMap::new();
         f.insert("display_name".into(), self.display_name(cx));
-        // An OpenVPN 3 tunnel's "gateway" is its profile.
-        let gateway = if self.protocol == "openvpn3" {
-            self.profile.clone().unwrap_or_default()
-        } else {
-            self.gateway.read(cx).value().trim().to_owned()
+        // OpenVPN: the gateway its profile names, and the profile (craked
+        // keeps it); changed only when one was chosen.
+        let gateway = match (&self.ovpn, self.protocol) {
+            (Some(o), "openvpn") => o.remote.clone(),
+            (None, "openvpn") => self.kept_gateway.clone(),
+            _ => self.gateway.read(cx).value().trim().to_owned(),
         };
         f.insert("gateway".into(), gateway);
+        if let (Some(o), "openvpn") = (&self.ovpn, self.protocol) {
+            f.insert("profile".into(), o.text.clone());
+        }
         f.insert(
             "protocol".into(),
             self.protocol().unwrap_or("anyconnect").into(),
         );
         let group = match self.protocol {
-            "openvpn3" => String::new(),
+            "openvpn" => String::new(),
             _ => self.group.clone().unwrap_or_default(),
         };
         f.insert("group".into(), group);

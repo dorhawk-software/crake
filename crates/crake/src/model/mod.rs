@@ -22,6 +22,7 @@ pub use self::days::{Day, Row, Show};
 pub use self::demo::demo_log_whole_day;
 pub use self::demo::{
     demo, demo_detail, demo_expired, demo_leftover, demo_log, demo_long_names, demo_openvpn3,
+    demo_staying,
 };
 
 /// How long the tray shows the "routed" shape after a decision.
@@ -51,6 +52,23 @@ pub struct Leftover {
     pub session: String,
 }
 
+/// An OpenVPN 3 tunnel that stays on OpenVPN 3 (CLAUDE.md, 7i): its
+/// profile is locked there, or Crake can't run it. The panel says so, with
+/// "Import .ovpn…" (design/proposals/openvpn-tunnel.html, 5).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Staying {
+    pub tunnel: String,
+    pub title: String,
+    pub why: String,
+}
+
+impl Staying {
+    /// What "Not now" remembers.
+    pub fn dismiss_key(&self) -> String {
+        format!("openvpn3-stays:{}", self.tunnel)
+    }
+}
+
 impl Leftover {
     /// What "Got it" remembers: this process, not its number alone.
     pub fn dismiss_key(&self) -> String {
@@ -74,6 +92,8 @@ pub struct Model {
     /// OpenVPN 3 processes that outlived their sessions and still run
     /// (`ovpn3::leftover`): the panel says how to stop each.
     pub leftovers: Vec<Leftover>,
+    /// OpenVPN 3 tunnels that stay on OpenVPN 3 (`openvpn::move_from_openvpn3`).
+    pub staying: Vec<Staying>,
     /// Oldest first.
     pub log: Vec<LogEntry>,
     pub routed_at: Option<Instant>,

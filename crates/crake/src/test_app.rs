@@ -144,7 +144,7 @@ pub(crate) async fn sign_in_to(gateway: &str) -> crake_proto::Session {
             .expect("sign-in went quiet")
             .expect("sign-in ended");
         let answer = match event {
-            Event::Reached | Event::Attached(..) => continue,
+            Event::Reached | Event::Attached(..) | Event::Browser(_) => continue,
             Event::Done(session) => {
                 assert_eq!(asked, ["trust", "password"], "what the window asked");
                 return session;

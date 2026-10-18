@@ -49,6 +49,10 @@ struct Opened {
 }
 
 fn open(cx: &mut TestAppContext, openconnect: PathBuf) -> Opened {
+    open_with(cx, openconnect, "anyconnect")
+}
+
+fn open_with(cx: &mut TestAppContext, openconnect: PathBuf, protocol: &str) -> Opened {
     // Real I/O: openconnect's answers arrive from the sign-in thread.
     cx.executor().allow_parking();
     cx.update(gpui_kit::init);
@@ -64,7 +68,7 @@ fn open(cx: &mut TestAppContext, openconnect: PathBuf) -> Opened {
         tunnel: "acme".into(),
         display: "ACME".into(),
         gateway: "vpn.acme.example".into(),
-        protocol: "anyconnect".into(),
+        protocol: protocol.into(),
         user: String::new(),
         auth_args: vec![],
         extra_args: vec![],
@@ -133,6 +137,67 @@ impl Opened {
         self.model
             .read_with(cx, |m, _| m.signing_in.contains("acme"))
     }
+}
+
+/// OpenVPN (design/proposals/openvpn-tunnel.html, 6): craked's questions,
+/// shown as craked asks them (`openvpn::asked`): a page opened in the
+/// browser, with "Open the page again"; after a sign-in the gateway refused,
+/// the username asked again, saying so; the answer goes back to craked with
+/// its question's id.
+#[gpui_kit::test]
+fn openvpns_questions_come_from_craked(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open_with(cx, fake(dir.path()), "openvpn");
+    let ask = |pairs: &[(&str, &str)]| -> std::collections::HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect()
+    };
+    let page = ask(&[
+        ("id", "7"),
+        ("kind", "browser"),
+        ("url", "https://vpn.acme.example/sso"),
+    ]);
+    cx.update(|cx| crate::openvpn::asked("acme", &page, cx));
+    w.until(
+        "the page",
+        cx,
+        |s| matches!(s, Stage::Browser { url, .. } if url == "https://vpn.acme.example/sso"),
+    );
+    w.click("open-again", cx);
+
+    let user = ask(&[("id", "8"), ("kind", "user"), ("retry", "true")]);
+    cx.update(|cx| crate::openvpn::asked("acme", &user, cx));
+    w.until(
+        "the username, again",
+        cx,
+        |s| matches!(s, Stage::Asking(p) if p.refused && p.label == "Username"),
+    );
+    w.type_answer("alice", cx);
+    w.click("continue", cx);
+    let end = Instant::now() + Duration::from_secs(5);
+    loop {
+        match w.requests.try_recv() {
+            Ok(Request::Answer(tunnel, id, text)) => {
+                assert_eq!((tunnel.as_str(), id, text.as_str()), ("acme", 8, "alice"));
+                break;
+            }
+            Ok(_) => {}
+            Err(_) => {
+                assert!(Instant::now() < end, "the answer never went to craked");
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        }
+    }
+    // Up: the window says so and closes.
+    w.model.update(cx, |m, cx| {
+        if let Some(t) = m.tunnels.iter_mut().find(|t| t.name == "acme") {
+            t.state = "connected".into();
+        }
+        cx.notify();
+    });
+    w.until("up", cx, |s| *s == Stage::Up);
 }
 
 fn asked(stage: &Stage, ask: &Ask) -> bool {

@@ -181,7 +181,7 @@ impl Panel {
 }
 
 /// The bird's head with an amber triangle: three layers, each one colour.
-fn warning_icon(t: &Theme) -> impl IntoElement + use<> {
+pub(super) fn warning_icon(t: &Theme) -> impl IntoElement + use<> {
     let layer = |path: &'static str, color| {
         svg()
             .absolute()

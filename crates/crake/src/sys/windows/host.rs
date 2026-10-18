@@ -73,6 +73,12 @@ unsafe extern "system" fn each_monitor(
 
 /// A folder only this user can read, for files that live as long as a
 /// sign-in (in the user's local application data, private to them).
+/// The default browser, for the sign-in window ("Waiting for you in your
+/// browser"): not looked up here yet (Linux reads its desktop entry).
+pub fn browser_name() -> String {
+    "your browser".to_owned()
+}
+
 pub fn private_dir() -> Result<PathBuf, String> {
     let base = std::env::var_os("LOCALAPPDATA").ok_or("no LOCALAPPDATA")?;
     let dir = PathBuf::from(base).join("Crake").join("run");

@@ -40,6 +40,13 @@ Don't drift back into these. Each was tried and dropped for a reason.
   notice's left, design/proposals/leftover-warning.html, 2). An AI-made-UI
   tell, like the breathing dots: a notice says what it is with its words,
   its icon and, when it needs you, its whole surface.
+- **Two OpenVPNs to choose from** ("OpenVPN" beside "OpenVPN 3 profile",
+  design/proposals/openvpn-tunnel.html's first draft, B), and **an action
+  inside a list's menu** ("Choose a .ovpn file…" as the menu's first row,
+  its A): two cards that sound alike, and one action in two places. Chosen
+  by the user (2026-10-18): one "OpenVPN" card, "Import .ovpn…" in the
+  label's row in every state (as ovpn-import.html, A), and importing a
+  .ovpn picks OpenVPN by itself.
 - **Tray marks above the head** (design/proposals/tray-marks-above.html).
   The bar icon is a fixed square: room above the head shrinks the bird.
   The call marks stay off the beak and the "!" on the back of the head.

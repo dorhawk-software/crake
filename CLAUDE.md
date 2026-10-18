@@ -873,6 +873,12 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    loopback TCP with a password), (5) macOS (Homebrew's openvpn, utun),
    (6) OpenVPN 3 tunnels moved to it (their profile's text copied out of
    openvpn3, unless locked) and the openvpn3 code removed.
+   **Decided with the user (2026-10-18, after the critique of
+   design/proposals/openvpn-tunnel.html):** OpenVPN 3 profiles move to the
+   new engine now, not after it leaves Beta (slice 6 comes with the app's
+   slice); and importing a .ovpn picks OpenVPN by itself ("Import .ovpn…"
+   in the Gateway label's row fills in the protocol, the gateway and the
+   name), so someone holding the file needn't know what a protocol is.
    **Slice 1: built (2026-10-18).** craked: `openvpn/` (profile, env,
    mgmt), `manager/openvpn/` (`run.rs` the process, `sign_in.rs` the
    management dialogue as a state machine: hold release, the kept token
@@ -896,6 +902,36 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    (`pkcs11-providers`, refused today) and Windows' certificate store
    (`cryptoapicert`); the DCO fallback has no test against a gateway that
    needs it (the user's real one does: CLAUDE.local.md).
+   **Slice 2 (the app) and 6 (the move): built (2026-10-18;
+   design/proposals/openvpn-tunnel.html, chosen by the user).** New
+   tunnel: "Import .ovpn…" beside Gateway picks OpenVPN by itself (name
+   from the file, the profile's gateway shown, not typed, the list folded
+   behind it); one "OpenVPN" card replaces "OpenVPN 3 profile", its
+   Profile list holding OpenVPN 3's profiles to take over (a locked one
+   says to import its file); a profile is read against the allowlist the
+   moment it's chosen (`crake_proto::openvpn_profile`, moved from craked,
+   with `Refusal` sentences: forbidden, unknown, a file it points to);
+   step 2 "As the profile says". Sign-in: switched on, an OpenVPN tunnel
+   just connects; craked's questions (`Update::Asking`) open the window
+   (`openvpn.rs`, its registry a global); a page opens in the browser
+   ("Finish in the browser tab Crake opened", "Waiting for you in
+   Firefox": the desktop entry's name, `sys::browser_name`; "your
+   browser" on Windows and macOS), "Open the page again"; asked again
+   after a refusal, "Initech didn't accept that username or password."
+   The move (`openvpn::move_from_openvpn3`): each OpenVPN 3 tunnel added
+   in the app, once off and where openvpn is installed, gets its
+   profile's copy (UpdateTunnel; craked logs "X now runs on Crake's own
+   OpenVPN." and refuses while its session runs); a locked or refused
+   one stays, with the panel's amber notice (`panel/staying.rs`,
+   "Import .ovpn…" opens its Edit). Tested: window tests (New tunnel's
+   import and take-over, the sign-in window's questions, the notice),
+   lifecycle (the move), e2e through the app's client, the journey's
+   import step. Not yet: passwords kept in the keyring for OpenVPN;
+   tunnels from craked.toml or IT that are OpenVPN 3 stay so.
+   **Don't release before slice 3:** under the package's AppArmor
+   profile craked can't run openvpn or write `profiles/`, and the move
+   would take the user's OpenVPN 3 tunnels onto an engine that then
+   fails (the user's own OpenVPN 3 tunnel among them).
 7j. **Real gateways in CI, on every system (requested 2026-10-18; after
    7i).** Each CI system (Linux, macOS, Windows) starts Crake, connects to
    a real gateway of each kind there is software for, and checks that,
@@ -1162,6 +1198,13 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
     clicking one to find it in the table (the proposal's notes): not built.
   - *AppArmor:* the profile now allows `nf_conntrack_acct`; not yet run in
     `scripts/vm-test.sh` (AppArmor enforced, KVM; not in CI).
+- **The tray's trouble and warning badges are too small to read
+  (the user, 2026-10-18, with a screenshot of GNOME's bar: Teams' "5"
+  badge reads, Crake's red dot doesn't).** The badge is a circle of
+  r 4.5 on the 32 grid (9/32 of the icon: under 5 px at the bar's 16 px,
+  its "!" 1 px wide). Next after the OpenVPN proposal: a proposal for a
+  larger badge (about a third of the icon, as other apps' badges are),
+  through the impeccable critique, both themes and the warning triangle.
 - **The explainers** (docs/explainers.md): written down, not yet drawn or
   published anywhere.
 - **The website's version number** (dorhawk-website): visitors get the

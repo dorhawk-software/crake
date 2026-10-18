@@ -41,7 +41,15 @@ pub(super) fn lower_first(s: &str) -> String {
 /// Reached the gateway, signed in, tunnel up: done (two-stroke tick), now
 /// (dots, bold), later (empty circle); or failed there (a red cross, bold).
 /// The gateway's name is a machine fact: mono.
-pub(super) fn steps(at: usize, failed: Option<(usize, String)>, spec: &Spec, t: &Theme) -> Div {
+/// `signing`: the sign-in step's words while it's under way ("Waiting for
+/// you in Firefox"), "Signing in" otherwise.
+pub(super) fn steps(
+    at: usize,
+    failed: Option<(usize, String)>,
+    signing: Option<String>,
+    spec: &Spec,
+    t: &Theme,
+) -> Div {
     let failed_row = failed.as_ref().map(|(_, row)| row.clone());
     let failed = failed.map(|(at, _)| at);
     let gateway = || {
@@ -55,7 +63,10 @@ pub(super) fn steps(at: usize, failed: Option<(usize, String)>, spec: &Spec, t: 
             div().flex().gap(px(4.)).child("Reached").child(gateway()),
             div().flex().gap(px(4.)).child("Reaching").child(gateway()),
         ),
-        (div().child("Signed in"), div().child("Signing in")),
+        (
+            div().child("Signed in"),
+            div().child(signing.unwrap_or_else(|| "Signing in".into())),
+        ),
         (
             div().child("Tunnel up"),
             div().child("Bringing the tunnel up"),

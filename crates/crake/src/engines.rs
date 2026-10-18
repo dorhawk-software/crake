@@ -175,7 +175,7 @@ fn find_openconnect(given: Option<OsString>, path: Option<&OsStr>, extra: &[Path
 
 /// openvpn is installed where craked looks for it: on PATH, in the
 /// administrators' folders (Debian's /usr/sbin), or Homebrew's on macOS.
-fn openvpn_installed() -> bool {
+pub fn openvpn_installed() -> bool {
     let extra: Vec<PathBuf> = if cfg!(target_os = "macos") {
         vec!["/opt/homebrew/sbin".into(), "/usr/local/sbin".into()]
     } else {

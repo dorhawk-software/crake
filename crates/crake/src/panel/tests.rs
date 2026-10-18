@@ -470,3 +470,31 @@ fn with_no_tray_the_note_says_what_would_help(cx: &mut TestAppContext) {
     cx.update(|cx| cx.global_mut::<Prefs>().show_bird = false);
     assert!(!shown(cx), "the bird hidden: nothing said");
 }
+
+/// An OpenVPN 3 tunnel that stays on OpenVPN 3 (design/proposals/
+/// openvpn-tunnel.html, 5): said, "Import .ovpn…" opens its Edit, "Not
+/// now" hides it.
+#[gpui_kit::test]
+fn a_tunnel_staying_on_openvpn3_says_what_to_do(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    assert!(!w.shows_element(("staying", 0usize), cx), "nothing stays");
+    w.model.update(cx, |m, cx| {
+        *m = crate::model::demo_staying(std::mem::take(m));
+        cx.notify();
+    });
+    assert!(w.shows_element(("staying", 0usize), cx), "said");
+    match w.click(("staying-import", 0usize), cx) {
+        Request::NewTunnel(Some(tunnel)) => assert_eq!(tunnel, "globex"),
+        other => panic!("{other:?}"),
+    }
+    match w.click(("staying-not-now", 0usize), cx) {
+        Request::Dismiss(key) => {
+            assert_eq!(key, "openvpn3-stays:globex");
+            cx.update(|cx| {
+                cx.global_mut::<Prefs>().dismissed.insert(key);
+            });
+        }
+        other => panic!("{other:?}"),
+    }
+    assert!(!w.shows_element(("staying", 0usize), cx), "not now: hidden");
+}

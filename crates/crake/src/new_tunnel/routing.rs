@@ -190,7 +190,7 @@ impl NewTunnel {
                         Some(px(92.)),
                         t,
                         cx,
-                        |this, v| this.forget = v,
+                        |this, v, _| this.forget = v,
                     )),
             )
             .child(

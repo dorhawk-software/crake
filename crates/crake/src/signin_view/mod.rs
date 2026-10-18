@@ -36,6 +36,12 @@ pub const WIDTH: f32 = 340.;
 pub(crate) enum Stage {
     Reaching,
     SigningIn,
+    /// OpenVPN: finishing on the page opened in the browser (its address,
+    /// and the browser's name).
+    Browser {
+        url: String,
+        browser: String,
+    },
     Asking(Prompt),
     /// Signed in; waiting for craked to bring the tunnel up.
     Connecting,
@@ -52,7 +58,7 @@ impl Stage {
     fn step(&self) -> usize {
         match self {
             Stage::Reaching => 0,
-            Stage::SigningIn | Stage::Asking(_) => 1,
+            Stage::SigningIn | Stage::Browser { .. } | Stage::Asking(_) => 1,
             Stage::Connecting => 2,
             Stage::Up => 3, // literal: the fourth of the steps shown
             Stage::Failed { at, .. } => *at,
@@ -96,7 +102,7 @@ fn start(
             crate::ovpn3::start(spec.tunnel.clone(), spec.gateway.clone(), events, requests)
         }
         "openvpn" => {
-            let asks = &mut cx.global_mut::<crate::Shell>().openvpn;
+            let asks = cx.default_global::<crate::openvpn::Asks>();
             crate::openvpn::start(spec.tunnel.clone(), events, requests, asks)
         }
         _ => crate::signin::start(spec, events),
@@ -145,7 +151,7 @@ impl Render for SignIn {
                 let why = explain(&reason, at, &self.spec);
                 card.child(title(why.title))
                     .child(para(why.sentence, t.ink))
-                    .child(steps(at, Some((at, why.row)), &self.spec, &t))
+                    .child(steps(at, Some((at, why.row)), None, &self.spec, &t))
                     // openconnect's (or openvpn3's) own words, for whoever helps.
                     .child(
                         div()
@@ -183,10 +189,40 @@ impl Render for SignIn {
                             ),
                     )
             }
+            // design/screens/sign-in.html, "Single sign-on".
+            Stage::Browser { url, browser } => card
+                .child(title(format!("Sign in to {display}")))
+                .child(para(
+                    "Finish in the browser tab Crake opened. This window updates by itself.".into(),
+                    t.muted,
+                ))
+                .child(steps(
+                    1,
+                    None,
+                    Some(format!("Waiting for you in {browser}")),
+                    &self.spec,
+                    &t,
+                ))
+                .child(
+                    buttons()
+                        .child(
+                            button("open-again", "Open the page again", Look::Outline, &t)
+                                .keys()
+                                .on_click(move |_, _, cx| cx.open_url(&url))
+                                .test_support(),
+                        )
+                        .child(div().flex_1())
+                        .child(
+                            button("cancel", "Cancel", Look::Text, &t)
+                                .keys()
+                                .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
+                                .test_support(),
+                        ),
+                ),
             stage => card
                 .child(title(format!("Sign in to {display}")))
                 .child(para("This window updates by itself.".into(), t.muted))
-                .child(steps(stage.step(), None, &self.spec, &t))
+                .child(steps(stage.step(), None, None, &self.spec, &t))
                 .child(
                     buttons().child(div().flex_1()).child(
                         button("cancel", "Cancel", Look::Text, &t)
@@ -282,7 +318,10 @@ impl SignIn {
                 // OpenVPN: craked signs in and connects; it's up (or not)
                 // whatever the window shows meanwhile.
                 let openvpn = this.spec.protocol == "openvpn"
-                    && matches!(this.stage, Stage::Reaching | Stage::SigningIn);
+                    && matches!(
+                        this.stage,
+                        Stage::Reaching | Stage::SigningIn | Stage::Browser { .. }
+                    );
                 if this.stage != Stage::Connecting && !openvpn {
                     return;
                 }
@@ -349,6 +388,12 @@ impl SignIn {
                 if self.stage == Stage::Reaching {
                     self.stage = Stage::SigningIn;
                 }
+            }
+            Event::Browser(url) => {
+                self.stage = Stage::Browser {
+                    url,
+                    browser: crate::sys::browser_name(),
+                };
             }
             Event::Prompt(prompt) => {
                 let secret = matches!(prompt.ask, Ask::Secret | Ask::CertificatePassword { .. });

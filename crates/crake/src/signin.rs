@@ -74,6 +74,8 @@ pub struct Prompt {
     pub label: String,
     /// The gateway's own words before the question, if any.
     pub words: Option<String>,
+    /// Asked again: the gateway refused what was given (OpenVPN's sign-in).
+    pub refused: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -85,6 +87,8 @@ pub enum Event {
     /// OpenVPN 3: connected: the session (its openvpn3 path) and its
     /// device and DNS for craked (`ovpn3`).
     Attached(String, std::collections::HashMap<String, String>),
+    /// OpenVPN: a sign-in page opened in the browser (its address).
+    Browser(String),
 }
 
 #[derive(Clone, Debug)]
@@ -511,6 +515,7 @@ pub fn classify(question: &str, lines: &[String]) -> Prompt {
             ask: Ask::TrustServer { fingerprint },
             label: q.into(),
             words: None,
+            refused: false,
         };
     }
     if lower.contains("pkcs#12") || lower.contains("pass phrase") || lower.contains("certificate") {
@@ -521,6 +526,7 @@ pub fn classify(question: &str, lines: &[String]) -> Prompt {
             },
             label: "Certificate password".into(),
             words: None,
+            refused: false,
         };
     }
     // "GROUP: [Employees|Contractors]"
@@ -537,6 +543,7 @@ pub fn classify(question: &str, lines: &[String]) -> Prompt {
             ask: Ask::Choice(options),
             label,
             words,
+            refused: false,
         };
     }
     let secret = ["password", "passcode", "pin", "token", "code", "otp"]
@@ -546,6 +553,7 @@ pub fn classify(question: &str, lines: &[String]) -> Prompt {
         ask: if secret { Ask::Secret } else { Ask::Text },
         label: q.into(),
         words,
+        refused: false,
     }
 }
 

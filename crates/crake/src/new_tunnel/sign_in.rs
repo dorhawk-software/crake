@@ -4,7 +4,7 @@ use super::*;
 
 impl NewTunnel {
     pub(super) fn sign_in(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
-        if self.protocol == "openvpn3" {
+        if self.protocol == "openvpn" {
             return div()
                 .child(heading("How do you sign in?"))
                 .child(
@@ -20,7 +20,7 @@ impl NewTunnel {
                                 .child("As the profile says"),
                         )
                         .child(div().text_color(t.muted).child(
-                            "OpenVPN 3 asks what the profile needs, a password, a code or a sign-in in your browser, and Crake shows its questions when you switch the tunnel on.",
+                            "Crake asks what the profile needs, a password, a code or a sign-in in your browser, when you switch the tunnel on.",
                         )),
                 )
                 .into_any_element();
@@ -158,7 +158,7 @@ impl NewTunnel {
                         Some(px(320.)),
                         t,
                         cx,
-                        |this, v| {
+                        |this, v, _| {
                             this.cert_source = match v.as_str() {
                                 "pkcs11" => "pkcs11",
                                 "keyring" => "keyring",

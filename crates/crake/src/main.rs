@@ -265,8 +265,6 @@ struct Shell {
     sessions: std::collections::HashMap<String, (String, async_channel::Sender<signin::Reply>)>,
     /// OpenVPN 3 sessions started outside Crake, being taken over.
     adopting: std::collections::HashSet<String>,
-    /// OpenVPN tunnels' sign-in windows, taking craked's questions.
-    openvpn: openvpn::Asks,
     /// The tray state last shown, and the animation running for it.
     tray_shape: tray::Shape,
     tray_motion: Option<gpui_kit::Task<()>>,
@@ -416,6 +414,8 @@ fn main() {
                 Ok("expired") => model::demo_expired(model),
                 Ok("openvpn3") => model::demo_openvpn3(model),
                 Ok("leftover") => model::demo_leftover(model),
+                // CRAKE_DEMO=staying: an OpenVPN 3 tunnel stays (locked).
+                Ok("staying") => model::demo_staying(model),
                 // CRAKE_DEMO=long: names that take two lines in the panel.
                 Ok("long") => model::demo_long_names(model),
                 _ => model,
@@ -619,7 +619,6 @@ pub(crate) fn start(cx: &mut App, setup: Setup) -> bool {
         new_tunnel: None,
         sessions: Default::default(),
         adopting: Default::default(),
-        openvpn: Default::default(),
         tray_shape: tray::Shape::Off,
         tray_motion: None,
         panel_motion: None,
@@ -631,6 +630,7 @@ pub(crate) fn start(cx: &mut App, setup: Setup) -> bool {
     cx.observe(&model, |_, cx| refresh_tray(cx)).detach();
     if openvpn3 {
         watch_openvpn3(cx);
+        openvpn::move_from_openvpn3(cx);
         watch_service(cx);
         watch_versions(cx);
     }

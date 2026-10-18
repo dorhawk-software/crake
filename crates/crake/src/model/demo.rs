@@ -249,6 +249,17 @@ pub fn demo_leftover(mut m: Model) -> Model {
     m
 }
 
+/// Globex, an OpenVPN 3 tunnel whose profile OpenVPN 3 keeps locked, stays
+/// on it (CRAKE_DEMO=staying; design/proposals/openvpn-tunnel.html, 5).
+pub fn demo_staying(mut m: Model) -> Model {
+    m.staying.push(super::Staying {
+        tunnel: "globex".into(),
+        title: crate::openvpn::LOCKED_TITLE.replace("{}", "Globex"),
+        why: crate::openvpn::LOCKED_WHY.replace("{}", "Globex"),
+    });
+    m
+}
+
 /// The demo with Nordbank an OpenVPN 3 tunnel whose profile's name is too
 /// long for its fact (CRAKE_DEMO=openvpn3): tunnel detail's "Edit…" and a
 /// name cut with "…" (design/proposals/edit-ovpn-profile.html).

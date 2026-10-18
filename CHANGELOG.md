@@ -11,6 +11,16 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Crake runs OpenVPN profiles itself.** Import the .ovpn file your IT team gave you (New
+  tunnel, beside Gateway): Crake picks OpenVPN, takes the gateway and a name from the file, and
+  keeps its own copy, which only its service can read. Signing in through your browser, with a
+  password, a code or a certificate's password works as the profile says. A profile that would run
+  something on your computer is refused, saying why. Beta until it has met a real gateway.
+
+- **Your OpenVPN 3 tunnels move to it.** Each one is copied over once, while it's off, and the log
+  says so; OpenVPN 3 keeps its own profile. One whose profile OpenVPN 3 keeps locked stays where it
+  is, and the panel asks for its .ovpn file.
+
 ## 0.10.4 (2026-10-17)
 
 - **No more large pointer for a moment.** Coming onto a Crake window, the pointer could blink

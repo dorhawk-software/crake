@@ -23,6 +23,7 @@ mod decisions;
 mod first_run;
 mod leftover;
 mod no_tray;
+mod staying;
 mod tunnels;
 mod version;
 
@@ -183,6 +184,7 @@ impl Render for Panel {
             panel = panel
                 .children(self.version_notice(model, &t, cx))
                 .children(self.leftover_notices(model, &t, cx))
+                .children(self.staying_notices(model, &t, cx))
                 .child(self.chart(model, &t, window, cx))
                 .child(self.decisions(model, &t, window, cx))
                 .child(self.tunnels(model, &t, cx))

@@ -894,3 +894,60 @@ async fn an_upgrade_hands_the_tunnels_to_the_new_craked() {
     assert!(!resume.exists());
     assert!(log().contains("Switched ACME off."));
 }
+
+/// An OpenVPN 3 tunnel moves to Crake's own OpenVPN (7i): not while its
+/// session runs; off, its profile's copy makes it an OpenVPN tunnel with
+/// the gateway the profile names, and the log says so.
+#[tokio::test]
+async fn an_openvpn3_tunnel_moves_to_crakes_openvpn() {
+    use std::collections::HashMap;
+    let dir = tempfile::tempdir().unwrap();
+    let mgr = Manager::new(setup(dir.path(), FAKE)).unwrap();
+    mgr.init().await.unwrap();
+    let fields = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect()
+    };
+    let initech = mgr
+        .add_tunnel(&fields(&[
+            ("display_name", "Initech"),
+            ("gateway", "initech"),
+            ("protocol", "openvpn3"),
+        ]))
+        .unwrap();
+    let moving = fields(&[
+        ("display_name", "Initech"),
+        ("protocol", "openvpn"),
+        (
+            "profile",
+            "client\nremote vpn.initech.example 1194\n<ca>\nx\n</ca>\n",
+        ),
+    ]);
+    // Its session runs: not now.
+    let tun0 = fields(&[("device", "tun0"), ("dns", "10.8.0.1")]);
+    mgr.attach(&initech, &tun0).await.unwrap();
+    let err = mgr.update_tunnel(&initech, &moving).await.unwrap_err();
+    assert!(
+        err.to_string().contains("Switch Initech off first"),
+        "{err}"
+    );
+    mgr.detach(&initech, None).await.unwrap();
+
+    mgr.update_tunnel(&initech, &moving).await.unwrap();
+    let t = mgr.get(&initech).unwrap();
+    assert_eq!(t.config.protocol, Protocol::Openvpn);
+    assert_eq!(t.config.gateway, "vpn.initech.example");
+    let profile = dir.path().join("profiles").join(format!("{initech}.ovpn"));
+    assert!(
+        std::fs::read_to_string(profile)
+            .unwrap()
+            .contains("vpn.initech.example")
+    );
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(
+        log.contains("Initech now runs on Crake\u{2019}s own OpenVPN."),
+        "{log}"
+    );
+}

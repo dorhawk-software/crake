@@ -93,6 +93,13 @@ impl SignIn {
                         asks_for(&prompt.label)
                             .map_or_else(|| lower_first(&prompt.label), str::to_owned)
                     )))
+                    // Asked again (OpenVPN): the gateway refused the last one.
+                    .when(prompt.refused, |b| {
+                        b.child(para(
+                            format!("{display} didn\u{2019}t accept that username or password."),
+                            t.ink,
+                        ))
+                    })
                     .when_some(prompt.words.clone(), |b, w| {
                         b.child(para(
                             format!("The gateway\u{2019}s own words: \u{201c}{w}\u{201d}"),

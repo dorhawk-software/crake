@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: OpenVPN tunnels</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  /* DESIGN.md's tokens. */
+  :root { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --line-strong: #BDBDB8; --ink: #1A1C1E;
+    --muted: #5A5F64; --accent: #0F766E; --accent-ink: #FFFFFF; --accent-soft: #E2F1EF;
+    --warning: #BF7E12; --warning-soft: #FCF4E4; --warning-line: #EFD9AE; --on-warning: #1A1C1E;
+    /* The proposal's own marker for what changes: outside Crake's palette. */
+    --mark: #C026D3; }
+  body.dark { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --line-strong: #4A4E53; --ink: #ECEDEE;
+    --muted: #A9AEB4; --accent: #2DD4BF; --accent-ink: #0B1514; --accent-soft: #17332F;
+    --warning: #F5B740; --warning-soft: #2C2618; --warning-line: #5C4A22; --on-warning: #1A1408; --mark: #E879F9; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 56px; max-width: 1520px; }
+  h1 { font-size: 20px; margin: 0 0 10px; }
+  h2.sec { font-size: 17px; margin: 40px 0 6px; }
+  .intro, .note { color: var(--muted); font-size: 13px; max-width: 72ch; }
+  .intro { margin-bottom: 10px; }
+  .intro b, .note b { color: var(--ink); }
+  .note { margin: 4px 0 14px; }
+  .mark-key { display: inline-block; width: 22px; height: 12px; border: 2px dashed var(--mark); border-radius: 3px; vertical-align: -2px; }
+  .pair { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
+  .cap { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+  .shot { display: block; width: 720px; border-radius: 12px; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  .changed { outline: 2px dashed var(--mark); outline-offset: 3px; }
+  /* Inside a list that clips: drawn inside the row. */
+  .p.changed { outline-offset: -3px; }
+
+  /* New tunnel (design/screens/new-tunnel.html, measured against the app at 720 px). */
+  .win { width: 720px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .bar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 56px; box-sizing: border-box; padding: 0 12px; border-bottom: 1px solid var(--line); }
+  .bar .cancel { padding: 0 12px; font-weight: 600; }
+  .bar .name { font-size: 15px; font-weight: 700; }
+  .bar .x { justify-self: end; width: 32px; height: 32px; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; }
+  .stepsbar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0 32px; border-bottom: 1px solid var(--line); }
+  .stepsbar div { display: flex; align-items: center; gap: 8px; height: 50px; color: var(--muted); font-weight: 500; }
+  .stepsbar .cur { color: var(--ink); font-weight: 700; border-bottom: 2px solid var(--accent); margin-bottom: -1px; }
+  .stepsbar span { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line-strong); box-sizing: border-box; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .stepsbar .cur span { border-color: var(--accent); color: var(--accent); }
+  .body { padding: 26px 32px 8px; }
+  .body h3 { margin: 0; font-size: 22px; font-weight: 700; }
+  .fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; margin-top: 18px; }
+  .lab { display: flex; align-items: baseline; justify-content: space-between; height: 20px; font-weight: 600; margin-bottom: 6px; }
+  .lab .act { font-size: 13px; font-weight: 600; color: var(--accent); }
+  .field { box-sizing: border-box; height: 42px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel);
+    display: flex; align-items: center; justify-content: space-between; font-size: 15px; white-space: nowrap; overflow: hidden; }
+  .field.mono { font-size: 14px; }
+  .field.kept { background: var(--surface); border-color: var(--line); }
+  .field.empty { color: var(--muted); }
+  .line { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; font-size: 13px; line-height: 19px; color: var(--muted); }
+  .line svg { flex: none; margin-top: 1px; }
+  .line.ink { color: var(--ink); }
+  .ptitle { margin-top: 24px; font-weight: 600; }
+  .list { margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .p { box-sizing: border-box; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 56px;
+    padding: 8px 14px; border-top: 1px solid var(--line); background: var(--panel); }
+  .p:first-child { border-top: none; }
+  .p.on { background: var(--accent-soft); }
+  .p.more { min-height: 46px; grid-template-columns: 20px minmax(0, 1fr) auto; }
+  .p .n { display: block; font-weight: 600; }
+  .p .s { display: block; font-size: 13px; color: var(--muted); }
+  .p .c { font-size: 12px; color: var(--muted); }
+  .rec { margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--accent); }
+  .radio { width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--line-strong); display: flex; align-items: center; justify-content: center; }
+  .on .radio { border-color: var(--accent); }
+  .on .radio::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .sect { box-sizing: border-box; padding: 8px 14px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); }
+  .foot { display: flex; align-items: center; gap: 12px; padding: 16px 32px 22px; }
+  .foot .grow { flex: 1; }
+  .foot .of { font-size: 13px; color: var(--muted); }
+  .primary { height: 42px; padding: 0 20px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); font-weight: 700; display: flex; align-items: center; }
+  .menu { position: absolute; left: 0; right: 0; top: 74px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel); overflow: hidden; z-index: 1; }
+  .menu div { padding: 9px 12px; font-size: 14px; }
+  .menu .dim { color: var(--muted); }
+  .rel { position: relative; }
+  .card2 { margin-top: 18px; padding: 14px 16px; border-radius: 8px; background: var(--surface); }
+  .card2 b { display: block; font-weight: 600; }
+  .card2 span { color: var(--muted); }
+
+  /* The panel (design/screens/tray-panel.html) and its notice (leftover-warning.html, 3). */
+  .panel { width: 452px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding-bottom: 8px; }
+  .phead { display: flex; align-items: center; gap: 10px; padding: 14px 18px 10px; }
+  .phead .t { font-weight: 700; font-size: 17px; } .phead .st { color: var(--muted); font-size: 13px; }
+  .notice { margin: 0 18px 10px; padding: 10px 12px; background: var(--warning-soft); border: 1px solid var(--warning-line); border-radius: 8px; font-size: 13px; display: flex; gap: 10px; }
+  .notice .t { font-weight: 600; }
+  .notice .why { color: var(--muted); margin-top: 3px; }
+  .notice .acts { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
+  .bordered { height: 30px; padding: 0 12px; border: 1px solid var(--warning-line); border-radius: 6px; background: var(--panel); font-weight: 600; display: flex; align-items: center; }
+  .quiet { color: var(--muted); font-weight: 600; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 8px 18px; border-top: 1px solid var(--line); }
+  .row .n { font-weight: 700; font-size: 15px; } .row .st { color: var(--muted); font-size: 13px; margin-left: 8px; }
+  .sw { width: 46px; height: 26px; border-radius: 13px; background: var(--line-strong); position: relative; margin-left: auto; flex: none; }
+  .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; }
+  .logline { padding: 10px 18px 4px; font-size: 13px; }
+  .logline .why { color: var(--muted); }
+
+  /* The sign-in window (design/screens/sign-in.html). */
+  .signin { width: 340px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px 22px 18px; }
+  .signin h4 { margin: 0; font-size: 19px; font-weight: 700; }
+  .signin p { margin: 6px 0 0; color: var(--muted); }
+  .signin p.ink { color: var(--ink); }
+  .steps { list-style: none; margin: 18px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; }
+  .steps li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; align-items: center; padding: 11px 12px; }
+  .steps li + li { border-top: 1px solid var(--line); }
+  .steps .now { font-weight: 700; }
+  .steps .later { color: var(--muted); }
+  .sbuttons { display: flex; gap: 8px; margin-top: 18px; }
+  .sbuttons .grow { flex: 1; }
+  .sb { box-sizing: border-box; height: 40px; padding: 0 14px; border-radius: 6px; font-weight: 600; display: flex; align-items: center; }
+  .sb.bordered2 { border: 1px solid var(--line); }
+  .sb.primary2 { background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 0 18px; }
+  .slabel { font-weight: 600; margin: 16px 0 8px; }
+  .sfield { box-sizing: border-box; height: 44px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 6px; display: flex; align-items: center; font-size: 15px; }
+  .states { width: 720px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 32px 20px; }
+  .states .k { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 14px; }
+  .states .k:first-child { margin-top: 0; }
+</style>
+</head>
+<body>
+<script>if (new URLSearchParams(location.search).get('dark') === 'true') document.body.classList.add('dark');</script>
+<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+  <symbol id="check" viewBox="0 0 18 18"><path d="M4 9.5l3.2 3.2L14 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="tick" viewBox="0 0 18 18"><path d="M6 15V4M12 15V8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+</svg>
+<div class="page">
+  <h1>Proposal: OpenVPN tunnels (CLAUDE.md, 7i)</h1>
+  <div class="intro">Crake runs OpenVPN profiles itself now, with the <span class="mono">openvpn</span> program: on Linux
+    today, on Windows and macOS next. <b>Decided with you (2026-10-18):</b> importing a .ovpn picks OpenVPN by itself,
+    and the OpenVPN 3 profiles move to Crake's own OpenVPN. This shows what that looks like. The windows are drawn at
+    the app's size; “Today” is captured from the app at 1:1. <span class="mark-key"></span> marks what changes; the rest
+    is as the app has it.</div>
+
+  <h2 class="sec">Built (2026-10-18), captured from the app</h2>
+  <div class="pair">
+    <div>
+      <div class="cap">New tunnel after importing initech.ovpn</div>
+      <img class="shot" src="openvpn-tunnel/built-imported-light.png" data-dark="openvpn-tunnel/built-imported-dark.png" alt="New tunnel built: Import .ovpn beside Gateway, OpenVPN chosen">
+    </div>
+    <div>
+      <div class="cap">The panel, for a profile OpenVPN 3 keeps locked</div>
+      <img class="shot" style="width: 452px" src="openvpn-tunnel/built-staying-light.png" data-dark="openvpn-tunnel/built-staying-dark.png" alt="The panel built: Globex's profile is locked in OpenVPN 3">
+    </div>
+  </div>
+
+  <h2 class="sec">1 · Starting from a .ovpn file</h2>
+  <div class="note">“Import .ovpn…” sits in the Gateway label's row, where you chose to put the import before
+    (ovpn-import.html, A). Importing fills in the name from the file, the gateway from the profile, and chooses
+    OpenVPN. A profile replaced later is imported the same way, from the tunnel's Edit.</div>
+  <div class="pair">
+    <div>
+      <div class="cap">Today</div>
+      <img class="shot" src="openvpn-tunnel/newtunnel-protocols-light.png" data-dark="openvpn-tunnel/newtunnel-protocols-dark.png" alt="New tunnel today: Name, Gateway, Protocol">
+    </div>
+    <div>
+      <div class="cap">After importing initech.ovpn</div>
+      <div class="win">
+        <div class="bar"><span class="cancel">Cancel</span><span class="name">New tunnel</span><span class="x"><svg width="14" height="14"><use href="#x"/></svg></span></div>
+        <div class="stepsbar"><div class="cur"><span>1</span>Server</div><div><span>2</span>Sign-in</div><div><span>3</span>Routing</div></div>
+        <div class="body">
+          <h3>Where does it connect?</h3>
+          <div class="fields">
+            <div><div class="lab">Name</div><div class="field">Initech</div></div>
+            <div><div class="lab">Gateway<span class="act changed">Import .ovpn…</span></div>
+              <div class="field mono kept changed">vpn.initech.example</div></div>
+          </div>
+          <div class="line changed"><svg width="16" height="16"><use href="#check"/></svg>
+            <span>From initech.ovpn. Crake keeps its own copy, which only its service can read, so you can delete the file.</span></div>
+          <div class="ptitle">Protocol</div>
+          <div class="list">
+            <div class="p on changed"><span class="radio"></span><span><span class="n">OpenVPN</span><span class="s">From the profile you imported</span></span><span class="c mono">openvpn</span></div>
+            <div class="p more"><svg width="16" height="16" style="justify-self: center"><use href="#chev"/></svg><span>Choose the protocol yourself</span><span class="s" style="font-size: 13px; color: var(--muted)">8 more</span></div>
+          </div>
+          <div class="line changed"><span>Beta: Crake hasn't run OpenVPN against a real gateway yet. If it doesn't connect, the sign-in window says what openvpn said, with Copy for helpdesk.</span></div>
+        </div>
+        <div class="foot"><span class="grow"></span><span class="of">Step 1 of 3</span><span class="primary">Continue</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top: 12px">The gateway is the profile's, so its field can't be typed in (a surface
+    fill, not an input). No Group row: a profile has none. The Beta line under the list replaces today's, which
+    says openconnect speaks the protocol (not true of OpenVPN).</div>
+
+  <h2 class="sec">2 · Choosing OpenVPN from the list</h2>
+  <div class="note">One “OpenVPN” card replaces “OpenVPN 3 profile”. Its Profile field is today's (a list with
+    “Import .ovpn…” in the label's row); the list now holds OpenVPN 3's profiles to take over. It sits under Beta
+    until you've signed in to a real gateway with it.</div>
+  <div class="pair">
+    <div>
+      <div class="cap">Today</div>
+      <img class="shot" src="openvpn-tunnel/newtunnel-openvpn3-light.png" data-dark="openvpn-tunnel/newtunnel-openvpn3-dark.png" alt="New tunnel today: OpenVPN 3 profile chosen">
+    </div>
+    <div>
+      <div class="cap">After (Linux, with OpenVPN 3 profiles: initech chosen)</div>
+      <div class="win">
+        <div class="bar"><span class="cancel">Cancel</span><span class="name">New tunnel</span><span class="x"><svg width="14" height="14"><use href="#x"/></svg></span></div>
+        <div class="stepsbar"><div class="cur"><span>1</span>Server</div><div><span>2</span>Sign-in</div><div><span>3</span>Routing</div></div>
+        <div class="body">
+          <h3>Where does it connect?</h3>
+          <div class="fields">
+            <div><div class="lab">Name</div><div class="field">Initech</div></div>
+            <div><div class="lab">Profile<span class="act">Import .ovpn…</span></div>
+              <div class="field">initech<svg width="14" height="14"><use href="#chev"/></svg></div>
+            </div>
+          </div>
+          <div class="line changed"><svg width="16" height="16"><use href="#check"/></svg><span>It connects to <span class="mono">vpn.initech.example</span>. Crake takes its own copy; OpenVPN 3 keeps its own.</span></div>
+          <div class="ptitle">Protocol</div>
+          <div class="list">
+            <div class="p"><span class="radio"></span><span><span class="n">Detect automatically<span class="rec">Recommended</span></span><span class="s">Crake asks the gateway. It answered: AnyConnect.</span></span><span></span></div>
+            <div class="sect">Used with real gateways</div>
+            <div class="p"><span class="radio"></span><span><span class="n">Cisco AnyConnect / ocserv</span><span class="s">Most corporate gateways</span></span><span class="c mono">anyconnect</span></div>
+            <div class="sect">Beta: not yet tried with a real gateway</div>
+            <div class="p on changed"><span class="radio"></span><span><span class="n">OpenVPN</span><span class="s">A .ovpn profile from your IT team</span></span><span class="c mono">openvpn</span></div>
+            <div class="p"><span class="radio"></span><span><span class="n">Palo Alto GlobalProtect</span><span class="s">Portal and gateway</span></span><span class="c mono">gp</span></div>
+            <div class="p"><span class="radio"></span><span><span class="n">Ivanti Connect Secure (Pulse)</span><span class="s">Newer Pulse servers</span></span><span class="c mono">pulse</span></div>
+          </div>
+          <div class="line changed"><span>Beta: Crake hasn't run OpenVPN against a real gateway yet. If it doesn't connect, the sign-in window says what openvpn said, with Copy for helpdesk.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pair" style="margin-top: 14px">
+    <div>
+      <div class="cap">The list opened: a profile OpenVPN 3 keeps locked says what to do instead</div>
+      <div class="win" style="width: 404px; padding: 14px 16px 16px">
+        <div class="lab">Profile<span class="act">Import .ovpn…</span></div>
+        <div class="field empty">Choose…<svg width="14" height="14"><use href="#chev"/></svg></div>
+        <div class="menu changed" style="position: static; margin-top: 4px"><div>initech</div><div class="dim">globex · locked: import its .ovpn file</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top: 12px">With no OpenVPN 3 profiles (Windows, macOS, Linux without it), the field
+    is today's “Import a .ovpn file…” button. Copying a profile is done here only: OpenVPN 3 keeps its own, and a
+    later change there doesn't reach Crake (import it again).</div>
+
+  <h2 class="sec">3 · A profile Crake can't take</h2>
+  <div class="note">Said under the field the moment it's chosen, in ink, as today's “Couldn't import…”. Continue
+    stays off until a profile is taken.</div>
+  <div class="states">
+    <div class="k">It runs a program or loads a library (refused for good)</div>
+    <div class="line ink"><span>Crake won't run initech.ovpn: it loads a plugin (<span class="mono">plugin</span>), and Crake runs nothing a profile brings with it.</span></div>
+    <div class="k">An option Crake doesn't know yet</div>
+    <div class="line ink"><span>Crake can't run initech.ovpn yet: it uses <span class="mono">tls-export-cert</span>, which Crake doesn't know.</span></div>
+    <div class="k">A file it points to is missing (today's wording)</div>
+    <div class="line ink"><span>Couldn't import initech.ovpn: it points to ca.crt, which isn't next to it. Keep the files your IT team sent together and try again.</span></div>
+    <div class="k">No openvpn on this computer (the card's “Not installed”, as for openconnect)</div>
+    <div class="line ink"><span>Needs openvpn, which isn't installed: <span class="mono">sudo apt install openvpn</span></span></div>
+  </div>
+
+  <h2 class="sec">4 · Step 2: how it signs in</h2>
+  <div class="note">Today's OpenVPN 3 card, saying Crake instead of OpenVPN 3.</div>
+  <div class="win" style="width: 720px">
+    <div class="body" style="padding-bottom: 22px">
+      <h3>How do you sign in?</h3>
+      <div class="card2 changed"><b>As the profile says</b><span>Crake asks what the profile needs, a password, a code or a sign-in in your browser, when you switch the tunnel on.</span></div>
+    </div>
+  </div>
+
+  <h2 class="sec">5 · Your OpenVPN 3 tunnels move</h2>
+  <div class="note">Once, when this Crake first starts: each OpenVPN 3 tunnel's profile is copied into Crake's own
+    OpenVPN, and it says so in the log. A tunnel that's on moves when it's next switched on. A profile OpenVPN 3 keeps
+    locked can't be read: that tunnel stays on OpenVPN 3 and its notice asks for the .ovpn file (the amber notice of
+    leftover-warning.html, 3: it needs you, nothing has broken yet).</div>
+  <div class="pair">
+    <div>
+      <div class="cap">The log window's line, for a profile that moved</div>
+      <div class="panel" style="padding: 6px 0 10px">
+        <div class="logline changed"><div>Initech now runs on Crake's own OpenVPN.</div><div class="why">Its profile was copied from OpenVPN 3, which keeps its own. Your sign-in is asked again the first time. Crake's OpenVPN is Beta: if Initech doesn't connect, its sign-in window says why.</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">The panel, for a locked one</div>
+      <div class="panel">
+        <div class="phead"><span class="t">Crake</span><span class="st">Nothing through a tunnel right now</span></div>
+        <div class="notice changed">
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 21h20Z" fill="var(--warning)"/><path d="M12 10v5M12 17.6v.4" stroke="var(--on-warning)" stroke-width="2" stroke-linecap="round"/></svg>
+          <div style="flex: 1">
+            <div class="t">Globex's profile is locked in OpenVPN 3</div>
+            <div class="why">Crake can't take it over, so Globex stays on OpenVPN 3 for now. Import its .ovpn file to move it.</div>
+            <div class="acts"><span class="bordered">Import .ovpn…</span><span class="quiet">Not now</span></div>
+          </div>
+        </div>
+        <div class="row"><span class="n">Globex</span><span class="st">Off</span><span class="sw"></span></div>
+        <div class="row"><span class="n">Initech</span><span class="st">Off</span><span class="sw"></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top: 12px">The notice's icon here is a plain triangle for the proposal; the app
+    draws the bird's head with the amber triangle, as the leftover notice does.</div>
+
+  <h2 class="sec">6 · The sign-in window</h2>
+  <div class="note">Switched on, an OpenVPN tunnel just connects; the window opens only when the gateway asks
+    something (a kept sign-in asks nothing). The browser state is the approved screen's (sign-in.html), which the
+    app doesn't show yet: it comes with this. One line is new: after a sign-in the gateway refused, it's asked again,
+    saying so.</div>
+  <div class="pair">
+    <div>
+      <div class="cap">A sign-in page opened (as sign-in.html)</div>
+      <div class="signin">
+        <h4>Sign in to Initech</h4>
+        <p>Finish in the browser tab Crake opened. This window updates by itself.</p>
+        <ol class="steps">
+          <li><svg width="18" height="18" style="color: var(--accent)"><use href="#tick"/></svg><span>Reached <span class="mono" style="font-size: 13px">vpn.initech.example</span></span></li>
+          <li class="now"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="3" cy="9" r="2" fill="var(--accent)"/><circle cx="9" cy="9" r="2" fill="var(--accent)" opacity=".6"/><circle cx="15" cy="9" r="2" fill="var(--accent)" opacity=".3"/></svg><span>Waiting for you in Firefox</span></li>
+          <li class="later"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="6" fill="none" stroke="var(--line-strong)" stroke-width="1.6"/></svg><span>Tunnel up</span></li>
+        </ol>
+        <div class="sbuttons"><span class="sb bordered2">Open the page again</span><span class="grow"></span><span class="sb">Cancel</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">Asked again after a refused sign-in</div>
+      <div class="signin">
+        <h4>Initech asks for your username</h4>
+        <p class="ink changed">Initech didn't accept that username or password.</p>
+        <div class="slabel">Username</div>
+        <div class="sfield">alice</div>
+        <div class="sbuttons"><span class="grow"></span><span class="sb">Cancel</span><span class="sb primary2">Continue</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  if (document.body.classList.contains('dark'))
+    document.querySelectorAll('img[data-dark]').forEach(i => i.src = i.dataset.dark);
+</script>
+</body>
+</html>

@@ -106,7 +106,7 @@ impl Manager {
             .await
             .with_context(|| format!("reading {}", stored.display()))?;
         // Read again each time: what may run is craked's to decide now.
-        let profile = openvpn::profile::check(&text)?;
+        let profile = openvpn::profile::check(&text).map_err(anyhow::Error::msg)?;
         let conf = self.run_config(name);
         {
             use std::io::Write;

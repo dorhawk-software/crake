@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 pub mod live;
+pub mod openvpn_profile;
 pub mod trouble;
 
 /// Where `craked` listens for the hook, unless configured otherwise.
@@ -349,6 +350,7 @@ mod tests {
         assert_eq!(openvpn_reason("up", "restart"), "reconnect");
         assert_eq!(openvpn_reason("down", "restart"), "attempt-reconnect");
         assert_eq!(openvpn_reason("down", "init"), "disconnect");
+        assert_eq!(openvpn_reason("route-up", "init"), "other");
     }
 
     #[test]

@@ -13,7 +13,7 @@ impl NewTunnel {
         width: Option<Pixels>,
         t: &Theme,
         cx: &mut Context<Self>,
-        pick: impl Fn(&mut Self, String) + Clone + 'static,
+        pick: impl Fn(&mut Self, String, &mut Context<Self>) + Clone + 'static,
     ) -> Div {
         let chosen = options
             .iter()
@@ -75,7 +75,7 @@ impl NewTunnel {
                         .child(label)
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.open_select = None;
-                            pick(this, value.clone());
+                            pick(this, value.clone(), cx);
                             cx.notify();
                         }))
                         .test_support(),
