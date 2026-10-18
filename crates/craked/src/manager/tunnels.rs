@@ -211,6 +211,7 @@ impl Manager {
             if first || e.up_since.is_none() {
                 e.up_since = Some(hosts::now());
             }
+            e.ups += 1;
             self.traffic.track(&info.device, name);
         }
         // Again, now that its pushed networks and gateway are known.
@@ -288,6 +289,9 @@ impl Manager {
             }
             "attempt-reconnect" => {
                 self.set_state(name, TunnelState::Connecting, false);
+                if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
+                    e.ups += 1;
+                }
                 self.log.system(
                     Some(name),
                     format!("{display} lost the gateway. Trying again."),
@@ -400,6 +404,7 @@ impl Manager {
                     );
                     if let Some(e) = self.tunnels.lock().unwrap().get_mut(&name) {
                         e.resumed = true;
+                        e.ups += 1;
                     }
                     crate::sys::stop(&mut child, true).await;
                     no_dtls = true;

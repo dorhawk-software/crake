@@ -258,6 +258,7 @@ impl Manager {
             )),
             _ => None,
         };
+        let ups_before = self.tunnel_ups(&candidates);
         for (i, (_, _, mark)) in candidates.iter().enumerate() {
             let (mark, attempt) = (*mark, attempt.clone());
             tries.spawn(async move { (i, attempt.through(dst, mark, PROBE_TIMEOUT).await) });
@@ -390,6 +391,15 @@ impl Manager {
             }
             return true;
         }
+        // A tunnel came up again (or went down) while it was tried: no
+        // answer then says nothing about the host. Seen 2026-10-18 on CI's
+        // Windows: ACME restarted over TCP (UDP blocked) 4 s after
+        // connecting, the probe fell in between, and 10.40.1.10 stayed
+        // unprobed for PROBED_FOR. Not said; probed again at the next try.
+        if !steady(&ups_before, &self.tunnel_ups(&candidates)) {
+            self.probed.lock().unwrap().remove(&dst);
+            return false;
+        }
         // UDP that no one answers is often meant so (logs, metrics): not
         // worth a line.
         if matches!(attempt, crate::probe::Attempt::Udp(..)) {
@@ -432,6 +442,19 @@ impl Manager {
         let mut down = self.down_everywhere.lock().unwrap();
         down.retain(|_, at| at.elapsed() < TROUBLE_WINDOW);
         down.keys().filter(|a| **a != dst).count()
+    }
+
+    /// Each candidate tunnel's count of ups while it's connected, or None.
+    fn tunnel_ups(&self, candidates: &[(String, String, u32)]) -> Vec<Option<u64>> {
+        let map = self.tunnels.lock().unwrap();
+        candidates
+            .iter()
+            .map(|(name, _, _)| {
+                map.get(name)
+                    .filter(|e| e.state == TunnelState::Connected)
+                    .map(|e| e.ups)
+            })
+            .collect()
     }
 
     /// Probe `dst` again after `TROUBLE_RETRY`, not `PROBED_FOR`.
@@ -682,5 +705,24 @@ mod tests {
             and_list(&["ACME", "Globex", "Nordbank"]),
             "ACME, Globex and Nordbank"
         );
+    }
+}
+
+/// Whether the tunnels stayed as they were through a probe: connected at
+/// its start and end, none come up again in between.
+fn steady(before: &[Option<u64>], after: &[Option<u64>]) -> bool {
+    before == after && before.iter().all(Option::is_some)
+}
+
+#[cfg(test)]
+mod steady_tests {
+    use super::steady;
+
+    #[test]
+    fn a_probe_across_a_restart_says_nothing() {
+        assert!(steady(&[Some(1), Some(3)], &[Some(1), Some(3)]));
+        assert!(!steady(&[Some(1)], &[Some(2)]), "it came up again");
+        assert!(!steady(&[Some(1)], &[None]), "it went down");
+        assert!(!steady(&[None], &[None]), "it wasn't up to begin with");
     }
 }

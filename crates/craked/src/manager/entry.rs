@@ -23,6 +23,10 @@ pub(super) struct Entry {
     /// When it last came up (seconds since the epoch); kept across a
     /// reconnect, cleared when it goes off.
     pub(super) up_since: Option<u64>,
+    /// How many times it came up or began to come up again (connected,
+    /// reconnecting, restarted over TCP): a probe that spans a change says
+    /// nothing about the host.
+    pub(super) ups: u64,
     /// Refused because it clashes with a tunnel that's up: it's stopping,
     /// already said why, and goes Off quietly.
     pub(super) refused: bool,
@@ -55,6 +59,7 @@ impl Entry {
             routed: false,
             resumed: false,
             up_since: None,
+            ups: 0,
             refused: false,
             handover: false,
             attached: None,
