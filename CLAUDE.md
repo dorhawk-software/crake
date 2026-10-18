@@ -928,9 +928,11 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    lifecycle (the move), e2e through the app's client, the journey's
    import step. Not yet: passwords kept in the keyring for OpenVPN;
    tunnels from craked.toml or IT that are OpenVPN 3 stay so.
-   **Slice 3 (packages): built (2026-10-18).** openvpn is one of the
-   engine alternatives and Recommended (.deb `openconnect | openvpn |
-   openvpn3` and Recommends openvpn; RPM likewise; Arch an optdepend; the
+   **Slice 3 (packages): built (2026-10-18).** openvpn is a
+   Recommended engine (.deb and RPM Recommends; not one of the
+   required alternatives, `openconnect | openvpn3`: dnf met
+   "(openconnect or openvpn or openvpn3)" with openvpn, and AnyConnect
+   users were left without openconnect, CI 2026-10-18; Arch an optdepend; the
    NixOS module puts it on craked's path and the system's). AppArmor:
    openvpn runs under craked's profile (`ix`, as openconnect), and
    resolved's PropertiesChanged may reach craked. The package test has an

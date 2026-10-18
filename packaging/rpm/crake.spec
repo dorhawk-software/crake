@@ -10,7 +10,9 @@ URL:            https://dorhawk.software/crake/
 ExclusiveArch:  x86_64
 
 # At least one engine; openvpn3 isn't in Fedora (its own repository).
-Requires:       (openconnect or openvpn or openvpn3)
+# openvpn is Recommended, not an alternative here: dnf met "(openconnect or
+# openvpn)" with openvpn, leaving AnyConnect users without openconnect.
+Requires:       (openconnect or openvpn3)
 Requires:       nftables
 Requires:       iproute
 Requires:       systemd-resolved

@@ -5,7 +5,7 @@ Maintainer: dorhawk.software <ondrej@dorhawk.software>
 Section: net
 Priority: optional
 Homepage: https://dorhawk.software
-Depends: @SHLIBS@, nftables, iproute2, systemd-resolved | systemd (<< 252), polkitd | policykit-1, dbus, openconnect | openvpn | openvpn3
+Depends: @SHLIBS@, nftables, iproute2, systemd-resolved | systemd (<< 252), polkitd | policykit-1, dbus, openconnect | openvpn3
 Recommends: openvpn, gnome-shell-extension-appindicator, gnome-keyring
 Suggests: openvpn3
 Description: VPN client that routes only what needs the tunnel
