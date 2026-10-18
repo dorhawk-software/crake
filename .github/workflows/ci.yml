@@ -259,11 +259,13 @@ jobs:
             target/release/crake.exe
             target/release/craked.exe
             target/release/crake-hook.exe
-      # The app's tests, built above, for the real-gateway job (7j).
+      # The app's tests, built above, for the real-gateway job (7j): the
+      # same --workspace build (-p crake unifies features differently and
+      # built most of it again, 15 minutes).
       - name: The app's test binary
         shell: bash
         run: |
-          BIN=$(cargo test -p crake --locked --no-run --message-format=json |
+          BIN=$(cargo test --workspace --locked --no-run --message-format=json |
             jq -r 'select(.executable != null and .target.name == "crake" and .profile.test) | .executable' | head -n1)
           mkdir -p target/ci && cp "$BIN" target/ci/crake-tests.exe
       - uses: actions/upload-artifact@v7

@@ -51,9 +51,9 @@ until curl -sk -o /dev/null https://127.0.0.1:8443; do
 done
 status=0
 if [ "$SYSTEM" = macos ]; then
-  cargo build -q --locked -p craked --bin crake-hook
+  cargo build -q --workspace --locked --bin crake-hook
   HOOK=$PWD/target/debug/crake-hook
-  BIN=$(cargo test -p crake --locked --no-run --message-format=json 2>/dev/null |
+  BIN=$(cargo test --workspace --locked --no-run --message-format=json 2>/dev/null |
     jq -r 'select(.executable != null and .target.name == "crake" and .profile.test) | .executable' | head -n1)
   [ -n "$BIN" ] || { echo "could not build the tests" >&2; exit 1; }
   sudo env CRAKE_E2E=1 CRAKE_E2E_GATEWAY=https://127.0.0.1:8443 \
