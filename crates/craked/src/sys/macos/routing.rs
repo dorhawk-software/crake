@@ -83,9 +83,30 @@ impl Routing {
         true
     }
 
-    /// Nothing to clear at startup: Crake's routes go with their devices.
+    /// Crake's routes go with their devices; its pf anchor and pf's token
+    /// don't. At the start (a craked that died left them) and at the end:
+    /// the anchor emptied and the token given back, this run's or the one
+    /// a previous run wrote down (`PF_TOKEN`), so pf is off again unless
+    /// someone else holds it on (found by the Doctor, 2026-10-18: pf on
+    /// and Crake's NAT rule still there after craked had gone).
     pub async fn reset_all(&self) -> Result<()> {
-        Ok(())
+        if !self.real {
+            return Ok(());
+        }
+        let mut pf = self.pf.lock().await;
+        let anchor = cmd::pf_rules(ANCHOR, "").await;
+        let held = pf.take().or_else(|| {
+            std::fs::read_to_string(PF_TOKEN)
+                .ok()
+                .map(|t| t.trim().to_owned())
+        });
+        if let Some(token) = held.filter(|t| !t.is_empty()) {
+            // A token from a run before a restart of the system is no
+            // longer pf's: refused, and that's fine.
+            let _ = cmd::pf_release(&token).await;
+        }
+        let _ = std::fs::remove_file(PF_TOKEN);
+        anchor
     }
 
     /// A tunnel's pinned networks and learned hosts, as routes through it.
@@ -183,19 +204,29 @@ impl Routing {
         if !self.real {
             return Ok(());
         }
+        // Every route tried, and pf's NAT after them, whatever fails: one
+        // refusal (the device gone with its scoped routes) had left the
+        // NAT rule and pf on.
+        let mut first = None;
+        let mut note = |r: Result<()>| {
+            if let Err(e) = r {
+                first.get_or_insert(e);
+            }
+        };
         for t in routes.targets {
-            cmd::route_delete(&t.addr().to_string(), t.prefix_len(), None).await?;
+            note(cmd::route_delete(&t.addr().to_string(), t.prefix_len(), None).await);
         }
         for any in defaults(routes.ipv6) {
-            cmd::route_delete(any, 0, Some(&routes.device)).await?;
+            note(cmd::route_delete(any, 0, Some(&routes.device)).await);
         }
         for (t, _) in routes.kept {
-            cmd::route_delete(&t.addr().to_string(), t.prefix_len(), None).await?;
+            note(cmd::route_delete(&t.addr().to_string(), t.prefix_len(), None).await);
         }
         for t in routes.rejected {
-            cmd::route_delete(&t.addr().to_string(), t.prefix_len(), None).await?;
+            note(cmd::route_delete(&t.addr().to_string(), t.prefix_len(), None).await);
         }
-        self.nat().await
+        note(self.nat().await);
+        first.map_or(Ok(()), Err)
     }
 
     /// pf's NAT for every tunnel that's up, in Crake's anchor (under
@@ -213,13 +244,23 @@ impl Routing {
         if devices.is_empty() {
             cmd::pf_rules(ANCHOR, "").await?;
             if let Some(token) = pf.take() {
+                let _ = std::fs::remove_file(PF_TOKEN);
                 cmd::pf_release(&token).await?;
             }
             return Ok(());
         }
         cmd::pf_rules(ANCHOR, &nat_rules(&devices)).await?;
         if pf.is_none() {
-            *pf = Some(cmd::pf_enable().await?);
+            let token = cmd::pf_enable().await?;
+            // Written down, so a craked that dies can't leave pf on for good.
+            let kept = std::path::Path::new(PF_TOKEN)
+                .parent()
+                .map_or(Ok(()), std::fs::create_dir_all)
+                .and_then(|()| std::fs::write(PF_TOKEN, &token));
+            if let Err(e) = kept {
+                tracing::warn!("keeping pf's token in {PF_TOKEN}: {e}");
+            }
+            *pf = Some(token);
         }
         Ok(())
     }
@@ -283,6 +324,8 @@ impl Routing {
 
 /// Crake's pf anchor.
 const ANCHOR: &str = "com.apple/250.Crake";
+/// pf's token while Crake holds pf on (craked's state folder).
+const PF_TOKEN: &str = "/var/db/crake/pf-token";
 
 /// One NAT rule per tunnel device and family it has: anything leaving
 /// through it with another source takes the device's address.

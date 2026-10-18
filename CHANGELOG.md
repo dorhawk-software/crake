@@ -57,6 +57,12 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## 0.10.4 (2026-10-17)
 
+- **On a Mac, switching a tunnel off undoes all of it.** Crake turns on the Mac's packet filter
+  while a tunnel is up, for connections that started before a host was routed. Switching the
+  tunnel off, or quitting Crake, could leave the filter on, with Crake's rule for that tunnel
+  still in it. Now both go. If Crake's service ever stops without tidying up, it does so the next
+  time it starts.
+
 - **No more large pointer for a moment.** Coming onto a Crake window, the pointer could blink
   large for an instant: GNOME had given XWayland's background a pointer at an older scale's size,
   which shows before the window's own. Crake now gives it your theme's pointer at today's size,

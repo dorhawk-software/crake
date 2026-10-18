@@ -103,7 +103,8 @@ async fn route(args: &[String], adding: bool) -> Result<()> {
     let fine = if adding {
         said.contains("File exists")
     } else {
-        said.contains("not in table")
+        // A route scoped to a device that's gone went with it.
+        said.contains("not in table") || said.contains("bad interface name")
     };
     if !out.status.success() && !fine {
         bail!("route {}: {}", args.join(" "), said.trim());

@@ -170,6 +170,18 @@ fn sh(cmd: &str) -> String {
     String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr)
 }
 
+/// macOS: no NAT rule of Crake's left in pf, `when` (the Doctor saw one
+/// stay with the tunnel off and craked gone, and pf on, 2026-10-18).
+fn no_nat_left(when: &str) {
+    #[cfg(target_os = "macos")]
+    {
+        let nat = sh("pfctl -a com.apple/250.Crake -s nat 2>/dev/null");
+        assert!(!nat.contains("nat on"), "{when}, Crake's NAT stayed:\n{nat}");
+    }
+    #[cfg(windows)]
+    let _ = when;
+}
+
 /// An HTTP GET of `ip`, retried until it answers (the first try may wait
 /// for the probe), or None after `WAIT`.
 async fn get_within(ip: &'static str) -> Option<String> {
@@ -334,6 +346,7 @@ async fn anyconnect_through_cloudflare() {
     crake.app.within(WAIT, "ACME off", off).await;
     assert!(get("10.40.1.10", Duration::from_secs(2)).is_err());
     names_work("switched off", WAIT).await;
+    no_nat_left("switched off");
     crake.stop().await;
 }
 
@@ -390,6 +403,7 @@ async fn openvpn_through_cloudflare() {
     .await;
     assert!(get("10.40.1.10", Duration::from_secs(2)).is_err());
     names_work("switched off", WAIT).await;
+    no_nat_left("switched off");
     crake.stop().await;
 }
 
@@ -476,6 +490,9 @@ async fn the_internet_survives_crakeds_end() {
             "macOS's own DNS still points at craked's server:\n{dns}"
         );
     }
+    // Nor pf's NAT for a tunnel: the new craked emptied the anchor and gave
+    // back the token the one that died held.
+    no_nat_left("after craked's end, started again");
 
     app.within(BACK, "craked reached again", reached).await;
     remove_tunnels(&mut app).await;
