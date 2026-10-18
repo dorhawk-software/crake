@@ -231,6 +231,23 @@ async fn names_work(what: &str, wait: Duration) {
     }
 }
 
+/// What the system makes of ACME's host and the tunnel's device, and
+/// what craked decided: for a failure's message.
+fn diagnose(device: &str) -> String {
+    #[cfg(target_os = "macos")]
+    let seen = sh(&format!(
+        "route -n get 10.40.1.10; ifconfig {device}; netstat -rn -f inet | head -40"
+    ));
+    #[cfg(windows)]
+    let seen = sh(&format!(
+        "Find-NetRoute -RemoteIPAddress 10.40.1.10 | Format-List | Out-String; \
+         Get-NetIPAddress -InterfaceAlias {device} -ErrorAction SilentlyContinue | Format-Table | Out-String; \
+         Get-NetRoute -InterfaceAlias {device} -ErrorAction SilentlyContinue | Format-Table | Out-String; \
+         Get-Content C:\\ProgramData\\Crake\\craked.log | Select-String -Pattern 'probe|Sent |Left |No answer|answered|learn|WARN|ERROR' | Select-Object -Last 40 | Out-String"
+    ));
+    format!("where 10.40.1.10 goes and what craked decided:\n{seen}")
+}
+
 /// What a tunnel that's up must give: ACME's network through it, its names
 /// before the first packet, and the internet directly.
 async fn the_split_holds(crake: &Crake, tunnel: &str) {
@@ -239,7 +256,8 @@ async fn the_split_holds(crake: &Crake, tunnel: &str) {
     let probed = get_within("10.40.1.10").await;
     assert!(
         probed.is_some_and(|b| b.contains("crex")),
-        "git.acme.internal through {tunnel}"
+        "git.acme.internal through {tunnel}\n{}",
+        diagnose(&device)
     );
     assert_eq!(route_device("10.40.1.10"), device, "10.40.1.10's way");
     // 2. A name only ACME's DNS knows, asked as an app asks macOS.
