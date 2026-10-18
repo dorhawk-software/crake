@@ -64,7 +64,7 @@ const SERVER: &str = "mode server\ntls-server\ndev utun\ntopology subnet\nproto 
     push \"dhcp-option DNS 10.88.0.53\"\npush \"dhcp-option DOMAIN mac.internal\"\n\
     ca ca.crt\ncert server.crt\nkey server.key\ndh none\nverify-client-cert require\nverb 3\n";
 
-async fn until(mgr: &Manager, name: &str, want: TunnelState) {
+async fn until(mgr: &Manager, name: &str, want: TunnelState, dir: &Path) {
     for _ in 0..300 {
         let got = mgr.get(name).unwrap();
         assert!(got.asking.is_none(), "a certificate asks nothing");
@@ -73,7 +73,12 @@ async fn until(mgr: &Manager, name: &str, want: TunnelState) {
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
-    panic!("never {want:?}: {:?}", mgr.get(name).unwrap().why);
+    let server = std::fs::read_to_string(dir.join("server.log")).unwrap_or_default();
+    let got = mgr.get(name).unwrap();
+    panic!(
+        "never {want:?} (it's {:?}: {:?})\n--- the server said:\n{server}",
+        got.state, got.why
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -81,6 +86,12 @@ async fn an_openvpn_tunnel_on_this_mac() {
     if !enabled() {
         return;
     }
+    // craked's own lines (openvpn's output and its management dialogue
+    // among them), shown when the test fails.
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("debug")
+        .with_test_writer()
+        .try_init();
     let dir = tempfile::tempdir().unwrap();
     pki(dir.path());
     std::fs::write(dir.path().join("server.conf"), SERVER).unwrap();
@@ -88,6 +99,7 @@ async fn an_openvpn_tunnel_on_this_mac() {
         .args(["--config", "server.conf"])
         .current_dir(dir.path())
         .stdout(std::fs::File::create(dir.path().join("server.log")).unwrap())
+        .stderr(std::fs::File::create(dir.path().join("server.err")).unwrap())
         .spawn()
         .unwrap();
     let read = |f: &str| std::fs::read_to_string(dir.path().join(f)).unwrap();
@@ -124,7 +136,7 @@ async fn an_openvpn_tunnel_on_this_mac() {
     .collect();
     let name = mgr.add_tunnel(&fields).unwrap();
     mgr.connect(&name).unwrap();
-    until(&mgr, &name, TunnelState::Connected).await;
+    until(&mgr, &name, TunnelState::Connected, dir.path()).await;
 
     let info = mgr.get(&name).unwrap().info.unwrap();
     assert!(
@@ -144,7 +156,7 @@ async fn an_openvpn_tunnel_on_this_mac() {
     assert_eq!(info.split_include, ["10.89.0.0/16"]);
 
     mgr.disconnect(&name).unwrap();
-    until(&mgr, &name, TunnelState::Off).await;
+    until(&mgr, &name, TunnelState::Off, dir.path()).await;
     let gone = sh(&format!("ifconfig {}", info.device), dir.path());
     assert!(gone.contains("does not exist"), "its utun went: {gone}");
     mgr.shutdown().await;
