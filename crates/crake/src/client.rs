@@ -151,7 +151,7 @@ pub fn start(updates: async_channel::Sender<Update>) -> async_channel::Sender<Co
 }
 
 /// The same, always on this socket (tests: a craked of their own).
-#[cfg(all(test, target_os = "linux"))]
+#[cfg(all(test, unix))]
 pub fn start_on(
     socket: PathBuf,
     updates: async_channel::Sender<Update>,
