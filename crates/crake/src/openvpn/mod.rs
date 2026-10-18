@@ -2,24 +2,38 @@
 //! (D-Bus `Asking`, `Update::Asking`); the sign-in window shows the
 //! question, the browser opens a sign-in page, and the answer goes back
 //! (`Answer`). Switched on, an OpenVPN tunnel just connects: the window
-//! opens only when craked asks (a kept token asks nothing).
+//! opens only when craked asks (a kept token asks nothing), and not for a
+//! username or password kept from a sign-in that worked (`kept`).
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
 
 use gpui_kit::App;
 
 use crate::Request;
 use crate::signin::{Ask, Event, Prompt, Reply};
 
-/// The sign-in windows taking OpenVPN tunnels' questions, by tunnel: where
-/// a question goes, and the id of the one it shows.
+mod kept;
+
+/// The question a sign-in window shows: craked's id for it, and its kind.
+type Shown = Arc<Mutex<(u32, String)>>;
+
+/// A sign-in window taking a tunnel's questions: where they go, what it
+/// shows, and where its answers go.
+struct Window {
+    events: async_channel::Sender<Event>,
+    shown: Shown,
+    requests: async_channel::Sender<Request>,
+}
+
+/// The sign-in windows taking OpenVPN tunnels' questions, by tunnel.
 #[derive(Default)]
 pub struct Asks {
-    windows: HashMap<String, (async_channel::Sender<Event>, Arc<AtomicU32>)>,
+    windows: HashMap<String, Window>,
     /// The last page opened in the browser, by tunnel (its question's id).
     opened: HashMap<String, u32>,
+    /// What the user typed, by tunnel, kept once the tunnel is up.
+    typed: Arc<Mutex<HashMap<String, kept::Typed>>>,
 }
 
 impl gpui_kit::Global for Asks {}
@@ -32,15 +46,30 @@ pub fn start(
     requests: async_channel::Sender<Request>,
     asks: &mut Asks,
 ) -> async_channel::Sender<Reply> {
-    let shown = Arc::new(AtomicU32::new(0));
-    asks.windows
-        .insert(tunnel.clone(), (events, Arc::clone(&shown)));
+    let shown: Shown = Arc::default();
+    asks.windows.insert(
+        tunnel.clone(),
+        Window {
+            events,
+            shown: Arc::clone(&shown),
+            requests: requests.clone(),
+        },
+    );
+    let typed = Arc::clone(&asks.typed);
     let (replies, incoming) = async_channel::unbounded::<Reply>();
     std::thread::spawn(move || {
         while let Ok(reply) = incoming.recv_blocking() {
             let request = match reply {
                 Reply::Answer { text, .. } => {
-                    Request::Answer(tunnel.clone(), shown.load(Ordering::Relaxed), text)
+                    let (id, kind) = shown.lock().unwrap().clone();
+                    let mut typed = typed.lock().unwrap();
+                    let entry = typed.entry(tunnel.clone()).or_default();
+                    match kind.as_str() {
+                        "user" => entry.user = Some(text.clone()),
+                        "password" => entry.password = Some(text.clone()),
+                        _ => {}
+                    }
+                    Request::Answer(tunnel.clone(), id, text)
                 }
                 // Cancelled: the tunnel goes off, its sign-in with it.
                 Reply::Cancel => Request::Switch(tunnel.clone(), false),
@@ -53,17 +82,109 @@ pub fn start(
     replies
 }
 
-/// craked asks this (`Update::Asking`): shown in the tunnel's sign-in
-/// window, opened if it isn't; a page opens in the browser, once.
+/// craked asks this (`Update::Asking`): a username or password kept from
+/// a sign-in that worked is given at once; anything else is shown in the
+/// tunnel's sign-in window, opened if it isn't; a page opens in the
+/// browser, once.
 pub fn asked(tunnel: &str, ask: &HashMap<String, String>, cx: &mut App) {
     let Some(id) = ask.get("id").and_then(|i| i.parse::<u32>().ok()) else {
         return;
     };
+    let kind = ask.get("kind").map(String::as_str).unwrap_or("");
+    // Demo mode keeps nothing (CRAKE_DEMO never touches the keyring).
+    let demo = cx.try_global::<crate::Shell>().is_some_and(|s| s.demo);
+    if let Some(k) = kept::kind(kind).filter(|_| !demo) {
+        if ask.get("retry").map(String::as_str) == Some("true") {
+            // Refused: what was kept, and what was typed, goes.
+            cx.default_global::<Asks>()
+                .typed
+                .lock()
+                .unwrap()
+                .remove(tunnel);
+            let t = tunnel.to_owned();
+            cx.background_executor()
+                .spawn(async move { kept::forget(&t) })
+                .detach();
+        } else {
+            let (tunnel, ask) = (tunnel.to_owned(), ask.clone());
+            cx.spawn(async move |cx| {
+                let t = tunnel.clone();
+                let found = cx
+                    .background_executor()
+                    .spawn(async move { kept::read(&t, k) })
+                    .await;
+                cx.update(|cx| match found {
+                    Some(text) => answer(&tunnel, id, text, cx),
+                    None => show(&tunnel, id, &ask, cx),
+                })
+            })
+            .detach();
+            return;
+        }
+    }
+    show(tunnel, id, ask, cx);
+}
+
+/// A kept answer, to craked, as the window would have sent it.
+fn answer(tunnel: &str, id: u32, text: String, cx: &mut App) {
+    let request = Request::Answer(tunnel.to_owned(), id, text);
+    let window = cx
+        .default_global::<Asks>()
+        .windows
+        .get(tunnel)
+        .filter(|w| !w.events.is_closed())
+        .map(|w| w.requests.clone());
+    match window {
+        Some(requests) => {
+            let _ = requests.send_blocking(request);
+        }
+        None => {
+            if let Some(shell) = cx.try_global::<crate::Shell>() {
+                let _ = shell.requests.send_blocking(request);
+            }
+        }
+    }
+}
+
+/// Up: what the user typed for its sign-in is kept.
+pub fn up(cx: &mut App) {
+    let Some(shell) = cx.try_global::<crate::Shell>() else {
+        return;
+    };
+    if shell.demo {
+        return;
+    }
+    let up: Vec<(String, String)> = shell
+        .model
+        .read(cx)
+        .tunnels
+        .iter()
+        .filter(|t| t.state == "connected")
+        .map(|t| (t.name.clone(), t.display.clone()))
+        .collect();
+    let typed = Arc::clone(&cx.default_global::<Asks>().typed);
+    for (tunnel, display) in up {
+        let Some(t) = typed.lock().unwrap().remove(&tunnel) else {
+            continue;
+        };
+        cx.background_executor()
+            .spawn(async move { kept::write(&tunnel, &display, &t) })
+            .detach();
+    }
+}
+
+/// Removed: what was kept for it goes (with its other keyring items).
+pub fn forget(tunnel: &str) {
+    kept::forget(tunnel);
+}
+
+/// The question in the tunnel's sign-in window.
+fn show(tunnel: &str, id: u32, ask: &HashMap<String, String>, cx: &mut App) {
     let open = |cx: &mut App| {
         cx.default_global::<Asks>()
             .windows
             .get(tunnel)
-            .is_some_and(|(events, _)| !events.is_closed())
+            .is_some_and(|w| !w.events.is_closed())
     };
     if !open(cx) {
         let found = cx
@@ -82,10 +203,14 @@ pub fn asked(tunnel: &str, ask: &HashMap<String, String>, cx: &mut App) {
     let kind = ask.get("kind").map(String::as_str).unwrap_or("");
     let url = ask.get("url").cloned().unwrap_or_default();
     let asks = cx.default_global::<Asks>();
-    let Some((events, shown)) = asks.windows.get(tunnel).cloned() else {
+    let Some((events, shown)) = asks
+        .windows
+        .get(tunnel)
+        .map(|w| (w.events.clone(), Arc::clone(&w.shown)))
+    else {
         return;
     };
-    shown.store(id, Ordering::Relaxed);
+    *shown.lock().unwrap() = (id, kind.to_owned());
     if kind == "browser" {
         let fresh = asks.opened.insert(tunnel.to_owned(), id) != Some(id);
         if fresh && (url.starts_with("https://") || url.starts_with("http://")) {
@@ -282,6 +407,99 @@ mod tests {
             .iter()
             .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
             .collect()
+    }
+
+    /// The next request from the window's side, or what's there now.
+    fn next(rx: &async_channel::Receiver<Request>, cx: &mut gpui_kit::TestAppContext) -> Request {
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            cx.run_until_parked();
+            if let Ok(r) = rx.try_recv() {
+                return r;
+            }
+            assert!(std::time::Instant::now() < end, "nothing went to craked");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+
+    #[gpui_kit::test]
+    fn a_kept_username_and_password_ask_nothing_until_refused(cx: &mut gpui_kit::TestAppContext) {
+        cx.executor().allow_parking();
+        let tunnel = "kept-test";
+        kept::write(
+            tunnel,
+            "Kept",
+            &kept::Typed {
+                user: Some("alice".into()),
+                password: Some("hunter2".into()),
+            },
+        );
+        let (events, shown) = async_channel::unbounded();
+        let (requests, to_craked) = async_channel::unbounded();
+        let replies = cx.update(|cx| {
+            let asks = cx.default_global::<Asks>();
+            start(tunnel.into(), events, requests, asks)
+        });
+        // Asked again: answered from what was kept, the window shows nothing.
+        for (id, kind, kept) in [("1", "user", "alice"), ("2", "password", "hunter2")] {
+            cx.update(|cx| asked(tunnel, &ask(&[("id", id), ("kind", kind)]), cx));
+            match next(&to_craked, cx) {
+                Request::Answer(t, i, text) => {
+                    assert_eq!(
+                        (t.as_str(), i.to_string(), text.as_str()),
+                        (tunnel, id.into(), kept)
+                    );
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+        assert!(shown.try_recv().is_err(), "the window asked nothing");
+        // Refused: forgotten, and the window asks.
+        cx.update(|cx| {
+            asked(
+                tunnel,
+                &ask(&[("id", "3"), ("kind", "password"), ("retry", "true")]),
+                cx,
+            )
+        });
+        cx.run_until_parked();
+        let Ok(Event::Prompt(p)) = shown.try_recv() else {
+            panic!("the window wasn't asked");
+        };
+        assert!(p.refused, "it says the password wasn't accepted");
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while kept::read(tunnel, crate::keyring::Kind::Password).is_some() {
+            assert!(
+                std::time::Instant::now() < end,
+                "the refused password stayed"
+            );
+            cx.run_until_parked();
+        }
+        assert_eq!(kept::read(tunnel, crate::keyring::Kind::Username), None);
+        // What the user types is noted, to be kept once the tunnel is up.
+        replies
+            .send_blocking(Reply::Answer {
+                text: "hunter3".into(),
+                remember: false,
+                keep_certificate: false,
+            })
+            .unwrap();
+        assert!(matches!(next(&to_craked, cx), Request::Answer(_, 3, ref t) if t == "hunter3"));
+        let typed = cx.update(|cx| {
+            cx.default_global::<Asks>()
+                .typed
+                .lock()
+                .unwrap()
+                .get(tunnel)
+                .cloned()
+        });
+        assert_eq!(
+            typed,
+            Some(kept::Typed {
+                user: None,
+                password: Some("hunter3".into())
+            })
+        );
     }
 
     #[test]

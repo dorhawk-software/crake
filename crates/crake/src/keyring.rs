@@ -12,6 +12,8 @@ pub enum Kind {
     Certificate,
     /// The gateway password (sign-in "Username and password").
     Password,
+    /// The gateway username, where the sign-in asks it (OpenVPN's).
+    Username,
 }
 
 impl Kind {
@@ -20,6 +22,7 @@ impl Kind {
             Self::CertificatePassword => "certificate-password",
             Self::Certificate => "certificate",
             Self::Password => "password",
+            Self::Username => "username",
         }
     }
 
@@ -28,6 +31,7 @@ impl Kind {
             Self::CertificatePassword => format!("Crake: certificate password for {display}"),
             Self::Certificate => format!("Crake: certificate for {display}"),
             Self::Password => format!("Crake: password for {display}"),
+            Self::Username => format!("Crake: username for {display}"),
         }
     }
 }

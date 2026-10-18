@@ -22,6 +22,13 @@ What's new in each Crake release, for the people using it. The newest is at the 
   bird's bottom right, larger, with a "!" drawn on whole pixels, so it reads at a bar's small size.
   On a light taskbar or menu bar it's a deeper red or amber, so it stands out there too.
 
+- **OpenVPN remembers your sign-in.** After a username and password that worked, Crake keeps them
+  in your keyring, as it does for AnyConnect, and doesn't ask again. If the gateway refuses them,
+  Crake forgets them and asks.
+
+- **On Windows, what Crake keeps is yours alone.** Its log and the hosts it learned for each tunnel
+  were readable by every user of the PC; now only Windows itself and administrators can read them.
+
 - **OpenVPN on Windows and macOS too.** On Windows it comes with Crake, with its drivers; on a Mac
   it comes with Homebrew's cask (`brew install openvpn` otherwise).
 

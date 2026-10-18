@@ -934,8 +934,14 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    "Import .ovpn…" opens its Edit). Tested: window tests (New tunnel's
    import and take-over, the sign-in window's questions, the notice),
    lifecycle (the move), e2e through the app's client, the journey's
-   import step. Not yet: passwords kept in the keyring for OpenVPN;
-   tunnels from craked.toml or IT that are OpenVPN 3 stay so.
+   import step. Tunnels from craked.toml or IT that are OpenVPN 3 stay so.
+   **The sign-in kept (2026-10-18):** a username and password typed for
+   an OpenVPN tunnel are kept in the keyring once it's up
+   (`openvpn/kept.rs`, `keyring::Kind::Username` beside `Password`), and
+   when craked asks again the app answers from there without opening the
+   window; a refusal (craked's `retry`) forgets both and the window asks.
+   Removing the tunnel forgets them. Demo mode keeps nothing; tests keep
+   them in memory.
    **Slice 3 (packages): built (2026-10-18).** openvpn is a
    Recommended engine (.deb and RPM Recommends; not one of the
    required alternatives, `openconnect | openvpn3`: dnf met
@@ -968,6 +974,12 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    sends each command once the one before is answered (`Paced`, every
    platform). The Windows VM test has an OpenVPN tunnel (a password
    sign-in through the app's client, routed, off, no adapter left).
+   craked's own folder, ProgramData\Crake, is locked the same way when
+   the service starts (`create_private_dir`, `/T` for what an older Crake
+   left there): ProgramData lets every user read, and its log, host store
+   and settings had been readable by any user of the PC (found
+   2026-10-18); the VM test checks no Users, Everyone or Authenticated
+   Users entry is left on the folder, the log or the host store.
    **Slice 5 (macOS): built (2026-10-18).** Homebrew's openvpn (the cask
    depends on it; craked looks in /opt/homebrew/sbin and /usr/local/sbin),
    `--dev utun --dev-type tun` (openvpn takes tun or tap from a device's
@@ -1282,16 +1294,6 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   live one from versions.json; the page's fallback is bumped by hand at
   each release. Automating it (the packages workflow updating the page, or
   Cloudflare filling it in) was offered, not decided.
-- **Windows: craked's files in ProgramData\Crake are readable by every
-  user (found 2026-10-18, building 7i's Windows slice).** ProgramData's
-  default permissions let users read what craked writes there: its log
-  (craked.log), the host store (which hosts each tunnel learned, names
-  included) and settings. Nothing secret (sign-ins stay in the user's
-  Credential Manager; OpenVPN's run folder and profiles are locked with
-  icacls), but another user of the PC could see where this one connects.
-  To do: lock ProgramData\Crake itself as `create_private_dir` does, and
-  check the app never needed to read anything there.
-
 ## Tried by real people (a checklist, ticked one by one)
 
 Asked for by the user, 2026-10-14. The tests prove the mechanics on every

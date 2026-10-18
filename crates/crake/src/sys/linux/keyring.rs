@@ -23,7 +23,7 @@ pub async fn set(tunnel: &str, display: &str, kind: Kind, secret: &[u8]) -> Resu
     let keyring = oo7::Keyring::new().await.map_err(|e| e.to_string())?;
     keyring.unlock().await.map_err(|e| e.to_string())?;
     let secret = match kind {
-        Kind::CertificatePassword | Kind::Password => {
+        Kind::CertificatePassword | Kind::Password | Kind::Username => {
             oo7::Secret::text(String::from_utf8_lossy(secret))
         }
         Kind::Certificate => oo7::Secret::blob(secret),

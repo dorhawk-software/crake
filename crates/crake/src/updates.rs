@@ -49,11 +49,16 @@ pub(super) fn on_update(update: client::Update, cx: &mut App) {
     }
     let shell = cx.global::<Shell>();
     let (model, requests) = (shell.model.clone(), shell.requests.clone());
+    let tunnels = matches!(update, client::Update::Tunnels(_));
     let appended = model.update(cx, |m, cx| {
         let new = m.apply(update);
         cx.notify();
         new
     });
+    // An OpenVPN tunnel up after a sign-in: what was typed is kept.
+    if tunnels {
+        crate::openvpn::up(cx);
+    }
     if let Some(entry) = appended {
         let how = cx.global::<prefs::Prefs>().notify.clone();
         if notify::worth_telling(&entry) && how != "none" {

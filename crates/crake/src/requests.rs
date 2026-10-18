@@ -319,6 +319,7 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
                             keyring::forget(&n, keyring::Kind::Password).await;
                         });
                     }
+                    crate::openvpn::forget(&n);
                 });
             }
             remember_on(&name, false, cx);
