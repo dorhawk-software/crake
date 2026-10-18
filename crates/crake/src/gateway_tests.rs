@@ -518,6 +518,8 @@ async fn the_internet_survives_crakeds_end() {
         sh("Stop-Process -Name openconnect -Force -ErrorAction SilentlyContinue");
     }
     names_work("after craked's end, started again", BACK).await;
+    // craked serves the app once its start has put the system right.
+    app.within(BACK, "craked reached again", reached).await;
     #[cfg(target_os = "macos")]
     {
         // The system's own resolver (#1, every name), not the ones per
@@ -538,7 +540,6 @@ async fn the_internet_survives_crakeds_end() {
     // back the token the one that died held.
     no_nat_left("after craked's end, started again");
 
-    app.within(BACK, "craked reached again", reached).await;
     remove_tunnels(&mut app).await;
     #[cfg(target_os = "macos")]
     {
