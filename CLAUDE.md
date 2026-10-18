@@ -380,6 +380,14 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    Trouble}`): asleep when nothing is up (a tunnel that stopped in the
    night looked connected), dashed and moving while another connects,
    awake while one is up; and the routed head only while a tunnel is up.
+   **The badge, readable (2026-10-18; design/proposals/tray-badge.html,
+   B, chosen by the user, who found the old one "extremely teeny tiny"):**
+   at the bottom right over the breast, 14/32 of the icon, on each size's
+   whole pixels with its "!" fitted to them (`art::Place`, `badge_at`,
+   `bang`; at 16 px a 7 px circle, a 1 px stem, a gap, a dot), and on a
+   light bar the light theme's red and amber (`tray::for_light_bar`,
+   `light_bar_pixel`). The proposal's icons are the app's own
+   (`write_badge_proposal` writes tray-badge/art.js).
    Why a tunnel stopped (design/proposals/trouble-reason.html, option A,
    chosen by the user): craked keeps the sentence it logged with the
    tunnel while it's in trouble (ListTunnels `why`); the panel's status
@@ -1226,13 +1234,6 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
     clicking one to find it in the table (the proposal's notes): not built.
   - *AppArmor:* the profile now allows `nf_conntrack_acct`; not yet run in
     `scripts/vm-test.sh` (AppArmor enforced, KVM; not in CI).
-- **The tray's trouble and warning badges are too small to read
-  (the user, 2026-10-18, with a screenshot of GNOME's bar: Teams' "5"
-  badge reads, Crake's red dot doesn't).** The badge is a circle of
-  r 4.5 on the 32 grid (9/32 of the icon: under 5 px at the bar's 16 px,
-  its "!" 1 px wide). Next after the OpenVPN proposal: a proposal for a
-  larger badge (about a third of the icon, as other apps' badges are),
-  through the impeccable critique, both themes and the warning triangle.
 - **The explainers** (docs/explainers.md): written down, not yet drawn or
   published anywhere.
 - **The website's version number** (dorhawk-website): visitors get the

@@ -156,8 +156,11 @@ fn rgba(size: u32, argb: &[u8], light: bool) -> Option<tray_icon::Icon> {
         .0
         .iter()
         .flat_map(|&[a, r, g, b]| {
-            let grey = r == g && g == b;
-            let [r, g, b] = if light && grey { DARK } else { [r, g, b] };
+            let [r, g, b] = if light {
+                crate::tray::light_bar_pixel([r, g, b], DARK)
+            } else {
+                [r, g, b]
+            };
             [r, g, b, a]
         })
         .collect();

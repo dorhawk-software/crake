@@ -18,25 +18,63 @@ fn the_eye_is_a_hole_the_bar_shows_through() {
     assert_eq!(px(listening, 14.5, 7.)[0], 0, "the eye is see-through");
     assert_eq!(px(listening, 16., 26.)[0], 255, "the breast is solid");
     assert_eq!(px(listening, 10., 24.)[0], 0, "the wing is a cut");
-    // Routed: teal marks in front of the bill; trouble: a red badge behind
-    // the head; needs you: an amber triangle there.
+    // Routed: teal marks in front of the bill; trouble: a red badge at the
+    // bottom right, over the breast; needs you: an amber triangle there.
     assert_eq!(
         px(&ICONS[Shape::Routed.index()], 29.1, 3.1)[1..],
         [0x2D, 0xD4, 0xBF]
     );
     for shape in [Shape::Trouble, Shape::OffTrouble, Shape::ConnectingTrouble] {
         assert_eq!(
-            px(&ICONS[shape.index()], 8., 5.5)[1..],
+            px(&ICONS[shape.index()], 22., 25.)[1..],
             [0xF9, 0x70, 0x66],
             "{shape:?}"
         );
     }
     for shape in [Shape::Warning, Shape::OffWarning, Shape::ConnectingWarning] {
         assert_eq!(
-            px(&ICONS[shape.index()], 8., 7.)[1..],
+            px(&ICONS[shape.index()], 22., 29.)[1..],
             [0xF5, 0xB7, 0x40],
             "{shape:?}"
         );
+    }
+}
+
+#[test]
+fn the_badge_reads_at_sixteen_pixels() {
+    // On whole pixels (tray-badge.html, B): a 7 px circle on rows 9-15,
+    // its "!" one pixel wide on the middle column, solid: a stem on rows
+    // 10-12, a gap, a dot on row 14. Today's badge sat between pixels and
+    // its "!" was a smudge.
+    let (_, small) = ICONS[Shape::Trouble.index()]
+        .small
+        .iter()
+        .find(|(n, _)| *n == 16)
+        .unwrap();
+    let at = |x: usize, y: usize| -> [u8; 4] { small[(y * 16 + x) * 4..][..4].try_into().unwrap() };
+    for y in [10, 11, 12, 14] {
+        assert_eq!(at(12, y), [255, 0x0b, 0x15, 0x14], "the \"!\" at row {y}");
+    }
+    for (x, y) in [(12, 13), (11, 11), (13, 11), (12, 9), (9, 12), (15, 12)] {
+        assert_eq!(at(x, y), [255, 0xF9, 0x70, 0x66], "red at {x},{y}");
+    }
+}
+
+#[test]
+fn a_light_bar_gets_the_light_themes_badge() {
+    let svg = resting_svg(Shape::Trouble) + &resting_svg(Shape::Warning);
+    let light = for_light_bar(&svg, "#1f1f1f");
+    for dark in [
+        "#ffffff",
+        art::TROUBLE,
+        art::ON_TROUBLE,
+        art::WARNING,
+        art::ON_WARNING,
+    ] {
+        assert!(!light.contains(dark), "{dark} is left");
+    }
+    for colour in ["#1f1f1f", "#B42318", "#FFFFFF", "#BF7E12", "#1A1C1E"] {
+        assert!(light.contains(colour), "{colour} is missing");
     }
 }
 
@@ -124,16 +162,17 @@ fn motion_ends_where_the_state_rests() {
 
 #[test]
 fn the_coloured_marks_fit_inside_the_icon() {
-    // A mark that reaches the edge is cut flat there.
-    for shape in [
-        Shape::Routed,
-        Shape::Trouble,
-        Shape::OffTrouble,
-        Shape::ConnectingTrouble,
-        Shape::Warning,
-        Shape::OffWarning,
-        Shape::ConnectingWarning,
-    ] {
+    // A mark that reaches the edge is cut flat there. The badge sits in
+    // the bottom right corner, its circle and triangle meeting the edges
+    // without crossing them (tray-badge.html, B).
+    let (b, r) = (art::BADGE.centre, art::BADGE.radius);
+    assert!(
+        b.0 + r <= 32. && b.1 + r <= 32.,
+        "the circle fits: {b:?} {r}"
+    );
+    assert!(b.1 - r >= 0. && b.0 - r >= 0.);
+    {
+        let shape = Shape::Routed;
         let icon = &ICONS[shape.index()];
         // Coloured: drawn, and not the white bird (which runs off the
         // bottom).
@@ -229,4 +268,91 @@ fn write_bird_assets() {
     for (path, contents) in family::assets() {
         std::fs::write(&path, contents).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     }
+}
+
+/// The badges design/proposals/tray-badge.html compares, drawn by the
+/// app's own code: `cargo test -p crake write_badge_proposal -- --ignored`.
+#[test]
+#[ignore]
+fn write_badge_proposal() {
+    use art::Place;
+    let options = [
+        (
+            "today",
+            Place {
+                centre: (5.5, 5.5),
+                radius: 4.5,
+                snapped: false,
+            },
+        ),
+        (
+            "a",
+            Place {
+                centre: (5.5, 5.5),
+                radius: 4.5,
+                snapped: true,
+            },
+        ),
+        (
+            "b",
+            Place {
+                centre: (25., 25.),
+                radius: 7.,
+                snapped: true,
+            },
+        ),
+        (
+            "c",
+            Place {
+                centre: (24., 24.),
+                radius: 8.,
+                snapped: true,
+            },
+        ),
+    ];
+    let states = [
+        ("awake", Shape::Trouble),
+        ("asleep", Shape::OffTrouble),
+        ("connecting", Shape::ConnectingTrouble),
+        ("warning", Shape::Warning),
+        ("warning-asleep", Shape::OffWarning),
+    ];
+    // On a light bar the bird is drawn dark (menu_tray.rs); the badge in
+    // the light theme's danger and warning, as proposed, or as today.
+    let light = |svg: String| {
+        svg.replace("#F97066", "#B42318")
+            .replace("#0b1514", "#FFFFFF")
+            .replace("#F5B740", "#BF7E12")
+            .replace("#1a1408", "#1A1C1E")
+    };
+    let mut js = String::from(
+        "// Written by `cargo test -p crake write_badge_proposal -- --ignored`.\nconst ART = {\n",
+    );
+    for (key, place) in options {
+        js += &format!("  {key:?}: {{\n");
+        for (state, shape) in states {
+            js += &format!("    {state:?}: {{\n");
+            for n in [16_u32, 20, 22, 24, 32, 36] {
+                let svg = |ink: &str| {
+                    let art::Parts { defs, ink, over } = rest(shape).parts_at(n, ink, place);
+                    format!(
+                        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{n}" height="{n}" viewBox="0 0 {n} {n}"><defs>{defs}</defs>{ink}{over}</svg>"#
+                    )
+                };
+                js += &format!(
+                    "      {n}: {{ dark: {:?}, lightNow: {:?}, light: {:?} }},\n",
+                    svg("#ffffff"),
+                    svg("#1f1f1f"),
+                    light(svg("#1f1f1f"))
+                );
+            }
+            js += "    },\n";
+        }
+        js += "  },\n";
+    }
+    js += "};\n";
+    let dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../design/proposals/tray-badge");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("art.js"), js).unwrap();
 }

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tray badge</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --ink: #1A1C1E; --muted: #5A5F64;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4;
+    }
+  }
+  :root[data-theme="dark"] {
+    --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--panel); color: var(--ink);
+    font: 14px/1.5 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+  }
+  main { max-width: 1000px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 40px 0 4px; }
+  p { margin: 6px 0; max-width: 70ch; }
+  .muted { color: var(--muted); }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', monospace; font-size: 13px; }
+  .option { border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-top: 12px; }
+  .option h3 { font-size: 15px; margin: 0 0 2px; }
+  .bars { display: grid; gap: 8px; margin-top: 12px; }
+  .bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 32px; padding: 4px 12px;
+    border-radius: 6px;
+  }
+  .bar.dark { background: #000; color: #fff; }
+  .bar.light { background: #EEEEEE; color: #1A1C1E; }
+  .bar .lbl { font: 12px/1 'Atkinson Hyperlegible Mono', monospace; min-width: 112px; }
+  .bar.dark .lbl { color: #B8B8B8; }
+  .bar.light .lbl { color: #4A4A4A; }
+  .bar .sp { width: 12px; }
+  .bar img, .bar svg { display: block; flex: none; }
+  .tiles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+  figure { margin: 0; }
+  figcaption { font-size: 12px; color: var(--muted); margin-top: 4px; max-width: 96px; }
+  .tile { display: grid; place-items: center; width: 96px; height: 96px; border-radius: 6px; }
+  .tile.dark { background: #000; }
+  .tile.light { background: #EEEEEE; }
+  canvas { width: 96px; height: 96px; image-rendering: pixelated; }
+  .sizes { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; margin-top: 12px; padding: 12px; border-radius: 6px; background: #000; }
+  .sizes figcaption { color: #B8B8B8; }
+  ul { margin: 6px 0; padding-left: 20px; max-width: 70ch; }
+  li { margin: 3px 0; }
+  .rec { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 12px 16px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>A tray badge you can read</h1>
+  <p class="muted">Proposal, 2026-10-18; <strong>B chosen by the user</strong> the same day and built. The user, with a screenshot of GNOME's bar: the trouble and warning badges are "extremely teeny tiny and pretty much impossible to read"; another app's count badge beside it read at once.</p>
+  <p>Two things make today's badge unreadable at the bar's 16 px. It is small: a circle 9/32 of the icon, 4.5 px across. And it sits between pixels: its centre and its "!" land on half pixels, so the "!" is a smudge of half-inked pixels, while the bird's eye is snapped to whole pixels at every size. Every option below is drawn by Crake's own code (<span class="mono">tray/art.rs</span>, the drawing the bar gets), the badge on whole pixels in A, B and C, and the enlarged tiles are those 16 px images, pixel for pixel.</p>
+  <p class="muted">The neighbour in each bar is a stand-in for another app's icon with a count badge, for scale. On a light bar (Windows' light taskbar, macOS' light menu bar) Crake draws the bird dark; today its badge keeps the dark-bar colours there.</p>
+
+  <div id="options"></div>
+
+  <div class="rec">
+    <h2 style="margin-top:0">Recommendation: B</h2>
+    <p>Bottom right, a 7 px circle at 16 px with a "!" one pixel wide, centred on its pixels: it reads at 16 px, it leaves the head, the eye and the bill whole (asleep at 16 px, the bill's underside thins by a row), and the bird keeps its breast. C reads a little more at 16 px but takes most of the breast and the tip of the sleeping bill. A shows that snapping alone isn't enough: today's place has no room for a "!" at 16 px.</p>
+  </div>
+
+  <h2>What comes with it</h2>
+  <ul>
+    <li><strong>On a light bar, the light theme's colours.</strong> Red #B42318 with a white "!", amber #BF7E12 with a dark "!" (DESIGN.md's danger and warning). Today's dark-bar red is 2.4:1 against a light taskbar and its amber 1.5:1, under the 3:1 a shape needs.</li>
+    <li><strong>Every size on whole pixels</strong>, as the eye already is: the circle an odd or even number of pixels across, centred to match, the "!" a stem, a gap and a dot that keep the circle's middle, smaller in a small circle and left out where there's no room.</li>
+    <li><strong>The same rules otherwise.</strong> Red means a tunnel stopped, amber that Crake needs you; red wins. The badge sits on the bird as it would be without it (asleep, connecting or awake), with a gap cut so it reads on any bar, and grows in about its own centre. A routed bird with a badge shows the badge instead of the call marks, as today.</li>
+    <li><strong>DESIGN.md's tray table</strong> says "behind the head"; with B it says "at the bottom right, over the breast". Already ruled out, and not tried again here: colouring the bird itself (the bird changes shape, never colour) and room above the head (it shrinks the bird).</li>
+  </ul>
+</main>
+<script src="tray-badge/art.js"></script>
+<script>
+const OPTIONS = [
+  { key: "today", title: "Today: behind the head, 9/32, between pixels",
+    text: "4.5 px across at 16 px. Its \"!\" is two half-inked columns and a dot that runs into it.",
+    light: "lightNow" },
+  { key: "a", title: "A: today's place and size, on whole pixels",
+    text: "The same circle snapped: 5 px across, crisp, but no room is left for a \"!\" at 16 px, so it's a plain dot there (the \"!\" comes back from 24 px). Any larger in this corner reaches the eye.",
+    light: "light" },
+  { key: "b", title: "B: bottom right, 14/32, on whole pixels",
+    text: "7 px across at 16 px, with a \"!\" one pixel wide, three tall, a gap and a dot, on the circle's middle column. Over the front of the breast, clear of the eye and the bill awake. Asleep at 16 px its gap takes one row off the underside of the dropped bill, and the breast beside the wing's cut is a pixel wide at the bottom.",
+    light: "light" },
+  { key: "c", title: "C: bottom right, half the icon, on whole pixels",
+    text: "8 px across at 16 px, as large as a chat app's count badge, its \"!\" two pixels wide. The breast mostly goes, and asleep its gap takes the tip of the bill.",
+    light: "light" },
+];
+const STATES = [
+  ["awake", "awake"], ["asleep", "asleep"], ["connecting", "connecting"],
+  ["warning", "needs you"], ["warning-asleep", "needs you, asleep"],
+];
+
+const url = svg => "data:image/svg+xml;base64," + btoa(svg);
+const img = (svg, px) => `<img src="${url(svg)}" width="${px}" height="${px}" alt="">`;
+
+// A neighbour app: a plain rounded square with a red count badge.
+function neighbour(ink, px) {
+  return `<svg width="${px}" height="${px}" viewBox="0 0 32 32" aria-hidden="true">
+    <rect x="2" y="4" width="24" height="24" rx="5" fill="${ink}" opacity=".85"/>
+    <circle cx="24" cy="10" r="8" fill="#E5484D"/>
+    <text x="24" y="14" text-anchor="middle" font-size="12" font-weight="700" font-family="sans-serif" fill="#fff">5</text></svg>`;
+}
+
+function bar(o, kind, px, label) {
+  const art = ART[o.key], look = kind === "dark" ? "dark" : o.light;
+  const ink = kind === "dark" ? "#fff" : "#1f1f1f";
+  return `<div class="bar ${kind}"><span class="lbl">${label}</span>` +
+    ["awake", "asleep", "connecting", "warning"].map(s => img(art[s][px][look], px)).join("") +
+    `<span class="sp"></span>${neighbour(ink, px)}</div>`;
+}
+
+function tiles(o) {
+  const art = ART[o.key];
+  const cell = (kind, svg, caption) =>
+    `<figure><div class="tile ${kind}"><canvas width="16" height="16" data-svg="${url(svg)}"></canvas></div><figcaption>${caption}</figcaption></figure>`;
+  return `<div class="tiles">` +
+    STATES.map(([s, caption]) => cell("dark", art[s][16].dark, caption + ", 16 px ×6")).join("") +
+    cell("light", art.awake[16][o.light], "light bar") +
+    cell("light", art.warning[16][o.light], "light bar, needs you") + `</div>`;
+}
+
+function sizes(o) {
+  const art = ART[o.key];
+  return `<div class="sizes">` + [20, 22, 24, 32, 36].map(px =>
+    `<figure>${img(art.awake[px].dark, px)}<figcaption>${px} px</figcaption></figure>` +
+    `<figure>${img(art.asleep[px].dark, px)}<figcaption>&nbsp;</figcaption></figure>` +
+    `<figure>${img(art.warning[px].dark, px)}<figcaption>&nbsp;</figcaption></figure>`).join("") +
+    `</div><p class="muted" style="font-size:12px">20 px: Windows at 125 %. 22: KDE. 24: Windows at 150 %. 32: GNOME at 200 %. 36: macOS' menu bar at 2× (18 pt). Each size drawn for its own pixels: awake, asleep, and needing you.</p>`;
+}
+
+document.getElementById("options").innerHTML = OPTIONS.map(o => `
+  <section class="option">
+    <h3>${o.title}</h3>
+    <p class="muted">${o.text}</p>
+    <div class="bars">${bar(o, "dark", 16, "GNOME, 16 px")}${bar(o, "light", 24, "Windows, 24 px")}</div>
+    ${tiles(o)}
+    ${sizes(o)}
+  </section>`).join("");
+
+for (const c of document.querySelectorAll("canvas[data-svg]")) {
+  const i = new Image();
+  i.onload = () => c.getContext("2d").drawImage(i, 0, 0, 16, 16);
+  i.src = c.dataset.svg;
+}
+</script>
+</body>
+</html>

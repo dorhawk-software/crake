@@ -47,6 +47,12 @@ Don't drift back into these. Each was tried and dropped for a reason.
   by the user (2026-10-18): one "OpenVPN" card, "Import .ovpn…" in the
   label's row in every state (as ovpn-import.html, A), and importing a
   .ovpn picks OpenVPN by itself.
+- **The tray's badge behind the head** (9/32 of the icon, between pixels:
+  4.5 px across at 16 px, its "!" a smudge of half-inked pixels; "extremely
+  teeny tiny", the user, 2026-10-18), the same corner on whole pixels (no
+  room for a "!" up to 22 px), and **half the icon at the bottom right**
+  (it takes the breast and the sleeping bill's tip): design/proposals/
+  tray-badge.html, Today, A and C; B was chosen.
 - **Tray marks above the head** (design/proposals/tray-marks-above.html).
   The bar icon is a fixed square: room above the head shrinks the bird.
   The call marks stay off the beak and the "!" on the back of the head.
@@ -247,8 +253,18 @@ White; the states:
 | connecting | the outline dashed, the bill shut |
 | listening | the bird, eye open, bill parted |
 | routed (a few seconds) | the bill open in the call, the two call marks in front of it, **teal** |
-| trouble | a **red** badge with "!" behind the head, clear of the eye and the bill, on the bird as it would be without it: asleep when nothing is up, dashed while another tunnel connects, awake while one is up (design/proposals/dismiss-trouble.html) |
+| trouble | a **red** badge with "!" at the bottom right, over the breast (14/32 of the icon: 7 px at 16 px), clear of the eye and the bill, on the bird as it would be without it: asleep when nothing is up, dashed while another tunnel connects, awake while one is up (design/proposals/dismiss-trouble.html, tray-badge.html B) |
 | needs you | an **amber** triangle with "!" in the same place, on the bird as it is: an OpenVPN 3 process left running, until it ends or "Got it" (design/proposals/leftover-warning.html). Red wins: a tunnel that stopped shows trouble's badge instead |
+
+The badge is drawn on each size's whole pixels, as the eye is: the circle
+an odd or even number of pixels across and centred to match, its "!" a
+stem a sixth of the circle wide, a space and a dot as wide as the stem,
+on the circle's middle (at 16 px: a 1 px stem three rows tall, a gap, a
+1 px dot), and none where the circle has no room for one. On a light bar
+(Windows' light taskbar, macOS' light menu bar) the bird is drawn dark and
+the badge takes the light theme's danger and warning (#B42318 with a white
+"!", #BF7E12 with a dark one): the dark ones are 2.4:1 and 1.5:1 against a
+light bar.
 
 The bird changes shape, never colour; only the state marks are coloured
 (dark-mode accent, danger and warning, the bar is dark), with a gap cut
@@ -279,7 +295,7 @@ Whole bird (larger places):
 | connecting | the outline dashed |
 | listening | the bird in the grass |
 | routed (a few seconds) | the bird calling, two marks in front of the bill |
-| trouble | the bird plus "!" at top left |
+| trouble | the bird plus the red badge at its bottom right |
 
 **One drawing everywhere.** The panel header's bird (`bird.svg`, with the
 call marks in accent or the bar's badge over it), the leftover notice's

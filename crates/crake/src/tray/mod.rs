@@ -246,6 +246,50 @@ fn argb(tree: &resvg::usvg::Tree, size: u32) -> Vec<u8> {
     data
 }
 
+/// The badges' colours on a light bar (Windows' light taskbar, macOS'
+/// light menu bar), in place of the dark bar's: DESIGN.md's light danger
+/// and warning, and what goes on them (the dark ones are 2.4:1 and 1.5:1
+/// against a light bar; design/proposals/tray-badge.html).
+const ON_LIGHT_BAR: [(&str, &str); 4] = [
+    (art::TROUBLE, "#B42318"),
+    (art::ON_TROUBLE, "#FFFFFF"),
+    (art::WARNING, "#BF7E12"),
+    (art::ON_WARNING, "#1A1C1E"),
+];
+
+/// An SVG of the bird for a light bar: `ink` for the bird, the badges in
+/// their light-bar colours.
+pub fn for_light_bar(svg: &str, ink: &str) -> String {
+    ON_LIGHT_BAR
+        .iter()
+        .fold(svg.replace("#ffffff", ink), |svg, (dark, light)| {
+            svg.replace(dark, light)
+        })
+}
+
+/// A pixel of the tray's image for a light bar: the grey bird drawn
+/// `ink`, a badge's colour its light-bar one (the badge sits on whole
+/// pixels, so its colours arrive exact; its edges only fade).
+#[cfg(any(windows, target_os = "macos"))]
+// literal: "#rrggbb" read as its three bytes
+pub fn light_bar_pixel([r, g, b]: [u8; 3], ink: [u8; 3]) -> [u8; 3] {
+    if r == g && g == b {
+        return ink;
+    }
+    let hex = |h: &str| {
+        let v = u32::from_str_radix(&h[1..], 16).unwrap_or(0);
+        v.to_be_bytes()
+    };
+    for (dark, light) in ON_LIGHT_BAR {
+        let [_, dr, dg, db] = hex(dark);
+        if [dr, dg, db] == [r, g, b] {
+            let [_, lr, lg, lb] = hex(light);
+            return [lr, lg, lb];
+        }
+    }
+    [r, g, b]
+}
+
 /// The resting look of `shape` as an SVG at the drawing's own size, the
 /// bird white (Settings shows each look in the bird row's "?").
 pub fn resting_svg(shape: Shape) -> String {

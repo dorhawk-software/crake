@@ -18,6 +18,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
   something on your computer is refused, saying why. Beta until it has met a real gateway. The
   packages now recommend openvpn.
 
+- **The tray's badge reads now.** When a tunnel stops or Crake needs you, the badge sits at the
+  bird's bottom right, larger, with a "!" drawn on whole pixels, so it reads at a bar's small size.
+  On a light taskbar or menu bar it's a deeper red or amber, so it stands out there too.
+
 - **OpenVPN on Windows and macOS too.** On Windows it comes with Crake, with its drivers; on a Mac
   it comes with Homebrew's cask (`brew install openvpn` otherwise).
 

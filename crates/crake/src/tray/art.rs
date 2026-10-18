@@ -114,9 +114,20 @@ const ASLEEP: f32 = 0.45;
 const MARK_1: (P, P) = ((27.8, 4.4), (30.4, 1.8));
 const MARK_2: (P, P) = ((28.2, 8.4), (30.4, 7.75));
 const MARK_WIDTH: f32 = 2.1;
-// literal: the bird's drawing (design/proposals/bird-calling.html)
-/// The badge behind the head: its centre and radius.
-const BADGE: (P, f32) = ((5.5, 5.5), 4.5);
+// literal: the bird's drawing (design/proposals/tray-badge.html, B)
+/// The badge at the bottom right, over the breast, on each size's whole
+/// pixels: 7 px across at 16 px.
+pub(super) const BADGE: Place = Place {
+    centre: (25., 25.),
+    radius: 7.,
+    snapped: true,
+};
+/// The badges' colours for a dark bar (DESIGN.md's dark danger and
+/// warning, and what goes on them); `tray::for_light_bar` swaps them.
+pub(super) const TROUBLE: &str = "#F97066";
+pub(super) const ON_TROUBLE: &str = "#0b1514";
+pub(super) const WARNING: &str = "#F5B740";
+pub(super) const ON_WARNING: &str = "#1a1408";
 /// The gap cut round a coloured mark, so it reads on any bar.
 const GAP: f32 = 1.;
 /// Connecting: the outline's stroke, its dash and gap.
@@ -220,9 +231,19 @@ pub(super) fn marks(s: f32, a: f32, b: f32, opacity: f32, colour: &str) -> (Stri
     (cut, over)
 }
 
+/// Where a badge sits on the bird and how large it is: its centre and
+/// radius in the drawing, and whether each size gets it on whole pixels
+/// (its edge, its gap and its "!"), as the eye is.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Place {
+    pub centre: P,
+    pub radius: f32,
+    pub snapped: bool,
+}
+
 /// The badge at scale `s`, grown to `size`: the gap cut, the badge in
 /// `colour`, and its "!" in `on` (once it's nearly grown).
-// literal: the badge's drawing (design/proposals/bird-calling.html)
+#[cfg(test)]
 pub(super) fn badge(
     s: f32,
     size: f32,
@@ -230,58 +251,167 @@ pub(super) fn badge(
     colour: &str,
     on: &str,
 ) -> (String, String, String) {
-    let ((x, y), r) = ((BADGE.0.0 * s, BADGE.0.1 * s), BADGE.1 * s);
+    badge_at(BADGE, s, size, warning, colour, on)
+}
+
+/// The "!": its stem's top, width and height, and its dot's top.
+struct Bang {
+    top: f32,
+    width: f32,
+    height: f32,
+    dot: f32,
+}
+
+/// A badge's shape at scale `s`: its centre, radius and gap, and its "!".
+// literal: the badge's drawing (design/proposals/bird-calling.html,
+// tray-badge.html)
+fn shape(place: Place, s: f32, warning: bool) -> ((f32, f32), f32, f32, Option<Bang>) {
+    let ((x, y), r) = ((place.centre.0 * s, place.centre.1 * s), place.radius * s);
+    if !place.snapped {
+        let bar = 2. * s;
+        let bang = if warning {
+            Bang {
+                top: y - r * 0.35,
+                width: bar,
+                height: r * 0.6,
+                dot: y + r * 0.45,
+            }
+        } else {
+            Bang {
+                top: y - r * 0.62,
+                width: bar,
+                height: r * 0.75,
+                dot: y + r * 0.3,
+            }
+        };
+        return ((x, y), r, 1.2 * s, Some(bang));
+    }
+    // On whole pixels: an even width centred on a pixel boundary, an odd
+    // one on a pixel's middle; the "!" a stem, a gap and a dot, each whole.
+    let across = (2. * r).round().max(4.);
+    let at = |c: f32| {
+        if across % 2. == 0. {
+            c.round()
+        } else {
+            c.floor() + 0.5
+        }
+    };
+    let (x, y, r) = (at(x), at(y), across / 2.);
+    let gap = (1.2 * s).round().max(1.);
+    let bang = if warning {
+        // The triangle's: low in it, where it's wide enough.
+        let (width, space) = (whole(across / 8., across), (across / 10.).round().max(1.));
+        let base = (y + r * 0.9).round();
+        let height = (across * 0.3).round().max(2.);
+        let dot = base - space - width;
+        Some(Bang {
+            top: dot - space - height,
+            width,
+            height,
+            dot,
+        })
+    } else {
+        bang(across, y)
+    };
+    ((x, y), r, gap, bang)
+}
+
+/// The nearest whole width to `w` that centres in `across` (odd in an odd
+/// width, even in an even one).
+fn whole(w: f32, across: f32) -> f32 {
+    let odd = across % 2. == 1.;
+    let w = if odd {
+        ((w - 1.) / 2.).round() * 2. + 1.
+    } else {
+        (w / 2.).round() * 2.
+    };
+    w.max(if odd { 1. } else { 2. })
+}
+
+/// The circle's "!" on whole pixels, `across` wide about `y`: a stem a
+/// sixth of the circle wide, a space and a dot as wide as the stem, with
+/// a margin above and below; none where the circle has no room for one.
+// literal: the badge's drawing (design/proposals/tray-badge.html)
+fn bang(across: f32, y: f32) -> Option<Bang> {
+    let width = whole(across / 6., across);
+    let space = (across / 8.).round().max(1.);
+    let margin = (across / 8.).round().max(1.);
+    let room = across - 2. * margin;
+    let height = (across * 0.375).round().min(room - space - width);
+    // A stem half again as tall as it's wide, or it reads as a block.
+    if height < 1.5 * width {
+        return None;
+    }
+    let top = (y - (height + space + width) / 2.).round();
+    Some(Bang {
+        top,
+        width,
+        height,
+        dot: top + height + space,
+    })
+}
+
+/// The badge `place` puts on the bird, as `badge` draws it.
+// literal: the badge's drawing (design/proposals/bird-calling.html)
+pub(super) fn badge_at(
+    place: Place,
+    s: f32,
+    size: f32,
+    warning: bool,
+    colour: &str,
+    on: &str,
+) -> (String, String, String) {
+    let ((x, y), r, gap, bang) = shape(place, s, warning);
     let grow = format!(
         r#" transform="translate({x:.2} {y:.2}) scale({size:.3}) translate({:.2} {:.2})""#,
         -x, -y
     );
-    let bar = 2. * s;
-    let mark = |top: f32, height: f32, dot: f32| {
+    let mark = if let Some(bang) = bang.filter(|_| size > 0.8) {
+        let left = if place.snapped {
+            (x - bang.width / 2.).round()
+        } else {
+            x - bang.width / 2.
+        };
         format!(
-            r##"<rect x="{:.2}" y="{:.2}" width="{bar:.2}" height="{height:.2}" fill="{on}"/><rect x="{:.2}" y="{:.2}" width="{bar:.2}" height="{bar:.2}" fill="{on}"/>"##,
-            x - bar / 2.,
-            top,
-            x - bar / 2.,
-            dot
+            r##"<rect x="{left:.2}" y="{:.2}" width="{:.2}" height="{:.2}" fill="{on}"/><rect x="{left:.2}" y="{:.2}" width="{:.2}" height="{:.2}" fill="{on}"/>"##,
+            bang.top, bang.width, bang.height, bang.dot, bang.width, bang.width
         )
+    } else {
+        String::new()
     };
     if warning {
         let triangle = format!(
             "M{x:.2} {:.2}L{:.2} {:.2}H{:.2}Z",
             y - r,
             x + r,
-            y + r * 0.9,
+            if place.snapped {
+                (y + r * 0.9).round()
+            } else {
+                y + r * 0.9
+            },
             x - r
         );
         (
             format!(
                 r##"<path d="{triangle}" fill="#000" stroke="#000" stroke-width="{:.2}" stroke-linejoin="round"{grow}/>"##,
-                2.4 * s
+                2. * gap
             ),
             format!(
                 r##"<path d="{triangle}" fill="{colour}" stroke="{colour}" stroke-width="{s:.2}" stroke-linejoin="round"{grow}/>"##
             ),
-            if size > 0.8 {
-                mark(y - r * 0.35, r * 0.6, y + r * 0.45)
-            } else {
-                String::new()
-            },
+            mark,
         )
     } else {
         (
             format!(
                 r##"<circle cx="{x:.2}" cy="{y:.2}" r="{:.2}" fill="#000"/>"##,
-                (r + 1.2 * s) * size
+                (r + gap) * size
             ),
             format!(
                 r##"<circle cx="{x:.2}" cy="{y:.2}" r="{:.2}" fill="{colour}"/>"##,
                 r * size
             ),
-            if size > 0.8 {
-                mark(y - r * 0.62, r * 0.75, y + r * 0.3)
-            } else {
-                String::new()
-            },
+            mark,
         )
     }
 }
@@ -308,8 +438,13 @@ impl Art {
         self.svg_at(SQUARE as u32)
     }
 
-    // literal: the bird's drawing (design/proposals/bird-calling.html)
     pub(super) fn parts(&self, n: u32, ink: &str) -> Parts {
+        self.parts_at(n, ink, BADGE)
+    }
+
+    /// The parts with the badge at `place`.
+    // literal: the bird's drawing (design/proposals/bird-calling.html)
+    pub(super) fn parts_at(&self, n: u32, ink: &str, place: Place) -> Parts {
         let s = n as f32 / SQUARE;
         let tilt = RAISED + (DROPPED - RAISED) * self.sleep;
         let head: [P; POINTS] = if self.dashes.is_some() {
@@ -358,9 +493,9 @@ impl Art {
         }
         if let Some(size) = self.badge {
             let (c, shape, mark) = if self.warning {
-                badge(s, size, true, "#F5B740", "#1a1408")
+                badge_at(place, s, size, true, WARNING, ON_WARNING)
             } else {
-                badge(s, size, false, "#F97066", "#0b1514")
+                badge_at(place, s, size, false, TROUBLE, ON_TROUBLE)
             };
             cut += &c;
             over += &shape;

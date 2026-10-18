@@ -82,7 +82,7 @@ fn light_bar() -> bool {
 fn drawing(shape: Shape, light: bool) -> Arc<Image> {
     let svg = crate::tray::resting_svg(shape).replacen(r#"width="32" height="32""#, DRAWN_AT, 1);
     let svg = if light {
-        svg.replace("#ffffff", INK_ON_LIGHT)
+        crate::tray::for_light_bar(&svg, INK_ON_LIGHT)
     } else {
         svg
     };
