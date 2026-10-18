@@ -1109,10 +1109,16 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    secrets; the tunnel's token: the tunnel's "Rotate token", then
    CLOUDFLARE_TUNNEL_TOKEN. One tunnel for every
    run: a push cancels the branch's run still going, so two runs' gateways
-   meet only for a moment. **First run through Cloudflare: 2026-10-18**
-   (run 39138233626): the Mac's two tests passed through the real
-   gateways; Windows ran none, its module gated to macOS by mistake until
-   the next commit. The gateway tests also check the internet by name
+   meet only for a moment. **Running since 2026-10-18; both systems green
+   on 7ae0d82 (run 39149518264):** the Mac passed from its first run;
+   Windows ran none at first (the module gated to macOS by mistake), then
+   found three bugs in Crake, all fixed: a probe falling into the
+   UDP-blocked restart right after connecting (and one a reconnect
+   followed at once) left the host direct for PROBED_FOR; "not probed
+   again for 10 minutes" held across tunnels coming up (probing.rs, both
+   now: a probe across a tunnel's change doesn't count, and a tunnel
+   coming up forgets the probed hosts); and Windows' openvpn hands its
+   hook no pushed DNS (`openvpn::env::Pushed`, from openvpn's output). The gateway tests also check the internet by name
    (one.one.one.one resolved as an app resolves it, while up and after
    switching off: "my internet stopped" is almost always names, craked
    standing in for the system's DNS), and `the_internet_survives_crakeds_end`:
