@@ -1076,7 +1076,29 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    crake-ci-openvpn.dorhawk.software → tcp://localhost:1194; a
    self-hosted Access application over both that admits only the service
    token `crake-ci` (Service Auth), its ID and secret the secrets
-   CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET. One tunnel for every
+   CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET. **Set up by the user
+   on 2026-10-18**, in the user's Cloudflare account (the dorhawk.software
+   zone), all on the free Zero Trust plan:
+   - Networking → Tunnels: `crake-ci` (cloudflared), with two routes
+     (Published application): crake-ci-anyconnect.dorhawk.software →
+     tcp://localhost:8443 and crake-ci-openvpn.dorhawk.software →
+     tcp://localhost:1194; Cloudflare made a CNAME for each in the zone's
+     DNS. "Inactive" except while a CI run's gateways job is connected.
+   - Zero Trust → Access → Service credentials: the service token
+     `crake-ci` (non-expiring).
+   - Zero Trust → Access → Applications: `Crake CI gateways`
+     (self-hosted, both hostnames), with the policy `crake-ci` (Service
+     Auth, include Service Token crake-ci): nobody else gets in.
+   - GitHub, dorhawk-software/crake → Settings → Secrets → Actions:
+     CLOUDFLARE_TUNNEL_TOKEN, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET.
+   To take it down: delete the application, the policy and the service
+   token (Access), the tunnel (its routes go with it; check the two
+   CNAMEs are gone from the zone's DNS), and the three secrets; CI then
+   skips every real-gateway step by itself (no code change needed). To
+   change the token (it leaked, or a yearly habit): Access → Service
+   credentials → refresh `crake-ci`, put the new ID and secret in the two
+   secrets; the tunnel's token: the tunnel's "Rotate token", then
+   CLOUDFLARE_TUNNEL_TOKEN. One tunnel for every
    run: a push cancels the branch's run still going, so two runs' gateways
    meet only for a moment. Later: OpenVPN's browser sign-in through Cloudflare (its
    page, sso.py on 8080, needs a third hostname) and openconnect's fake
