@@ -34,12 +34,16 @@ pub fn luid(alias: &str) -> Result<NET_LUID_LH> {
 
 /// An interface's index, by its alias.
 pub fn index(alias: &str) -> Result<u32> {
-    let luid = luid(alias)?;
+    index_of(luid(alias)?).map_err(|e| anyhow::anyhow!("{alias}: {e}"))
+}
+
+/// An interface's index, by its LUID.
+pub fn index_of(luid: NET_LUID_LH) -> Result<u32> {
     let mut index = 0;
     // SAFETY: a LUID from Windows, an out pointer for the call.
     let err = unsafe { ConvertInterfaceLuidToIndex(&raw const luid, &raw mut index) };
     if err != 0 {
-        bail!("no index for {alias} ({})", os_error(err));
+        bail!("no index ({})", os_error(err));
     }
     Ok(index)
 }

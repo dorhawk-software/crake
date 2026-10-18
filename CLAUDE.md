@@ -306,6 +306,21 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    tried again"); one a company allows only from its own addresses never
    answers directly and is learned as before, at most 3 s later
    (netns-tested, fails without it).
+   Public hosts an older Crake learned by mistake (2026-10-16; Windows
+   and macOS 2026-10-18): once per version, for each tunnel that's up,
+   craked tries every public address it learned by probing directly
+   (`recheck_public`, 443 then 80) and forgets those that answer
+   ("connectivity-check.ubuntu.com goes direct again."). The try carries
+   `plan::DIRECT_MARK` (0x43520000): on Linux every tunnel's chain returns
+   on it and no `ip rule` matches (netns-tested, fails if the try goes
+   through the tunnel); on Windows and macOS, where a learned host is a
+   route craked's own socket follows too, the socket is bound to the
+   default route's interface (the best route to 0.0.0.0, IP_UNICAST_IF;
+   `route -n get default`, IP_BOUND_IF; none while that's one of Crake's
+   tunnels). Proven on CI's runners as administrator and root: a public
+   address routed into loopback or a utun nobody reads, a plain
+   connection gets nowhere, a direct one through (tests/windows_direct.rs,
+   tests/macos.rs).
    UDP (Linux): with no handshake to try, a UDP host is tried with the
    app's own first datagram. The race chain copies a new UDP
    conversation's first datagram to the same addresses as the race
@@ -1138,17 +1153,6 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   from another user's session needs root: craked can't see the user's
   sessions, the app can't see others'); worth reporting to OpenVPN (a
   Connect that times out shouldn't orphan the process).
-- **Public hosts an older Crake learned by mistake: built for Linux
-  (2026-10-16), not Windows or macOS.** Once per version, for each
-  tunnel that's up, craked tries every public address it learned by
-  probing directly (`recheck_public`, 443 then 80) and forgets those that
-  answer ("connectivity-check.ubuntu.com goes direct again."; netns-tested,
-  and it fails if the direct try goes through the tunnel). The try passes
-  the tunnels with `plan::DIRECT_MARK` (0x43520000), which every tunnel's
-  chain returns on and no `ip rule` matches. Windows and macOS route a
-  learned host with a route, which craked's own socket follows too: they'd
-  need the socket bound to the physical interface (IP_UNICAST_IF /
-  IP_BOUND_IF on the default route's device).
 - **macOS: what CI can't check of craked registered by the app.** The
   user's approval (no runner can click it), so craked under launchd from
   Crake.app, and an upgrade's restart of a registered craked

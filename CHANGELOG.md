@@ -33,6 +33,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
   Crake no longer holds back names that another VPN client on the PC serves (AnyConnect,
   GlobalProtect and the like), as it already didn't on Linux and macOS.
 
+- **Public sites a tunnel took by mistake go direct again on Windows and macOS too.** Once per
+  version, Crake tries each public address a tunnel learned and forgets those that answer
+  directly, as it already did on Linux.
+
 - **OpenVPN on Windows and macOS too.** On Windows it comes with Crake, with its drivers; on a Mac
   it comes with Homebrew's cask (`brew install openvpn` otherwise).
 

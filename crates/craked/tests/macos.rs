@@ -519,3 +519,33 @@ async fn asked_until(ask: impl Fn() -> String, want: &str) -> String {
     }
     found
 }
+
+/// A public host Crake learned by mistake is a route through its tunnel,
+/// which craked's own sockets follow too; the re-check's direct mark binds
+/// to the default route's interface instead (`recheck_public`). Here a
+/// public address goes into a utun nobody reads: a plain connection gets
+/// nowhere, a direct one gets through.
+#[tokio::test]
+async fn the_direct_mark_passes_a_learned_route() {
+    if !enabled() {
+        return;
+    }
+    use std::time::Duration;
+    let (_fd, dev) = utun();
+    sh("ifconfig", &[&dev, "10.99.0.1", "10.99.0.1", "up"]);
+    sh(
+        "route",
+        &["-n", "add", "-host", "1.1.1.1", "-interface", &dev],
+    );
+    assert_eq!(way("1.1.1.1"), dev, "1.1.1.1 goes into the utun");
+    let addr = std::net::SocketAddr::from(([1, 1, 1, 1], 443));
+    let plain = tokio::time::timeout(Duration::from_secs(3), tokio::net::TcpStream::connect(addr))
+        .await
+        .is_ok_and(|c| c.is_ok());
+    let direct =
+        craked::probe::through_tunnel(addr, craked::plan::DIRECT_MARK, Duration::from_secs(10))
+            .await;
+    sh("route", &["-n", "delete", "-host", "1.1.1.1"]);
+    assert!(!plain, "a plain connection went around the utun");
+    assert!(direct.is_some(), "the direct mark didn't get through");
+}

@@ -241,6 +241,10 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: The tests that aren't Linux's own, on Windows
+        # The runner's user is an administrator: tests/windows_direct.rs
+        # routes a public address into the loopback interface.
+        env:
+          CRAKE_WINDOWS_ADMIN: "1"
         run: cargo test --workspace --locked
       - name: crake.exe, craked.exe and crake-hook.exe (unsigned)
         run: cargo build --release --locked -p crake -p craked

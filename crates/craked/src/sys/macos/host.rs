@@ -21,15 +21,39 @@ pub(crate) fn set_path(mark: u32, device: Option<&str>) {
     };
 }
 
-/// A socket that takes the tunnel's path: bound to its interface.
+/// A socket that takes the tunnel's path: bound to its interface. The
+/// direct mark (`plan::DIRECT_MARK`, the re-check of public hosts learned
+/// by mistake) binds to the default route's: a learned host's route goes
+/// through its tunnel, and craked's own sockets follow routes too.
 pub fn mark(sock: &impl AsRawFd, mark: u32) -> std::io::Result<()> {
-    let device = PATHS
+    let tunnels = PATHS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .get(&mark)
-        .cloned()
-        .ok_or_else(|| std::io::Error::other("no tunnel is up for this path"))?;
+        .clone();
+    let device = if mark == crate::plan::DIRECT_MARK {
+        direct_device(&tunnels)?
+    } else {
+        tunnels
+            .get(&mark)
+            .cloned()
+            .ok_or_else(|| std::io::Error::other("no tunnel is up for this path"))?
+    };
     bind_device(sock, &device)
+}
+
+/// The default route's interface (`route -n get default`: Crake's own
+/// default routes are scoped to their utuns, a full tunnel's are halves);
+/// none while that's a tunnel of Crake's: nothing goes direct then.
+fn direct_device(tunnels: &BTreeMap<u32, String>) -> std::io::Result<String> {
+    let out = std::process::Command::new("route")
+        .args(["-n", "get", "default"])
+        .output()?;
+    let device = super::cmd::route_interface(&String::from_utf8_lossy(&out.stdout))
+        .ok_or_else(|| std::io::Error::other("no default route"))?;
+    if tunnels.values().any(|d| *d == device) {
+        return Err(std::io::Error::other("everything goes through a tunnel"));
+    }
+    Ok(device)
 }
 
 /// A socket that leaves through this interface: IP_BOUND_IF for an IPv4

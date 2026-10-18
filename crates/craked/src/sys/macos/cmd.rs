@@ -190,6 +190,14 @@ pub fn parse_route_get(text: &str) -> (bool, Option<String>) {
     (default, gateway)
 }
 
+/// `route -n get`'s interface.
+pub fn route_interface(text: &str) -> Option<String> {
+    text.lines()
+        .find_map(|l| l.trim().strip_prefix("interface:"))
+        .map(|i| i.trim().to_owned())
+        .filter(|i| !i.is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -219,6 +227,11 @@ mod tests {
         );
         let lan = "   route to: 192.0.2.7\ndestination: 192.0.2.0\n  interface: en0\n";
         assert_eq!(super::parse_route_get(lan), (false, None));
+        assert_eq!(super::route_interface(lan).as_deref(), Some("en0"));
+        assert_eq!(
+            super::route_interface("route: writing to routing socket: not in table"),
+            None
+        );
     }
 
     #[test]

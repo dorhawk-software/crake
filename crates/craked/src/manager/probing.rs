@@ -545,10 +545,11 @@ impl Manager {
     /// per version, for each tunnel that's up, every public address it
     /// learned by probing is tried directly (craked's direct mark passes
     /// the tunnels); one that answers is forgotten, and said. A company's
-    /// host that answers only from inside stays. Linux only: elsewhere a
-    /// learned host is a route, which craked's sockets follow too.
+    /// host that answers only from inside stays. On Windows and macOS a
+    /// learned host is a route, which craked's sockets follow too: the
+    /// direct mark binds there to the default route's interface.
     pub(super) async fn recheck_public(&self) {
-        if !cfg!(target_os = "linux") || !self.cfg.apply_network {
+        if !self.cfg.apply_network {
             return;
         }
         let version = env!("CARGO_PKG_VERSION");

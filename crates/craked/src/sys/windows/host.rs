@@ -219,15 +219,46 @@ pub(crate) fn set_path(mark: u32, device: Option<&str>) {
     };
 }
 
-/// A socket that takes the tunnel's path: bound to its interface.
+/// A socket that takes the tunnel's path: bound to its interface. The
+/// direct mark (`plan::DIRECT_MARK`, the re-check of public hosts learned
+/// by mistake) binds to the default route's: a learned host's route goes
+/// through its tunnel, and craked's own sockets follow routes too.
 pub fn mark(sock: &impl std::os::windows::io::AsRawSocket, mark: u32) -> std::io::Result<()> {
-    let device = PATHS
+    let index = if mark == crate::plan::DIRECT_MARK {
+        direct_index()?
+    } else {
+        let device = PATHS
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&mark)
+            .cloned()
+            .ok_or_else(|| std::io::Error::other("no tunnel is up for this path"))?;
+        super::iphelper::index(&device).map_err(std::io::Error::other)?
+    };
+    unicast_index(sock.as_raw_socket(), index)
+}
+
+/// The interface the default route takes (the best route to 0.0.0.0: a
+/// learned host's is more specific, and leaves it alone); none while that's
+/// a tunnel of Crake's (a full tunnel's halves): nothing goes direct then.
+fn direct_index() -> std::io::Result<u32> {
+    use super::iphelper;
+    let (best, _) = iphelper::best_route(std::net::Ipv4Addr::UNSPECIFIED.into())
+        .map_err(std::io::Error::other)?;
+    let index = iphelper::index_of(best.luid).map_err(std::io::Error::other)?;
+    let tunnels: Vec<String> = PATHS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .get(&mark)
+        .values()
         .cloned()
-        .ok_or_else(|| std::io::Error::other("no tunnel is up for this path"))?;
-    unicast_if(sock.as_raw_socket(), &device)
+        .collect();
+    if tunnels
+        .iter()
+        .any(|d| iphelper::index(d).is_ok_and(|i| i == index))
+    {
+        return Err(std::io::Error::other("everything goes through a tunnel"));
+    }
+    Ok(index)
 }
 
 /// A socket that leaves through this interface.
@@ -242,10 +273,15 @@ pub fn bind_device(
 /// IPv4 socket, IPV6_UNICAST_IF (in host byte order) for an IPv6 one. The
 /// socket's family isn't asked: each is tried, and one taking it is enough.
 fn unicast_if(raw: std::os::windows::io::RawSocket, device: &str) -> std::io::Result<()> {
+    let index = super::iphelper::index(device).map_err(std::io::Error::other)?;
+    unicast_index(raw, index)
+}
+
+/// The same, by the interface's index.
+fn unicast_index(raw: std::os::windows::io::RawSocket, index: u32) -> std::io::Result<()> {
     use windows_sys::Win32::Networking::WinSock::{
         IP_UNICAST_IF, IPPROTO_IP, IPPROTO_IPV6, IPV6_UNICAST_IF, SOCKET, setsockopt,
     };
-    let index = super::iphelper::index(device).map_err(std::io::Error::other)?;
     let set = |level: i32, option: i32, value: u32| {
         // SAFETY: a live socket of ours; `value` is the u32 the option takes.
         let err = unsafe {
