@@ -1147,6 +1147,20 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    appliance (FortiGate-VM's free evaluation would carry traffic; it needs
    a Fortinet account of the user's, and FortiOS 7.4: 7.6.3 dropped the
    SSL-VPN tunnel mode openconnect speaks, to check first).
+   **The Doctor (2026-10-18, asked for by the user: investigate a Mac or
+   Windows problem without a colleague's machine):** `.github/workflows/
+   doctor.yml`, started by hand (system, tunnel anyconnect/openvpn/none,
+   minutes, shell). The CI gateways come up as in CI; on the chosen
+   runner `gateway_tests::doctor` holds the tunnel up (phases written to
+   CRAKE_DOCTOR_PHASE) while `scripts/doctor-snapshot.sh` looks before,
+   connected, off and after craked: DNS (scutil / NRPT), routes,
+   pf/firewall rules, a public name looked up and fetched, ACME's name,
+   craked's logs; the artifact `doctor-<system>` holds it all, and the
+   run's own log (run.log). With shell, tmate (mxschmitt/action-tmate,
+   pinned by commit, `limit-access-to-actor`: the starter's GitHub SSH
+   keys only; detached, so the snapshots go on). The Mac builds the
+   branch; Windows takes main's latest green CI installer and tests. CI's
+   and the Doctor's gateways jobs share one concurrency group.
    Later: OpenVPN's browser sign-in through Cloudflare (its
    page, sso.py on 8080, needs a third hostname) and openconnect's fake
    servers for the other protocols' sign-in.

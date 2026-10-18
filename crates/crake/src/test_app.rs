@@ -75,7 +75,6 @@ impl App {
     }
 
     /// Apply whatever arrives for `wait`.
-    #[cfg(any(target_os = "linux", windows))]
     pub async fn settle(&mut self, wait: Duration) {
         let end = Instant::now() + wait;
         while let Ok(Ok(u)) = tokio::time::timeout(

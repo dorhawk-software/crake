@@ -477,3 +477,84 @@ async fn the_internet_survives_crakeds_end() {
         let _ = craked.wait();
     }
 }
+
+/// The Doctor workflow (.github/workflows/doctor.yml): the tunnel it was
+/// asked for (CRAKE_DOCTOR_TUNNEL: anyconnect, openvpn or none) up for
+/// CRAKE_DOCTOR_MINUTES while scripts/doctor-snapshot.sh looks at the
+/// system, each phase said in CRAKE_DOCTOR_PHASE (a file): "connected",
+/// "off", "done". Skipped unless the workflow runs it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn doctor() {
+    let (Ok(tunnel), Ok(minutes), Ok(phase)) = (
+        std::env::var("CRAKE_DOCTOR_TUNNEL"),
+        std::env::var("CRAKE_DOCTOR_MINUTES"),
+        std::env::var("CRAKE_DOCTOR_PHASE"),
+    ) else {
+        return;
+    };
+    let say = |what: &str| std::fs::write(&phase, what).unwrap();
+    let hold = Duration::from_secs(minutes.parse::<u64>().unwrap_or(1) * 60);
+    let mut crake = Crake::start().await;
+    let name = match tunnel.as_str() {
+        "anyconnect" => {
+            let session = sign_in().await;
+            crake
+                .app
+                .send(Command::ConnectWithSession("acme".into(), session));
+            crake.app.within(WAIT, "ACME connected", connected).await;
+            Some("acme")
+        }
+        "openvpn" => {
+            let remote = std::env::var("CRAKE_GATEWAY_OPENVPN").expect("CRAKE_GATEWAY_OPENVPN");
+            let ca = std::fs::read_to_string(std::env::var("CRAKE_GATEWAY_CA").unwrap()).unwrap();
+            let profile = format!(
+                "client\ndev tun\nproto tcp-client\nremote {remote}\nnobind\nauth-user-pass\n\
+                 remote-cert-tls server\n<ca>\n{ca}</ca>\n"
+            );
+            crake
+                .add(&[
+                    ("display_name", "Initech"),
+                    ("protocol", "openvpn"),
+                    ("profile", profile.as_str()),
+                ])
+                .await;
+            let app = &mut crake.app;
+            app.send(Command::Connect("initech".into()));
+            for (kind, text) in [("user", "alice"), ("password", "hunter2")] {
+                let ask = app.asked(kind).await;
+                app.send(Command::Answer(
+                    "initech".into(),
+                    ask["id"].parse().unwrap(),
+                    text.to_owned(),
+                ));
+            }
+            app.within(WAIT, "Initech connected", |m| {
+                m.tunnels
+                    .iter()
+                    .any(|t| t.name == "initech" && t.state == "connected")
+            })
+            .await;
+            Some("initech")
+        }
+        _ => None,
+    };
+    // A host through it, as a person's first visit would go.
+    if name.is_some() {
+        let _ = get_within("10.40.1.10").await;
+    }
+    say("connected");
+    crake.app.settle(hold).await;
+    if let Some(name) = name {
+        crake.app.send(Command::Disconnect(name.into()));
+        crake
+            .app
+            .within(WAIT, "off", |m| {
+                m.tunnels.iter().any(|t| t.name == name && t.state == "off")
+            })
+            .await;
+    }
+    say("off");
+    crake.app.settle(Duration::from_secs(20)).await;
+    crake.stop().await;
+    say("done");
+}

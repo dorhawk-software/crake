@@ -188,6 +188,11 @@ jobs:
   # the tunnel's secrets (a fork, or before it's set up) it does nothing.
   gateways:
     runs-on: ubuntu-24.04
+    # One gateways job at a time, CI's or the Doctor's: they share the one
+    # Cloudflare tunnel, and each image makes its own OpenVPN CA.
+    concurrency:
+      group: cloudflare-gateways
+      cancel-in-progress: false
     permissions:
       contents: read
       # This run's jobs: whether the Mac's is done.

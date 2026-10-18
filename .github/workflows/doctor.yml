@@ -1,0 +1,152 @@
+# The Doctor, started by hand (Actions → Doctor → Run workflow): Crake on
+# GitHub's Mac or Windows, a tunnel to the CI gateways (AnyConnect or
+# OpenVPN, through Cloudflare, as CI's real-gateway tests reach them) up
+# for the minutes asked, and a look at the system before, while
+# connected, after switching off and after craked stops: DNS, routes,
+# firewall rules, a public name looked up and fetched, craked's logs. It
+# all comes back as the artifact "doctor-<system>". With "shell", an SSH
+# session onto that machine while the tunnel is up, for the keys on the
+# starter's GitHub profile only (tmate; the address is in the step's log).
+# The Mac builds the branch; Windows takes the installer and the tests
+# from main's latest green CI run. CLAUDE.md, 7j.
+name: Doctor
+
+on:
+  workflow_dispatch:
+    inputs:
+      system:
+        description: Which machine
+        type: choice
+        options: [macos, windows]
+        default: macos
+      tunnel:
+        description: Which tunnel to hold up
+        type: choice
+        options: [anyconnect, openvpn, none]
+        default: anyconnect
+      minutes:
+        description: How long it stays up
+        type: number
+        default: 5
+      shell:
+        description: An SSH session onto the machine meanwhile (your GitHub SSH keys only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One at a time: the CI gateways' tunnel serves one Doctor and CI.
+concurrency:
+  group: doctor
+  cancel-in-progress: false
+
+jobs:
+  # ACME's gateways, as CI's gateways job has them (scripts/ci-gateways.sh).
+  gateways:
+    runs-on: ubuntu-24.04
+    # One gateways job at a time, CI's or the Doctor's: they share the one
+    # Cloudflare tunnel, and each image makes its own OpenVPN CA.
+    concurrency:
+      group: cloudflare-gateways
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: ACME's gateways
+        run: scripts/ci-gateways.sh up "$RUNNER_TEMP/gateways"
+      - name: Published by Cloudflare Tunnel
+        env:
+          CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+        run: |
+          sh scripts/cloudflared.sh linux "$RUNNER_TEMP/cloudflared"
+          nohup "$RUNNER_TEMP/cloudflared" tunnel --no-autoupdate run --token "$CLOUDFLARE_TUNNEL_TOKEN" \
+            > "$RUNNER_TEMP/cloudflared.log" 2>&1 &
+          for i in $(seq 60); do
+            grep -q "Registered tunnel connection" "$RUNNER_TEMP/cloudflared.log" && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/cloudflared.log"
+          exit 1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: gateways-ready
+          path: ${{ runner.temp }}/gateways/openvpn-ca.crt
+      - name: Up until the Doctor is done
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/ci-gateways.sh wait doctor
+      - name: What the gateways said
+        if: always()
+        run: scripts/ci-gateways.sh down "$RUNNER_TEMP/gateways"
+
+  doctor:
+    runs-on: ${{ inputs.system == 'windows' && 'windows-latest' || 'macos-latest' }}
+    permissions:
+      contents: read
+      actions: read
+    env:
+      SYSTEM: ${{ inputs.system }}
+      CRAKE_DOCTOR_TUNNEL: ${{ inputs.tunnel }}
+      CRAKE_DOCTOR_MINUTES: ${{ inputs.minutes }}
+      CRAKE_GATEWAY_FILTER: gateway_tests::doctor
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        if: inputs.system == 'macos'
+      - uses: Swatinem/rust-cache@v2
+        if: inputs.system == 'macos'
+        with:
+          save-if: false
+      - name: Main's latest installer and tests (Windows)
+        if: inputs.system == 'windows'
+        shell: bash
+        run: |
+          RUN=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --status success \
+            --limit 1 --json databaseId --jq '.[0].databaseId')
+          echo "From CI run $RUN"
+          gh run download "$RUN" -R "$GITHUB_REPOSITORY" -n crake-windows-setup -D setup
+          gh run download "$RUN" -R "$GITHUB_REPOSITORY" -n crake-windows-tests -D tests
+      - name: Before Crake
+        shell: bash
+        run: |
+          OUT="$RUNNER_TEMP/doctor"
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+          echo "CRAKE_DOCTOR_PHASE=$RUNNER_TEMP/doctor-phase" >> "$GITHUB_ENV"
+          sh scripts/doctor-snapshot.sh "$SYSTEM" 0-before "$OUT"
+      - name: Crake, the tunnel up (in the background)
+        shell: bash
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          if [ "$SYSTEM" = macos ]; then
+            nohup sh scripts/ci-through-cloudflare.sh macos > "$OUT/run.log" 2>&1 &
+          else
+            nohup sh scripts/ci-through-cloudflare.sh windows "$(ls setup/crake-setup-*.exe)" \
+              tests/crake-tests.exe > "$OUT/run.log" 2>&1 &
+          fi
+          echo "started"
+      - name: While connected
+        shell: bash
+        run: sh scripts/doctor-wait.sh connected 2400 && sh scripts/doctor-snapshot.sh "$SYSTEM" 1-connected "$OUT"
+      - name: An SSH session onto this machine (your GitHub SSH keys only)
+        if: inputs.shell
+        uses: mxschmitt/action-tmate@35b54afac29c97fb54faba5b513f8fbd1882f113 # v3.24
+        with:
+          detached: true
+          limit-access-to-actor: true
+      - name: Switched off
+        shell: bash
+        run: sh scripts/doctor-wait.sh off $(( ${CRAKE_DOCTOR_MINUTES:-5} * 60 + 300 )) && sh scripts/doctor-snapshot.sh "$SYSTEM" 2-off "$OUT"
+      - name: After craked
+        shell: bash
+        run: sh scripts/doctor-wait.sh done 300 && sh scripts/doctor-snapshot.sh "$SYSTEM" 3-after "$OUT"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: doctor-${{ inputs.system }}
+          path: ${{ runner.temp }}/doctor
