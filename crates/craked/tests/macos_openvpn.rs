@@ -1,6 +1,8 @@
 //! OpenVPN on macOS (CLAUDE.md, 7i, slice 5), as root on CI's Mac: craked
 //! runs Homebrew's openvpn against an openvpn server on this same Mac
-//! (loopback), signing in with a certificate: the utun the hook names gets
+//! (loopback; the server says `dev tun`, which macOS' openvpn makes a
+//! utun of: it refuses `--mode server` with `dev utun`), signing in with a
+//! certificate: the utun the hook names gets
 //! the tunnel's address and its DNS route, the tunnel comes up, and goes
 //! with its device. Not the data path (a server on the same Mac answers its
 //! own addresses directly): that's 7j's, with a gateway on another machine.
@@ -58,7 +60,7 @@ fn pki(dir: &Path) {
     assert!(dir.join("client.crt").exists(), "made the certificates");
 }
 
-const SERVER: &str = "mode server\ntls-server\ndev utun\ntopology subnet\nproto udp\n\
+const SERVER: &str = "mode server\ntls-server\ndev tun\ntopology subnet\nproto udp\n\
     local 127.0.0.1\nport 11940\nifconfig 10.88.0.1 255.255.255.0\nifconfig-pool 10.88.0.10 10.88.0.50\n\
     push \"topology subnet\"\npush \"route-gateway 10.88.0.1\"\npush \"route 10.89.0.0 255.255.0.0\"\n\
     push \"dhcp-option DNS 10.88.0.53\"\npush \"dhcp-option DOMAIN mac.internal\"\n\
