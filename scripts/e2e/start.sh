@@ -3,7 +3,8 @@
 # only through a tunnel: its DNS (10.40.0.2) and two web servers (git,
 # wiki); the wire to the client (relay.py) as the gateway's public side;
 # a public web server (203.0.113.80) that only answers direct; ocserv and
-# openvpn as ACME's two gateways.
+# openvpn as ACME's two gateways; openconnect's fake servers for the other
+# protocols' sign-in.
 set -e
 ip link set lo up
 ip link add acme type dummy
@@ -33,4 +34,9 @@ busybox httpd -p 80 -h /srv/www
 cp /etc/openvpn/e2e/ca.crt /link/openvpn-ca.crt
 openvpn --config /etc/openvpn/e2e/server.conf > /link/openvpn-server.log 2>&1 &
 python3 /sso.py /run/openvpn-mgmt.sock 198.51.100.10 8080 &
+# The other protocols' sign-in (e2e_protocols.rs), one port each.
+for gw in fortinet:4431 gp:4432 f5:4433 juniper:4434; do
+  python3 "/fake/fake-${gw%%:*}-server.py" 198.51.100.10 "${gw##*:}" /etc/ocserv/cert.pem /etc/ocserv/key.pem \
+    > "/link/fake-${gw%%:*}.log" 2>&1 &
+done
 exec ocserv --foreground --config /etc/ocserv/ocserv.conf

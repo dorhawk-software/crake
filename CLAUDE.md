@@ -1100,7 +1100,39 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    secrets; the tunnel's token: the tunnel's "Rotate token", then
    CLOUDFLARE_TUNNEL_TOKEN. One tunnel for every
    run: a push cancels the branch's run still going, so two runs' gateways
-   meet only for a moment. Later: OpenVPN's browser sign-in through Cloudflare (its
+   meet only for a moment. **First run through Cloudflare: 2026-10-18**
+   (run 39138233626): the Mac's two tests passed through the real
+   gateways; Windows ran none, its module gated to macOS by mistake until
+   the next commit. The gateway tests also check the internet by name
+   (one.one.one.one resolved as an app resolves it, while up and after
+   switching off: "my internet stopped" is almost always names, craked
+   standing in for the system's DNS), and `the_internet_survives_crakeds_end`:
+   craked killed mid-connection (macOS: a craked process of its own,
+   SIGKILL, started again as launchd would; Windows: the service's
+   process, restarted by Windows), then within 45 s names work and macOS'
+   DNS no longer points at 127.53.0.1.
+   **The other protocols' sign-in (Linux e2e, 2026-10-18):**
+   `e2e_protocols.rs` against openconnect's own fake servers for Fortinet,
+   GlobalProtect, F5 and Juniper/Pulse (openconnect 9.12's tests/, LGPL,
+   fetched into the e2e image pinned by checksum, one port each,
+   4431-4434; Fortinet's, F5's and Juniper's cookie helper patched at
+   build: their bytes cookie makes today's Werkzeug answer 500, and
+   openconnect then asks for the password forever). Crake's sign-in asks
+   what each asks and gets a session: Fortinet's code (tokeninfo),
+   GlobalProtect's portal then gateway, F5's domain as a choice,
+   Juniper's realm and token page (set through each server's /CONFIGURE,
+   not the address); a sign-in that asks more than 8 questions fails
+   instead of looping. Switched on with the session, craked's tunnel ends
+   in trouble with a reason when the gateway refuses it at the tunnel
+   stage (the fake servers carry no traffic). A regression guard for
+   sign-in, not proof against a company's real gateway (forms, ports,
+   SAML through ADFS, host checks, EMS): those protocols stay Beta until
+   one is used. Array has no fake server. Not yet through Cloudflare for
+   the Mac and Windows (four more hostnames), nor a vendor's own virtual
+   appliance (FortiGate-VM's free evaluation would carry traffic; it needs
+   a Fortinet account of the user's, and FortiOS 7.4: 7.6.3 dropped the
+   SSL-VPN tunnel mode openconnect speaks, to check first).
+   Later: OpenVPN's browser sign-in through Cloudflare (its
    page, sso.py on 8080, needs a third hostname) and openconnect's fake
    servers for the other protocols' sign-in.
 8. **Someday: other platforms** (see below). Not before Linux is solid.
