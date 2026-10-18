@@ -274,6 +274,15 @@ impl Manager {
                     crate::config::Protocol::Openvpn => crate::openvpn::env::info(&msg.env)?,
                     _ => TunnelInfo::from_env(&msg.env)?,
                 };
+                // What the engine handed over: its variables' names (values
+                // may be personal), and what Crake made of them.
+                tracing::debug!(
+                    tunnel = name,
+                    keys = ?msg.env.keys().collect::<Vec<_>>(),
+                    ?info,
+                    "the hook's {}",
+                    msg.reason
+                );
                 if !crate::sys::tunnel_device(name, &info.device) {
                     bail!("device {} does not belong to {display}", info.device);
                 }

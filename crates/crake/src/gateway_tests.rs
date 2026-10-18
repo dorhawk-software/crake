@@ -250,6 +250,25 @@ fn diagnose(device: &str) -> String {
     format!("where 10.40.1.10 goes and what craked decided:\n{seen}")
 }
 
+/// Where wiki.acme.internal's answer came from, and what craked was told
+/// of the tunnel's DNS: for a failure's message.
+fn diagnose_name(device: &str) -> String {
+    #[cfg(target_os = "macos")]
+    let seen = sh(&format!(
+        "scutil --dns | head -60; route -n get 10.40.1.11; ifconfig {device}; cat /etc/resolver/* 2>/dev/null"
+    ));
+    #[cfg(windows)]
+    let seen = sh(&format!(
+        "'cache:'; Get-DnsClientCache -Entry wiki.acme.internal -ErrorAction SilentlyContinue | Format-List | Out-String; \
+         'NRPT:'; Get-DnsClientNrptRule | Format-Table Namespace,NameServers -AutoSize | Out-String; \
+         'route:'; Find-NetRoute -RemoteIPAddress 10.40.1.11 | Select-Object -Last 1 | Format-List InterfaceAlias,DestinationPrefix | Out-String; \
+         'decisions:'; Get-Content C:\\ProgramData\\Crake\\log -Tail 8 | Out-String; \
+         'the hook:'; Get-Content C:\\ProgramData\\Crake\\craked.log | Select-String -Pattern \"the hook's\" | Select-Object -Last 3 | Out-String; \
+         '{device}'"
+    ));
+    format!("where wiki.acme.internal's answer came from:\n{seen}")
+}
+
 /// What a tunnel that's up must give: ACME's network through it, its names
 /// before the first packet, and the internet directly.
 async fn the_split_holds(crake: &Crake, tunnel: &str) {
@@ -275,7 +294,8 @@ async fn the_split_holds(crake: &Crake, tunnel: &str) {
     .unwrap();
     assert!(
         named.is_ok_and(|b| b.contains("crex")),
-        "wiki.acme.internal"
+        "wiki.acme.internal through {tunnel}\n{}",
+        diagnose_name(&device)
     );
     // 3. The internet, directly: it answers, and not through the tunnel
     //    (the OpenVPN gateway pushes redirect-gateway; Crake leaves it).
