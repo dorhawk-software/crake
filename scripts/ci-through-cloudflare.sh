@@ -25,6 +25,9 @@ else
   # Silent, as a company's software deployment would: the service and both
   # engines' drivers (crake.nsi).
   powershell -NoProfile -Command "\$p = Start-Process '$2' -ArgumentList '/S' -Wait -PassThru; exit \$p.ExitCode"
+  # craked's debug lines in its log, for a failure's message (as the VM
+  # test sets them).
+  powershell -NoProfile -Command "Set-ItemProperty HKLM:\\SYSTEM\\CurrentControlSet\\Services\\craked -Name Environment -Type MultiString -Value 'RUST_LOG=craked=debug,info'; Restart-Service craked"
 fi
 CLOUDFLARED=$WORK/cloudflared
 [ "$SYSTEM" = macos ] || CLOUDFLARED=$CLOUDFLARED.exe

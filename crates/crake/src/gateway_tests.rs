@@ -243,7 +243,9 @@ fn diagnose(device: &str) -> String {
         "Find-NetRoute -RemoteIPAddress 10.40.1.10 | Format-List | Out-String; \
          Get-NetIPAddress -InterfaceAlias {device} -ErrorAction SilentlyContinue | Format-Table | Out-String; \
          Get-NetRoute -InterfaceAlias {device} -ErrorAction SilentlyContinue | Format-Table | Out-String; \
-         Get-Content C:\\ProgramData\\Crake\\craked.log | Select-String -Pattern 'probe|Sent |Left |No answer|answered|learn|WARN|ERROR' | Select-Object -Last 40 | Out-String"
+         'ACME DNS through the tunnel:'; Resolve-DnsName git.acme.internal -Server 10.40.0.2 -DnsOnly -QuickTimeout -ErrorAction Continue 2>&1 | Out-String; \
+         'decisions:'; Get-Content C:\\ProgramData\\Crake\\log -Tail 15 | Out-String; \
+         'craked:'; Get-Content C:\\ProgramData\\Crake\\craked.log | Select-String -Pattern 'probe|flow|stuck|SYN|10.40.1.10|WARN|ERROR' | Select-Object -Last 40 | Out-String"
     ));
     format!("where 10.40.1.10 goes and what craked decided:\n{seen}")
 }
