@@ -201,7 +201,8 @@ impl Manager {
         use std::io::Write;
         let path = crate::openvpn::profile_path(&self.cfg.state_path, name);
         if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir).with_context(|| format!("making {}", dir.display()))?;
+            crate::sys::create_private_dir(dir)
+                .with_context(|| format!("making {}", dir.display()))?;
         }
         let mut f = crate::sys::create_private(&path)
             .with_context(|| format!("writing {}", path.display()))?;

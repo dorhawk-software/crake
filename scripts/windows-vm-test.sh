@@ -83,6 +83,7 @@ fi
 # --- Crake for Windows ------------------------------------------------------
 echo "== Building Crake for Windows (MinGW, in a container)"
 [ -x target/windows/openconnect/openconnect.exe ] || scripts/build-openconnect-windows.sh
+[ -f target/windows/openvpn/bin/openvpn.exe ] || scripts/fetch-openvpn-windows.sh
 OUT=$PWD/target/windows/vm
 mkdir -p "$OUT"
 docker build -q -t crake-windows-build scripts/windows >/dev/null
@@ -115,9 +116,10 @@ fi
 mkdir -p "$WORK/test/crake/openconnect" "$WORK/test/e2e"
 cp "$OUT/craked.exe" "$OUT/crake-hook.exe" packaging/windows/crake-hook.js "$WORK/test/crake/"
 cp target/windows/openconnect/* "$WORK/test/crake/openconnect/"
+cp -r target/windows/openvpn "$WORK/test/crake/openvpn"
 cp "$OUT/crake-tests.exe" scripts/windows-vm-test/run.ps1 "$WORK/test/"
 [ -z "$SETUP" ] || cp "$SETUP" "$WORK/test/crake-setup.exe"
-cp scripts/e2e/ocserv.conf "$WORK/test/e2e/"
+cp scripts/e2e/ocserv.conf scripts/e2e/openvpn.conf scripts/e2e/sso.py "$WORK/test/e2e/"
 cp scripts/windows-vm-test/gateway.sh "$WORK/test/"
 xorriso -as mkisofs -quiet -output "$WORK/test.iso" -volid CRAKETEST -joliet -rock "$WORK/test"
 

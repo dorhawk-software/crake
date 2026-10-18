@@ -90,8 +90,3 @@ pub fn profile_path(state_path: &Path, tunnel: &str) -> PathBuf {
         .with_file_name("profiles")
         .join(format!("{tunnel}.ovpn"))
 }
-
-/// The tunnel's management socket, beside the hook's.
-pub fn management_path(hook_socket: &Path, tunnel: &str) -> PathBuf {
-    hook_socket.with_file_name(format!("openvpn-{tunnel}.sock"))
-}

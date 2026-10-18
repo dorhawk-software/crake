@@ -18,6 +18,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
   something on your computer is refused, saying why. Beta until it has met a real gateway. The
   packages now recommend openvpn.
 
+- **OpenVPN on Windows and macOS too.** On Windows it comes with Crake, with its drivers; on a Mac
+  it comes with Homebrew's cask (`brew install openvpn` otherwise).
+
 - **Your OpenVPN 3 tunnels move to it.** Each one is copied over once, while it's off, and the log
   says so; OpenVPN 3 keeps its own profile. One whose profile OpenVPN 3 keeps locked stays where it
   is, and the panel asks for its .ovpn file.

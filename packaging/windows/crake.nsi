@@ -1,6 +1,7 @@
 ; Crake's installer for Windows (scripts/build-windows-installer.sh builds
-; it with NSIS): Program Files\Crake with openconnect and Wintun beside it
-; (their licences and where their source is, too), craked as an automatic
+; it with NSIS): Program Files\Crake with openconnect and Wintun, and
+; OpenVPN and its two drivers, beside it (their licences and where their
+; source is, too; the drivers into Windows' driver store), craked as an automatic
 ; service, a Start menu entry, and an entry in Installed apps. Installing
 ; over an older Crake stops its service first. Uninstalling stops and
 ; removes the service and the programs; the user's tunnels and log stay
@@ -34,7 +35,7 @@ VIAddVersionKey "LegalCopyright" "GPL-3.0-or-later"
 !define MUI_UNICON "${SRC}\crake.ico"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Crake"
-!define MUI_WELCOMEPAGE_TEXT "Crake connects to your VPNs but routes nothing by default. It learns, per host, what needs a tunnel and sends only that through, telling you each time.$\r$\n$\r$\nThis will install Crake, with openconnect and Wintun beside it, and run it as a background service."
+!define MUI_WELCOMEPAGE_TEXT "Crake connects to your VPNs but routes nothing by default. It learns, per host, what needs a tunnel and sends only that through, telling you each time.$\r$\n$\r$\nThis will install Crake, with openconnect, Wintun and OpenVPN beside it, and run it as a background service."
 !define MUI_FINISHPAGE_RUN "$INSTDIR\crake.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "Open Crake"
 !define MUI_FINISHPAGE_RUN_NOTCHECKED
@@ -77,7 +78,22 @@ Section "Crake"
   File "${SRC}\LICENSE.txt"
   SetOutPath "$INSTDIR\openconnect"
   File /r "${SRC}\openconnect\*"
+  SetOutPath "$INSTDIR\openvpn"
+  File /r "${SRC}\openvpn\*"
   SetOutPath "$INSTDIR"
+
+  ; OpenVPN's drivers (signed by Microsoft for OpenVPN Inc.): ovpn-dco, its
+  ; build for Windows 11 or 10, and tap-windows6. craked makes each OpenVPN
+  ; tunnel's adapter with them. pnputil through Sysnative: this installer is
+  ; 32-bit, and System32's 64-bit pnputil is hidden from it otherwise.
+  ReadRegStr $0 HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion" "CurrentBuildNumber"
+  StrCpy $1 "Win10"
+  IntCmp $0 22000 win11 win10 win11
+  win11:
+    StrCpy $1 "Win11"
+  win10:
+  nsExec::ExecToLog '"$WINDIR\Sysnative\pnputil.exe" /add-driver "$INSTDIR\openvpn\ovpn-dco\$1\ovpn-dco.inf" /install'
+  nsExec::ExecToLog '"$WINDIR\Sysnative\pnputil.exe" /add-driver "$INSTDIR\openvpn\tap-windows6\OemVista.inf" /install'
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
   ; craked as a service (created once; an upgrade keeps it).
@@ -108,6 +124,9 @@ Section "Uninstall"
   nsExec::Exec 'sc.exe delete craked'
   Delete "$SMPROGRAMS\Crake.lnk"
   RMDir /r "$INSTDIR\openconnect"
+  ; The drivers stay in Windows' driver store (with no adapter left, they
+  ; do nothing; OpenVPN's own installer may share them).
+  RMDir /r "$INSTDIR\openvpn"
   Delete "$INSTDIR\crake.exe"
   Delete "$INSTDIR\craked.exe"
   Delete "$INSTDIR\crake-hook.exe"

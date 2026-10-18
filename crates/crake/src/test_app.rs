@@ -54,11 +54,10 @@ impl App {
         }
     }
 
-    /// The next question an OpenVPN tunnel's sign-in asks (5 s at most),
+    /// The next question an OpenVPN tunnel's sign-in asks (30 s at most),
     /// applying what comes before it.
-    #[cfg(target_os = "linux")]
     pub async fn asked(&mut self, what: &str) -> std::collections::HashMap<String, String> {
-        let end = Instant::now() + Duration::from_secs(5);
+        let end = Instant::now() + Duration::from_secs(30);
         loop {
             let left = end.saturating_duration_since(Instant::now());
             match tokio::time::timeout(left, self.updates.recv()).await {

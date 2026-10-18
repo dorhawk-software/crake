@@ -317,8 +317,36 @@ pub fn in_console_session(pid: u32) -> bool {
     found && session == unsafe { WTSGetActiveConsoleSessionId() }
 }
 
-/// A new file for craked alone, replacing any older one (the service's
-/// folder is only open to SYSTEM and administrators).
+/// A folder for SYSTEM and administrators alone (OpenVPN's profiles and
+/// runs): its access not inherited from ProgramData, where every user may
+/// read. By SID: the groups' names are the system language's.
+pub fn create_private_dir(dir: &Path) -> std::io::Result<()> {
+    use std::os::windows::process::CommandExt as _;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    std::fs::create_dir_all(dir)?;
+    let status = std::process::Command::new("icacls")
+        .arg(dir)
+        .args([
+            "/inheritance:r",
+            "/grant:r",
+            "*S-1-5-18:(OI)(CI)F",
+            "*S-1-5-32-544:(OI)(CI)F",
+            "/q",
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(std::io::Error::other(format!(
+            "icacls couldn\u{2019}t lock {}",
+            dir.display()
+        )))
+    }
+}
+
+/// A new file for craked alone, replacing any older one: in a folder made
+/// with `create_private_dir` (ProgramData\Crake itself lets users read).
 pub fn create_private(path: &Path) -> std::io::Result<std::fs::File> {
     let _ = std::fs::remove_file(path);
     std::fs::File::create(path)

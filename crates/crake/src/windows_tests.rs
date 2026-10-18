@@ -451,3 +451,109 @@ async fn a_full_tunnel_without_ipv6() {
     })
     .await;
 }
+
+/// OpenVPN on Windows (CLAUDE.md, 7i, slice 4): the installed service runs
+/// the openvpn beside it against ACME's OpenVPN gateway, on an adapter of
+/// its own (ovpn-dco, made with tapctl), with a password sign-in answered
+/// as the app's sign-in window does; a host that doesn't answer directly
+/// gets through it; off, its adapter goes.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_openvpn_tunnel() {
+    if !enabled() {
+        return;
+    }
+    let ca = tokio::task::spawn_blocking(|| {
+        let addr: std::net::SocketAddr = "198.51.100.10:80".parse().unwrap();
+        let mut s = std::net::TcpStream::connect_timeout(&addr, Duration::from_secs(5)).unwrap();
+        use std::io::{Read, Write};
+        s.write_all(b"GET /openvpn-ca.crt HTTP/1.0\r\n\r\n")
+            .unwrap();
+        let mut body = String::new();
+        s.read_to_string(&mut body).unwrap();
+        body.split_once("\r\n\r\n")
+            .map(|(_, b)| b.to_owned())
+            .unwrap_or_default()
+    })
+    .await
+    .unwrap();
+    assert!(ca.contains("BEGIN CERTIFICATE"), "the gateway's CA: {ca}");
+    let profile = format!(
+        "client\ndev tun\nproto udp\nremote 198.51.100.10 1194\nnobind\nauth-user-pass\n\
+         remote-cert-tls server\n<ca>\n{ca}</ca>\n"
+    );
+    let (tx, updates) = async_channel::unbounded();
+    let mut app = App::new(client::start(tx), updates);
+    app.within(Duration::from_secs(30), "the craked service", |m| {
+        m.reachable == Some(true) && !m.settings.is_empty()
+    })
+    .await;
+    for old in ["acme", "globex", "initech"] {
+        if app.state(old).is_some() {
+            app.send(Command::RemoveTunnel(old.into()));
+            app.until("an old one gone", |m| {
+                !m.tunnels.iter().any(|t| t.name == old)
+            })
+            .await;
+        }
+    }
+    let fields: HashMap<String, String> = [
+        ("display_name", "Initech"),
+        ("protocol", "openvpn"),
+        ("profile", profile.as_str()),
+    ]
+    .iter()
+    .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+    .collect();
+    app.send(Command::AddTunnel(fields));
+    app.until("added", |m| m.tunnels.iter().any(|t| t.name == "initech"))
+        .await;
+
+    app.send(Command::Connect("initech".into()));
+    let answer = |ask: &HashMap<String, String>, text: &str| {
+        Command::Answer(
+            "initech".into(),
+            ask["id"].parse().unwrap(),
+            text.to_owned(),
+        )
+    };
+    let ask = app.asked("the username").await;
+    assert_eq!(ask["kind"], "user");
+    app.send(answer(&ask, "alice"));
+    let ask = app.asked("the password").await;
+    assert_eq!(ask["kind"], "password");
+    app.send(answer(&ask, "hunter2"));
+    app.within(Duration::from_secs(60), "Initech connected", |m| {
+        m.tunnels
+            .iter()
+            .any(|t| t.name == "initech" && t.state == "connected")
+    })
+    .await;
+    let addr = ps("(Get-NetIPAddress -InterfaceAlias crake-initech -AddressFamily IPv4).IPAddress");
+    assert!(
+        addr.contains("10.40.254."),
+        "crake-initech's address: {addr}"
+    );
+    let (through, tries) =
+        tokio::task::spawn_blocking(|| get_within("10.40.1.12", Duration::from_secs(30)))
+            .await
+            .unwrap();
+    assert!(
+        through.is_some_and(|b| b.contains("crex")),
+        "10.40.1.12 through Initech ({tries} tries)"
+    );
+
+    app.send(Command::Disconnect("initech".into()));
+    app.within(Duration::from_secs(30), "Initech off", |m| {
+        m.tunnels
+            .iter()
+            .any(|t| t.name == "initech" && t.state == "off")
+    })
+    .await;
+    let left = ps("Get-NetAdapter -Name crake-initech -ErrorAction SilentlyContinue");
+    assert!(left.trim().is_empty(), "its adapter went: {left}");
+    app.send(Command::RemoveTunnel("initech".into()));
+    app.until("removed", |m| {
+        !m.tunnels.iter().any(|t| t.name == "initech")
+    })
+    .await;
+}

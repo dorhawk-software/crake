@@ -3,6 +3,7 @@
 //! to craked's own DNS server (`resolved`, `dns_queue`), the TCP connection
 //! table (`conntrack`).
 
+pub mod adapters;
 pub mod conntrack;
 pub mod dns_queue;
 pub mod net;

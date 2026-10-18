@@ -1,23 +1,21 @@
 //! One OpenVPN tunnel's openvpn: started with craked's copy of the profile,
-//! answered over its management interface (a Unix socket beside the
-//! hook's), stopped with `signal SIGTERM`, and started again without data
-//! channel offload where the gateway can't take it.
+//! answered over its management interface (`listen`), stopped with
+//! `signal SIGTERM`, and started again without data channel offload where
+//! the gateway can't take it. On Windows each run gets an adapter of its
+//! own, `crake-<name>`, made with OpenVPN's tapctl (`sys::adapters`).
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use tokio::io::AsyncWrite;
-use tokio::net::UnixStream;
 use tokio::sync::mpsc;
 
 use super::super::entry::Answers;
 use super::super::*;
+use super::listen::Listen;
 use super::sign_in::{Do, SignIn};
 use crate::openvpn::{self, AskKind, mgmt};
 
-/// How long openvpn gets to open its management socket.
-const MANAGEMENT_WAIT: Duration = Duration::from_secs(10);
-const MANAGEMENT_POLL: Duration = Duration::from_millis(50);
 /// How long it gets to stop once told to, before it's killed.
 const STOP_WAIT: Duration = Duration::from_secs(10);
 /// What openvpn 2.6 and later say when the gateway can't take data channel
@@ -83,15 +81,29 @@ impl Manager {
             }
         };
         let _ = std::fs::remove_file(self.run_config(&name));
+        #[cfg(windows)]
+        crate::sys::adapters::remove(&self.cfg.openvpn, &interface_name(&name)).await;
         self.asked(&name);
         self.finish(&name, &label, state, reason).await;
     }
 
-    /// Where a run's config goes: beside the hook's socket (tmpfs), root's only.
+    /// Where a run's files go: craked's runtime folder beside the hook's
+    /// socket (tmpfs); on Windows, whose hook is a named pipe, a private
+    /// folder beside its state.
+    fn run_dir(&self) -> PathBuf {
+        if cfg!(windows) {
+            self.cfg.state_path.with_file_name("run")
+        } else {
+            self.cfg.hook_socket.parent().map_or_else(
+                || self.cfg.state_path.with_file_name("run"),
+                Path::to_path_buf,
+            )
+        }
+    }
+
+    /// A run's config: the profile as checked, root's (SYSTEM's) only.
     fn run_config(&self, name: &str) -> PathBuf {
-        self.cfg
-            .hook_socket
-            .with_file_name(format!("openvpn-{name}.conf"))
+        self.run_dir().join(format!("openvpn-{name}.conf"))
     }
 
     async fn run_openvpn(
@@ -108,15 +120,21 @@ impl Manager {
         // Read again each time: what may run is craked's to decide now.
         let profile = openvpn::profile::check(&text).map_err(anyhow::Error::msg)?;
         let conf = self.run_config(name);
+        crate::sys::create_private_dir(&self.run_dir())
+            .with_context(|| format!("making {}", self.run_dir().display()))?;
         {
             use std::io::Write;
             let mut f = crate::sys::create_private(&conf)
                 .with_context(|| format!("writing {}", conf.display()))?;
             f.write_all(profile.text.as_bytes())?;
         }
-        let socket = openvpn::management_path(&self.cfg.hook_socket, name);
-        let _ = std::fs::remove_file(&socket);
-        let mut child = self.spawn_openvpn(name, &conf, &socket, no_dco)?;
+        #[cfg(windows)]
+        crate::sys::adapters::make(&self.cfg.openvpn, &interface_name(name), !no_dco).await?;
+        #[cfg(unix)]
+        let listen = Listen::new(&self.run_dir(), name)?;
+        #[cfg(windows)]
+        let listen = Listen::new()?;
+        let mut child = self.spawn_openvpn(name, &conf, &listen, no_dco)?;
         let heard = Arc::new(Mutex::new(Heard::default()));
         let (dco_tx, mut dco_rx) = mpsc::unbounded_channel();
         if let Some(out) = child.stdout.take() {
@@ -137,14 +155,14 @@ impl Manager {
                 Arc::clone(&self.transport),
             ));
         }
-        let Some(stream) = management(&socket, &mut child).await else {
+        let Some((reader, mut writer)) = listen.connect(&mut child).await else {
             let _ = child.kill().await;
             let last = heard.lock().unwrap().last.clone();
             return Ok(Run::Ended(TunnelState::Trouble, Some(exited(None, &last))));
         };
-        let (reader, mut writer) = stream.into_split();
         let mut lines = BufReader::new(reader).lines();
-        send(&mut writer, "state on").await;
+        let mut paced = Paced::default();
+        paced.send(&mut writer, "state on".into()).await;
         let token = self
             .tunnels
             .lock()
@@ -178,7 +196,13 @@ impl Manager {
                     return Ok(Run::WithoutDco);
                 }
                 line = lines.next_line() => match line {
-                    Ok(Some(line)) => sign_in.said(mgmt::parse(&line)),
+                    Ok(Some(line)) => {
+                        // What it said, but never a token.
+                        let shown = if line.contains("Auth-Token") { "(its token)" } else { line.as_str() };
+                        tracing::debug!("openvpn's management said: {shown}");
+                        paced.heard(&mut writer, &line).await;
+                        sign_in.said(mgmt::parse(&line))
+                    }
                     // openvpn is going: its exit says why.
                     _ => {
                         let _ = child.wait().await;
@@ -196,7 +220,7 @@ impl Manager {
             };
             for d in todo {
                 match d {
-                    Do::Send(cmd) => send(&mut writer, &cmd).await,
+                    Do::Send(cmd) => paced.send(&mut writer, cmd).await,
                     Do::Ask(kind, label, url, retry) => {
                         asked_id = Some(self.ask(name, (kind, label, url, retry), &answers));
                     }
@@ -212,11 +236,23 @@ impl Manager {
         }
     }
 
-    fn spawn_openvpn(&self, name: &str, conf: &Path, socket: &Path, no_dco: bool) -> Result<Child> {
-        let hook = self.cfg.hook_path.display().to_string();
+    fn spawn_openvpn(
+        &self,
+        name: &str,
+        conf: &Path,
+        listen: &Listen,
+        no_dco: bool,
+    ) -> Result<Child> {
+        let hook = self.openvpn_hook()?;
         let mut cmd = Command::new(&self.cfg.openvpn);
         cmd.arg("--config").arg(conf);
-        if crate::sys::NAMES_DEVICES {
+        if cfg!(windows) {
+            // Its own adapter, made for this run; Windows' address set-up
+            // is craked's (IP Helper), not openvpn's.
+            // ovpn-dco by default; --disable-dco takes tap-windows6.
+            cmd.args(["--dev", "tun", "--dev-node", &interface_name(name)])
+                .args(["--ip-win32", "manual"]);
+        } else if crate::sys::NAMES_DEVICES {
             cmd.args(["--dev", &interface_name(name), "--dev-type", "tun"]);
         } else {
             // macOS: the next free utun; the hook says which.
@@ -232,9 +268,6 @@ impl Manager {
                 &hook,
                 "--up-restart",
             ])
-            .arg("--management")
-            .arg(socket)
-            .arg("unix")
             .args(["--management-hold", "--management-query-passwords"])
             .args(["--auth-retry", "interact"])
             // It can open a sign-in page, and answer a code (CR_TEXT).
@@ -252,6 +285,7 @@ impl Manager {
             .arg(ENV_SOCKET)
             .arg(&self.cfg.hook_socket)
             .args(["--verb", "3"]);
+        listen.args(&mut cmd);
         if no_dco {
             cmd.arg("--disable-dco");
         }
@@ -263,6 +297,20 @@ impl Manager {
         crate::sys::own_group(&mut cmd);
         cmd.spawn()
             .with_context(|| format!("starting {}", self.cfg.openvpn.display()))
+    }
+
+    /// The hook, as openvpn runs it. Windows: crake-hook.exe (openvpn runs
+    /// programs, not openconnect's JScript shim), copied into the private
+    /// run folder: openvpn there takes quotes around a path as part of its
+    /// name, and Program Files has a space in it.
+    fn openvpn_hook(&self) -> Result<String> {
+        if cfg!(windows) {
+            let hook = self.cfg.hook_path.with_file_name("crake-hook.exe");
+            let copy = self.run_dir().join("crake-hook.exe");
+            std::fs::copy(&hook, &copy).with_context(|| format!("copying {}", hook.display()))?;
+            return Ok(copy.display().to_string());
+        }
+        Ok(self.cfg.hook_path.display().to_string())
     }
 
     /// A question for the user, shown by the app's sign-in window.
@@ -309,27 +357,46 @@ impl Manager {
     }
 }
 
-/// openvpn's management socket, once it's there; None if openvpn ended
-/// first or took too long.
-async fn management(socket: &Path, child: &mut Child) -> Option<UnixStream> {
-    let deadline = Instant::now() + MANAGEMENT_WAIT;
-    while Instant::now() < deadline {
-        if let Ok(stream) = UnixStream::connect(socket).await {
-            return Some(stream);
+/// Commands one at a time, each once openvpn has answered the one before
+/// (`SUCCESS:` or `ERROR:`, which every command gets): Windows' openvpn
+/// 2.7 took the second of two commands that came in one read for the
+/// first (a password went in as the username again, and sign-in hung).
+#[derive(Default)]
+struct Paced {
+    waiting: bool,
+    queue: std::collections::VecDeque<String>,
+}
+
+impl Paced {
+    async fn send(&mut self, w: &mut (impl AsyncWrite + Unpin), cmd: String) {
+        if self.waiting {
+            self.queue.push_back(cmd);
+        } else {
+            send(w, &cmd).await;
+            self.waiting = true;
         }
-        if child.try_wait().ok().flatten().is_some() {
-            return None;
-        }
-        tokio::time::sleep(MANAGEMENT_POLL).await;
     }
-    None
+
+    /// A line from openvpn: an answer lets the next command go.
+    async fn heard(&mut self, w: &mut (impl AsyncWrite + Unpin), line: &str) {
+        if !(line.starts_with("SUCCESS:") || line.starts_with("ERROR:")) {
+            return;
+        }
+        self.waiting = false;
+        if let Some(next) = self.queue.pop_front() {
+            send(w, &next).await;
+            self.waiting = true;
+        }
+    }
 }
 
 /// One command; never logged with its words (they may be a password).
 async fn send(w: &mut (impl AsyncWrite + Unpin), cmd: &str) {
+    /// The interface reads a line to its end: CR LF on Windows.
+    const END: &str = if cfg!(windows) { "\r\n" } else { "\n" };
     let verb = cmd.split_whitespace().next().unwrap_or("");
-    tracing::debug!(target: "openvpn", "management: {verb} …");
-    if let Err(e) = w.write_all(format!("{cmd}\n").as_bytes()).await {
+    tracing::debug!("openvpn's management: {verb} \u{2026}");
+    if let Err(e) = w.write_all(format!("{cmd}{END}").as_bytes()).await {
         tracing::debug!(target: "openvpn", "management: {e}");
     }
 }
@@ -395,5 +462,39 @@ async fn pump<R: tokio::io::AsyncRead + Unpin>(
                 .insert(tunnel.clone(), how.to_owned());
         }
         heard.lock().unwrap().last = line;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_command_waits_for_the_answer_to_the_one_before() {
+        let mut out = Vec::new();
+        let mut paced = Paced::default();
+        paced
+            .send(&mut out, "username \"Auth\" \"alice\"".into())
+            .await;
+        paced
+            .send(&mut out, "password \"Auth\" \"hunter2\"".into())
+            .await;
+        let sent = |out: &Vec<u8>| String::from_utf8_lossy(out).lines().count();
+        assert_eq!(sent(&out), 1, "the password waits");
+        paced
+            .heard(&mut out, ">PASSWORD:Need 'Auth' username/password")
+            .await;
+        assert_eq!(sent(&out), 1, "a real-time message isn't an answer");
+        paced
+            .heard(
+                &mut out,
+                "SUCCESS: 'Auth' username entered, but not yet verified",
+            )
+            .await;
+        assert_eq!(sent(&out), 2);
+        assert!(String::from_utf8_lossy(&out).contains("password \"Auth\""));
+        paced.heard(&mut out, "ERROR: bad").await;
+        paced.send(&mut out, "state on".into()).await;
+        assert_eq!(sent(&out), 3, "nothing waiting: it goes at once");
     }
 }

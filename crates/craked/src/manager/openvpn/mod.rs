@@ -1,15 +1,11 @@
 //! OpenVPN tunnels (CLAUDE.md, 7i): craked runs `openvpn` with the profile
-//! it keeps (`run`), answers its management interface (`sign_in`), and
-//! asks the app what only the user can answer (here). Windows comes later
-//! (7i, slice 4: its management interface is a TCP port there, and its
-//! drivers come with OpenVPN's installer); until then switching such a
-//! tunnel on there says so (`tunnels::connect_with`).
+//! it keeps (`run`), answers its management interface (`listen`,
+//! `sign_in`), and asks the app what only the user can answer (here).
 
 use super::*;
 
-#[cfg(unix)]
+mod listen;
 mod run;
-#[cfg(unix)]
 mod sign_in;
 
 impl Manager {

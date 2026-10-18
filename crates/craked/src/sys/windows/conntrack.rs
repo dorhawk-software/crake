@@ -119,6 +119,24 @@ fn table() -> io::Result<HashMap<Flow, TcpState>> {
     Ok(found)
 }
 
+/// The process whose loopback connection comes from `from` to `to` (two
+/// ports on 127.0.0.1): who it is that connected to a port of craked's.
+pub fn loopback_owner(from: u16, to: u16) -> Option<u32> {
+    let v4 = raw_table(AF_INET, size_of::<MIB_TCPROW_OWNER_PID>()).ok()?;
+    // SAFETY: as in `table`, a MIB_TCPTABLE_OWNER_PID.
+    let rows: &[MIB_TCPROW_OWNER_PID] = unsafe {
+        let table = &*v4.as_ptr().cast::<MIB_TCPTABLE_OWNER_PID>();
+        std::slice::from_raw_parts(table.table.as_ptr(), table.dwNumEntries as usize)
+    };
+    rows.iter()
+        .find(|r| {
+            Ipv4Addr::from(r.dwLocalAddr.to_ne_bytes()).is_loopback()
+                && port(r.dwLocalPort) == from
+                && port(r.dwRemotePort) == to
+        })
+        .map(|r| r.dwOwningPid)
+}
+
 /// One family's connection table, as GetExtendedTcpTable writes it (its
 /// rows `row` bytes each), in an 8-byte aligned buffer.
 fn raw_table(family: ADDRESS_FAMILY, row: usize) -> io::Result<Vec<u64>> {

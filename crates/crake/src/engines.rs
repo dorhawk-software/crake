@@ -90,8 +90,9 @@ impl Engines {
                 "Needs OpenVPN 3, which isn\u{2019}t installed. It comes from OpenVPN\u{2019}s own repository (openvpn.net, \u{201c}OpenVPN 3 Linux\u{201d}).",
             ),
             "openvpn3" => None,
-            "openvpn" if cfg!(windows) => Some("OpenVPN isn\u{2019}t built for Windows yet."),
-            "openvpn" if !self.openvpn => Some(if cfg!(target_os = "macos") {
+            "openvpn" if !self.openvpn => Some(if cfg!(windows) {
+                "Needs OpenVPN, which comes with Crake but is missing. Reinstall Crake."
+            } else if cfg!(target_os = "macos") {
                 "Needs openvpn, which isn\u{2019}t installed. Install it with Homebrew (brew.sh): brew install openvpn"
             } else {
                 "Needs openvpn, which isn\u{2019}t installed: sudo apt install openvpn"
@@ -174,8 +175,17 @@ fn find_openconnect(given: Option<OsString>, path: Option<&OsStr>, extra: &[Path
 }
 
 /// openvpn is installed where craked looks for it: on PATH, in the
-/// administrators' folders (Debian's /usr/sbin), or Homebrew's on macOS.
+/// administrators' folders (Debian's /usr/sbin), Homebrew's on macOS, or
+/// beside Crake on Windows (its installer brings it).
 pub fn openvpn_installed() -> bool {
+    if cfg!(windows) {
+        return std::env::current_exe().ok().is_some_and(|exe| {
+            exe.with_file_name("openvpn")
+                .join("bin")
+                .join("openvpn.exe")
+                .is_file()
+        });
+    }
     let extra: Vec<PathBuf> = if cfg!(target_os = "macos") {
         vec!["/opt/homebrew/sbin".into(), "/usr/local/sbin".into()]
     } else {
@@ -252,7 +262,7 @@ mod tests {
         assert!(none.missing("gp").unwrap().contains(how));
         assert!(none.missing("openvpn3").unwrap().contains("OpenVPN 3"));
         let openvpn = if cfg!(windows) {
-            "isn\u{2019}t built for Windows yet"
+            "Reinstall Crake"
         } else if cfg!(target_os = "macos") {
             "brew install openvpn"
         } else {

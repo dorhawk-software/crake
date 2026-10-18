@@ -9,7 +9,7 @@ set -eu
 say() { echo "$*" > /dev/ttyS1; }
 apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-    ocserv gnutls-bin dnsmasq-base busybox nftables > /dev/null
+    ocserv gnutls-bin dnsmasq-base busybox nftables openvpn openssl python3 > /dev/null
 lan=$(ip -o link | awk -F': ' '/52:54:00:c0:ff:10/ {print $2}')
 ip addr add 198.51.100.10/24 dev "$lan"
 ip -6 addr add fd00:1a::10/64 dev "$lan" nodad
@@ -69,4 +69,17 @@ sed -e 's/^tcp-port = 443$/tcp-port = 8443/' -e 's/^udp-port = 443$/udp-port = 8
     -e 's|^ipv4-network = .*|ipv4-network = 10.41.255.0/24|' /test/e2e/ocserv.conf > /etc/ocserv/b.conf
 printf 'pid-file = /run/ocserv-b.pid\nuse-occtl = false\n' >> /etc/ocserv/b.conf
 ocserv --config /etc/ocserv/b.conf
+# ACME's OpenVPN gateway too (scripts/e2e/openvpn.conf, its sign-in
+# sso.py: alice's password), its CA on the web server for the test.
+mkdir -p /etc/openvpn/e2e
+cd /etc/openvpn/e2e
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout ca.key -out ca.crt -days 30 -subj /CN=ACME-CA 2>/dev/null
+openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout server.key -out server.csr -subj /CN=vpn.acme.example 2>/dev/null
+printf 'extendedKeyUsage=serverAuth\nkeyUsage=digitalSignature,keyAgreement\n' > server.ext
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 30 -extfile server.ext 2>/dev/null
+cp ca.crt /srv/www/openvpn-ca.crt
+cd /
+systemctl stop openvpn.service 2>/dev/null || true
+openvpn --config /test/e2e/openvpn.conf > /tmp/openvpn-gw.log 2>&1 &
+python3 /test/e2e/sso.py /run/openvpn-mgmt.sock 198.51.100.10 8080 /tmp/openvpn-seen > /dev/null 2>&1 &
 say "GATEWAY-READY"

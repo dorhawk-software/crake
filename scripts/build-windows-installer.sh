@@ -9,7 +9,8 @@
 # target/windows/app: CI's crake-windows artifact, `gh run download -n
 # crake-windows -D target/windows/app`; crake.exe needs a Windows runner,
 # GPUI's shaders need the Windows SDK). openconnect comes from
-# target/windows/openconnect (scripts/build-openconnect-windows.sh).
+# target/windows/openconnect (scripts/build-openconnect-windows.sh), OpenVPN
+# from target/windows/openvpn (scripts/fetch-openvpn-windows.sh).
 # The script inside the container is single-quoted: no apostrophes in it.
 set -eu
 cd "$(dirname "$0")/.."
@@ -19,12 +20,14 @@ for f in crake.exe craked.exe crake-hook.exe; do
   [ -f "$DIR/$f" ] || { echo "no $DIR/$f" >&2; exit 1; }
 done
 [ -x target/windows/openconnect/openconnect.exe ] || scripts/build-openconnect-windows.sh
+[ -f target/windows/openvpn/bin/openvpn.exe ] || scripts/fetch-openvpn-windows.sh
 STAGE=$(mktemp -d "${TMPDIR:-/tmp}/crake-setup.XXXXXX")
 trap 'rm -rf "$STAGE"' EXIT
 cp "$DIR/crake.exe" "$DIR/craked.exe" "$DIR/crake-hook.exe" packaging/windows/crake-hook.js \
   assets/icons/app/crake.ico "$STAGE/"
 cp LICENSE "$STAGE/LICENSE.txt"
 cp -r target/windows/openconnect "$STAGE/openconnect"
+cp -r target/windows/openvpn "$STAGE/openvpn"
 cp packaging/windows/crake.nsi "$STAGE/"
 docker run --rm -v "$STAGE:/stage" -e VERSION="$VERSION" -e HOST_UID="$(id -u)" debian:bookworm sh -euc '
   apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends nsis >/dev/null

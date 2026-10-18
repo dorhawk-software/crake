@@ -104,6 +104,15 @@ pub const OWNER_ONLY: u32 = 0o600;
 /// A stopped child gets this long before it's killed.
 const STOP_WAIT: Duration = Duration::from_secs(10);
 
+/// A folder for root alone (0700): OpenVPN's profiles and runs.
+pub fn create_private_dir(dir: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    /// Owner only, for a folder.
+    const OWNER_ONLY_DIR: u32 = 0o700;
+    std::fs::create_dir_all(dir)?;
+    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(OWNER_ONLY_DIR))
+}
+
 /// A new file for root alone (0600), replacing any older one.
 pub fn create_private(path: &Path) -> std::io::Result<std::fs::File> {
     use std::os::unix::fs::OpenOptionsExt;

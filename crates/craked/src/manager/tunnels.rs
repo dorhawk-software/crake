@@ -26,9 +26,6 @@ impl Manager {
             if e.config.protocol == crate::config::Protocol::Openvpn3 {
                 bail!("{} is switched on from the app.", e.config.display());
             }
-            if cfg!(windows) && e.config.protocol == crate::config::Protocol::Openvpn {
-                bail!("OpenVPN isn\u{2019}t built for Windows yet.");
-            }
             let (tx, rx) = oneshot::channel();
             if e.running {
                 bail!("{} is still switching off", e.config.display());
@@ -56,7 +53,6 @@ impl Manager {
             self.log.system(Some(name), line, None);
         }
         let this = Arc::clone(self);
-        #[cfg(unix)]
         if config.protocol == crate::config::Protocol::Openvpn {
             tokio::spawn(async move { this.supervise_openvpn(config, stop_rx).await });
             return Ok(());

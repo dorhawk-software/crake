@@ -870,7 +870,7 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    packages (`openvpn` as an engine alternative), (4) Windows (openvpn and
    its drivers from OpenVPN's installer: 2.7 dropped Wintun for
    ovpn-dco-win, with tap-windows6 when DCO is off; management over
-   loopback TCP with a password), (5) macOS (Homebrew's openvpn, utun),
+   loopback TCP), (5) macOS (Homebrew's openvpn, utun),
    (6) OpenVPN 3 tunnels moved to it (their profile's text copied out of
    openvpn3, unless locked) and the openvpn3 code removed.
    **Decided with the user (2026-10-18, after the critique of
@@ -941,6 +941,25 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    learned through it, removed with its profile); `scripts/vm-test.sh
    26.04` passes it with the profile enforced. A release still needs CI's
    package tests on every system (22.04's openvpn is 2.5).
+   **Slice 4 (Windows): built (2026-10-18).** `scripts/fetch-openvpn-windows.sh`
+   takes openvpn.exe, tapctl.exe, their DLLs and the ovpn-dco driver from
+   OpenVPN's MSI and tap-windows6 from its release (pinned by checksum,
+   unmodified, a README with their licences); the installer puts them in
+   `Crake\openvpn` and installs both drivers (pnputil). craked makes each
+   run's adapter `crake-<name>` with tapctl (ovpn-dco, or tap-windows6
+   without DCO) and removes it after, runs the hook as a copy of
+   crake-hook.exe in its private run folder (openvpn there takes quotes
+   as part of a path, and Program Files has a space), and locks its
+   private folders with icacls (SYSTEM and Administrators). Management:
+   2.7.8 on Windows ignores the management password file (it never asked
+   for it; Linux's 2.7 does), so craked listens on a loopback port of its
+   own, openvpn connects to it (`--management-client`), and craked takes
+   only the connection whose process (Windows' TCP table) is that
+   openvpn. And it took the second of two commands that came in one read
+   for the first (the password went in as the username again), so craked
+   sends each command once the one before is answered (`Paced`, every
+   platform). The Windows VM test has an OpenVPN tunnel (a password
+   sign-in through the app's client, routed, off, no adapter left).
 7j. **Real gateways in CI, on every system (requested 2026-10-18; after
    7i).** Each CI system (Linux, macOS, Windows) starts Crake, connects to
    a real gateway of each kind there is software for, and checks that,
@@ -1220,6 +1239,15 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   live one from versions.json; the page's fallback is bumped by hand at
   each release. Automating it (the packages workflow updating the page, or
   Cloudflare filling it in) was offered, not decided.
+- **Windows: craked's files in ProgramData\Crake are readable by every
+  user (found 2026-10-18, building 7i's Windows slice).** ProgramData's
+  default permissions let users read what craked writes there: its log
+  (craked.log), the host store (which hosts each tunnel learned, names
+  included) and settings. Nothing secret (sign-ins stay in the user's
+  Credential Manager; OpenVPN's run folder and profiles are locked with
+  icacls), but another user of the PC could see where this one connects.
+  To do: lock ProgramData\Crake itself as `create_private_dir` does, and
+  check the app never needed to read anything there.
 
 ## Tried by real people (a checklist, ticked one by one)
 

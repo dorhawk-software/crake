@@ -50,6 +50,9 @@ if ($setup) {
     Check "openconnect's and Wintun's licences beside them" {
         (Test-Path "$dir\openconnect\openconnect-LICENSE.txt") -and (Test-Path "$dir\openconnect\wintun-LICENSE.txt")
     }
+    Check "OpenVPN beside them, with where its source is" {
+        (Test-Path "$dir\openvpn\bin\openvpn.exe") -and (Test-Path "$dir\openvpn\README.txt")
+    }
 } else {
     Check "installed in Program Files\Crake" {
         New-Item -ItemType Directory -Force $dir | Out-Null
@@ -58,6 +61,14 @@ if ($setup) {
     }
     New-Service -Name craked -DisplayName 'Crake' -BinaryPathName "`"$dir\craked.exe`"" `
         -StartupType Automatic | Out-Null
+    # OpenVPN's drivers, as the installer adds them.
+    $dco = if ([Environment]::OSVersion.Version.Build -ge 22000) { 'Win11' } else { 'Win10' }
+    pnputil /add-driver "$dir\openvpn\ovpn-dco\$dco\ovpn-dco.inf" /install | Out-Null
+    pnputil /add-driver "$dir\openvpn\tap-windows6\OemVista.inf" /install | Out-Null
+}
+Check "OpenVPN's drivers are in the driver store" {
+    $drivers = pnputil /enum-drivers | Out-String
+    $drivers -match 'ovpn-dco' -and $drivers -match 'oemvista|tap0901'
 }
 Check "the craked service runs" {
     # craked's debug lines in its log, for when something goes wrong.
@@ -95,7 +106,8 @@ if ($LASTEXITCODE -ne 0) { $fail = 1 }
 
 Check "craked stops cleanly" {
     Stop-Service craked -ErrorAction Stop
-    -not (Get-Process openconnect -ErrorAction SilentlyContinue)
+    -not (Get-Process openconnect -ErrorAction SilentlyContinue) -and
+        -not (Get-Process openvpn -ErrorAction SilentlyContinue)
 }
 Check "no crake adapters left" { -not (Get-NetAdapter -Name 'crake-*' -ErrorAction SilentlyContinue) }
 Check "no DNS rules left" {

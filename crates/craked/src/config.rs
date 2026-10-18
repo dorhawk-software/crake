@@ -296,8 +296,15 @@ fn default_openconnect() -> PathBuf {
     "openconnect".into()
 }
 /// openvpn on PATH (Debian puts it in /usr/sbin, which a service's PATH
-/// has); on macOS, Homebrew's.
+/// has); on Windows, the copy Crake ships beside craked; on macOS,
+/// Homebrew's.
 fn default_openvpn() -> PathBuf {
+    if cfg!(windows)
+        && let Ok(exe) = std::env::current_exe()
+        && let Some(dir) = exe.parent()
+    {
+        return dir.join("openvpn").join("bin").join("openvpn.exe");
+    }
     if cfg!(target_os = "macos")
         && let Some(found) = ["/opt/homebrew/sbin/openvpn", "/usr/local/sbin/openvpn"]
             .iter()
