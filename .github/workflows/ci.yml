@@ -121,7 +121,8 @@ jobs:
           for t in macos macos_openvpn; do
             BIN=$(cargo test -p craked --test $t --no-run --locked --message-format=json |
               jq -r "select(.executable != null and .target.name == \"$t\") | .executable")
-            sudo CRAKE_MACOS_ROOT=1 "$BIN" --nocapture
+            # One at a time: they change the Mac's routes and DNS as root.
+            sudo CRAKE_MACOS_ROOT=1 "$BIN" --nocapture --test-threads=1
           done
       # ACME's gateways in the gateways job, carried here by Cloudflare
       # Tunnel: AnyConnect and OpenVPN (over TCP) signed in to, a host only
