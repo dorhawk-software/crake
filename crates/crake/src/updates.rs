@@ -19,6 +19,10 @@ const FRAME_MS: u64 = 70;
 const SETTLE_MS: u64 = 300;
 
 pub(super) fn on_update(update: client::Update, cx: &mut App) {
+    // An OpenVPN tunnel's sign-in asks the user: its window shows it.
+    if let client::Update::Asking(t, ask) = &update {
+        return crate::openvpn::asked(t, ask, cx);
+    }
     // craked refused an OpenVPN 3 session (it clashes with a tunnel that's
     // up; the log says which): end it, so it doesn't stay up unrouted.
     if let client::Update::AttachRefused(t) = &update

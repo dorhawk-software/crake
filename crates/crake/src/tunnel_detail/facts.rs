@@ -309,6 +309,7 @@ pub fn protocol_name(protocol: &str) -> &str {
         "f5" => "F5 BIG-IP",
         "array" => "Array Networks",
         "openvpn3" => "OpenVPN 3",
+        "openvpn" => "OpenVPN",
         other => other,
     }
 }

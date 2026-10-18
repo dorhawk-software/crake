@@ -47,6 +47,7 @@ mod no_tray;
 mod no_tray_view;
 mod tray_host;
 
+mod openvpn;
 mod ovpn3;
 
 mod ovpn_file;
@@ -218,6 +219,8 @@ pub enum Request {
     Restart,
     /// Open a page in the browser (a new version's download page).
     OpenUrl(String),
+    /// OpenVPN: the user's answer to question `id` of a tunnel's sign-in.
+    Answer(String, u32, String),
     Quit,
 }
 
@@ -262,6 +265,8 @@ struct Shell {
     sessions: std::collections::HashMap<String, (String, async_channel::Sender<signin::Reply>)>,
     /// OpenVPN 3 sessions started outside Crake, being taken over.
     adopting: std::collections::HashSet<String>,
+    /// OpenVPN tunnels' sign-in windows, taking craked's questions.
+    openvpn: openvpn::Asks,
     /// The tray state last shown, and the animation running for it.
     tray_shape: tray::Shape,
     tray_motion: Option<gpui_kit::Task<()>>,
@@ -614,6 +619,7 @@ pub(crate) fn start(cx: &mut App, setup: Setup) -> bool {
         new_tunnel: None,
         sessions: Default::default(),
         adopting: Default::default(),
+        openvpn: Default::default(),
         tray_shape: tray::Shape::Off,
         tray_motion: None,
         panel_motion: None,

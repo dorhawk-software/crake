@@ -35,6 +35,8 @@ pub enum Command {
     Forget(String, String),
     ForgetLearned(String),
     DismissTrouble(String),
+    /// OpenVPN: the user's answer to question `id` of a tunnel's sign-in.
+    Answer(String, u32, String),
     /// An OpenVPN 3 session's process outlived its session (tunnel or "",
     /// profile, process).
     LeftRunning(String, String, u32),
@@ -88,6 +90,9 @@ pub enum Update {
     AttachRefused(String),
     /// craked's view of the computer, line by line, for helpdesk copies.
     Diagnostics(Vec<String>),
+    /// OpenVPN: what a tunnel's sign-in asks the user (craked's `Asking`:
+    /// id, kind, label, url, retry).
+    Asking(String, HashMap<String, String>),
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -136,6 +141,9 @@ pub struct Tunnel {
     pub dns_down: bool,
     /// In trouble: why, as the log says it (crake_proto::trouble).
     pub why: String,
+    /// OpenVPN: the id of what its sign-in asks the user now (0: nothing);
+    /// `Update::Asking` says what.
+    pub asking: u32,
 }
 
 pub fn start(updates: async_channel::Sender<Update>) -> async_channel::Sender<Command> {
@@ -316,7 +324,42 @@ fn tunnel(d: &HashMap<String, OwnedValue>) -> Tunnel {
         clash: text("clash"),
         dns_down: flag("dns_down"),
         why: text("why"),
+        asking: d
+            .get("asking")
+            .and_then(|v| u32::try_from(v.clone()).ok())
+            .unwrap_or(0),
     }
+}
+
+/// The tunnels, then what any of them newly asks (each question once).
+async fn send_tunnels(
+    api: &Api,
+    tunnels: Vec<Tunnel>,
+    asked: &mut HashMap<String, u32>,
+    updates: &async_channel::Sender<Update>,
+) -> bool {
+    let new: Vec<String> = tunnels
+        .iter()
+        .filter(|t| t.asking != 0 && asked.get(&t.name) != Some(&t.asking))
+        .map(|t| t.name.clone())
+        .collect();
+    for t in &tunnels {
+        asked.insert(t.name.clone(), t.asking);
+    }
+    if updates.send(Update::Tunnels(tunnels)).await.is_err() {
+        return false;
+    }
+    for t in new {
+        if let Ok(ask) = api
+            .call::<_, HashMap<String, String>>("Asking", &(t.clone(),))
+            .await
+            && !ask.is_empty()
+            && updates.send(Update::Asking(t, ask)).await.is_err()
+        {
+            return false;
+        }
+    }
+    true
 }
 
 /// craked's name changing owner on the bus: it stopped, or a new one
@@ -358,6 +401,8 @@ async fn session(
     };
 
     let send = |u: Update| async { updates.send(u).await.is_ok() };
+    // What each tunnel's sign-in last asked (OpenVPN), said once each.
+    let mut asked: HashMap<String, u32> = HashMap::new();
     let mut traffic_tick = tokio::time::interval(TRAFFIC_EVERY);
     let tunnels = api.tunnels().await?;
     // Enough for the log window's days (kept for 30 days).
@@ -371,7 +416,7 @@ async fn session(
     *reachable = Some(true);
     if !(send(Update::Reachable(true)).await
         && send(Update::ServiceVersion(version)).await
-        && send(Update::Tunnels(tunnels)).await
+        && send_tunnels(&api, tunnels, &mut asked, updates).await
         && send(Update::Log(log)).await
         && send(Update::Settings(settings)).await)
     {
@@ -420,7 +465,7 @@ async fn session(
                     }
                     Some("TunnelChanged") => {
                         let tunnels = api.tunnels().await?;
-                        if !send(Update::Tunnels(tunnels)).await { return Ok(()); }
+                        if !send_tunnels(&api, tunnels, &mut asked, updates).await { return Ok(()); }
                         // What changed with it: devices, DNS.
                         if let Ok(d) = api.call::<_, Vec<String>>("Diagnostics", &()).await
                             && !send(Update::Diagnostics(d)).await { return Ok(()); }
@@ -431,7 +476,7 @@ async fn session(
                             && !send(Update::Appended(entry)).await { return Ok(()); }
                         // Host counts change with decisions.
                         let tunnels = api.tunnels().await?;
-                        if !send(Update::Tunnels(tunnels)).await { return Ok(()); }
+                        if !send_tunnels(&api, tunnels, &mut asked, updates).await { return Ok(()); }
                     }
                     _ => {}
                 }
@@ -476,6 +521,7 @@ async fn session(
                     Command::Forget(t, x) => api.call::<_, String>("Forget", &(t, x)).await.map(drop),
                     Command::ForgetLearned(t) => api.call::<_, String>("ForgetLearned", &(t,)).await.map(drop),
                     Command::DismissTrouble(t) => api.call::<_, ()>("DismissTrouble", &(t,)).await,
+                    Command::Answer(t, id, text) => api.call::<_, ()>("Answer", &(t, id, text)).await,
                     Command::LeftRunning(t, profile, pid) => api.call::<_, ()>("LeftRunning", &(t, profile, pid)).await,
                     Command::Hosts(t) => match api.call::<_, Vec<HashMap<String, String>>>("HostDetails", &(t.clone(),)).await {
                         Ok(rows) => {

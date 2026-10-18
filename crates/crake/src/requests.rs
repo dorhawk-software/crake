@@ -97,6 +97,49 @@ fn show_bird(on: bool, cx: &mut App) {
     }
 }
 
+/// Switch a tunnel on: said at once if it clashes with one that's up;
+/// signed in first without a kept sign-in (OpenVPN: craked asks).
+fn switch_on(t: String, cx: &mut App) {
+    // It can't be up together with a tunnel that's on: say so
+    // before signing in, not after.
+    let shell = cx.global::<Shell>();
+    let model = shell.model.clone();
+    let clash = model
+        .read(cx)
+        .tunnels
+        .iter()
+        .find(|x| x.name == t)
+        .map(|x| x.clash.clone())
+        .filter(|c| !c.is_empty());
+    if let Some(why) = clash {
+        model.update(cx, |m, cx| {
+            m.failed = Some((why, std::time::Instant::now()));
+            cx.notify();
+        });
+        return;
+    }
+    remember_on(&t, true, cx);
+    // Without a kept sign-in, sign in first (in this session, as the user).
+    let tunnel = cx
+        .global::<Shell>()
+        .model
+        .read(cx)
+        .tunnels
+        .iter()
+        .find(|x| x.name == t)
+        .cloned();
+    // An OpenVPN tunnel just connects: craked asks if it must.
+    match tunnel {
+        Some(tunnel) if !tunnel.signed_in && tunnel.protocol != "openvpn" => {
+            open_sign_in(tunnel, cx)
+        }
+        _ => {
+            let commands = cx.global::<Shell>().commands.clone();
+            commands.send_blocking(Command::Connect(t)).ok();
+        }
+    }
+}
+
 pub(super) fn on_request(request: Request, cx: &mut App) {
     debug(&format!("request: {request:?}"));
     let commands = cx.global::<Shell>().commands.clone();
@@ -105,40 +148,7 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
     };
     match request {
         Request::Panel(at) => toggle_panel(at, cx),
-        Request::Switch(t, true) => {
-            // It can't be up together with a tunnel that's on: say so
-            // before signing in, not after.
-            let shell = cx.global::<Shell>();
-            let model = shell.model.clone();
-            let clash = model
-                .read(cx)
-                .tunnels
-                .iter()
-                .find(|x| x.name == t)
-                .map(|x| x.clash.clone())
-                .filter(|c| !c.is_empty());
-            if let Some(why) = clash {
-                model.update(cx, |m, cx| {
-                    m.failed = Some((why, std::time::Instant::now()));
-                    cx.notify();
-                });
-                return;
-            }
-            remember_on(&t, true, cx);
-            // Without a kept sign-in, sign in first (in this session, as the user).
-            let tunnel = cx
-                .global::<Shell>()
-                .model
-                .read(cx)
-                .tunnels
-                .iter()
-                .find(|x| x.name == t)
-                .cloned();
-            match tunnel {
-                Some(tunnel) if !tunnel.signed_in => open_sign_in(tunnel, cx),
-                _ => send(Command::Connect(t)),
-            }
-        }
+        Request::Switch(t, true) => switch_on(t, cx),
         Request::ConnectWithSession(t, session) => {
             if cx.global::<Shell>().demo {
                 // No craked in demo mode: the tunnel just comes up.
@@ -179,6 +189,7 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
                 None => send(Command::Disconnect(t)),
             }
         }
+        Request::Answer(t, id, text) => send(Command::Answer(t, id, text)),
         Request::Undo(t, hosts) => undo(t, hosts, cx),
         Request::Redo(t, hosts) => send(Command::Redo(t, hosts)),
         Request::Log => open_log(cx),

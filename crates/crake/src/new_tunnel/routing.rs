@@ -220,10 +220,11 @@ impl NewTunnel {
             "fortinet" => "Fortinet SSL VPN",
             "f5" => "F5 BIG-IP",
             "openvpn3" => "OpenVPN 3",
+            "openvpn" => "OpenVPN",
             _ => "Array Networks",
         };
         let sign_in = match self.method {
-            _ if self.protocol == "openvpn3" => "ask what the profile needs",
+            _ if self.protocol.starts_with("openvpn") => "ask what the profile needs",
             "password" => "ask for your password",
             "certificate" => "use your certificate",
             _ => "sign you in through your browser",

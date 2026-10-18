@@ -1,9 +1,10 @@
 """The OpenVPN gateway's sign-in, for scripts/e2e-test.sh: openvpn's
 management interface (management-client-auth) asks it about each client.
-A client that says it can open a page (IV_SSO webauth) is sent one
-(client-pending-auth WEB_AUTH), and signed in once that page is fetched; a
-client back with its token is let in by openvpn itself (auth-gen-token),
-without asking here; any other is refused. What each client said goes to /link/openvpn-seen.
+A client signing in as sso-placeholder that says it can open a page (IV_SSO
+webauth) is sent one (client-pending-auth WEB_AUTH), and signed in once that
+page is fetched; alice is let in with her password (hunter2); a client back
+with its token is let in by openvpn itself (auth-gen-token), without asking
+here; any other is refused. What each client said goes to /link/openvpn-seen.
 
     sso.py <management socket> <page address> <page port>
 """
@@ -77,10 +78,16 @@ while True:
             client = None
             state = env.get("session_state", "")
             sso = env.get("IV_SSO", "")
-            seen(f"{kind} session_state={state} IV_SSO={sso}")
+            user = env.get("username", "")
+            seen(f"{kind} user={user} session_state={state} IV_SSO={sso}")
             if kind == "REAUTH" or state.startswith("Authenticated"):
                 send(f"client-auth-nt {cid} {kid}")
-            elif "webauth" in sso.split(","):
+            elif user == "alice":
+                if env.get("password") == "hunter2":
+                    send(f"client-auth-nt {cid} {kid}")
+                else:
+                    send(f'client-deny {cid} {kid} "wrong password"')
+            elif user == "sso-placeholder" and "webauth" in sso.split(","):
                 pending[cid] = kid
                 url = f"http://{host}:{port}/sign-in?cid={cid}"
                 send(f'client-pending-auth {cid} {kid} "WEB_AUTH::{url}" 120')

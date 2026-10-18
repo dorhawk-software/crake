@@ -433,7 +433,8 @@ impl Model {
             Update::Days(d) => self.days = d,
             Update::Settings(s) => self.settings = s,
             Update::ServiceVersion(v) => self.service_version = (!v.is_empty()).then_some(v),
-            Update::Added(_) => {}
+            // The shell's: shown in a sign-in window (`openvpn::asked`).
+            Update::Added(_) | Update::Asking(..) => {}
         }
         None
     }

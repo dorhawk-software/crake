@@ -14,8 +14,10 @@ use std::time::Duration;
 use crake_proto::TunnelState;
 use craked::manager::Manager;
 
+use crate::client::Command;
 use crate::e2e_tests::{config, look_up_and_get, sh};
 use crate::test_app::{enabled, get};
+use crate::wire_tests;
 
 /// The gateway's address on the wire, and the folder it shares.
 const GATEWAY: &str = "198.51.100.10";
@@ -35,11 +37,24 @@ fn profile() -> String {
     )
 }
 
+/// A password profile: nothing inline but the gateway's CA.
+fn password_profile() -> String {
+    let ca = std::fs::read_to_string(format!("{SHARED}/openvpn-ca.crt")).unwrap();
+    format!(
+        "client\ndev tun\nproto udp\nremote {GATEWAY} 1194\nnobind\nauth-user-pass\n\
+         remote-cert-tls server\n<ca>\n{ca}</ca>\n"
+    )
+}
+
 fn fields() -> HashMap<String, String> {
+    fields_for("ACME OpenVPN", profile())
+}
+
+fn fields_for(display: &str, profile: String) -> HashMap<String, String> {
     [
-        ("display_name", "ACME OpenVPN".to_owned()),
+        ("display_name", display.to_owned()),
         ("protocol", "openvpn".to_owned()),
-        ("profile", profile()),
+        ("profile", profile),
         ("mode", "learn".to_owned()),
     ]
     .into_iter()
@@ -220,4 +235,79 @@ async fn a_browser_sign_in_then_the_gateways_token() {
         "pgrep -a -x openvpn | grep -F openvpn-{name}.conf"
     ));
     assert!(left.trim().is_empty(), "openvpn stopped: {left}");
+}
+
+/// The app's side of a password sign-in, over D-Bus as the sign-in window
+/// does it: switched on, craked asks for the username and the password; a
+/// wrong one is asked again, saying so.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_password_sign_in_through_the_app() {
+    if !enabled() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = config(dir.path());
+    let hook_socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    mgr.init().await.unwrap();
+    craked::hook_server::serve(mgr.clone(), &hook_socket).unwrap();
+    let mut app = wire_tests::serve(mgr.clone(), dir.path());
+    app.send(Command::AddTunnel(fields_for(
+        "ACME Password",
+        password_profile(),
+    )));
+    app.until("added", |m| {
+        m.tunnels.iter().any(|t| t.protocol == "openvpn")
+    })
+    .await;
+    let name = app
+        .model
+        .tunnels
+        .iter()
+        .find(|t| t.protocol == "openvpn")
+        .unwrap()
+        .name
+        .clone();
+
+    // The panel's switch: an OpenVPN tunnel just connects.
+    app.send(Command::Connect(name.clone()));
+    let answer = |ask: &HashMap<String, String>, text: &str| {
+        Command::Answer(name.clone(), ask["id"].parse().unwrap(), text.to_owned())
+    };
+    let ask = app.asked("the username").await;
+    let prompt = crate::openvpn::prompt(&ask).unwrap();
+    assert_eq!(
+        (prompt.ask, prompt.label.as_str()),
+        (crate::signin::Ask::Text, "Username")
+    );
+    app.send(answer(&ask, "alice"));
+    let ask = app.asked("the password").await;
+    assert_eq!(ask["kind"], "password");
+    app.send(answer(&ask, "wrong"));
+    // Refused: asked again, from the username, saying so.
+    let ask = app.asked("the username again").await;
+    assert_eq!(
+        (ask["kind"].as_str(), ask["retry"].as_str()),
+        ("user", "true")
+    );
+    app.send(answer(&ask, "alice"));
+    let ask = app.asked("the password again").await;
+    app.send(answer(&ask, "hunter2"));
+    app.within(WAIT, "connected", |m| {
+        m.tunnels
+            .iter()
+            .any(|t| t.name == name && t.state == "connected")
+    })
+    .await;
+    app.send(Command::AddHosts(name.clone(), vec!["10.40.1.10".into()]));
+    let git = until("git through the tunnel", || {
+        get("10.40.1.10", Duration::from_secs(1)).ok()
+    })
+    .await;
+    assert!(git.contains("crex"), "{git}");
+    app.send(Command::Disconnect(name.clone()));
+    app.within(WAIT, "off", |m| {
+        m.tunnels.iter().any(|t| t.name == name && t.state == "off")
+    })
+    .await;
 }

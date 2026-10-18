@@ -89,11 +89,17 @@ fn start(
     cx: &mut Context<SignIn>,
 ) -> async_channel::Sender<Reply> {
     let (events, incoming) = async_channel::unbounded();
-    // OpenVPN 3 profiles run as openvpn3 sessions; the rest is openconnect.
-    let replies = if spec.protocol == "openvpn3" {
-        crate::ovpn3::start(spec.tunnel.clone(), spec.gateway.clone(), events, requests)
-    } else {
-        crate::signin::start(spec, events)
+    // OpenVPN 3 profiles run as openvpn3 sessions; OpenVPN's sign-in is
+    // craked's questions; the rest is openconnect.
+    let replies = match spec.protocol.as_str() {
+        "openvpn3" => {
+            crate::ovpn3::start(spec.tunnel.clone(), spec.gateway.clone(), events, requests)
+        }
+        "openvpn" => {
+            let asks = &mut cx.global_mut::<crate::Shell>().openvpn;
+            crate::openvpn::start(spec.tunnel.clone(), events, requests, asks)
+        }
+        _ => crate::signin::start(spec, events),
     };
     cx.spawn_in(window, async move |this, cx| {
         while let Ok(event) = incoming.recv().await {
@@ -273,7 +279,11 @@ impl SignIn {
             }),
             // The tunnel coming up (or not) after sign-in.
             cx.observe(&model, |this, model, cx| {
-                if this.stage != Stage::Connecting {
+                // OpenVPN: craked signs in and connects; it's up (or not)
+                // whatever the window shows meanwhile.
+                let openvpn = this.spec.protocol == "openvpn"
+                    && matches!(this.stage, Stage::Reaching | Stage::SigningIn);
+                if this.stage != Stage::Connecting && !openvpn {
                     return;
                 }
                 let state = model
@@ -290,6 +300,17 @@ impl SignIn {
                             let _ = this.update(cx, |_, cx| cx.emit(Close));
                         })
                         .detach();
+                    }
+                    Some("trouble") if openvpn => {
+                        let why = model
+                            .read(cx)
+                            .tunnels
+                            .iter()
+                            .find(|t| t.name == this.spec.tunnel)
+                            .map(|t| t.why.clone())
+                            .unwrap_or_default();
+                        let at = this.stage.step();
+                        this.stage = Stage::Failed { reason: why, at };
                     }
                     Some("trouble") => {
                         let display = &this.spec.display;
@@ -409,6 +430,12 @@ impl SignIn {
         self.signing(true, false, cx);
         self.replies = start(self.spec.clone(), self.requests.clone(), window, cx);
         self.stage = Stage::Reaching;
+        // OpenVPN: craked runs the sign-in; switched on again, it asks.
+        if self.spec.protocol == "openvpn" {
+            let _ = self
+                .requests
+                .send_blocking(Request::Switch(self.spec.tunnel.clone(), true));
+        }
         cx.notify();
     }
 

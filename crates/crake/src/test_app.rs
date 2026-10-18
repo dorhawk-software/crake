@@ -54,6 +54,26 @@ impl App {
         }
     }
 
+    /// The next question an OpenVPN tunnel's sign-in asks (5 s at most),
+    /// applying what comes before it.
+    #[cfg(target_os = "linux")]
+    pub async fn asked(&mut self, what: &str) -> std::collections::HashMap<String, String> {
+        let end = Instant::now() + Duration::from_secs(5);
+        loop {
+            let left = end.saturating_duration_since(Instant::now());
+            match tokio::time::timeout(left, self.updates.recv()).await {
+                Ok(Ok(Update::Asking(_, ask))) => return ask,
+                Ok(Ok(Update::Failed(text))) => {
+                    panic!("craked refused while waiting for {what}: {text}")
+                }
+                Ok(Ok(u)) => {
+                    self.model.apply(u);
+                }
+                _ => panic!("never asked {what}"),
+            }
+        }
+    }
+
     /// Apply whatever arrives for `wait`.
     pub async fn settle(&mut self, wait: Duration) {
         let end = Instant::now() + wait;
