@@ -4,7 +4,7 @@
 # ocserv on 127.0.0.1:8443 and openvpn over TCP on 127.0.0.1:1194, where
 # Cloudflare Tunnel (cloudflared, started by the workflow) picks them up.
 #   scripts/ci-gateways.sh up OUT   the gateways; their CA and logs in OUT
-#   scripts/ci-gateways.sh wait JOB until this run's job JOB has finished
+#   scripts/ci-gateways.sh wait JOB… until this run's jobs JOB… have finished
 #   scripts/ci-gateways.sh down OUT what they said, and they go
 set -eu
 cd "$(dirname "$0")/.."
@@ -29,15 +29,19 @@ case "${1:-}" in
     echo "ACME's gateways are up"
     ;;
   wait)
-    JOB=$2
+    shift
     end=$(( $(date +%s) + WAIT_MINUTES * 60 ))
     while [ "$(date +%s)" -lt "$end" ]; do
-      state=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --paginate \
-        --jq ".jobs[] | select(.name == \"$JOB\") | .status")
-      [ "$state" = completed ] && { echo "$JOB is done"; exit 0; }
+      jobs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --paginate \
+        --jq '.jobs[] | "\(.name) \(.status)"')
+      left=
+      for job in "$@"; do
+        echo "$jobs" | grep -qx "$job completed" || left="$left $job"
+      done
+      [ -z "$left" ] && { echo "$* done"; exit 0; }
       sleep 20
     done
-    echo "$JOB didn't finish in $WAIT_MINUTES minutes" >&2
+    echo "still going after $WAIT_MINUTES minutes:$left" >&2
     exit 1
     ;;
   down)

@@ -1008,17 +1008,21 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    installed Windows service unless the runner allows it.
    Setup with the user, once: a tunnel, a hostname and a service token in
    the Cloudflare dashboard.
-   **macOS: built, waiting on that setup (2026-10-18).** CI's `gateways`
+   **macOS and Windows: built, waiting on that setup (2026-10-18).** CI's `gateways`
    job runs the e2e gateway's image with a network on the Linux runner
    (`scripts/ci-gateways.sh`, `scripts/e2e/ci-start.sh`: ocserv on
    127.0.0.1:8443, openvpn over TCP on 127.0.0.1:1194, ACME's network
    answering only through a tunnel), `cloudflared tunnel run` publishes
    them, an artifact (`gateways-ready`, the OpenVPN CA) says they're up,
-   and it stays until the `macos` job has finished. That job's last test
-   step (`scripts/ci-through-cloudflare.sh`) carries each to 127.0.0.1
+   and it stays until the `macos` and `windows-gateways` jobs have
+   finished. The Mac job's last test step and the Windows job
+   (`scripts/ci-through-cloudflare.sh macos|windows`) carry each to 127.0.0.1
    with `cloudflared access tcp` and the service token and runs
-   `crates/crake/src/gateway_tests.rs` as root, craked in the test as the
-   e2e tests run it: AnyConnect signed in with the app's sign-in, OpenVPN
+   `crates/crake/src/gateway_tests.rs`: on the Mac as root, craked in the
+   test as the e2e tests run it; on Windows against the installed service
+   (`windows-installer` builds the installer from the run's executables,
+   openconnect and OpenVPN cached by their scripts' hash; the job installs
+   it silently, `/S`, and runs the app's test binary from `windows-build`): AnyConnect signed in with the app's sign-in, OpenVPN
    with its password asked through craked; connected, 10.40.1.10 answers
    once probed (through the tunnel's device), wiki.acme.internal is asked
    of macOS and routed before the first packet, 1.1.1.1 answers off the
@@ -1033,9 +1037,7 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    token `crake-ci` (Service Auth), its ID and secret the secrets
    CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET. One tunnel for every
    run: a push cancels the branch's run still going, so two runs' gateways
-   meet only for a moment. Next: Windows (the installer built from the
-   run's crake-windows artifact, the service installed on the runner, the
-   same tests); later, OpenVPN's browser sign-in through Cloudflare (its
+   meet only for a moment. Later: OpenVPN's browser sign-in through Cloudflare (its
    page, sso.py on 8080, needs a third hostname) and openconnect's fake
    servers for the other protocols' sign-in.
 8. **Someday: other platforms** (see below). Not before Linux is solid.

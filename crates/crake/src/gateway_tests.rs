@@ -1,24 +1,22 @@
-//! Real gateways, reached through Cloudflare (CLAUDE.md, 7j), on CI's Mac:
-//! the e2e gateway's container runs in a Linux job (ocserv, and openvpn
-//! over TCP, with ACME's internal network behind them), Cloudflare Tunnel
-//! carries each to this Mac (`cloudflared access tcp`, on 127.0.0.1), and
-//! craked runs here as root, the app's own client and sign-in driving it.
+//! Real gateways, reached through Cloudflare (CLAUDE.md, 7j), on CI's Mac
+//! and Windows: the e2e gateway's container runs in a Linux job (ocserv,
+//! and openvpn over TCP, with ACME's internal network behind them),
+//! Cloudflare Tunnel carries each here (`cloudflared access tcp`, on
+//! 127.0.0.1), and craked (macOS: in the test, as root; Windows: the
+//! installed service) is driven by the app's own client and sign-in.
 //! Connected, a host only the tunnel reaches answers, a name only its DNS
 //! knows is routed before the first packet, and the internet still answers
 //! directly; off, the internal network is gone again.
 //!
 //! Skipped unless CRAKE_E2E=1, with CRAKE_E2E_GATEWAY (AnyConnect's
-//! address here), CRAKE_GATEWAY_OPENVPN ("host port", over TCP),
-//! CRAKE_GATEWAY_CA (the OpenVPN gateway's CA) and CRAKE_E2E_HOOK
-//! (craked's crake-hook): see .github/workflows/ci.yml.
+//! address here), CRAKE_GATEWAY_OPENVPN ("host port", over TCP) and
+//! CRAKE_GATEWAY_CA (the OpenVPN gateway's CA); on macOS CRAKE_E2E_HOOK
+//! (craked's crake-hook). See scripts/ci-through-cloudflare.sh.
 
 use std::collections::HashMap;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs as _};
 use std::process::Command as Run;
 use std::time::Duration;
-
-use craked::config::{Config, Protocol, TunnelConfig};
-use craked::manager::Manager;
 
 use crate::client::Command;
 use crate::test_app::{App, connected, enabled, gateway, get, off, sign_in};
@@ -27,48 +25,129 @@ use crate::test_app::{App, connected, enabled, gateway, get, off, sign_in};
 const WAIT: Duration = Duration::from_secs(60);
 /// A public address that answers anywhere: it must answer directly.
 const PUBLIC: &str = "1.1.1.1:443";
+/// The test tunnels, gone before and after.
+const TUNNELS: [&str; 2] = ["acme", "initech"];
 
-fn sh(cmd: &str) -> String {
-    let out = Run::new("sh").args(["-c", cmd]).output().unwrap();
-    String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr)
+/// craked and the app's client connected to it, ACME's AnyConnect gateway
+/// added as New tunnel adds one.
+struct Crake {
+    #[cfg(target_os = "macos")]
+    _dir: tempfile::TempDir,
+    #[cfg(target_os = "macos")]
+    mgr: std::sync::Arc<craked::manager::Manager>,
+    app: App,
 }
 
-/// craked, as root on this Mac, with ACME's AnyConnect gateway configured.
-async fn start(dir: &std::path::Path) -> (std::sync::Arc<Manager>, App) {
-    let hook = std::env::var("CRAKE_E2E_HOOK").expect("CRAKE_E2E_HOOK: craked's crake-hook");
-    let cfg = Config {
-        hook_path: hook.into(),
-        hook_socket: dir.join("hook.sock"),
-        log_path: dir.join("log"),
-        state_path: dir.join("hosts.json"),
-        probe_wait_secs: 1,
-        race_first_syn: false,
-        managed_dir: dir.join("managed.d"),
-        tunnels: vec![TunnelConfig {
-            name: "acme".into(),
-            display_name: Some("ACME".into()),
-            gateway: gateway(),
-            protocol: Protocol::Anyconnect,
-            user: Some("alice".into()),
-            passwd_file: None,
-            dns_domains: vec![],
-            auth_args: vec![],
-            extra_args: vec![],
-            managed: None,
-            own: None,
-        }],
-        ..Config::default()
-    };
-    let hook_socket = cfg.hook_socket.clone();
-    let mgr = Manager::new(cfg).unwrap();
-    mgr.init().await.unwrap();
-    craked::hook_server::serve(mgr.clone(), &hook_socket).unwrap();
-    let mut app = crate::test_app::serve(mgr.clone(), dir);
-    app.within(WAIT, "craked reached, with ACME", |m| {
-        m.reachable == Some(true) && m.tunnels.iter().any(|t| t.name == "acme")
-    })
-    .await;
-    (mgr, app)
+impl Crake {
+    /// macOS: craked in this test, as root, with a folder of its own.
+    #[cfg(target_os = "macos")]
+    async fn craked() -> Self {
+        use craked::config::Config;
+        let dir = tempfile::tempdir().unwrap();
+        let hook = std::env::var("CRAKE_E2E_HOOK").expect("CRAKE_E2E_HOOK: craked's crake-hook");
+        let cfg = Config {
+            hook_path: hook.into(),
+            hook_socket: dir.path().join("hook.sock"),
+            log_path: dir.path().join("log"),
+            state_path: dir.path().join("hosts.json"),
+            probe_wait_secs: 1,
+            race_first_syn: false,
+            managed_dir: dir.path().join("managed.d"),
+            ..Config::default()
+        };
+        let hook_socket = cfg.hook_socket.clone();
+        let mgr = craked::manager::Manager::new(cfg).unwrap();
+        mgr.init().await.unwrap();
+        craked::hook_server::serve(mgr.clone(), &hook_socket).unwrap();
+        let app = crate::test_app::serve(mgr.clone(), dir.path());
+        Self {
+            _dir: dir,
+            mgr,
+            app,
+        }
+    }
+
+    /// Windows: the craked service the installer put there.
+    #[cfg(windows)]
+    async fn craked() -> Self {
+        let (tx, updates) = async_channel::unbounded();
+        Self {
+            app: App::new(crate::client::start(tx), updates),
+        }
+    }
+
+    async fn start() -> Self {
+        let mut c = Self::craked().await;
+        c.app
+            .within(WAIT, "craked reached", |m| {
+                m.reachable == Some(true) && !m.settings.is_empty()
+            })
+            .await;
+        c.remove_tunnels().await;
+        let gateway = gateway();
+        c.add(&[
+            ("display_name", "ACME"),
+            ("gateway", &gateway),
+            ("protocol", "anyconnect"),
+            ("user", "alice"),
+        ])
+        .await;
+        c
+    }
+
+    async fn add(&mut self, fields: &[(&str, &str)]) {
+        let fields: HashMap<String, String> = fields
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        let name = fields["display_name"].to_lowercase();
+        self.app.send(Command::AddTunnel(fields));
+        self.app
+            .until("added", |m| m.tunnels.iter().any(|t| t.name == name))
+            .await;
+    }
+
+    /// No test tunnel left (the service keeps them from run to run).
+    async fn remove_tunnels(&mut self) {
+        for old in TUNNELS {
+            if self.app.model.tunnels.iter().any(|t| t.name == old) {
+                self.app.send(Command::RemoveTunnel(old.into()));
+                self.app
+                    .until("an old one gone", |m| {
+                        !m.tunnels.iter().any(|t| t.name == old)
+                    })
+                    .await;
+            }
+        }
+    }
+
+    /// The device `tunnel` runs on.
+    #[cfg(target_os = "macos")]
+    fn device(&self, tunnel: &str) -> String {
+        self.mgr.get(tunnel).unwrap().info.unwrap().device
+    }
+
+    #[cfg(windows)]
+    fn device(&self, tunnel: &str) -> String {
+        format!("crake-{tunnel}")
+    }
+
+    async fn stop(mut self) {
+        self.remove_tunnels().await;
+        #[cfg(target_os = "macos")]
+        self.mgr.shutdown().await;
+    }
+}
+
+fn sh(cmd: &str) -> String {
+    #[cfg(windows)]
+    let out = Run::new("powershell")
+        .args(["-NoProfile", "-Command", cmd])
+        .output()
+        .unwrap();
+    #[cfg(target_os = "macos")]
+    let out = Run::new("sh").args(["-c", cmd]).output().unwrap();
+    String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr)
 }
 
 /// An HTTP GET of `ip`, retried until it answers (the first try may wait
@@ -88,7 +167,8 @@ async fn get_within(ip: &'static str) -> Option<String> {
     .unwrap()
 }
 
-/// The device macOS sends `ip` out of.
+/// The device the system sends `ip` out of.
+#[cfg(target_os = "macos")]
 fn route_device(ip: &str) -> String {
     sh(&format!("route -n get {ip}"))
         .lines()
@@ -96,10 +176,19 @@ fn route_device(ip: &str) -> String {
         .unwrap_or_default()
 }
 
+#[cfg(windows)]
+fn route_device(ip: &str) -> String {
+    sh(&format!(
+        "(Find-NetRoute -RemoteIPAddress {ip} | Select-Object -First 1).InterfaceAlias"
+    ))
+    .trim()
+    .to_owned()
+}
+
 /// What a tunnel that's up must give: ACME's network through it, its names
 /// before the first packet, and the internet directly.
-async fn the_split_holds(mgr: &Manager, tunnel: &str) {
-    let device = mgr.get(tunnel).unwrap().info.unwrap().device;
+async fn the_split_holds(crake: &Crake, tunnel: &str) {
+    let device = crake.device(tunnel);
     // 1. A host that doesn't answer directly: probed, then through.
     let probed = get_within("10.40.1.10").await;
     assert!(
@@ -142,20 +231,21 @@ async fn anyconnect_through_cloudflare() {
     if !enabled() {
         return;
     }
-    let dir = tempfile::tempdir().unwrap();
-    let (mgr, mut app) = start(dir.path()).await;
+    let mut crake = Crake::start().await;
     let before = get("10.40.1.10", Duration::from_secs(2));
     assert!(before.is_err(), "10.40.1.10 answered without a tunnel");
 
     let session = sign_in().await;
-    app.send(Command::ConnectWithSession("acme".into(), session));
-    app.within(WAIT, "ACME connected", connected).await;
-    the_split_holds(&mgr, "acme").await;
+    crake
+        .app
+        .send(Command::ConnectWithSession("acme".into(), session));
+    crake.app.within(WAIT, "ACME connected", connected).await;
+    the_split_holds(&crake, "acme").await;
 
-    app.send(Command::Disconnect("acme".into()));
-    app.within(WAIT, "ACME off", off).await;
+    crake.app.send(Command::Disconnect("acme".into()));
+    crake.app.within(WAIT, "ACME off", off).await;
     assert!(get("10.40.1.10", Duration::from_secs(2)).is_err());
-    mgr.shutdown().await;
+    crake.stop().await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -170,20 +260,15 @@ async fn openvpn_through_cloudflare() {
         "client\ndev tun\nproto tcp-client\nremote {remote}\nnobind\nauth-user-pass\n\
          remote-cert-tls server\n<ca>\n{ca}</ca>\n"
     );
-    let dir = tempfile::tempdir().unwrap();
-    let (mgr, mut app) = start(dir.path()).await;
-    let fields: HashMap<String, String> = [
-        ("display_name", "Initech"),
-        ("protocol", "openvpn"),
-        ("profile", profile.as_str()),
-    ]
-    .iter()
-    .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-    .collect();
-    app.send(Command::AddTunnel(fields));
-    app.until("added", |m| m.tunnels.iter().any(|t| t.name == "initech"))
+    let mut crake = Crake::start().await;
+    crake
+        .add(&[
+            ("display_name", "Initech"),
+            ("protocol", "openvpn"),
+            ("profile", profile.as_str()),
+        ])
         .await;
-
+    let app = &mut crake.app;
     app.send(Command::Connect("initech".into()));
     let answer = |ask: &HashMap<String, String>, text: &str| {
         Command::Answer(
@@ -204,8 +289,9 @@ async fn openvpn_through_cloudflare() {
             .any(|t| t.name == "initech" && t.state == "connected")
     })
     .await;
-    the_split_holds(&mgr, "initech").await;
+    the_split_holds(&crake, "initech").await;
 
+    let app = &mut crake.app;
     app.send(Command::Disconnect("initech".into()));
     app.within(WAIT, "Initech off", |m| {
         m.tunnels
@@ -214,5 +300,5 @@ async fn openvpn_through_cloudflare() {
     })
     .await;
     assert!(get("10.40.1.10", Duration::from_secs(2)).is_err());
-    mgr.shutdown().await;
+    crake.stop().await;
 }

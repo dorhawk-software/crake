@@ -133,7 +133,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-        run: sh scripts/ci-through-cloudflare.sh
+        run: sh scripts/ci-through-cloudflare.sh macos
       - name: A keychain with the Developer ID certificates
         if: env.SIGNING == 'true'
         env:
@@ -182,8 +182,8 @@ jobs:
           path: target/macos/Crake-*.pkg
 
   # ACME's gateways (the e2e gateway's image: ocserv, and openvpn over
-  # TCP) for the Mac's job, published by Cloudflare Tunnel, up until that
-  # job is done with them (CLAUDE.md, 7j; scripts/ci-gateways.sh). Without
+  # TCP) for the Mac's and Windows' jobs, published by Cloudflare Tunnel,
+  # up until those jobs are done with them (CLAUDE.md, 7j; scripts/ci-gateways.sh). Without
   # the tunnel's secrets (a fork, or before it's set up) it does nothing.
   gateways:
     runs-on: ubuntu-24.04
@@ -221,11 +221,11 @@ jobs:
         with:
           name: gateways-ready
           path: ${{ runner.temp }}/gateways/openvpn-ca.crt
-      - name: Up until the Mac's job is done with them
+      - name: Up until the Mac's and Windows' jobs are done with them
         if: env.HAVE_TUNNEL == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: scripts/ci-gateways.sh wait macos
+        run: scripts/ci-gateways.sh wait macos windows-gateways
       - name: What the gateways said
         if: always() && env.HAVE_TUNNEL == 'true'
         run: |
@@ -259,6 +259,85 @@ jobs:
             target/release/crake.exe
             target/release/craked.exe
             target/release/crake-hook.exe
+      # The app's tests, built above, for the real-gateway job (7j).
+      - name: The app's test binary
+        shell: bash
+        run: |
+          BIN=$(cargo test -p crake --locked --no-run --message-format=json |
+            jq -r 'select(.executable != null and .target.name == "crake" and .profile.test) | .executable' | head -n1)
+          mkdir -p target/ci && cp "$BIN" target/ci/crake-tests.exe
+      - uses: actions/upload-artifact@v7
+        with:
+          name: crake-windows-tests
+          path: target/ci/crake-tests.exe
+
+  # The installer, as a release builds it (release.yml), from this run's
+  # executables: openconnect built from source and OpenVPN taken from its
+  # MSI, both kept in a cache while their scripts don't change.
+  windows-installer:
+    needs: windows-build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: crake-windows
+          path: target/windows/app
+      - uses: actions/cache/restore@v6
+        id: engines
+        with:
+          path: |
+            target/windows/openconnect
+            target/windows/openvpn
+          key: windows-engines-${{ hashFiles('scripts/build-openconnect-windows.sh', 'scripts/windows/**', 'scripts/fetch-openvpn-windows.sh') }}
+      - name: The installer, with openconnect and OpenVPN (unsigned)
+        run: scripts/build-windows-installer.sh
+      - uses: actions/cache/save@v6
+        if: github.ref == 'refs/heads/main' && steps.engines.outputs.cache-hit != 'true'
+        with:
+          path: |
+            target/windows/openconnect
+            target/windows/openvpn
+          key: windows-engines-${{ hashFiles('scripts/build-openconnect-windows.sh', 'scripts/windows/**', 'scripts/fetch-openvpn-windows.sh') }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: crake-windows-setup
+          path: target/windows/crake-setup-*.exe
+
+  # Crake installed on a Windows runner as a person would have it, signed
+  # in to ACME's gateways through Cloudflare Tunnel (7j).
+  windows-gateways:
+    needs: [windows-build, windows-installer]
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      HAVE_TUNNEL: ${{ secrets.CF_ACCESS_CLIENT_ID != '' }}
+    steps:
+      - name: Without Cloudflare Tunnel, nothing to do
+        if: env.HAVE_TUNNEL != 'true'
+        run: echo "No Cloudflare Tunnel secrets here; the real-gateway tests are skipped."
+      - uses: actions/checkout@v7
+        if: env.HAVE_TUNNEL == 'true'
+      - uses: actions/download-artifact@v8
+        if: env.HAVE_TUNNEL == 'true'
+        with:
+          name: crake-windows-setup
+          path: setup
+      - uses: actions/download-artifact@v8
+        if: env.HAVE_TUNNEL == 'true'
+        with:
+          name: crake-windows-tests
+          path: tests
+      - name: Real gateways, through Cloudflare
+        if: env.HAVE_TUNNEL == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: sh scripts/ci-through-cloudflare.sh windows "$(ls setup/crake-setup-*.exe)" tests/crake-tests.exe
 
   nixos:
     runs-on: ubuntu-24.04
@@ -393,7 +472,7 @@ jobs:
   # same kind replaced (an older Cargo.lock's) are deleted, or they push
   # out caches still in use (scripts/prune-caches.sh).
   caches:
-    needs: [check, windows, macos, windows-build, packages]
+    needs: [check, windows, macos, windows-build, windows-installer, packages]
     if: ${{ always() && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     permissions:

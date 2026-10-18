@@ -1,9 +1,13 @@
 #!/bin/sh
-# CI's Mac reaches ACME's gateways in the run's `gateways` job through
-# Cloudflare Tunnel (CLAUDE.md, 7j): cloudflared carries each to a port
-# on 127.0.0.1 (with the repository's service token), and the tests in
-# crates/crake/src/gateway_tests.rs connect to them with craked run as
-# root, the system's openconnect and openvpn (Homebrew's).
+# CI's Mac or Windows reaches ACME's gateways in the run's `gateways` job
+# through Cloudflare Tunnel (CLAUDE.md, 7j): cloudflared carries each to a
+# port on 127.0.0.1 (with the repository's service token), and the tests in
+# crates/crake/src/gateway_tests.rs connect to them. macOS: craked in the
+# test, as root, with Homebrew's openconnect and openvpn. Windows: the
+# installer (SETUP) puts Crake's service, openconnect and openvpn there,
+# and the tests (TESTS, the app's test binary) drive it.
+#   scripts/ci-through-cloudflare.sh macos
+#   scripts/ci-through-cloudflare.sh windows SETUP TESTS
 # Needs CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET, GH_TOKEN.
 set -eu
 cd "$(dirname "$0")/.."
@@ -12,12 +16,21 @@ ANYCONNECT_HOST=crake-ci-anyconnect.dorhawk.software
 OPENVPN_HOST=crake-ci-openvpn.dorhawk.software
 # How long the gateways job gets to be up, and the tunnel to carry them.
 READY_TRIES=60
+SYSTEM=$1
 WORK=${RUNNER_TEMP:-/tmp}/through-cloudflare
 mkdir -p "$WORK"
-brew install openconnect openvpn >/dev/null
-sh scripts/cloudflared.sh macos "$WORK/cloudflared"
+if [ "$SYSTEM" = macos ]; then
+  brew install openconnect openvpn >/dev/null
+else
+  # Silent, as a company's software deployment would: the service and both
+  # engines' drivers (crake.nsi).
+  powershell -NoProfile -Command "\$p = Start-Process '$2' -ArgumentList '/S' -Wait -PassThru; exit \$p.ExitCode"
+fi
+CLOUDFLARED=$WORK/cloudflared
+[ "$SYSTEM" = macos ] || CLOUDFLARED=$CLOUDFLARED.exe
+sh scripts/cloudflared.sh "$SYSTEM" "$CLOUDFLARED"
 access() {
-  "$WORK/cloudflared" access tcp --hostname "$1" --url "127.0.0.1:$2" \
+  "$CLOUDFLARED" access tcp --hostname "$1" --url "127.0.0.1:$2" \
     --service-token-id "$CF_ACCESS_CLIENT_ID" --service-token-secret "$CF_ACCESS_CLIENT_SECRET" \
     > "$WORK/access-$2.log" 2>&1 &
 }
@@ -36,14 +49,22 @@ until curl -sk -o /dev/null https://127.0.0.1:8443; do
   [ "$i" -lt "$READY_TRIES" ] || { cat "$WORK"/access-*.log; echo "no gateway through Cloudflare" >&2; exit 1; }
   sleep 5
 done
-cargo build -q --locked -p craked --bin crake-hook
-HOOK=$PWD/target/debug/crake-hook
-BIN=$(cargo test -p crake --locked --no-run --message-format=json 2>/dev/null |
-  jq -r 'select(.executable != null and .target.name == "crake" and .profile.test) | .executable' | head -n1)
-[ -n "$BIN" ] || { echo "could not build the tests" >&2; exit 1; }
 status=0
-sudo env CRAKE_E2E=1 CRAKE_E2E_GATEWAY=https://127.0.0.1:8443 \
-  CRAKE_GATEWAY_OPENVPN="127.0.0.1 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
-  CRAKE_E2E_HOOK="$HOOK" "$BIN" gateway_tests --test-threads=1 --nocapture || status=$?
+if [ "$SYSTEM" = macos ]; then
+  cargo build -q --locked -p craked --bin crake-hook
+  HOOK=$PWD/target/debug/crake-hook
+  BIN=$(cargo test -p crake --locked --no-run --message-format=json 2>/dev/null |
+    jq -r 'select(.executable != null and .target.name == "crake" and .profile.test) | .executable' | head -n1)
+  [ -n "$BIN" ] || { echo "could not build the tests" >&2; exit 1; }
+  sudo env CRAKE_E2E=1 CRAKE_E2E_GATEWAY=https://127.0.0.1:8443 \
+    CRAKE_GATEWAY_OPENVPN="127.0.0.1 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
+    CRAKE_E2E_HOOK="$HOOK" "$BIN" gateway_tests --test-threads=1 --nocapture || status=$?
+else
+  CRAKE_E2E=1 CRAKE_E2E_GATEWAY=https://127.0.0.1:8443 \
+    CRAKE_GATEWAY_OPENVPN="127.0.0.1 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
+    CRAKE_OPENCONNECT="C:/Program Files/Crake/openconnect/openconnect.exe" \
+    "$3" gateway_tests --test-threads=1 --nocapture || status=$?
+  [ "$status" = 0 ] || tail -n 60 "C:/ProgramData/Crake/craked.log"
+fi
 [ "$status" = 0 ] || tail -n 30 "$WORK"/access-*.log
 exit "$status"
