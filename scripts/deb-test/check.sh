@@ -5,7 +5,8 @@
 #            should, on the system bus, guarded by polkit
 #   tunnel   (no network any more) a real tunnel through the installed
 #            service: ocserv in its own namespace (gateway.sh), probing,
-#            DNS through systemd-resolved, keeping names private
+#            DNS through systemd-resolved, keeping names private; then an
+#            OpenVPN one (openvpn, a password sign-in answered over D-Bus)
 #   journey  the journey suite (the app and its craked) on this system
 #   remove   remove and purge; nothing is left
 # Prints each check; exits non-zero if any failed.
@@ -27,7 +28,7 @@ install() {
         check "installs with its depends only" pacman -U --noconfirm /pkg/crake.pkg.tar.zst
         # What its install message says to do: an engine, and the services
         # (Arch packages enable none themselves).
-        check "openconnect, as the message says" pacman -S --noconfirm --needed openconnect
+        check "openconnect, as the message says" pacman -S --noconfirm --needed openconnect openvpn
         check "and the services" systemctl enable --now systemd-resolved craked
     elif [ "$PM" = dnf ]; then
         check "installs with its Requires only" dnf install -y -q --setopt=install_weak_deps=False /pkg/crake.rpm
@@ -63,9 +64,11 @@ install() {
     if [ "$PM" = pacman ]; then
         check "the gateway's software" pacman -S --noconfirm --needed curl
     elif [ "$PM" = dnf ]; then
-        check "the gateway's software" dnf install -y -q ocserv gnutls-utils dnsmasq busybox curl
+        check "the gateway's software" dnf install -y -q ocserv gnutls-utils dnsmasq busybox curl openssl python3
+        check "openvpn, as Recommends would" dnf install -y -q openvpn
     else
-        check "the gateway's software" apt-get install -y -qq --no-install-recommends ocserv gnutls-bin dnsmasq-base busybox curl
+        check "the gateway's software" apt-get install -y -qq --no-install-recommends ocserv gnutls-bin dnsmasq-base busybox curl openssl python3
+        check "openvpn, as Recommends would" apt-get install -y -qq --no-install-recommends openvpn
     fi
     # systemd-resolved, when apt just pulled it in (24.04 and newer), started
     # before D-Bus read its policy and isn't on the bus; on a real desktop
@@ -143,6 +146,7 @@ tunnel() {
     check "the other client goes" ip link del other0
     for _ in $(seq 1 20); do resolvectl domain crake-hush 2>/dev/null | grep -q acme.internal && break; sleep 0.5; done
     check "acme.internal is kept private again" sh -c 'resolvectl domain crake-hush | grep -q acme.internal'
+    openvpn_tunnel
     check "nothing went wrong in craked's journal" sh -c '! journalctl -b -u craked --no-pager -o cat | grep -E "ERROR|panicked"'
     if aa-enabled --quiet 2>/dev/null; then
         # Complain mode (scripts/vm-test.sh --complain) lists what the
@@ -155,6 +159,52 @@ tunnel() {
     fi
     echo "  craked's journal:"
     journalctl -b -u craked --no-pager -o cat | sed 's/^/        /'
+}
+
+# craked's question about TUNNEL's sign-in, once it asks for KIND: answered
+# with TEXT, as the app's sign-in window does (D-Bus Asking and Answer).
+answer() {
+    for _ in $(seq 1 40); do
+        asked=$(call Asking s "$1" 2>&1)
+        echo "$asked" | grep -q "\"kind\" \"$2\"" && break
+        sleep 0.5
+    done
+    id=$(echo "$asked" | grep -o '"id" "[0-9]*"' | grep -o '[0-9][0-9]*')
+    call Answer sus "$1" "$id" "$3"
+}
+
+# An OpenVPN tunnel through the installed service (CLAUDE.md, 7i): craked
+# runs this system's openvpn (under its AppArmor profile, where there is
+# one) against ACME's OpenVPN gateway, with a password sign-in. ACME's
+# openconnect tunnel is off by now: both push the same DNS server.
+openvpn_tunnel() {
+    ca=/tmp/openvpn-ca.crt
+    [ -e /link/openvpn-ca.crt ] && ca=/link/openvpn-ca.crt
+    # Here (not Arch, whose gateway is a container of its own): its
+    # openvpn has to be up first, or nothing after says much.
+    if [ -e /tmp/openvpn-gw.log ]; then
+        for _ in $(seq 1 20); do grep -q "Initialization Sequence Completed" /tmp/openvpn-gw.log && break; sleep 0.5; done
+        check "ACME's OpenVPN gateway is up" sh -c 'grep -q "Initialization Sequence Completed" /tmp/openvpn-gw.log || { cat /tmp/openvpn-gw.log; false; }'
+    fi
+    printf 'client\ndev tun\nproto udp\nremote 198.51.100.10 1194\nnobind\nauth-user-pass\nremote-cert-tls server\n<ca>\n%s\n</ca>\n' \
+        "$(cat "$ca")" > /tmp/initech.ovpn
+    check "Initech (OpenVPN) added" call AddTunnel 'a{ss}' 3 display_name Initech protocol openvpn profile "$(cat /tmp/initech.ovpn)"
+    check "its profile is root's alone" sh -c 'test "$(stat -c %a /var/lib/crake/profiles/initech.ovpn)" = 600'
+    check "switched on" call Connect s initech
+    check "asked for the username" answer initech user alice
+    check "asked for the password" answer initech password hunter2
+    for _ in $(seq 1 40); do call GetTunnel s initech | grep -q '"connected"' && break; sleep 0.5; done
+    check "Initech connected" sh -c "busctl --system call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 GetTunnel s initech | grep -q '\"connected\"'"
+    if aa-enabled --quiet 2>/dev/null; then
+        check "openvpn runs confined too" sh -c 'ps -eo label,comm | grep -Eq "^craked \((enforce|complain)\) +openvpn"'
+    fi
+    check "its address on crake-initech" sh -c 'ip -4 -o addr show crake-initech | grep -q "inet 10.40.254."'
+    check "a host that doesn't answer directly gets through Initech" sh -c 'curl -s -m 15 http://10.40.1.12/ | grep -q crex'
+    check "Initech switches off" call Disconnect s initech
+    sleep 2
+    check "its openvpn stopped" sh -c '! ps -eo args | grep -v grep | grep -q "openvpn-initech.conf"'
+    check "Initech removed" call RemoveTunnel s initech
+    check "its profile went with it" test ! -e /var/lib/crake/profiles/initech.ovpn
 }
 
 # The journey (crates/crake/src/journey_tests.rs): the real app and its own

@@ -15,7 +15,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
   tunnel, beside Gateway): Crake picks OpenVPN, takes the gateway and a name from the file, and
   keeps its own copy, which only its service can read. Signing in through your browser, with a
   password, a code or a certificate's password works as the profile says. A profile that would run
-  something on your computer is refused, saying why. Beta until it has met a real gateway.
+  something on your computer is refused, saying why. Beta until it has met a real gateway. The
+  packages now recommend openvpn.
 
 - **Your OpenVPN 3 tunnels move to it.** Each one is copied over once, while it's off, and the log
   says so; OpenVPN 3 keeps its own profile. One whose profile OpenVPN 3 keeps locked stays where it

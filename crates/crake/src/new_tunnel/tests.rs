@@ -116,6 +116,9 @@ const ANYCONNECT: usize = 1;
 /// OpenVPN 3's profiles are taken over (design/proposals/openvpn-tunnel.html,
 /// 2): chosen in the Profile list, Crake takes a copy; a locked one says
 /// what to do instead.
+// OpenVPN isn't built for Windows yet (CLAUDE.md, 7i, slice 4): New tunnel
+// says so there (`engines::missing`), and these steps don't apply.
+#[cfg(not(windows))]
 #[gpui_kit::test]
 fn an_openvpn3_profile_is_taken_over(cx: &mut TestAppContext) {
     cx.executor().allow_parking();
@@ -226,10 +229,12 @@ fn an_incomplete_step_says_what_is_missing(cx: &mut TestAppContext) {
     w.click(("protocol", OPENVPN), cx);
     w.click("next", cx);
     assert_eq!(w.read(cx, |t| t.step), 1);
-    assert_eq!(
-        w.read(cx, |t| t.problem.clone()).as_deref(),
-        Some("Which profile? Import its .ovpn file.")
-    );
+    let openvpn = if cfg!(windows) {
+        "OpenVPN isn\u{2019}t built for Windows yet."
+    } else {
+        "Which profile? Import its .ovpn file."
+    };
+    assert_eq!(w.read(cx, |t| t.problem.clone()).as_deref(), Some(openvpn));
 
     w.click(("protocol", ANYCONNECT), cx);
     w.click("next", cx);
@@ -330,6 +335,7 @@ fn note(w: &Opened, cx: &mut TestAppContext) -> Option<String> {
 /// design/proposals/openvpn-tunnel.html, 1: "Import .ovpn…" beside
 /// Gateway picks OpenVPN by itself, with the profile's gateway and a name
 /// from the file; the rest of the list folds away.
+#[cfg(not(windows))]
 #[gpui_kit::test]
 fn a_ovpn_file_picks_openvpn_by_itself(cx: &mut TestAppContext) {
     cx.executor().allow_parking();

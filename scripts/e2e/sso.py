@@ -6,13 +6,14 @@ page is fetched; alice is let in with her password (hunter2); a client back
 with its token is let in by openvpn itself (auth-gen-token), without asking
 here; any other is refused. What each client said goes to /link/openvpn-seen.
 
-    sso.py <management socket> <page address> <page port>
+    sso.py <management socket> <page address> <page port> [seen file]
 """
 import socket, sys, threading, time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
 path, host, port = sys.argv[1], sys.argv[2], int(sys.argv[3])
+seen_file = sys.argv[4] if len(sys.argv) > 4 else "/link/openvpn-seen"
 pending = {}
 lock = threading.Lock()
 
@@ -51,7 +52,7 @@ threading.Thread(target=HTTPServer((host, port), Page).serve_forever, daemon=Tru
 
 
 def seen(text):
-    with open("/link/openvpn-seen", "a") as f:
+    with open(seen_file, "a") as f:
         f.write(text + "\n")
 
 

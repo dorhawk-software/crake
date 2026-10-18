@@ -10,12 +10,13 @@ URL:            https://dorhawk.software/crake/
 ExclusiveArch:  x86_64
 
 # At least one engine; openvpn3 isn't in Fedora (its own repository).
-Requires:       (openconnect or openvpn3)
+Requires:       (openconnect or openvpn or openvpn3)
 Requires:       nftables
 Requires:       iproute
 Requires:       systemd-resolved
 Requires:       polkit
 Requires:       dbus
+Recommends:     openvpn
 Recommends:     gnome-shell-extension-appindicator
 Recommends:     gnome-keyring
 Suggests:       openvpn3

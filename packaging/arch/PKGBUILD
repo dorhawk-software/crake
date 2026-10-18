@@ -15,6 +15,7 @@ makedepends=('rust' 'cmake' 'pkgconf' 'fontconfig' 'freetype2')
 # pacman can't say "one of these": each engine is optional, and the app
 # says which one a tunnel needs when it isn't installed.
 optdepends=('openconnect: AnyConnect, GlobalProtect, Fortinet and the other openconnect protocols'
+            'openvpn: OpenVPN profiles, run by Crake'
             'openvpn3: OpenVPN 3 profiles (AUR)'
             'gnome-shell-extension-appindicator: the tray icon on GNOME'
             'gnome-keyring: keeping passwords and certificates')

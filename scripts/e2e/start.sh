@@ -8,7 +8,7 @@ set -e
 ip link set lo up
 ip link add acme type dummy
 ip link set acme up
-for a in 10.40.0.2 10.40.1.10 10.40.1.11; do ip addr add "$a/32" dev acme; done
+for a in 10.40.0.2 10.40.1.10 10.40.1.11 10.40.1.12; do ip addr add "$a/32" dev acme; done
 ip link add inet type dummy
 ip link set inet up
 ip addr add 203.0.113.80/32 dev inet

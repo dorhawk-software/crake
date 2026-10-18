@@ -20,7 +20,7 @@ in {
 
   config = lib.mkIf cfg.enable {
     # The app signs in with openconnect as the user.
-    environment.systemPackages = [ cfg.package pkgs.openconnect ];
+    environment.systemPackages = [ cfg.package pkgs.openconnect pkgs.openvpn ];
     services.dbus.packages = [ cfg.package ];
     security.polkit.enable = true;
     # Tunnel DNS goes through systemd-resolved.
@@ -40,7 +40,7 @@ in {
       wantedBy = [ "multi-user.target" ];
       after = [ "network-online.target" "dbus.service" ];
       wants = [ "network-online.target" ];
-      path = [ pkgs.nftables pkgs.iproute2 pkgs.openconnect ];
+      path = [ pkgs.nftables pkgs.iproute2 pkgs.openconnect pkgs.openvpn ];
       # An upgrade (nixos-rebuild switch) reloads craked rather than
       # restarting it: the reload leaves the handover flag and restarts it,
       # so its tunnels stay signed in, as the packages' upgrade scripts do

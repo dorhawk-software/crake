@@ -928,10 +928,17 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    lifecycle (the move), e2e through the app's client, the journey's
    import step. Not yet: passwords kept in the keyring for OpenVPN;
    tunnels from craked.toml or IT that are OpenVPN 3 stay so.
-   **Don't release before slice 3:** under the package's AppArmor
-   profile craked can't run openvpn or write `profiles/`, and the move
-   would take the user's OpenVPN 3 tunnels onto an engine that then
-   fails (the user's own OpenVPN 3 tunnel among them).
+   **Slice 3 (packages): built (2026-10-18).** openvpn is one of the
+   engine alternatives and Recommended (.deb `openconnect | openvpn |
+   openvpn3` and Recommends openvpn; RPM likewise; Arch an optdepend; the
+   NixOS module puts it on craked's path and the system's). AppArmor:
+   openvpn runs under craked's profile (`ix`, as openconnect), and
+   resolved's PropertiesChanged may reach craked. The package test has an
+   OpenVPN phase (ACME's OpenVPN gateway beside ocserv, a password
+   sign-in answered over D-Bus Asking/Answer, openvpn confined, a host
+   learned through it, removed with its profile); `scripts/vm-test.sh
+   26.04` passes it with the profile enforced. A release still needs CI's
+   package tests on every system (22.04's openvpn is 2.5).
 7j. **Real gateways in CI, on every system (requested 2026-10-18; after
    7i).** Each CI system (Linux, macOS, Windows) starts Crake, connects to
    a real gateway of each kind there is software for, and checks that,
@@ -1668,7 +1675,12 @@ it doesn't, bundle, and own the updates.**
   [release]` runs the same checks in a throwaway Ubuntu VM (qemu, KVM, no
   display, no ports; cloud image cached in `target/vm/`) with the profile
   enforced: craked and openconnect confined, nothing refused. Passes on
-  22.04, 24.04 and 26.04. Not in CI (needs KVM). Still
+  22.04, 24.04 and 26.04. On a computer with Crake installed (the user's), the
+  package test's containers run craked under the host's loaded profile
+  (the kernel attaches it by path, /usr/sbin/craked; found 2026-10-18 when
+  the containers' openvpn was refused by 0.10.4's profile): a new rule is
+  proven by vm-test.sh only, and a container's AppArmor denial may be the
+  host's older profile. Not in CI (needs KVM). Still
   to do, with the user: the signed apt repository (their key) and its
   publishing.
 - **Upgrades keep tunnels up (requested).** postinst, upgrading a running

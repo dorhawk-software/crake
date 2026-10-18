@@ -3,7 +3,7 @@
 # network sends (DNS answers, connection events), so it gets only what it
 # needs: its own files, netlink (routes, nftables, the DNS queue,
 # conntrack), its D-Bus name and the calls it makes (resolved, polkit), ip,
-# nft and ss, and openconnect with the hook it runs.
+# nft and ss, and openconnect and openvpn with the hook they run.
 # Tested enforced by scripts/vm-test.sh.
 
 abi <abi/3.0>,
@@ -48,7 +48,7 @@ profile craked /usr/sbin/craked flags=(attach_disconnected) {
   @{PROC}/sys/net/netfilter/nf_conntrack_acct rw,
   # How many CPUs it may use (Rust's runtime, from its cgroup).
   @{PROC}/@{pid}/cgroup r,
-  /sys/fs/cgroup/**/cpu.max r,
+  /sys/fs/cgroup/{,**/}cpu.max r,
 
   # D-Bus: its own name and object, resolved, polkit.
   dbus bind bus=system name=software.dorhawk.Crake1,
@@ -58,6 +58,9 @@ profile craked /usr/sbin/craked flags=(attach_disconnected) {
        member={RequestName,ReleaseName,AddMatch,RemoveMatch,GetNameOwner,GetConnectionCredentials,GetConnectionUnixUser,GetConnectionUnixProcessID}
        peer=(name=org.freedesktop.DBus),
   dbus send bus=system peer=(name=org.freedesktop.resolve1),
+  # resolved telling its clients what changed (zbus listens for it).
+  dbus receive bus=system path=/org/freedesktop/resolve1
+       interface=org.freedesktop.DBus.Properties member=PropertiesChanged,
   dbus send bus=system path=/org/freedesktop/PolicyKit1/Authority
        interface=org.freedesktop.PolicyKit1.Authority member=CheckAuthorization
        peer=(name=org.freedesktop.PolicyKit1),
@@ -90,4 +93,12 @@ profile craked /usr/sbin/craked flags=(attach_disconnected) {
   /usr/share/crypto-policies/** r,
   /{usr/,}bin/{,da}sh ix,
   /usr/libexec/crake/hook ix,
+
+  # One openvpn per OpenVPN tunnel (CLAUDE.md, 7i), under this profile
+  # too: the run's config and its management socket are in /run/crake
+  # (above), the profiles in /var/lib/crake; it makes the tunnel's device
+  # (tun, or the kernel's ovpn over generic netlink: data channel offload)
+  # and runs the hook directly.
+  /{usr/,}{s,}bin/openvpn ix,
+  network netlink dgram,
 }
