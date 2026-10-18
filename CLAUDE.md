@@ -968,6 +968,16 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    sends each command once the one before is answered (`Paced`, every
    platform). The Windows VM test has an OpenVPN tunnel (a password
    sign-in through the app's client, routed, off, no adapter left).
+   **Slice 5 (macOS): built (2026-10-18).** Homebrew's openvpn (the cask
+   depends on it; craked looks in /opt/homebrew/sbin and /usr/local/sbin),
+   `--dev utun --dev-type tun` (openvpn takes tun or tap from a device's
+   name, and without the type every tunnel stopped at the push: "problem
+   with tun vs. tap setting", found by CI's Mac). `tests/macos_openvpn.rs`
+   on CI's Mac as root: an openvpn server on loopback (its own `dev tun`:
+   macOS' openvpn refuses `--mode server` with `dev utun`), a certificate
+   sign-in, the utun the hook names with the tunnel's address and its DNS
+   route, gone with the tunnel. Not the data path (a server on the same
+   Mac answers its own addresses directly): 7j's.
 7j. **Real gateways in CI, on every system (requested 2026-10-18; after
    7i).** Each CI system (Linux, macOS, Windows) starts Crake, connects to
    a real gateway of each kind there is software for, and checks that,
