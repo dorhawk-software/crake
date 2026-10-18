@@ -41,6 +41,9 @@ struct Crake {
     #[cfg(target_os = "macos")]
     mgr: std::sync::Arc<craked::manager::Manager>,
     app: App,
+    /// The socket craked serves the app on: the test's own (macOS), or
+    /// none, the installed service's (Windows).
+    socket: Option<std::path::PathBuf>,
 }
 
 impl Crake {
@@ -66,6 +69,7 @@ impl Crake {
         craked::hook_server::serve(mgr.clone(), &hook_socket).unwrap();
         let app = crate::test_app::serve(mgr.clone(), dir.path());
         Self {
+            socket: Some(dir.path().join("crake.sock")),
             _dir: dir,
             mgr,
             app,
@@ -78,6 +82,7 @@ impl Crake {
         let (tx, updates) = async_channel::unbounded();
         Self {
             app: App::new(crate::client::start(tx), updates),
+            socket: None,
         }
     }
 
@@ -328,15 +333,15 @@ async fn the_split_holds(crake: &Crake, tunnel: &str) {
     // 4. And by name: craked's DNS answers public names too.
     names_work("while a tunnel is up", WAIT).await;
     // 5. A report (the log's "Save a report…") says so, part by part.
-    report_holds(tunnel).await;
+    report_holds(crake, tunnel).await;
 }
 
 /// The report while `tunnel` is up: the internet answered directly, ACME's
 /// name through the tunnel, this system's DNS with craked's server in it,
 /// its routes and Crake's rules. Printed whole for the run's log.
-async fn report_holds(tunnel: &str) {
+async fn report_holds(crake: &Crake, tunnel: &str) {
     let label = if tunnel == "acme" { "ACME" } else { "Initech" };
-    let report = crate::report::gather_from(None).await;
+    let report = crate::report::gather_from(crake.socket.clone()).await;
     let text = crate::report::text(&report, false, &jiff::Zoned::now());
     println!("{text}");
     let computer = report.computer.as_ref().expect("craked's side");
