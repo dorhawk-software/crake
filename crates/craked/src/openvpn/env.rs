@@ -180,9 +180,127 @@ fn without_port(a: &str) -> &str {
     }
 }
 
+/// What a gateway pushed, as openvpn's own output says it ("PUSH:
+/// Received control message: 'PUSH_REPLY,...'", openvpn redacting any
+/// token): its DNS options. Windows' openvpn keeps `dhcp-option`s for its
+/// adapter and hands the hook none (seen 2026-10-18 on CI's Windows: no
+/// foreign_option or dns_* at all); Linux's and macOS' hand them over.
+#[derive(Debug, Default, Clone)]
+pub struct Pushed {
+    options: Vec<String>,
+    /// The last message said more follow ("push-continuation 2").
+    more: bool,
+}
+
+/// How openvpn's output brings a pushed reply.
+const PUSH_REPLY: &str = "PUSH: Received control message: 'PUSH_REPLY,";
+
+impl Pushed {
+    /// One line of openvpn's output.
+    pub fn heard(&mut self, line: &str) {
+        let Some(rest) = line.split_once(PUSH_REPLY).map(|(_, r)| r) else {
+            return;
+        };
+        let reply = rest.trim_end().trim_end_matches('\'');
+        if !self.more {
+            self.options.clear();
+        }
+        self.more = false;
+        for option in reply.split(',') {
+            let option = option.trim();
+            if option == "push-continuation 2" {
+                self.more = true;
+            } else if option.starts_with("dhcp-option ") || option.starts_with("dns ") {
+                self.options.push(option.to_owned());
+            }
+        }
+    }
+
+    /// The hook's variables for what was pushed, where it has none of its
+    /// own: `foreign_option_N` for `dhcp-option`s, `dns_server_*` and
+    /// `dns_search_domain_N` for 2.6's `dns`.
+    pub fn fill(&self, env: &mut BTreeMap<String, String>) {
+        let has = |p: &str| env.keys().any(|k| k.starts_with(p));
+        if has("foreign_option_") || has("dns_server_") || has("dns_search_domain_") {
+            return;
+        }
+        let (mut foreign, mut search) = (0, 0);
+        for option in &self.options {
+            let words: Vec<&str> = option.split_whitespace().collect();
+            match words.as_slice() {
+                ["dhcp-option", ..] => {
+                    foreign += 1;
+                    env.insert(format!("foreign_option_{foreign}"), option.clone());
+                }
+                ["dns", "server", n, "address", addrs @ ..] => {
+                    for (m, a) in addrs.iter().enumerate() {
+                        env.insert(format!("dns_server_{n}_address_{}", m + 1), (*a).to_owned());
+                    }
+                }
+                ["dns", "server", n, "resolve-domains", domains @ ..] => {
+                    env.insert(format!("dns_server_{n}_resolve_domains"), domains.join(" "));
+                }
+                ["dns", "search-domains", domains @ ..] => {
+                    for d in domains {
+                        search += 1;
+                        env.insert(format!("dns_search_domain_{search}"), (*d).to_owned());
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn what_windows_openvpn_keeps_to_itself_comes_from_its_output() {
+        // As CI's Windows run printed it (2026-10-18), and a 2.6 `dns` push
+        // in two messages.
+        let mut p = Pushed::default();
+        p.heard("2026-10-18 15:51:29 PUSH: Received control message: 'PUSH_REPLY,topology subnet,route-gateway 10.40.254.1,route 10.40.0.0 255.255.0.0,dhcp-option DNS 10.40.0.2,dhcp-option DOMAIN acme.internal,redirect-gateway def1,block-outside-dns,ifconfig 10.40.254.10 255.255.255.0,peer-id 0,cipher AES-256-GCM'");
+        let mut env: BTreeMap<String, String> = [
+            ("dev", "crake-initech"),
+            ("ifconfig_local", "10.40.254.10"),
+            ("ifconfig_netmask", "255.255.255.0"),
+            ("route_network_1", "10.40.0.0"),
+            ("route_netmask_1", "255.255.0.0"),
+        ]
+        .iter()
+        .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+        .collect();
+        p.fill(&mut env);
+        let i = info(&env).unwrap();
+        assert_eq!(i.dns, [Ipv4Addr::new(10, 40, 0, 2)]);
+        assert_eq!(i.domains, ["acme.internal"]);
+        // The hook's own, where there are any, win.
+        let mut own = env.clone();
+        own.retain(|k, _| !k.starts_with("foreign_option_"));
+        own.insert("foreign_option_1".into(), "dhcp-option DNS 10.9.9.9".into());
+        p.fill(&mut own);
+        assert_eq!(info(&own).unwrap().dns, [Ipv4Addr::new(10, 9, 9, 9)]);
+
+        let mut two = Pushed::default();
+        two.heard("PUSH: Received control message: 'PUSH_REPLY,dns server 0 address 10.40.0.2,push-continuation 2'");
+        two.heard("PUSH: Received control message: 'PUSH_REPLY,dns server 0 resolve-domains acme.internal,dns search-domains corp.acme.internal,push-continuation 1'");
+        let mut env: BTreeMap<String, String> = [("dev".to_owned(), "crake-initech".to_owned())]
+            .into_iter()
+            .collect();
+        two.fill(&mut env);
+        let i = info(&env).unwrap();
+        assert_eq!(i.dns, [Ipv4Addr::new(10, 40, 0, 2)]);
+        assert_eq!(i.domains, ["acme.internal", "corp.acme.internal"]);
+        // A new reply replaces the old.
+        two.heard("PUSH: Received control message: 'PUSH_REPLY,dhcp-option DNS 10.1.1.1'");
+        let mut env: BTreeMap<String, String> = [("dev".to_owned(), "crake-initech".to_owned())]
+            .into_iter()
+            .collect();
+        two.fill(&mut env);
+        assert_eq!(info(&env).unwrap().dns, [Ipv4Addr::new(10, 1, 1, 1)]);
+    }
 
     fn env(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
         pairs

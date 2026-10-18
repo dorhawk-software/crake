@@ -1002,6 +1002,12 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    own, openvpn connects to it (`--management-client`), and craked takes
    only the connection whose process (Windows' TCP table) is that
    openvpn. And it took the second of two commands that came in one read
+   (Windows' openvpn also hands the hook none of the pushed DNS: it
+   keeps `dhcp-option`s for its adapter; craked takes the DNS servers and
+   domains from openvpn's own output instead, its "PUSH: Received control
+   message: 'PUSH_REPLY,...'" lines, continuations joined
+   (`openvpn::env::Pushed`), where the hook has none; found by the
+   real-gateway test on CI's Windows, 2026-10-18.)
    for the first (the password went in as the username again), so craked
    sends each command once the one before is answered (`Paced`, every
    platform). The Windows VM test has an OpenVPN tunnel (a password

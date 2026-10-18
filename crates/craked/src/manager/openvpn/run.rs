@@ -139,6 +139,8 @@ impl Manager {
         let listen = Listen::new(&self.run_dir(), name)?;
         #[cfg(windows)]
         let listen = Listen::new()?;
+        // What this run's gateway pushes, from its own output (Windows).
+        self.pushed.lock().unwrap().remove(name);
         let mut child = self.spawn_openvpn(name, &conf, &listen, no_dco)?;
         let heard = Arc::new(Mutex::new(Heard::default()));
         let (dco_tx, mut dco_rx) = mpsc::unbounded_channel();
@@ -149,6 +151,7 @@ impl Manager {
                 Arc::clone(&heard),
                 dco_tx.clone(),
                 Arc::clone(&self.transport),
+                Arc::clone(&self.pushed),
             ));
         }
         if let Some(err) = child.stderr.take() {
@@ -158,6 +161,7 @@ impl Manager {
                 Arc::clone(&heard),
                 dco_tx,
                 Arc::clone(&self.transport),
+                Arc::clone(&self.pushed),
             ));
         }
         let Some((reader, mut writer)) = listen.connect(&mut child).await else {
@@ -439,6 +443,7 @@ async fn pump<R: tokio::io::AsyncRead + Unpin>(
     heard: Arc<Mutex<Heard>>,
     no_dco: mpsc::UnboundedSender<()>,
     transport: Arc<Mutex<HashMap<String, String>>>,
+    pushed: Arc<Mutex<HashMap<String, openvpn::env::Pushed>>>,
 ) {
     let mut lines = BufReader::new(r).lines();
     while let Ok(Some(line)) = lines.next_line().await {
@@ -449,6 +454,12 @@ async fn pump<R: tokio::io::AsyncRead + Unpin>(
         if line.contains(NO_DCO) {
             let _ = no_dco.send(());
         }
+        pushed
+            .lock()
+            .unwrap()
+            .entry(tunnel.clone())
+            .or_default()
+            .heard(&line);
         let how = if line.contains("UDP link remote")
             || line.contains("UDPv4 link remote")
             || line.contains("UDPv6 link remote")

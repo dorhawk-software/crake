@@ -48,7 +48,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
   tunnel comes up after a site found no answer: it's tried through it at once.
 
 - **OpenVPN on Windows and macOS too.** On Windows it comes with Crake, with its drivers; on a Mac
-  it comes with Homebrew's cask (`brew install openvpn` otherwise).
+  it comes with Homebrew's cask (`brew install openvpn` otherwise). On Windows, too, a company's
+  internal names go to its DNS and are routed before the first packet.
 
 - **Your OpenVPN 3 tunnels move to it.** Each one is copied over once, while it's off, and the log
   says so; OpenVPN 3 keeps its own profile. One whose profile OpenVPN 3 keeps locked stays where it

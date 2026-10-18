@@ -140,6 +140,9 @@ pub struct Manager {
     /// How each tunnel's packets travel, as openconnect (or the app, for
     /// OpenVPN 3) last said: tunnel -> "DTLS", "ESP", "TLS", "UDP", "TCP".
     transport: Arc<Mutex<HashMap<String, String>>>,
+    /// What each OpenVPN tunnel's gateway pushed, as openvpn's output says
+    /// (`openvpn::env::Pushed`): Windows' openvpn hands its hook no DNS.
+    pushed: Arc<Mutex<HashMap<String, crate::openvpn::env::Pushed>>>,
     /// Names no tunnel knew lately; not asked again for a while.
     unknown: Mutex<HashMap<(String, RecordType), Instant>>,
     /// Addresses another tunnel's DNS also gave (tunnel, address), when
@@ -310,6 +313,7 @@ impl Manager {
             encrypted_dns_said: std::sync::atomic::AtomicBool::new(false),
             traffic: Arc::default(),
             transport: Arc::default(),
+            pushed: Arc::default(),
             unknown: Mutex::new(HashMap::new()),
             contested: Mutex::new(HashMap::new()),
             asked: Mutex::new(HashMap::new()),

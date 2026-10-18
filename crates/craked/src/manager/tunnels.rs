@@ -271,7 +271,15 @@ impl Manager {
             "pre-init" => Ok(()),
             "connect" | "reconnect" => {
                 let info = match protocol {
-                    crate::config::Protocol::Openvpn => crate::openvpn::env::info(&msg.env)?,
+                    crate::config::Protocol::Openvpn => {
+                        // Windows' openvpn keeps the pushed DNS to itself:
+                        // what its output said fills in what the hook lacks.
+                        let mut env = msg.env.clone();
+                        if let Some(p) = self.pushed.lock().unwrap().get(name) {
+                            p.fill(&mut env);
+                        }
+                        crate::openvpn::env::info(&env)?
+                    }
                     _ => TunnelInfo::from_env(&msg.env)?,
                 };
                 // What the engine handed over: its variables' names (values
