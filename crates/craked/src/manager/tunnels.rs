@@ -26,6 +26,9 @@ impl Manager {
             if e.config.protocol == crate::config::Protocol::Openvpn3 {
                 bail!("{} is switched on from the app.", e.config.display());
             }
+            if cfg!(windows) && e.config.protocol == crate::config::Protocol::Openvpn {
+                bail!("OpenVPN isn\u{2019}t built for Windows yet.");
+            }
             let (tx, rx) = oneshot::channel();
             if e.running {
                 bail!("{} is still switching off", e.config.display());
@@ -53,6 +56,11 @@ impl Manager {
             self.log.system(Some(name), line, None);
         }
         let this = Arc::clone(self);
+        #[cfg(unix)]
+        if config.protocol == crate::config::Protocol::Openvpn {
+            tokio::spawn(async move { this.supervise_openvpn(config, stop_rx).await });
+            return Ok(());
+        }
         tokio::spawn(async move { this.supervise(config, session, stop_rx).await });
         Ok(())
     }
@@ -65,7 +73,7 @@ impl Manager {
         // With a kept session, switch off without logging off, so switching
         // on again needs no new sign-in (unless the tunnel says otherwise).
         let keep = e.config.own.as_ref().is_none_or(|o| o.keep_signed_in);
-        let how = if e.session.is_some() && keep {
+        let how = if (e.session.is_some() || e.token.is_some()) && keep {
             Stop::KeepSession
         } else {
             Stop::LogOff
@@ -243,12 +251,12 @@ impl Manager {
     /// Apply one call from the hook. An error makes the hook fail, which makes
     /// openconnect give up on that step.
     pub async fn handle_hook(&self, msg: HookMessage) -> Result<()> {
-        let (display, state) = {
+        let (display, state, protocol) = {
             let map = self.tunnels.lock().unwrap();
             let e = map
                 .get(&msg.tunnel)
                 .ok_or_else(|| anyhow!("unknown tunnel {}", msg.tunnel))?;
-            (e.config.display().to_owned(), e.state)
+            (e.config.display().to_owned(), e.state, e.config.protocol)
         };
         // Only a tunnel Crake started may report in.
         if state == TunnelState::Off || state == TunnelState::Trouble {
@@ -259,7 +267,10 @@ impl Manager {
         match msg.reason.as_str() {
             "pre-init" => Ok(()),
             "connect" | "reconnect" => {
-                let info = TunnelInfo::from_env(&msg.env)?;
+                let info = match protocol {
+                    crate::config::Protocol::Openvpn => crate::openvpn::env::info(&msg.env)?,
+                    _ => TunnelInfo::from_env(&msg.env)?,
+                };
                 if !crate::sys::tunnel_device(name, &info.device) {
                     bail!("device {} does not belong to {display}", info.device);
                 }

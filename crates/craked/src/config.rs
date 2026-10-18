@@ -32,6 +32,8 @@ pub struct Config {
     pub hook_socket: PathBuf,
     #[serde(default = "default_openconnect")]
     pub openconnect: PathBuf,
+    #[serde(default = "default_openvpn")]
+    pub openvpn: PathBuf,
     /// Append-only JSON lines.
     #[serde(default = "default_log_path")]
     pub log_path: PathBuf,
@@ -80,6 +82,9 @@ pub enum Protocol {
     /// An OpenVPN 3 profile (the gateway field is its name): the app runs
     /// the session; craked routes through its device.
     Openvpn3,
+    /// A profile craked runs with the `openvpn` program (`crate::openvpn`;
+    /// the gateway field is the gateway it names).
+    Openvpn,
 }
 
 impl std::str::FromStr for Protocol {
@@ -95,7 +100,8 @@ impl std::str::FromStr for Protocol {
             "f5" => Self::F5,
             "array" => Self::Array,
             "openvpn3" => Self::Openvpn3,
-            other => bail!("{other:?} isn't a protocol openconnect speaks"),
+            "openvpn" => Self::Openvpn,
+            other => bail!("{other:?} isn't a protocol Crake speaks"),
         })
     }
 }
@@ -111,6 +117,7 @@ impl Protocol {
             Self::F5 => "f5",
             Self::Array => "array",
             Self::Openvpn3 => "openvpn3",
+            Self::Openvpn => "openvpn",
         }
     }
 }
@@ -244,6 +251,7 @@ impl Default for Config {
             hook_path: default_hook_path(),
             hook_socket: default_hook_socket(),
             openconnect: default_openconnect(),
+            openvpn: default_openvpn(),
             log_path: default_log_path(),
             state_path: default_state_path(),
             learned_expiry_days: default_expiry_days(),
@@ -286,6 +294,19 @@ fn default_openconnect() -> PathBuf {
         return found;
     }
     "openconnect".into()
+}
+/// openvpn on PATH (Debian puts it in /usr/sbin, which a service's PATH
+/// has); on macOS, Homebrew's.
+fn default_openvpn() -> PathBuf {
+    if cfg!(target_os = "macos")
+        && let Some(found) = ["/opt/homebrew/sbin/openvpn", "/usr/local/sbin/openvpn"]
+            .iter()
+            .map(PathBuf::from)
+            .find(|p| p.exists())
+    {
+        return found;
+    }
+    "openvpn".into()
 }
 fn default_log_path() -> PathBuf {
     PathBuf::from(STATE_DIR).join("log")

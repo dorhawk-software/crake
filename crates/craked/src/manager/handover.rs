@@ -5,8 +5,9 @@
 //! (`/run/crake`, next to the hook's socket) before restarting it. craked,
 //! stopping, then disconnects each openconnect tunnel without logging its
 //! session off (SIGHUP) and writes what each tunnel needs to come back to
-//! `resume.json` there: the session, or for OpenVPN 3 the device the app
-//! attached (its session runs on in openvpn3). Root only, on tmpfs: gone at
+//! `resume.json` there: the session, for OpenVPN the gateway's token (its
+//! openvpn stops; the next craked starts it again with the token), or for
+//! OpenVPN 3 the device the app attached (its session runs on in openvpn3). Root only, on tmpfs: gone at
 //! reboot. The new craked reads it once, deletes it, and switches them on
 //! again. Without the flag, stopping logs every session off, as always.
 
@@ -34,6 +35,9 @@ struct Resume {
     /// OpenVPN 3 tunnels: what the app attached them with.
     #[serde(default)]
     attached: BTreeMap<String, HashMap<String, String>>,
+    /// OpenVPN tunnels: the gateway's token.
+    #[serde(default)]
+    openvpn: BTreeMap<String, crate::openvpn::Token>,
 }
 
 /// `path` exists and was written within `fresh`.
@@ -66,6 +70,10 @@ impl Manager {
                         resume.sessions.insert(name.clone(), session.to_map());
                         e.handover = true;
                     }
+                    if let (Some(token), Some(_)) = (&e.token, &e.stop) {
+                        resume.openvpn.insert(name.clone(), token.clone());
+                        e.handover = true;
+                    }
                     if let Some(fields) = &e.attached {
                         resume.attached.insert(name.clone(), fields.clone());
                     }
@@ -74,6 +82,7 @@ impl Manager {
                     Stop::KeepSession
                 } else {
                     e.session = None;
+                    e.token = None;
                     Stop::LogOff
                 };
                 if let Some(tx) = e.stop.take() {
@@ -81,7 +90,7 @@ impl Manager {
                 }
             }
         }
-        if resume.sessions.is_empty() && resume.attached.is_empty() {
+        if resume.sessions.is_empty() && resume.attached.is_empty() && resume.openvpn.is_empty() {
             return;
         }
         if let Some(path) = self.runtime_file(RESUME)
@@ -119,6 +128,16 @@ impl Manager {
                 e.handover = true;
             }
             match self.connect_with(name, Some(session)) {
+                Ok(()) => back += 1,
+                Err(e) => tracing::error!("{name} after the update: {e:#}"),
+            }
+        }
+        for (name, token) in &resume.openvpn {
+            if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
+                e.handover = true;
+                e.token = Some(token.clone());
+            }
+            match self.connect(name) {
                 Ok(()) => back += 1,
                 Err(e) => tracing::error!("{name} after the update: {e:#}"),
             }

@@ -34,6 +34,7 @@ libc = "0.2"
 time = { version = "0.3", features = ["formatting"] }
 clap = { version = "4", features = ["derive"] }
 hickory-proto = { version = "0.26", default-features = false, features = ["std"] }
+base64 = "0.22"
 
 # Linux only: answers held in NFQUEUE until their addresses are routed.
 [target.'cfg(target_os = "linux")'.dependencies]

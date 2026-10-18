@@ -1445,6 +1445,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tracing-subscriber",
  "tray-icon",
  "windows-sys 0.61.2",
  "x11rb 0.14.0",
@@ -1464,6 +1465,7 @@ name = "craked"
 version = "0.10.4"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "clap",
  "crake-proto",
  "hickory-proto",

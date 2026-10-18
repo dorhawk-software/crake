@@ -347,6 +347,7 @@ async fn start_probe(race: bool) -> Probe {
         hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
         hook_socket: dir.path().join("hook.sock"),
         openconnect: fake,
+        openvpn: "openvpn".into(),
         log_path: dir.path().join("log"),
         state_path: dir.path().join("hosts.json"),
         learned_expiry_days: 7,

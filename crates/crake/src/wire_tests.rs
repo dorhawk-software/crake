@@ -22,6 +22,7 @@ fn config(dir: &std::path::Path) -> Config {
         hook_path: "/bin/true".into(),
         hook_socket: dir.join("hook.sock"),
         openconnect: "/bin/false".into(),
+        openvpn: "openvpn".into(),
         log_path: dir.join("log"),
         state_path: dir.join("hosts.json"),
         learned_expiry_days: 7,

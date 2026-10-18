@@ -12,6 +12,7 @@ pub mod keep;
 pub mod log;
 pub mod manager;
 pub mod networks;
+pub mod openvpn;
 pub mod own;
 pub mod packet;
 pub mod plan;

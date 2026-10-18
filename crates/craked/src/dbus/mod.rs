@@ -169,6 +169,36 @@ impl Service {
         self.mgr.dismiss_trouble(tunnel).map_err(failed)
     }
 
+    /// What an OpenVPN tunnel's sign-in asks the user now (empty when
+    /// nothing): id, kind, label, url, retry. Guarded: a sign-in page is
+    /// the user's.
+    async fn asking(
+        &self,
+        tunnel: &str,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+    ) -> fdo::Result<HashMap<String, String>> {
+        self.authorize(&hdr, conn).await?;
+        Ok(self
+            .mgr
+            .asking(tunnel)
+            .map(|m| m.into_iter().collect())
+            .unwrap_or_default())
+    }
+
+    /// The user's answer to what an OpenVPN tunnel's sign-in asked.
+    async fn answer(
+        &self,
+        tunnel: &str,
+        id: u32,
+        text: &str,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+    ) -> fdo::Result<()> {
+        self.authorize(&hdr, conn).await?;
+        self.mgr.answer(tunnel, id, text.to_owned()).map_err(failed)
+    }
+
     /// The app found an OpenVPN 3 session's process still running after its
     /// session ended (the profile's Crake tunnel, or ""): logged, with how
     /// to stop it.
@@ -609,6 +639,8 @@ fn to_dict(s: &Snapshot) -> HashMap<String, OwnedValue> {
     d.insert("clash".into(), text(s.clash.as_deref().unwrap_or("")));
     d.insert("dns_down".into(), OwnedValue::from(s.dns_down));
     d.insert("why".into(), text(s.why.as_deref().unwrap_or("")));
+    // OpenVPN: its sign-in asks the user something (`Asking` says what).
+    d.insert("asking".into(), OwnedValue::from(s.asking.unwrap_or(0)));
     d.insert(
         "transport".into(),
         text(s.transport.as_deref().unwrap_or("")),

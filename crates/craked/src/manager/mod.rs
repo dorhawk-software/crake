@@ -28,10 +28,12 @@ mod app_tunnels;
 mod attached;
 mod clash;
 mod diagnostics;
+mod entry;
 mod handover;
 mod host_ops;
 mod live;
 mod naming;
+mod openvpn;
 mod outage;
 mod probing;
 mod routes;
@@ -40,6 +42,7 @@ mod tunnels;
 
 // Helpers one part uses and others need too.
 use self::clash::own_net;
+use self::entry::Entry;
 use self::host_ops::guard;
 use self::naming::{ask, ask_within};
 
@@ -64,6 +67,8 @@ pub struct Snapshot {
     pub transport: Option<String>,
     /// In trouble: why, as the log says it (crake_proto::trouble).
     pub why: Option<String>,
+    /// OpenVPN: the id of what its sign-in asks the user now (`Asking`).
+    pub asking: Option<u32>,
 }
 
 /// How to stop openconnect.
@@ -92,36 +97,6 @@ pub struct HostRow {
     /// Seconds since a learned host last carried traffic (its timeout is
     /// refreshed on use), when Crake forgets hosts at all.
     pub used_ago: Option<u64>,
-}
-
-struct Entry {
-    config: TunnelConfig,
-    /// Position in the config; picks the tunnel's mark, rule and table.
-    index: usize,
-    state: TunnelState,
-    info: Option<TunnelInfo>,
-    stop: Option<oneshot::Sender<Stop>>,
-    /// The last sign-in, reused to switch the tunnel on again.
-    session: Option<Session>,
-    /// openconnect's supervisor hasn't finished yet (stays true while stopping).
-    running: bool,
-    /// The kernel sets and rule for this tunnel are in place.
-    routed: bool,
-    /// Restarted over TCP (UDP blocked): its next "connect" is a return.
-    resumed: bool,
-    /// When it last came up (seconds since the epoch); kept across a
-    /// reconnect, cleared when it goes off.
-    up_since: Option<u64>,
-    /// Refused because it clashes with a tunnel that's up: it's stopping,
-    /// already said why, and goes Off quietly.
-    refused: bool,
-    /// Handed over to the new craked of a package upgrade (`handover`): it
-    /// stops, and starts again there, without a line in the log.
-    handover: bool,
-    /// OpenVPN 3: what the app attached it with, for a handover.
-    attached: Option<HashMap<String, String>>,
-    /// In trouble: why (cleared when it leaves trouble).
-    why: Option<String>,
 }
 
 /// A UDP conversation's first datagram, and when it was copied.
@@ -275,12 +250,13 @@ fn snapshot(e: &Entry) -> Snapshot {
         state: e.state,
         info: e.info.clone(),
         hosts: 0,
-        signed_in: e.session.is_some(),
+        signed_in: e.session.is_some() || e.token.is_some(),
         dns_down: false,
         clash: None,
         since: e.up_since,
         transport: None,
         why: e.why.clone(),
+        asking: e.asking.as_ref().map(|(a, _)| a.id),
     }
 }
 
@@ -298,22 +274,7 @@ impl Manager {
             .iter()
             .enumerate()
             .map(|(index, t)| {
-                let e = Entry {
-                    config: t.clone(),
-                    index,
-                    state: TunnelState::Off,
-                    info: None,
-                    stop: None,
-                    session: None,
-                    running: false,
-                    routed: false,
-                    resumed: false,
-                    up_since: None,
-                    refused: false,
-                    handover: false,
-                    attached: None,
-                    why: None,
-                };
+                let e = Entry::new(t.clone(), index);
                 (t.name.clone(), e)
             })
             .collect();

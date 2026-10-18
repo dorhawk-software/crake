@@ -240,6 +240,10 @@ pub struct TunnelHosts {
     /// (`Manager::recheck_public`): once per version.
     #[serde(default)]
     pub rechecked: Option<String>,
+    /// OpenVPN: its gateway can't take data channel offload (openvpn said
+    /// "Use --disable-dco"), so it starts without.
+    #[serde(default)]
+    pub no_dco: bool,
 }
 
 impl TunnelHosts {

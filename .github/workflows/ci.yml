@@ -37,7 +37,7 @@ env:
     build-essential pkg-config cmake clang
     libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
     libfontconfig-dev libfreetype-dev libvulkan-dev
-    openconnect nftables iproute2
+    openconnect openvpn nftables iproute2
 
 jobs:
   check:

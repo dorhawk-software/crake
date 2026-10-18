@@ -30,6 +30,7 @@ pub(crate) fn config(dir: &std::path::Path) -> Config {
         hook_path: hook.into(),
         hook_socket: dir.join("hook.sock"),
         openconnect: "openconnect".into(),
+        openvpn: "openvpn".into(),
         log_path: dir.join("log"),
         state_path: dir.join("hosts.json"),
         learned_expiry_days: 7,
@@ -69,7 +70,7 @@ fn query(name: &str) -> Vec<u8> {
 
 /// Ask the tunnel's DNS for `name`; then the app's first connection to the
 /// address it gave, at once.
-fn look_up_and_get(name: &str, addr: &str) -> std::io::Result<String> {
+pub(crate) fn look_up_and_get(name: &str, addr: &str) -> std::io::Result<String> {
     let sock = UdpSocket::bind("0.0.0.0:0")?;
     sock.set_read_timeout(Some(Duration::from_secs(5)))?;
     sock.send_to(&query(name), "10.40.0.2:53")?;

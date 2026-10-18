@@ -116,11 +116,46 @@ const ENV_PREFIXES: &[&str] = &[
     "IDLE_TIMEOUT",
 ];
 
-/// Keep only the variables openconnect documents for its script.
+/// What openvpn gives its scripts that craked reads (`craked::openvpn::env`).
+const OPENVPN_PREFIXES: &[&str] = &[
+    "dev",
+    "dns_",
+    "foreign_option_",
+    "ifconfig_",
+    "route_",
+    "script_",
+    "trusted_ip",
+    "tun_mtu",
+];
+
+/// Keep only the variables openconnect documents for its script, or, when
+/// openvpn runs it (it sets `script_type`), openvpn's.
 pub fn collect_env(vars: impl IntoIterator<Item = (String, String)>) -> BTreeMap<String, String> {
+    let vars: Vec<(String, String)> = vars.into_iter().collect();
+    let prefixes = if vars.iter().any(|(k, _)| k == OPENVPN_SCRIPT_TYPE) {
+        OPENVPN_PREFIXES
+    } else {
+        ENV_PREFIXES
+    };
     vars.into_iter()
-        .filter(|(k, _)| ENV_PREFIXES.iter().any(|p| k.starts_with(p)))
+        .filter(|(k, _)| prefixes.iter().any(|p| k.starts_with(p)))
         .collect()
+}
+
+/// Set by openvpn for its scripts: `up`, `down`, ...
+pub const OPENVPN_SCRIPT_TYPE: &str = "script_type";
+
+/// The hook's reason for one of openvpn's script calls, in openconnect's
+/// words: `up` is a connect, or a reconnect when openvpn restarted
+/// (`script_context`); `down` the end, or a restart.
+pub fn openvpn_reason(script_type: &str, context: &str) -> &'static str {
+    match (script_type, context) {
+        ("up", "restart") => "reconnect",
+        ("up", _) => "connect",
+        ("down", "restart") => "attempt-reconnect",
+        ("down", _) => "disconnect",
+        _ => "other",
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -307,6 +342,32 @@ fn unquote(v: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn openvpns_script_calls_in_openconnects_words() {
+        assert_eq!(openvpn_reason("up", "init"), "connect");
+        assert_eq!(openvpn_reason("up", "restart"), "reconnect");
+        assert_eq!(openvpn_reason("down", "restart"), "attempt-reconnect");
+        assert_eq!(openvpn_reason("down", "init"), "disconnect");
+    }
+
+    #[test]
+    fn openvpns_variables_are_kept_when_openvpn_calls() {
+        let vars = [
+            ("script_type", "up"),
+            ("dev", "crake-acme"),
+            ("foreign_option_1", "dhcp-option DNS 10.40.0.2"),
+            ("PATH", "/usr/bin"),
+            ("TUNDEV", "x"),
+        ]
+        .map(|(k, v)| (k.to_owned(), v.to_owned()));
+        let kept = collect_env(vars.clone());
+        assert!(kept.contains_key("dev") && kept.contains_key("foreign_option_1"));
+        assert!(!kept.contains_key("PATH") && !kept.contains_key("TUNDEV"));
+        // openconnect's call: its own.
+        let kept = collect_env(vars.into_iter().filter(|(k, _)| k != "script_type"));
+        assert!(kept.contains_key("TUNDEV") && !kept.contains_key("dev"));
+    }
 
     #[test]
     fn tunnel_names() {

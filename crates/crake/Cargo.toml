@@ -72,6 +72,8 @@ craked = { path = "../craked" }
 tempfile = "3"
 # Headless windows and simulated clicks for the window tests.
 gpui-kit = { version = "0.7", features = ["test-support"] }
+# craked's and its engines' log lines in the end-to-end tests' output.
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # A real window on a real X server (scripts/x11-test.sh); its own main.
 [[test]]

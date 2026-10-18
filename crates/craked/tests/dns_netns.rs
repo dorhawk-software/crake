@@ -465,7 +465,6 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
         probing: false,
         race_first_syn: false,
         probe_wait_secs: 3,
-        never: vec![],
         use_resolved: false, // no systemd in the namespace
         apply_network: true,
         managed_dir: dir.path().join("managed.d"),
@@ -482,6 +481,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
             managed: None,
             own: None,
         }],
+        ..Config::default()
     };
     let socket = cfg.hook_socket.clone();
     let mgr = Manager::new(cfg).unwrap();

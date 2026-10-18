@@ -1,6 +1,7 @@
 //! Which VPN engines this computer has (CLAUDE.md: Packaging and
 //! dependencies). Crake doesn't bundle them on Linux: openconnect speaks most
-//! protocols, OpenVPN 3 runs its own profiles. A protocol whose engine is
+//! protocols, openvpn runs OpenVPN profiles (craked runs it), OpenVPN 3 runs
+//! its own. A protocol whose engine is
 //! missing says how to get it, instead of failing at connect.
 
 use std::ffi::{OsStr, OsString};
@@ -13,6 +14,8 @@ const OPENVPN3_SERVICE: &str =
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Engines {
     pub openconnect: bool,
+    /// The `openvpn` program, which craked runs for OpenVPN profiles.
+    pub openvpn: bool,
     pub openvpn3: bool,
     /// openconnect can sign in through the browser (`--external-browser`,
     /// openconnect 9 and newer; Ubuntu 22.04 has 8.20).
@@ -25,6 +28,7 @@ impl Engines {
     /// All there, as tests and demo mode assume.
     pub const ALL: Self = Self {
         openconnect: true,
+        openvpn: true,
         openvpn3: true,
         browser: true,
         openconnect_version: Some((9, 12)),
@@ -56,6 +60,7 @@ impl Engines {
         };
         Self {
             openconnect,
+            openvpn: openvpn_installed(),
             openvpn3: Path::new(OPENVPN3_SERVICE).exists(),
             browser,
             openconnect_version,
@@ -85,6 +90,13 @@ impl Engines {
                 "Needs OpenVPN 3, which isn\u{2019}t installed. It comes from OpenVPN\u{2019}s own repository (openvpn.net, \u{201c}OpenVPN 3 Linux\u{201d}).",
             ),
             "openvpn3" => None,
+            "openvpn" if cfg!(windows) => Some("OpenVPN isn\u{2019}t built for Windows yet."),
+            "openvpn" if !self.openvpn => Some(if cfg!(target_os = "macos") {
+                "Needs openvpn, which isn\u{2019}t installed. Install it with Homebrew (brew.sh): brew install openvpn"
+            } else {
+                "Needs openvpn, which isn\u{2019}t installed: sudo apt install openvpn"
+            }),
+            "openvpn" => None,
             _ if !self.openconnect => Some(if cfg!(windows) {
                 "Needs openconnect, which comes with Crake but is missing. Reinstall Crake."
             } else if cfg!(target_os = "macos") {
@@ -161,6 +173,20 @@ fn find_openconnect(given: Option<OsString>, path: Option<&OsStr>, extra: &[Path
     "openconnect".into()
 }
 
+/// openvpn is installed where craked looks for it: on PATH, in the
+/// administrators' folders (Debian's /usr/sbin), or Homebrew's on macOS.
+fn openvpn_installed() -> bool {
+    let extra: Vec<PathBuf> = if cfg!(target_os = "macos") {
+        vec!["/opt/homebrew/sbin".into(), "/usr/local/sbin".into()]
+    } else {
+        vec!["/usr/sbin".into(), "/sbin".into()]
+    };
+    runnable(Path::new("openvpn"))
+        || extra
+            .iter()
+            .any(|dir| crate::sys::executable(&dir.join("openvpn")))
+}
+
 /// openconnect's version from `openconnect --version` ("OpenConnect version
 /// v8.20-1").
 fn version(said: &str) -> Option<(u16, u16)> {
@@ -209,6 +235,7 @@ mod tests {
     fn says_what_a_protocol_is_missing() {
         let none = Engines {
             openconnect: false,
+            openvpn: false,
             openvpn3: false,
             browser: false,
             openconnect_version: None,
@@ -224,6 +251,14 @@ mod tests {
         };
         assert!(none.missing("gp").unwrap().contains(how));
         assert!(none.missing("openvpn3").unwrap().contains("OpenVPN 3"));
+        let openvpn = if cfg!(windows) {
+            "isn\u{2019}t built for Windows yet"
+        } else if cfg!(target_os = "macos") {
+            "brew install openvpn"
+        } else {
+            "sudo apt install openvpn"
+        };
+        assert!(none.missing("openvpn").unwrap().contains(openvpn));
         let both = Engines::ALL;
         assert_eq!(both.missing("anyconnect"), None);
         assert_eq!(both.missing("openvpn3"), None);

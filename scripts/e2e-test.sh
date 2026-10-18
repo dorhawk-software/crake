@@ -1,7 +1,8 @@
 #!/bin/sh
-# End to end against a real AnyConnect gateway: ocserv in one container
-# (scripts/e2e/), the app's sign-in, craked, openconnect, nftables and policy
-# routing in another (crates/crake/src/e2e_tests.rs). Neither container has a
+# End to end against real gateways: ocserv (AnyConnect) and openvpn, with a
+# browser sign-in, in one container (scripts/e2e/), the app's sign-in,
+# craked, openconnect or openvpn, nftables and policy routing in another
+# (crates/crake/src/e2e_tests.rs, e2e_openvpn.rs). Neither container has a
 # network: their only link is a socket pair in a temporary folder
 # (scripts/e2e/relay.py). The client runs the host's own openconnect, nft and
 # ip from the host's filesystem, read-only, as scripts/netns-test.sh does.
@@ -32,6 +33,6 @@ docker run -d --rm --name "$GW" --network none --cap-add NET_ADMIN --device /dev
 # /host/run is the container's own: this computer's /run holds its system
 # bus (openvpn3, resolved), which a test running as root must never reach.
 docker run --rm --network none --cap-add NET_ADMIN --device /dev/net/tun \
-  -v /:/host:ro -v "$WORK/tmp:/host/mnt" -v "$WORK/link:/link" --tmpfs /host/run \
+  -v /:/host:ro -v "$WORK/tmp:/host/mnt" -v "$WORK/link:/link" -v "$WORK/link:/host/mnt/link:ro" --tmpfs /host/run \
   crake-e2e-gateway sh /client.sh env CRAKE_E2E_HOOK="$HOOK" LLVM_PROFILE_FILE=/dev/null \
-  env ${CRAKE_JOURNEY_DEBUG:+CRAKE_JOURNEY_DEBUG=$CRAKE_JOURNEY_DEBUG} ${CRAKE_DEBUG:+CRAKE_DEBUG=$CRAKE_DEBUG} "$BIN" e2e_tests journey_tests --test-threads=1 --nocapture "$@"
+  env ${CRAKE_JOURNEY_DEBUG:+CRAKE_JOURNEY_DEBUG=$CRAKE_JOURNEY_DEBUG} ${CRAKE_DEBUG:+CRAKE_DEBUG=$CRAKE_DEBUG} "$BIN" e2e_tests e2e_openvpn journey_tests --test-threads=1 --nocapture "$@"

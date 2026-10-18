@@ -807,6 +807,125 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
      the tunnel (443/80 or the port last used), and log it: "Initech's DNS
      doesn't answer. Using the address gitlab.initech.internal had last time."
      Names never seen before can't be helped.
+7i. **OpenVPN with the `openvpn` program, on every system (decided with
+   the user, 2026-10-18; in progress).** OpenVPN on Windows and macOS, and
+   in place of OpenVPN 3 on Linux: craked runs the community `openvpn`
+   (2.5 to 2.7) itself, one process per tunnel, as it runs openconnect, and
+   drives it over its management interface. Why: OpenVPN 3 exists only on
+   Linux, and most of 7g's trouble was openvpn3 running sessions itself
+   (leftover processes rewriting other tunnels' DNS, its routes and DNS
+   fought 5 times a second, tun0/tun1 renamed on reconnect, devices it
+   doesn't name, a process the packaged craked can't look into). `openvpn`
+   is in every distribution's archive (Ubuntu 22.04 2.5.11, 24.04 2.6.19,
+   26.04 2.7.0, Debian 12/13 2.6.14, Fedora 43 2.6.23, 44/45 2.7.8, Arch
+   2.7.8, looked up 2026-10-18), OpenVPN 3 only in OpenVPN's own.
+   **Proven first, on the user's real gateways** (CLAUDE.local.md):
+   Initech's browser sign-in works with plain `openvpn` 2.7 over the
+   management interface (`setenv IV_SSO webauth,crtext`, then
+   `>INFOMSG:WEB_AUTH::<url>`, the user signs in, `>PASSWORD:Auth-Token:`,
+   CONNECTED; the server is openvpn-auth-oauth2-like, which refuses clients
+   without webauth); an Azure VPN gateway's certificate profile fails with
+   2.6+ ("Server did not request DATA_V2 packet format required for data
+   channel offload ... Use --disable-dco", forever: why the user had to
+   install OpenVPN 3, which leaves DCO off) and connects with
+   `--disable-dco`.
+   How it runs (`openvpn --config <craked's copy> --dev crake-<name>
+   --dev-type tun --route-noexec --ifconfig-noexec --script-security 2
+   --up <hook> --down <hook> --up-restart --management <socket> unix
+   --management-hold --management-query-passwords --auth-retry interact
+   --setenv IV_SSO webauth,crtext --pull-filter ignore block-outside-dns
+   --ignore-unknown-option dns-updown --dns-updown disable`, LC_ALL=C):
+   openvpn sets no address, route or DNS; the hook (`crake-hook`, which
+   tells openvpn's call by `script_type`) hands craked the device, address,
+   MTU, gateway (`trusted_ip`), pushed routes (`route_network_N`, hints as
+   always), DNS and domains (`foreign_option_N` "dhcp-option DNS/DNS6/
+   DOMAIN/DOMAIN-SEARCH", and 2.6's `dns_server_N_address_M`/
+   `dns_search_domain_N`), and `script_context` init or restart (connect or
+   reconnect); craked assigns the address and routes per host, as for
+   openconnect (all seen in a lab run, 2026-10-18: a local server pushing
+   routes, IPv6, DNS, domains, redirect-gateway and block-outside-dns).
+   Sign-in: craked answers the management interface: a kept auth-token
+   (`>PASSWORD:Auth-Token:`, Crake's equivalent of openconnect's cookie:
+   switching on again, a restart without DCO and an upgrade's handover
+   reuse it), else the profile's inline credentials, else it asks the app
+   (D-Bus signal `SignInAsks`, answered with `Answer`): a password, a
+   private key's password, a static or dynamic (CRV1) challenge, a code
+   (`CR_TEXT`, answered with `cr-response`), or a page to open in the
+   browser (`WEB_AUTH`/`OPEN_URL`). The sign-in window shows them as it
+   shows openconnect's.
+   The profile: imported in New tunnel (`ovpn_file::inline` puts its files
+   inline), sent with AddTunnel, kept by craked as a root-only file
+   (`profiles/<name>.ovpn` next to the host store, as NetworkManager and
+   openvpn3 keep theirs), never in `tunnels.json` or ListTunnels. craked
+   runs openvpn as root, so a profile is read against an allowlist of
+   client options (`openvpn/profile.rs`): nothing that runs a program,
+   loads a library, writes or reads a file outside the profile (scripts,
+   plugins, `engine`, `pkcs11-providers`, `management`, `log`, `cd`, file
+   paths in place of inline blocks) gets in; what Crake owns (`dev`,
+   `persist-tun`, `user`/`group`) is dropped; anything unknown is refused
+   by name, so a real profile tells us what to add.
+   Slices: (1) craked's engine on Linux, tested in a namespace against a
+   real `openvpn` server (pending web sign-in included), (2) the app (New
+   tunnel's OpenVPN card, the sign-in window's questions, the journey), (3)
+   packages (`openvpn` as an engine alternative), (4) Windows (openvpn and
+   its drivers from OpenVPN's installer: 2.7 dropped Wintun for
+   ovpn-dco-win, with tap-windows6 when DCO is off; management over
+   loopback TCP with a password), (5) macOS (Homebrew's openvpn, utun),
+   (6) OpenVPN 3 tunnels moved to it (their profile's text copied out of
+   openvpn3, unless locked) and the openvpn3 code removed.
+   **Slice 1: built (2026-10-18).** craked: `openvpn/` (profile, env,
+   mgmt), `manager/openvpn/` (`run.rs` the process, `sign_in.rs` the
+   management dialogue as a state machine: hold release, the kept token
+   first, the profile's own credentials once, then the user; static and
+   CRV1 challenges, CR_TEXT, a key's password, WEB_AUTH), protocol
+   `openvpn` (AddTunnel's `profile` field; the gateway is the one it
+   names), D-Bus `Asking`/`Answer` (polkit-guarded: a sign-in page is the
+   user's) and ListTunnels `asking` (the question's id), the token in the
+   upgrade handover (`resume.json`'s `openvpn`), `no_dco` per tunnel in the
+   host store. Proven end to end (`e2e_openvpn.rs`, scripts/e2e: openvpn
+   as a server beside ocserv with ACME's network behind it, `sso.py` as
+   its browser sign-in, as the user's real gateway; a public host that
+   drops what comes through a tunnel): the page asked for and opened,
+   connected with what was pushed, the internet direct, a name only its
+   DNS knows routed before the first packet, a host learned by probing,
+   off and on again with the gateway's token and nothing asked, an
+   upgrade's handover with the token (a mutation that hands no token over
+   fails it). Not yet (later slices): the app's side; AppArmor's rules
+   for openvpn and `profiles/`; OpenVPN tunnels from craked.toml or IT's
+   managed.d (they'd name a profile file); smart cards
+   (`pkcs11-providers`, refused today) and Windows' certificate store
+   (`cryptoapicert`); the DCO fallback has no test against a gateway that
+   needs it (the user's real one does: CLAUDE.local.md).
+7j. **Real gateways in CI, on every system (requested 2026-10-18; after
+   7i).** Each CI system (Linux, macOS, Windows) starts Crake, connects to
+   a real gateway of each kind there is software for, and checks that,
+   connected, both a host only the tunnel reaches and the internet
+   directly answer: so engine changes on macOS and Windows no longer wait
+   for a colleague's Mac or a PC (the colleague then only checks what CI
+   can't: installing, the approval click in System Settings, Crake.app's
+   service under launchd, daily use).
+   Gateways: AnyConnect (ocserv) and OpenVPN (`openvpn` as a server, with
+   a pending web sign-in like the user's real one) carry traffic; for
+   GlobalProtect, Fortinet, F5 and Array there's no open-source server, only
+   openconnect's own test servers (its `tests/fake-*-server.py`), which
+   prove the sign-in and nothing after; Pulse/Juniper has nothing.
+   Linux: each gateway in a container of its own network, as the e2e and
+   package tests already do (UDP included: DTLS, OpenVPN over UDP).
+   macOS and Windows: GitHub's runners there have no Linux containers, and
+   a gateway on the same machine shares its network (its "internal" hosts
+   answer without the tunnel, proving nothing), so the gateways run in a
+   Linux job and the Mac and Windows jobs reach them through **Cloudflare
+   Tunnel** (decided with the user: free on the Zero Trust plan, the
+   user's existing Cloudflare account; both ends connect out, a service
+   token in the repository's secrets lets only CI in). Tailscale was
+   considered: its free plan has 1,000 ephemeral minutes a month (~20 runs
+   of three machines) and is for non-commercial use. Cloudflare Tunnel
+   carries TCP only: AnyConnect over TLS and OpenVPN over TCP there; UDP is
+   proven on Linux. On those runners craked runs by hand as root (as
+   tests/macos.rs does), not as Crake.app's registered service or the
+   installed Windows service unless the runner allows it.
+   Setup with the user, once: a tunnel, a hostname and a service token in
+   the Cloudflare dashboard.
 8. **Someday: other platforms** (see below). Not before Linux is solid.
 
 ## A newer Crake (built 2026-10-14; design/proposals/new-version.html)
