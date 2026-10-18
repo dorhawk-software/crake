@@ -12,6 +12,8 @@ cask "crake" do
 
   depends_on macos: ">= :monterey"
   depends_on formula: "openconnect"
+  # OpenVPN profiles (craked runs Homebrew's openvpn).
+  depends_on formula: "openvpn"
 
   pkg "Crake-#{version}.pkg"
 

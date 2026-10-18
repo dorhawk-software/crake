@@ -107,11 +107,15 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked
       - name: The tests that aren't Linux's own, on macOS
         run: cargo test --workspace --locked
-      - name: craked's macOS parts on a real utun device, as root
+      - name: craked's macOS parts on a real utun device, and an OpenVPN tunnel, as root
         run: |
-          BIN=$(cargo test -p craked --test macos --no-run --locked --message-format=json |
-            jq -r 'select(.executable != null and .target.name == "macos") | .executable')
-          sudo CRAKE_MACOS_ROOT=1 "$BIN" --nocapture
+          # Homebrew's openvpn, as the cask brings it (macos_openvpn.rs).
+          brew install openvpn
+          for t in macos macos_openvpn; do
+            BIN=$(cargo test -p craked --test $t --no-run --locked --message-format=json |
+              jq -r "select(.executable != null and .target.name == \"$t\") | .executable")
+            sudo CRAKE_MACOS_ROOT=1 "$BIN" --nocapture
+          done
       - name: A keychain with the Developer ID certificates
         if: env.SIGNING == 'true'
         env:
