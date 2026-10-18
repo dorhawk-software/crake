@@ -280,7 +280,10 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    stuck conntrack entry is deleted so the app's next SYN retry is routed and
    NATed afresh. Never probed: own LAN/bridges (on-link), loopback etc., the
    gateway, already-routed hosts, the `never` list, hosts probed in the last
-   10 min. Undo = send direct and keep direct (per tunnel) until redo; DNS
+   10 min (forgotten whenever a tunnel comes up, again or new: what found
+   no answer may answer through it now; and a probe whose tunnels were
+   restarting or changed while it ran doesn't count; both found on CI's
+   Windows through Cloudflare, 2026-10-18). Undo = send direct and keep direct (per tunnel) until redo; DNS
    learning respects it too. Recent public DNS answers give log lines a name.
    A router's ICMP "unreachable" (net, host, prohibited; never
    "fragmentation needed") from outside the tunnels goes to the same queue

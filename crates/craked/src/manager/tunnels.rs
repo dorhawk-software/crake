@@ -214,6 +214,12 @@ impl Manager {
             e.ups += 1;
             self.traffic.track(&info.device, name);
         }
+        // A tunnel up (again, or a new one): what found no answer before may
+        // answer through it now; hosts probed meanwhile may be tried again
+        // at once (seen 2026-10-18 on CI's Windows: a host probed through
+        // the first tunnel was never tried through the next one for
+        // PROBED_FOR; the same when a reconnect followed a probe at once).
+        self.probed.lock().unwrap().clear();
         // Again, now that its pushed networks and gateway are known.
         self.sync_syn_race().await;
         let domains = self.domains(name);

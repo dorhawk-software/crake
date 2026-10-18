@@ -44,7 +44,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 - **An internal site right after connecting works on networks that block UDP.** When a tunnel
   restarted over TCP in its first seconds, a site opened in that moment could be left direct for ten
-  minutes ("No answer just then"); Crake now tries it again on the next attempt.
+  minutes ("No answer just then"); Crake now tries it again on the next attempt. The same when a
+  tunnel comes up after a site found no answer: it's tried through it at once.
 
 - **OpenVPN on Windows and macOS too.** On Windows it comes with Crake, with its drivers; on a Mac
   it comes with Homebrew's cask (`brew install openvpn` otherwise).
