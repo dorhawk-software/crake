@@ -276,6 +276,34 @@ async fn the_installed_service_end_to_end() {
         "refused at once, not after a timeout ({took:?})"
     );
 
+    // Another VPN client serving acme.internal (an NRPT rule of its own,
+    // as GlobalProtect writes one): Crake's private names leave the domain
+    // to it, and take it back once it's gone (`served_elsewhere`; Crake's
+    // look comes every 2 s).
+    let hushed = || {
+        ps(r"(Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters\DnsPolicyConfig\Crake crake-hush' -ErrorAction SilentlyContinue).Name")
+            .contains("acme.internal")
+    };
+    let until_hushed = move |want: bool| {
+        let end = Instant::now() + Duration::from_secs(20);
+        while hushed() != want {
+            assert!(
+                Instant::now() < end,
+                "acme.internal kept private: never {want}"
+            );
+            std::thread::sleep(Duration::from_millis(500));
+        }
+    };
+    tokio::task::spawn_blocking(move || {
+        until_hushed(true);
+        ps("Add-DnsClientNrptRule -Namespace '.acme.internal' -NameServers '198.51.100.10' -Comment 'Another VPN client'");
+        until_hushed(false);
+        ps("Get-DnsClientNrptRule | Where-Object Comment -eq 'Another VPN client' | Remove-DnsClientNrptRule -Force");
+        until_hushed(true);
+    })
+    .await
+    .unwrap();
+
     app.send(Command::RemoveTunnel("acme".into()));
     app.until("ACME removed", |m| {
         !m.tunnels.iter().any(|t| t.name == "acme")

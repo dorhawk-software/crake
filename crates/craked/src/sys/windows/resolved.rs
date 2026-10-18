@@ -16,12 +16,15 @@ const NAME_LEN: usize = 256;
 use anyhow::{Result, bail};
 use windows_sys::Win32::Foundation::ERROR_SUCCESS;
 use windows_sys::Win32::System::Registry::{
-    HKEY, HKEY_LOCAL_MACHINE, KEY_ALL_ACCESS, REG_DWORD, REG_MULTI_SZ, REG_OPTION_VOLATILE, REG_SZ,
-    RegCloseKey, RegCreateKeyExW, RegDeleteTreeW, RegEnumKeyExW, RegOpenKeyExW, RegSetValueExW,
+    HKEY, HKEY_LOCAL_MACHINE, KEY_ALL_ACCESS, KEY_READ, REG_DWORD, REG_MULTI_SZ,
+    REG_OPTION_VOLATILE, REG_SZ, RRF_RT_REG_MULTI_SZ, RRF_RT_REG_SZ, RegCloseKey, RegCreateKeyExW,
+    RegDeleteTreeW, RegEnumKeyExW, RegGetValueW, RegOpenKeyExW, RegSetValueExW,
 };
 
 /// Where Windows keeps local NRPT rules.
 const POLICY: &str = r"SYSTEM\CurrentControlSet\Services\Dnscache\Parameters\DnsPolicyConfig";
+/// Where group policy's NRPT rules are.
+const GROUP_POLICY: &str = r"SOFTWARE\Policies\Microsoft\Windows NT\DNSClient\DnsPolicyConfig";
 /// Crake's rules are named after it and the link.
 const PREFIX: &str = "Crake ";
 
@@ -96,10 +99,23 @@ impl Resolved {
         true
     }
 
-    /// What other VPN clients serve (their NRPT rules and adapters'
-    /// suffixes): not looked at yet (CLAUDE.md, "Not now").
+    /// The domains other programs serve: the NRPT rules that aren't
+    /// Crake's (another VPN client's, group policy's) and the suffixes of
+    /// the adapters that are up and aren't Crake's (AnyConnect's, the
+    /// network's own). Crake's own adapters are all crake-*.
     pub async fn served_elsewhere(&self, _ours: &[String]) -> Vec<String> {
-        Vec::new()
+        if let Self::Noop = self {
+            return Vec::new();
+        }
+        let mut found = super::adapter_domains();
+        for root in [POLICY, GROUP_POLICY] {
+            for rule in subkeys(root, KEY_READ) {
+                if !rule.starts_with(PREFIX) {
+                    found.extend(namespaces(&multi_sz(&format!("{root}\\{rule}"), "Name")));
+                }
+            }
+        }
+        found
     }
 
     pub async fn link(&self, _device: &str) -> Result<(Vec<Ipv4Addr>, Vec<String>)> {
@@ -213,18 +229,20 @@ fn delete(path: &str) {
 
 /// Crake's rules, whoever left them.
 fn rule_keys() -> Vec<String> {
-    let path = wide(POLICY);
+    subkeys(POLICY, KEY_ALL_ACCESS)
+        .into_iter()
+        .filter(|name| name.starts_with(PREFIX))
+        .map(|name| format!("{POLICY}\\{name}"))
+        .collect()
+}
+
+/// The names of the keys under `path` (in HKLM), opened with `access`.
+fn subkeys(path: &str, access: u32) -> Vec<String> {
+    let path = wide(path);
     let mut key: HKEY = std::ptr::null_mut();
     // SAFETY: a NUL-terminated path; `key` is closed below.
-    if unsafe {
-        RegOpenKeyExW(
-            HKEY_LOCAL_MACHINE,
-            path.as_ptr(),
-            0,
-            KEY_ALL_ACCESS,
-            &raw mut key,
-        )
-    } != ERROR_SUCCESS
+    if unsafe { RegOpenKeyExW(HKEY_LOCAL_MACHINE, path.as_ptr(), 0, access, &raw mut key) }
+        != ERROR_SUCCESS
     {
         return Vec::new();
     }
@@ -248,14 +266,63 @@ fn rule_keys() -> Vec<String> {
         if err != ERROR_SUCCESS {
             break;
         }
-        let name = String::from_utf16_lossy(&name[..len as usize]);
-        if name.starts_with(PREFIX) {
-            found.push(format!("{POLICY}\\{name}"));
-        }
+        found.push(String::from_utf16_lossy(&name[..len as usize]));
     }
     // SAFETY: the key opened above.
     unsafe { RegCloseKey(key) };
     found
+}
+
+/// A REG_MULTI_SZ (or REG_SZ) value under `path` in HKLM, as UTF-16.
+fn multi_sz(path: &str, value: &str) -> Vec<u16> {
+    let (path, value) = (wide(path), wide(value));
+    let flags = RRF_RT_REG_MULTI_SZ | RRF_RT_REG_SZ;
+    let mut size: u32 = 0;
+    // SAFETY: NUL-terminated names; a size query, then a buffer that size.
+    unsafe {
+        if RegGetValueW(
+            HKEY_LOCAL_MACHINE,
+            path.as_ptr(),
+            value.as_ptr(),
+            flags,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &raw mut size,
+        ) != ERROR_SUCCESS
+        {
+            return Vec::new();
+        }
+        let mut data = vec![0u16; (size as usize).div_ceil(2)];
+        if RegGetValueW(
+            HKEY_LOCAL_MACHINE,
+            path.as_ptr(),
+            value.as_ptr(),
+            flags,
+            std::ptr::null_mut(),
+            data.as_mut_ptr().cast(),
+            &raw mut size,
+        ) != ERROR_SUCCESS
+        {
+            return Vec::new();
+        }
+        data.truncate((size as usize) / 2);
+        data
+    }
+}
+
+/// An NRPT rule's namespaces as domains: ".corp.example" (a suffix) and
+/// "vpn.corp.example" (a name) alike; never the root, or a wildcard's.
+fn namespaces(multi: &[u16]) -> Vec<String> {
+    multi
+        .split(|&c| c == 0)
+        .map(|s| {
+            String::from_utf16_lossy(s)
+                .trim()
+                .trim_start_matches(['*', '.'])
+                .to_lowercase()
+        })
+        .filter(|d| !d.is_empty())
+        .collect()
 }
 
 /// Who answers the system's DNS, for helpdesk copies (`Manager::diagnostics`).
@@ -281,4 +348,20 @@ pub fn view() -> Vec<String> {
         "Public names: Windows's own DNS answers them.".to_owned()
     };
     vec![line]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn another_clients_rule_names_its_domains() {
+        let multi: Vec<u16> = ".Corp.Example\0vpn.globex.example\0*.initech.example\0.\0\0"
+            .encode_utf16()
+            .collect();
+        assert_eq!(
+            namespaces(&multi),
+            ["corp.example", "vpn.globex.example", "initech.example"]
+        );
+    }
 }

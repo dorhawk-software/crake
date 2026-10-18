@@ -239,7 +239,9 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    internal name while Crake refused them): `Resolved::served_elsewhere`
    (Linux: resolved's domains on links not Crake's; macOS: every network
    service's DNS in the system configuration, where VPN clients put
-   theirs), looked at again every 2 s (`refresh_hush`, rewritten only when
+   theirs; Windows: the NRPT rules that aren't Crake's, local and group
+   policy's, and the suffixes of the adapters that are up and aren't
+   Crake's, built 2026-10-18), looked at again every 2 s (`refresh_hush`, rewritten only when
    the list changes); the package test and tests/macos.rs check it.
    Over TCP too: a tunnel DNS answer that fits one segment (almost every A
    answer) is held like a UDP one; one spread over several segments is put
@@ -1147,10 +1149,6 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   learned host with a route, which craked's own socket follows too: they'd
   need the socket bound to the physical interface (IP_UNICAST_IF /
   IP_BOUND_IF on the default route's device).
-- **Windows: names another VPN client serves are still kept private**
-  (2026-10-14). Linux and macOS leave a domain another program serves to
-  it (`served_elsewhere`); Windows returns nothing yet. To do: read other
-  clients' NRPT rules and adapters' DNS suffixes there.
 - **macOS: what CI can't check of craked registered by the app.** The
   user's approval (no runner can click it), so craked under launchd from
   Crake.app, and an upgrade's restart of a registered craked
@@ -1315,7 +1313,8 @@ daily.
   routes, NRPT rules and firewall rules it writes, not blocked or flagged.
 - [ ] Another VPN client installed (AnyConnect, GlobalProtect, ...): its
   names still resolve with "Keep internal names private" on
-  (`served_elsewhere` isn't built for Windows: Not now).
+  (`served_elsewhere`, built 2026-10-18: other programs' NRPT rules and
+  the adapters' DNS suffixes; the VM test adds another client's NRPT rule).
 - [ ] Group policy that owns NRPT or the firewall: Crake's rules work, or
   it says plainly that they can't.
 - [ ] Finding the bird: Windows 11 puts new icons in the notification

@@ -98,6 +98,34 @@ pub fn system_dns() -> Vec<std::net::IpAddr> {
     found
 }
 
+/// The DNS suffixes of the adapters that are up, Crake's own left out:
+/// each one's own (DHCP's, or a VPN client's on its adapter, as
+/// AnyConnect sets) and its suffix search list.
+pub fn adapter_domains() -> Vec<String> {
+    let mut found = Vec::new();
+    each_adapter(
+        windows_sys::Win32::Networking::WinSock::AF_UNSPEC,
+        |a, name| {
+            // 1: IfOperStatusUp.
+            if a.OperStatus != 1 || name.starts_with("crake-") {
+                return;
+            }
+            // SAFETY: as in `interfaces`: strings and a list Windows wrote.
+            unsafe {
+                found.push(wide(a.DnsSuffix));
+                let mut suffix = a.FirstDnsSuffix;
+                while !suffix.is_null() {
+                    let s = &*suffix;
+                    found.push(wide(s.String.as_ptr()));
+                    suffix = s.Next;
+                }
+            }
+        },
+    );
+    found.retain(|d| !d.is_empty());
+    found
+}
+
 /// Each adapter with addresses of `family`, with its alias.
 fn each_adapter(
     family: windows_sys::Win32::Networking::WinSock::ADDRESS_FAMILY,

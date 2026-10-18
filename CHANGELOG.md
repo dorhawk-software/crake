@@ -29,6 +29,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
 - **On Windows, what Crake keeps is yours alone.** Its log and the hosts it learned for each tunnel
   were readable by every user of the PC; now only Windows itself and administrators can read them.
 
+- **Another VPN client's names keep working on Windows.** With "Keep internal names private" on,
+  Crake no longer holds back names that another VPN client on the PC serves (AnyConnect,
+  GlobalProtect and the like), as it already didn't on Linux and macOS.
+
 - **OpenVPN on Windows and macOS too.** On Windows it comes with Crake, with its drivers; on a Mac
   it comes with Homebrew's cask (`brew install openvpn` otherwise).
 
