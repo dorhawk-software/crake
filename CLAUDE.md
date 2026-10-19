@@ -1391,8 +1391,17 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    file's path built in: a unit with `TemporaryFileSystem=/run` and
    `/run/crake` bound back in; until then craked runs charon itself and
    says plainly when another strongSwan runs), the app (New tunnel's
-   IPsec card with the key, identity and domains; the sign-in window's
-   questions already work through `Asking`), a kept password, IPsec in
+   IPsec card, design/proposals/ipsec-tunnel.html, chosen by the user
+   2026-10-19: the protocol list folds after a choice and "Import .ovpn…"
+   shows only with Detect or OpenVPN, for every protocol; IPsec's
+   "Gateway's key" and "Company domains" in step 1 under the gateway (A),
+   step 2 a plain "Username and password" card with the Username field
+   and "Gateway's identity" under Advanced; the sign-in window's password
+   question with "Remember the password in your keyring" ticked, a
+   refusal asking username and password again, a refused key in the
+   failure shape with "Change the key…"; Edit shows the key as kept;
+   needs craked to take the username from AddTunnel and to tell a
+   refused key from a refused password), a kept password, IPsec in
    craked.toml and IT's managed files, certificates (the gateway's or
    the user's), the journey and package tests, the FortiGate by hand.
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or

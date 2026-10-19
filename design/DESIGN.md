@@ -45,8 +45,21 @@ Don't drift back into these. Each was tried and dropped for a reason.
   inside a list's menu** ("Choose a .ovpn file…" as the menu's first row,
   its A): two cards that sound alike, and one action in two places. Chosen
   by the user (2026-10-18): one "OpenVPN" card, "Import .ovpn…" in the
-  label's row in every state (as ovpn-import.html, A), and importing a
-  .ovpn picks OpenVPN by itself.
+  label's row (as ovpn-import.html, A), and importing a .ovpn picks
+  OpenVPN by itself.
+- **"Import .ovpn…" in every state, and a protocol list that stays open
+  after a choice** (design/proposals/ipsec-tunnel.html, 1): with IPsec
+  chosen, the import pointed at a file that had nothing to do with it
+  ("why would I still want to import a .ovpn file? This is confusing
+  design", the user, 2026-10-19), and the open list pushed what the
+  chosen protocol needs (IPsec's key) 600 px down, under the fold. Chosen
+  by the user: the list folds once a protocol is chosen ("Choose the
+  protocol yourself" opens it again), and "Import .ovpn…" shows only
+  while the protocol is "Detect automatically" or OpenVPN.
+- **An IPsec tunnel's domains in step 3** (ipsec-tunnel.html, 2, B):
+  beside "Only what I list", whose list takes names for another purpose
+  (what may go through, not where a name is asked). Chosen: step 1, under
+  the gateway's key (A).
 - **The tray's badge behind the head** (9/32 of the icon, between pixels:
   4.5 px across at 16 px, its "!" a smudge of half-inked pixels; "extremely
   teeny tiny", the user, 2026-10-18), the same corner on whole pixels (no

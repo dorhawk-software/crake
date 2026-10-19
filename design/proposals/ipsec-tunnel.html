@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: IPsec tunnels</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  /* DESIGN.md's tokens. */
+  :root { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --line-strong: #BDBDB8; --ink: #1A1C1E;
+    --muted: #5A5F64; --accent: #0F766E; --accent-ink: #FFFFFF; --accent-soft: #E2F1EF; --danger: #B42318;
+    /* The proposal's own marker for what changes: outside Crake's palette. */
+    --mark: #C026D3; }
+  body.dark { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --line-strong: #4A4E53; --ink: #ECEDEE;
+    --muted: #A9AEB4; --accent: #2DD4BF; --accent-ink: #0B1514; --accent-soft: #17332F; --danger: #F97066; --mark: #E879F9; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 56px; max-width: 1520px; }
+  h1 { font-size: 20px; margin: 0 0 10px; }
+  h2.sec { font-size: 17px; margin: 40px 0 6px; }
+  .intro, .note { color: var(--muted); font-size: 13px; max-width: 78ch; }
+  .intro { margin-bottom: 10px; }
+  .intro b, .note b { color: var(--ink); }
+  .note { margin: 4px 0 14px; }
+  .note ol, .intro ol { margin: 6px 0 0; padding-left: 20px; }
+  .mark-key { display: inline-block; width: 22px; height: 12px; border: 2px dashed var(--mark); border-radius: 3px; vertical-align: -2px; }
+  .pair { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
+  .cap { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 8px; max-width: 720px; }
+  .cap .rec2 { color: var(--ink); }
+  .shot { display: block; width: 720px; border-radius: 12px; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  .changed { outline: 2px dashed var(--mark); outline-offset: 3px; }
+  .p.changed, .inset.changed { outline-offset: -3px; }
+  .choice { display: inline-block; font-size: 12px; font-weight: 700; color: var(--panel); background: var(--ink); border-radius: 4px; padding: 1px 7px; margin-right: 6px; }
+
+  /* New tunnel (design/screens/new-tunnel.html, measured against the app at 720 px). */
+  .win { width: 720px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .bar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 57px; box-sizing: border-box; padding: 0 12px; border-bottom: 1px solid var(--line); }
+  .bar .cancel { padding: 0 12px; font-weight: 600; }
+  .bar .name { font-size: 15px; font-weight: 700; }
+  .bar .x { justify-self: end; width: 32px; height: 32px; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; }
+  .stepsbar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0 32px; border-bottom: 1px solid var(--line); }
+  .stepsbar div { display: flex; align-items: center; gap: 8px; height: 49px; box-sizing: border-box; color: var(--muted); font-weight: 500; }
+  .stepsbar .cur { color: var(--ink); font-weight: 700; box-shadow: inset 0 -1px 0 var(--accent); }
+  .stepsbar span { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line-strong); box-sizing: border-box; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .stepsbar .cur span { border-color: var(--accent); color: var(--accent); }
+  .stepsbar .done span { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .body { padding: 26px 32px 8px; }
+  .body h3 { margin: 0; font-size: 22px; font-weight: 700; }
+  .fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; margin-top: 18px; align-items: start; }
+  .lab { display: flex; align-items: baseline; justify-content: space-between; height: 20px; font-weight: 600; margin-bottom: 6px; }
+  .lab .act { font-size: 13px; font-weight: 600; color: var(--accent); }
+  .lab .opt { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .field { box-sizing: border-box; height: 42px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel);
+    display: flex; align-items: center; justify-content: space-between; font-size: 15px; white-space: nowrap; overflow: hidden; }
+  .field.mono { font-size: 14px; }
+  .field.kept { background: var(--surface); border-color: var(--line); color: var(--muted); }
+  .field.empty { color: var(--muted); }
+  .dots { letter-spacing: 3px; font-size: 18px; }
+  .line { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; font-size: 13px; line-height: 19px; color: var(--muted); }
+  .line svg { flex: none; margin-top: 1px; }
+  .line.ink { color: var(--ink); }
+  .line .act { color: var(--accent); font-weight: 600; white-space: nowrap; }
+  .ptitle { margin-top: 24px; font-weight: 600; }
+  .list { margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .p { box-sizing: border-box; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 56px;
+    padding: 8px 14px; border-top: 1px solid var(--line); background: var(--panel); }
+  .p:first-child { border-top: none; }
+  .p.on { background: var(--accent-soft); }
+  .p.more { min-height: 46px; }
+  .p .n { display: block; font-weight: 600; }
+  .p .s { display: block; font-size: 13px; color: var(--muted); }
+  .p .c { font-size: 12px; color: var(--muted); }
+  .p .beta { margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .rec { margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--accent); }
+  .radio { width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--line-strong); display: flex; align-items: center; justify-content: center; }
+  .on .radio { border-color: var(--accent); }
+  .on .radio::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .foot { display: flex; align-items: center; gap: 12px; padding: 16px 32px 22px; border-top: 1px solid var(--line); margin-top: 22px; }
+  .foot .grow { flex: 1; }
+  .foot .of { font-size: 13px; color: var(--muted); }
+  .primary { height: 42px; padding: 0 20px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); font-weight: 700; display: flex; align-items: center; }
+  .back { height: 42px; padding: 0 18px; border-radius: 6px; border: 1px solid var(--line); font-weight: 600; display: flex; align-items: center; }
+  .card2 { margin-top: 18px; padding: 14px 16px; border-radius: 8px; background: var(--surface); }
+  .card2 b { display: block; font-weight: 600; }
+  .card2 span { color: var(--muted); }
+  .adv { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .adv .h { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+  .mode { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: 20px 1fr; gap: 10px; align-items: start; }
+  .mode.on { border: 1.5px solid var(--accent); }
+  .mode b { font-weight: 600; }
+  .mode .d { display: block; color: var(--muted); font-size: 13px; }
+
+  /* The sign-in window (design/screens/sign-in.html). */
+  .signin { width: 340px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px 22px 18px; }
+  .signin h4 { margin: 0; font-size: 19px; font-weight: 700; }
+  .signin p { margin: 6px 0 0; color: var(--muted); }
+  .signin p.ink { color: var(--ink); }
+  .steps { list-style: none; margin: 16px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; }
+  .steps li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; align-items: center; padding: 11px 12px; }
+  .steps li + li { border-top: 1px solid var(--line); }
+  .steps .now { font-weight: 700; }
+  .steps .later { color: var(--muted); }
+  .said { margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .link { margin-top: 10px; font-size: 13px; font-weight: 600; color: var(--accent); }
+  .sbuttons { display: flex; gap: 8px; margin-top: 18px; }
+  .sbuttons .grow { flex: 1; }
+  .sb { box-sizing: border-box; height: 40px; padding: 0 14px; border-radius: 6px; font-weight: 600; display: flex; align-items: center; }
+  .sb.primary2 { background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 0 18px; }
+  .slabel { font-weight: 600; margin: 16px 0 8px; }
+  .sfield { box-sizing: border-box; height: 44px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 6px; display: flex; align-items: center; font-size: 15px; }
+  .check { display: flex; gap: 8px; align-items: center; margin-top: 14px; font-size: 14px; }
+  .box { width: 16px; height: 16px; border-radius: 4px; background: var(--accent); display: flex; align-items: center; justify-content: center; color: var(--accent-ink); flex: none; }
+  .states { width: 720px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 32px 20px; }
+  .states .k { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 16px; }
+  .states .k:first-child { margin-top: 0; }
+  .cmd { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 8px 12px; border-radius: 6px; background: var(--surface); font-size: 13px; }
+  .cmd .mono { flex: 1; }
+</style>
+</head>
+<body>
+<script>if (new URLSearchParams(location.search).get('dark') === 'true') document.body.classList.add('dark');</script>
+<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+  <symbol id="check" viewBox="0 0 18 18"><path d="M4 9.5l3.2 3.2L14 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="tick" viewBox="0 0 18 18"><path d="M6 15V4M12 15V8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+  <symbol id="fail" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6.5 6.5l5 5M11.5 6.5l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="wait" viewBox="0 0 18 18"><circle cx="3" cy="9" r="2" fill="currentColor"/><circle cx="9" cy="9" r="2" fill="currentColor" opacity=".6"/><circle cx="15" cy="9" r="2" fill="currentColor" opacity=".3"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="tri" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4" fill="currentColor"/></symbol>
+  <symbol id="x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+</svg>
+<div class="page">
+  <h1>Proposal: IPsec tunnels in New tunnel (CLAUDE.md, 7k)</h1>
+  <div class="intro">Crake's service can now run IPsec (IKEv2) tunnels with strongSwan, on Linux. That's how FortiGates
+    from FortiOS 7.6.3 on take remote workers, and many other gateways too. What's missing is a way to add one. For it,
+    your IT team gives the <b>gateway</b>, the <b>gateway's key</b> (often called the pre-shared key) and your
+    <b>username</b>; sometimes also the <b>company's domains</b> and the <b>gateway's identity</b>. “Today” is captured from
+    the app at 1:1; the rest is drawn at the app's size. <span class="mark-key"></span> marks what changes.
+    <b>Two choices for you:</b>
+    <ol>
+      <li><b>Step 1 for every protocol:</b> the protocol list folds once you've chosen one, and “Import .ovpn…” shows only
+        while the protocol is “Detect automatically” or OpenVPN (1). This narrows what we decided on 2026-10-18 (“in
+        every state”). Recommended.</li>
+      <li><b>Where the company's domains go:</b> step 1, under the key (A, recommended), or step 3 (B) (2).</li>
+    </ol></div>
+
+  <h2 class="sec">1 · Step 1: IPsec chosen</h2>
+  <div class="note">A new card, “IPsec (IKEv2)”, under Beta until it's been used against a real gateway (your FortiGate
+    first). Once a protocol is chosen, the list folds to that row and today's “Choose the protocol yourself” (today it
+    folds only after detection answered or a .ovpn was imported). So the key, which IPsec needs before Continue, sits
+    right under its gateway instead of 600 px further down, under the fold. Group's place, which IPsec doesn't use,
+    takes the key and the domains, on the Name and Gateway grid.</div>
+  <div class="pair">
+    <div>
+      <div class="cap">Today (the list opened, a protocol chosen by hand: it stays open)</div>
+      <img class="shot" src="ipsec-tunnel/today-protocols-light.png" data-dark="ipsec-tunnel/today-protocols-dark.png" alt="New tunnel today: the protocol list stays open with Fortinet SSL VPN chosen">
+    </div>
+    <div>
+      <div class="cap">After: IPsec chosen, the list folded, the key typed (domains here: option A)</div>
+      <div class="win">
+        <div class="bar"><span class="cancel">Cancel</span><span class="name">New tunnel</span><span class="x"><svg width="14" height="14"><use href="#x"/></svg></span></div>
+        <div class="stepsbar"><div class="cur"><span>1</span>Server</div><div><span>2</span>Sign-in</div><div><span>3</span>Routing</div></div>
+        <div class="body">
+          <h3>Where does it connect?</h3>
+          <div class="fields">
+            <div><div class="lab">Name</div><div class="field">Nordbank</div></div>
+            <div><div class="lab changed">Gateway</div><div class="field mono">gw.nordbank.example</div></div>
+          </div>
+          <div class="ptitle">Protocol</div>
+          <div class="list changed">
+            <div class="p on"><span class="radio"></span><span><span class="n">IPsec (IKEv2)<span class="beta">Beta</span></span><span class="s">FortiClient's “IPsec VPN”, and other IKEv2 gateways</span></span><span class="c mono">ipsec</span></div>
+            <div class="p more"><svg width="16" height="16" style="justify-self: center"><use href="#chev"/></svg><span>Choose the protocol yourself</span><span class="s" style="font-size: 13px; color: var(--muted)">9 more</span></div>
+          </div>
+          <div class="line changed"><span>Beta: Crake hasn't been tried against a real IPsec gateway yet. If it doesn't connect, Copy for helpdesk in the sign-in window says why.</span></div>
+          <div class="fields changed" style="margin-top: 20px">
+            <div><div class="lab">Gateway's key<span class="act">Show</span></div><div class="field"><span class="dots">••••••••••••</span></div>
+              <div class="line"><span>From your IT team, who may call it the pre-shared key. Only Crake's service can read it.</span></div></div>
+            <div><div class="lab">Company domains<span class="opt">optional</span></div><div class="field mono">nordbank.internal nordbank.example</div>
+              <div class="line"><span>Names under them go to Nordbank's DNS. Without them, Crake asks public DNS first and finds those names a moment later.</span></div></div>
+          </div>
+        </div>
+        <div class="foot"><span class="grow"></span><span class="of">Step 1 of 3</span><span class="primary">Continue</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top: 12px"><b>What changes for every protocol:</b> the list folds when a row is picked,
+    as a menu closes after a choice, and “Choose the protocol yourself” opens it again. “Import .ovpn…” shows while
+    the protocol is Detect automatically (where someone holding a .ovpn file starts) or OpenVPN, and goes once another
+    one is picked; its label row keeps its height, so nothing moves. Continue is off until the key is there, with no
+    error line while the field is still empty: its help line says where the key comes from. Show becomes Hide, and the
+    key is in mono while shown. Several domains scroll sideways in their field, as any text field does.</div>
+
+  <h2 class="sec">2 · Your choice: where the company's domains go</h2>
+  <div class="note">AnyConnect and OpenVPN gateways hand Crake the company's domains; an IPsec gateway can't (strongSwan
+    receives them and passes them on to no one). So for IPsec they're typed, when IT gives them.</div>
+  <div class="pair">
+    <div style="max-width: 720px">
+      <div class="cap"><span class="choice">A</span><span class="rec2">Step 1, under the key (as drawn in 1), recommended</span></div>
+      <div class="note" style="margin: 0">What IT hands out for a tunnel is asked in one step. The domains say what's
+        behind the gateway, which is step 1's question (“Where does it connect?”), and step 3 stays as it is for every
+        tunnel. It also keeps them away from “Only what I list”, which takes names too, for a different purpose.</div>
+    </div>
+    <div>
+      <div class="cap"><span class="choice">B</span>Step 3, under the routing choices</div>
+      <div class="win">
+        <div class="bar"><span class="cancel">Cancel</span><span class="name">New tunnel</span><span class="x"><svg width="14" height="14"><use href="#x"/></svg></span></div>
+        <div class="stepsbar"><div class="done"><span><svg width="10" height="10"><use href="#check"/></svg></span>Server</div><div class="done"><span><svg width="10" height="10"><use href="#check"/></svg></span>Sign-in</div><div class="cur"><span>3</span>Routing</div></div>
+        <div class="body">
+          <h3>What should go through it?</h3>
+          <div class="modes">
+            <div class="mode on"><span class="radio"></span><div><b>Learn as it goes</b><span class="rec">Recommended</span><span class="d">Only hosts that don't answer directly.</span></div></div>
+            <div class="mode"><span class="radio"></span><div><b>Ask me first</b><span class="d">A notification for each new host.</span></div></div>
+            <div class="mode"><span class="radio"></span><div><b>Only what I list</b><span class="d">Names and networks you add, nothing else.</span></div></div>
+            <div class="mode"><span class="radio"></span><div><b>Everything</b><span class="d">Full tunnel. Crake won't learn anything.</span></div></div>
+          </div>
+          <div class="changed" style="margin-top: 20px; width: 58%">
+            <div class="lab">Company domains<span class="opt">optional</span></div><div class="field mono">nordbank.internal nordbank.example</div>
+            <div class="line"><span>Names under them go to Nordbank's DNS. Without them, Crake asks public DNS first and finds those names a moment later.</span></div>
+          </div>
+        </div>
+        <div class="foot"><span class="back">Back</span><span class="grow"></span><span class="of">Step 3 of 3</span><span class="primary">Add and connect</span></div>
+      </div>
+      <div class="note" style="margin-top: 10px; max-width: 720px">The domains sit with what they affect, which names go
+        where, but next to “Only what I list”, whose list takes names too: one says where to ask a name, the other what
+        may go through, and side by side they're easy to confuse.</div>
+    </div>
+  </div>
+
+  <h2 class="sec">3 · Step 2: how it signs in</h2>
+  <div class="note">IPsec signs in with a username and password (the gateway asks for them over EAP, as it asks
+    FortiClient). So step 2 shows that one way as a plain card, as OpenVPN's step 2 shows “As the profile says”, with
+    today's Username field. No “Stay signed in”: an IPsec gateway gives no session to keep, so the password is kept in
+    your keyring instead: the sign-in window's “Remember the password in your keyring” is ticked from the start (5). The gateway's identity, which few gateways ask
+    for, goes under today's Advanced.</div>
+  <div class="pair">
+    <div>
+      <div class="cap">Today (an AnyConnect gateway)</div>
+      <img class="shot" src="ipsec-tunnel/today-signin-light.png" data-dark="ipsec-tunnel/today-signin-dark.png" alt="New tunnel today, step 2: browser, password or certificate">
+    </div>
+    <div>
+      <div class="cap">After (IPsec; Advanced opened)</div>
+      <div class="win">
+        <div class="bar"><span class="cancel">Cancel</span><span class="name">New tunnel</span><span class="x"><svg width="14" height="14"><use href="#x"/></svg></span></div>
+        <div class="stepsbar"><div class="done"><span><svg width="10" height="10"><use href="#check"/></svg></span>Server</div><div class="cur"><span>2</span>Sign-in</div><div><span>3</span>Routing</div></div>
+        <div class="body">
+          <h3>How do you sign in?</h3>
+          <div class="card2 changed"><b>Username and password</b><span>Nordbank's gateway asks for them when you switch it on.</span></div>
+          <div style="margin-top: 18px; width: 50%"><div class="lab">Username</div><div class="field">ondrej.simon</div></div>
+          <div class="adv">
+            <div class="h"><svg width="14" height="14"><use href="#tri"/></svg>Advanced</div>
+            <div class="changed" style="margin-top: 12px; width: 58%">
+              <div class="lab">Gateway's identity<span class="opt">optional</span></div><div class="field mono empty"></div>
+              <div class="line"><span>Only if your IT team gave one, like <span class="mono">vpn.nordbank.example</span>. Crake then signs in only to a gateway that proves it's that one.</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="foot"><span class="back">Back</span><span class="grow"></span><span class="of">Step 2 of 3</span><span class="primary">Continue</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top: 12px">The browser and certificate ways aren't offered for IPsec yet (strongSwan can
+    do certificates; it's for later). “ondrej.simon” is the demo's username. Not built yet: craked takes the username
+    from here (today it asks in the sign-in window), and the kept password.</div>
+
+  <h2 class="sec">4 · Step 1's other states</h2>
+  <div class="note">Said under what it's about, in ink, as today's lines are.</div>
+  <div class="states">
+    <div class="k">Detect automatically, at an IPsec gateway (the Detect row's line; today “Crake asked; the gateway didn't say.”)</div>
+    <div class="line ink changed"><span>It didn't answer as an SSL VPN. If your IT team said IPsec, choose IPsec (IKEv2) below.</span></div>
+    <div class="k">A .ovpn imported, then IPsec chosen (the profile is dropped; the gateway it named stays, typed)</div>
+    <div class="line ink changed"><span>Not using initech.ovpn: IPsec doesn't take a profile. <span class="act">Use it again</span></span></div>
+    <div class="k">strongSwan isn't installed (the card's “Not installed”, as for openconnect and openvpn)</div>
+    <div class="line ink"><span>Needs strongSwan, which isn't installed:</span></div>
+    <div class="cmd"><span class="mono">sudo apt install --no-install-recommends strongswan-charon strongswan-swanctl libstrongswan-standard-plugins libcharon-extauth-plugins libcharon-extra-plugins</span><span class="act" style="color: var(--accent); font-weight: 600">Copy</span></div>
+    <div class="k">On Windows and macOS, for now (the card's “Not available”)</div>
+    <div class="line ink"><span>Crake runs IPsec on Linux only for now.</span></div>
+    <div class="k">Not a domain</div>
+    <div class="line ink"><span>“https://nordbank.internal” isn't a domain. Just the domain, like <span class="mono">nordbank.internal</span>; several are separated by spaces.</span></div>
+  </div>
+  <div class="note" style="margin-top: 10px">The install command is long because Ubuntu splits strongSwan into five
+    packages, and without <span class="mono">--no-install-recommends</span> it also starts a strongSwan service of its own
+    that Crake doesn't need. When Crake's package brings them (planned), this line is rare.</div>
+
+  <h2 class="sec">5 · The sign-in window, and Edit later</h2>
+  <div class="note">Today's sign-in window, with today's question and failure shapes (sign-in.html). Switched on, an IPsec
+    tunnel asks for its password unless the keyring has it. After a refusal it asks again, with the username filled in,
+    since either can be wrong. A key the gateway turns down is a failure only IT can fix, so it ends in today's failure
+    shape, with Change the key… to act on it. Copy for helpdesk and reports never hold the key or the password.</div>
+  <div class="pair">
+    <div>
+      <div class="cap">Asked for the password (today's question)</div>
+      <div class="signin">
+        <h4>Nordbank asks for your password</h4>
+        <p class="changed">As <b style="color: var(--ink); font-weight: 600">ondrej.simon</b></p>
+        <div class="slabel">Password</div>
+        <div class="sfield"><span class="dots">••••••••</span></div>
+        <div class="check"><span class="box"><svg width="11" height="11"><use href="#check"/></svg></span>Remember the password in your keyring</div>
+        <div class="sbuttons"><span class="grow"></span><span class="sb">Cancel</span><span class="sb primary2">Continue</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">Asked again after a refusal</div>
+      <div class="signin">
+        <h4>Nordbank asks for your username and password</h4>
+        <p class="ink changed">Nordbank didn't accept that username or password.</p>
+        <div class="slabel">Username</div>
+        <div class="sfield">ondrej.simon</div>
+        <div class="slabel">Password</div>
+        <div class="sfield"></div>
+        <div class="check"><span class="box"><svg width="11" height="11"><use href="#check"/></svg></span>Remember the password in your keyring</div>
+        <div class="sbuttons"><span class="grow"></span><span class="sb">Cancel</span><span class="sb primary2">Continue</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">Signing in (today's steps)</div>
+      <div class="signin">
+        <h4>Signing in to Nordbank</h4>
+        <p>This window updates by itself.</p>
+        <ol class="steps">
+          <li><svg width="18" height="18" style="color: var(--accent)"><use href="#tick"/></svg><span>Reached <span class="mono" style="font-size: 13px">gw.nordbank.example</span></span></li>
+          <li class="now"><svg width="18" height="18" style="color: var(--ink)"><use href="#wait"/></svg><span>Signing in as ondrej.simon</span></li>
+          <li class="later"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="6" fill="none" stroke="var(--line-strong)" stroke-width="1.6"/></svg><span>Tunnel up</span></li>
+        </ol>
+        <div class="sbuttons"><span class="grow"></span><span class="sb">Cancel</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">The gateway turned the key down (today's failure shape)</div>
+      <div class="signin">
+        <h4>Couldn't sign in to Nordbank</h4>
+        <p class="changed">The key doesn't match Nordbank's gateway. Your IT team can tell you the right one.</p>
+        <ol class="steps">
+          <li><svg width="18" height="18" style="color: var(--accent)"><use href="#tick"/></svg><span>Reached <span class="mono" style="font-size: 13px">gw.nordbank.example</span></span></li>
+          <li class="changed"><svg width="18" height="18" style="color: var(--danger)"><use href="#fail"/></svg><span>The gateway's key didn't match</span></li>
+        </ol>
+        <div class="said">strongSwan said: authentication of 'gw.nordbank.example' with pre-shared key failed</div>
+        <div class="link">Copy for helpdesk</div>
+        <div class="sbuttons"><span class="grow"></span><span class="sb">Close</span><span class="sb primary2 changed">Change the key…</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top: 12px">The step numbers are drawn at 11 px, as the app draws them today
+    (new_tunnel/view.rs), which is under DESIGN.md's 12 px; that's fixed in the app apart from this proposal.
+    While it signs in, the window shows today's steps, as for every tunnel (drawn below). Not built yet: telling a refused key from a refused password (craked says only
+    that the sign-in was refused).</div>
+  <div class="pair" style="margin-top: 18px">
+    <div>
+      <div class="cap">Edit, step 1: the key kept</div>
+      <div class="win" style="width: 404px; padding: 14px 16px 16px">
+        <div class="lab">Gateway's key<span class="act">Change…</span></div>
+        <div class="field kept changed">Kept by Crake's service</div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">After Change…</div>
+      <div class="win" style="width: 404px; padding: 14px 16px 16px">
+        <div class="lab">Gateway's key<span class="act">Show</span></div>
+        <div class="field empty changed"></div>
+        <div class="line"><span>The new key replaces the kept one when you save. <span class="act">Keep the old key</span></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  if (document.body.classList.contains('dark'))
+    document.querySelectorAll('img[data-dark]').forEach(i => i.src = i.dataset.dark);
+</script>
+</body>
+</html>
