@@ -31,7 +31,7 @@ impl Netlink {
             libc::bind(
                 owned.0.as_raw_fd(),
                 std::ptr::from_ref(&addr).cast(),
-                socklen::<libc::sockaddr_nl>(),
+                crate::unix::socklen::<libc::sockaddr_nl>(),
             )
         };
         if r < 0 {
@@ -58,7 +58,7 @@ impl Netlink {
     /// A receive buffer of `size` bytes, past the system's limit
     /// (SO_RCVBUFFORCE, CAP_NET_ADMIN): conntrack's events come in bursts.
     pub fn force_receive_buffer(&self, size: libc::c_int) -> io::Result<()> {
-        set_option(self, libc::SOL_SOCKET, libc::SO_RCVBUFFORCE, size)
+        crate::unix::set_option(self, libc::SOL_SOCKET, libc::SO_RCVBUFFORCE, size)
     }
 }
 
@@ -71,36 +71,7 @@ impl AsRawFd for Netlink {
 /// A socket's mark (SO_MARK): its packets take the route of the tunnel
 /// whose mark it is.
 pub fn set_mark(sock: &impl AsRawFd, mark: u32) -> io::Result<()> {
-    set_option(sock, libc::SOL_SOCKET, libc::SO_MARK, mark)
-}
-
-/// setsockopt with a plain integer value.
-fn set_option<T: Copy>(
-    sock: &impl AsRawFd,
-    level: libc::c_int,
-    name: libc::c_int,
-    value: T,
-) -> io::Result<()> {
-    // SAFETY: setsockopt reads `size_of::<T>()` bytes from `value`, which
-    // lives for the call; T is a plain integer for every option used here.
-    let r = unsafe {
-        libc::setsockopt(
-            sock.as_raw_fd(),
-            level,
-            name,
-            std::ptr::from_ref(&value).cast(),
-            socklen::<T>(),
-        )
-    };
-    if r == 0 {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
-}
-
-fn socklen<T>() -> libc::socklen_t {
-    libc::socklen_t::try_from(size_of::<T>()).unwrap_or(libc::socklen_t::MAX)
+    crate::unix::set_option(sock, libc::SOL_SOCKET, libc::SO_MARK, mark)
 }
 
 /// What owns its descriptor for as long as it lives: open, and the same

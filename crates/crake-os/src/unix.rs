@@ -3,6 +3,7 @@
 
 use std::ffi::{CStr, CString};
 use std::net::{Ipv4Addr, Ipv6Addr};
+use std::os::fd::AsRawFd;
 
 /// Every IPv4 address on the machine: interface, address, netmask (as a
 /// host-order u32).
@@ -108,6 +109,46 @@ pub fn signal(pid: u32, signal: libc::c_int) -> std::io::Result<()> {
     } else {
         Err(std::io::Error::last_os_error())
     }
+}
+
+/// A socket option's plain integer value: u32 or c_int, nothing else.
+pub trait OptionValue: Copy + private::Sealed {}
+impl OptionValue for u32 {}
+impl OptionValue for libc::c_int {}
+mod private {
+    pub trait Sealed {}
+    impl Sealed for u32 {}
+    impl Sealed for libc::c_int {}
+}
+
+/// setsockopt with a plain integer value (SO_MARK, IP_BOUND_IF, …).
+pub fn set_option<T: OptionValue>(
+    sock: &impl AsRawFd,
+    level: libc::c_int,
+    name: libc::c_int,
+    value: T,
+) -> std::io::Result<()> {
+    // SAFETY: setsockopt reads `size_of::<T>()` bytes from `value`, a
+    // plain integer that lives for the call.
+    let r = unsafe {
+        libc::setsockopt(
+            sock.as_raw_fd(),
+            level,
+            name,
+            std::ptr::from_ref(&value).cast(),
+            socklen::<T>(),
+        )
+    };
+    if r == 0 {
+        Ok(())
+    } else {
+        Err(std::io::Error::last_os_error())
+    }
+}
+
+/// A type's size as a socklen_t.
+pub(crate) fn socklen<T>() -> libc::socklen_t {
+    libc::socklen_t::try_from(size_of::<T>()).unwrap_or(libc::socklen_t::MAX)
 }
 
 #[cfg(test)]

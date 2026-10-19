@@ -21,22 +21,13 @@ pub fn monitors() -> Vec<Rect> {
 /// point).
 fn displays() -> Vec<(Rect, f64)> {
     use objc2_core_graphics::{
-        CGDisplayBounds, CGDisplayCopyDisplayMode, CGDisplayMode, CGError, CGGetActiveDisplayList,
-        CGMainDisplayID,
+        CGDisplayBounds, CGDisplayCopyDisplayMode, CGDisplayMode, CGMainDisplayID,
     };
     const MAX_DISPLAYS: usize = 16;
-    let mut ids = [0u32; MAX_DISPLAYS];
-    let mut count = 0u32;
-    // SAFETY: room for MAX_DISPLAYS ids, and the count, for the call.
-    let err =
-        unsafe { CGGetActiveDisplayList(MAX_DISPLAYS as u32, ids.as_mut_ptr(), &raw mut count) };
-    if err != CGError::Success {
-        return Vec::new();
-    }
+    let ids = crake_os::macos::active_displays(MAX_DISPLAYS);
     let main = CGMainDisplayID();
     let mut found: Vec<(bool, Rect, f64)> = ids
         .iter()
-        .take(count as usize)
         .map(|&id| {
             let b = CGDisplayBounds(id);
             let mode = CGDisplayCopyDisplayMode(id);

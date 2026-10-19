@@ -21,7 +21,6 @@ use serde::{Deserialize, Serialize};
 use system_configuration::core_foundation::array::CFArray;
 use system_configuration::core_foundation::base::{CFType, TCFType};
 use system_configuration::core_foundation::dictionary::CFDictionary;
-use system_configuration::core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
 use system_configuration::core_foundation::string::CFString;
 use system_configuration::dynamic_store::{
     SCDynamicStore, SCDynamicStoreBuilder, SCDynamicStoreCallBackContext,
@@ -257,9 +256,7 @@ fn watch() {
                     tracing::warn!("couldn't watch the system's DNS settings");
                     return;
                 };
-                // SAFETY: CoreFoundation's constant, only read.
-                CFRunLoop::get_current().add_source(&source, unsafe { kCFRunLoopCommonModes });
-                CFRunLoop::run_current();
+                crake_os::macos::run_loop_with(&source);
             });
         if let Err(e) = started {
             tracing::warn!("watching the system's DNS settings: {e}");
@@ -325,13 +322,9 @@ fn strings_of(dict: &CFDictionary, key: &'static str) -> Vec<String> {
     }
     item.downcast::<CFArray>()
         .map(|list| {
-            list.iter()
-                .filter_map(|item| {
-                    // SAFETY: an element the array holds; the wrapper retains it.
-                    unsafe { CFType::wrap_under_get_rule(*item) }
-                        .downcast::<CFString>()
-                        .map(|s| s.to_string())
-                })
+            crake_os::macos::array_items(&list)
+                .into_iter()
+                .filter_map(|item| item.downcast::<CFString>().map(|s| s.to_string()))
                 .collect()
         })
         .unwrap_or_default()
@@ -353,23 +346,16 @@ fn dictionary(store: &SCDynamicStore, key: &str) -> Option<CFDictionary> {
 
 /// A dictionary's value under a string key.
 fn value(dict: &CFDictionary, key: &'static str) -> Option<CFType> {
-    let key = CFString::from_static_string(key);
-    let item = dict.find(key.as_CFTypeRef())?;
-    // SAFETY: a value the dictionary holds; the wrapper retains it.
-    Some(unsafe { CFType::wrap_under_get_rule(*item) })
+    crake_os::macos::dict_value(dict, &CFString::from_static_string(key))
 }
 
 /// The servers a service's DNS dictionary names.
 fn servers_of(dict: &CFDictionary) -> Option<Vec<String>> {
     let list = value(dict, SERVERS)?.downcast::<CFArray>()?;
     Some(
-        list.iter()
-            .filter_map(|item| {
-                // SAFETY: an element the array holds; the wrapper retains it.
-                unsafe { CFType::wrap_under_get_rule(*item) }
-                    .downcast::<CFString>()
-                    .map(|s| s.to_string())
-            })
+        crake_os::macos::array_items(&list)
+            .into_iter()
+            .filter_map(|item| item.downcast::<CFString>().map(|s| s.to_string()))
             .collect(),
     )
 }
@@ -380,16 +366,7 @@ fn with_servers(base: Option<&CFDictionary>, servers: Option<&[String]>) -> CFDi
     let name = CFString::from_static_string(SERVERS);
     let mut pairs: Vec<(CFType, CFType)> = Vec::new();
     if let Some(base) = base {
-        let (keys, values) = base.get_keys_and_values();
-        for (k, v) in keys.into_iter().zip(values) {
-            // SAFETY: keys and values the dictionary holds; the wrappers
-            // retain them.
-            let (k, v) = unsafe {
-                (
-                    CFType::wrap_under_get_rule(k),
-                    CFType::wrap_under_get_rule(v),
-                )
-            };
+        for (k, v) in crake_os::macos::dict_pairs(base) {
             if k.downcast::<CFString>().is_some_and(|s| s == name) {
                 continue;
             }

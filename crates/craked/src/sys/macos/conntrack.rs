@@ -65,35 +65,7 @@ fn table() -> io::Result<HashMap<Flow, TcpState>> {
 
 /// One of the kernel's lists, as the sysctl gives it.
 fn list(name: &std::ffi::CStr) -> io::Result<Vec<u8>> {
-    let mut len = 0;
-    // SAFETY: a size query (no buffer), then a buffer of that size (plus
-    // room for connections opened meanwhile).
-    unsafe {
-        if libc::sysctlbyname(
-            name.as_ptr(),
-            std::ptr::null_mut(),
-            &raw mut len,
-            std::ptr::null_mut(),
-            0,
-        ) != 0
-        {
-            return Err(io::Error::last_os_error());
-        }
-        len += ROOM;
-        let mut buf = vec![0u8; len];
-        if libc::sysctlbyname(
-            name.as_ptr(),
-            buf.as_mut_ptr().cast(),
-            &raw mut len,
-            std::ptr::null_mut(),
-            0,
-        ) != 0
-        {
-            return Err(io::Error::last_os_error());
-        }
-        buf.truncate(len);
-        Ok(buf)
-    }
+    crake_os::macos::sysctl(name, ROOM)
 }
 
 /// Record kinds (xnu's XSO_*).

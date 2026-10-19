@@ -1368,13 +1368,18 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   devices for tests, tokio's `AsyncFd::register` only for `OwnsFd`
   types, and WAYLAND_DISPLAY unset only while /proc says the app has one
   thread). crake-proto, crake-hook and lint-literals forbid unsafe;
-  craked and the app forbid it on Linux (`cfg_attr`); the tests share a
+  craked and the app forbid it per system (`cfg_attr`); the tests share a
   helper that writes paths into fake scripts instead of setting the
   environment (racy with the harness's threads).
+  macOS too (2026-10-19): sysctl, each link's byte counters,
+  CoreFoundation's array items and dictionary values and pairs, the run
+  loop's common modes, utun devices and a timed read for tests, and
+  (feature `app`, the app's) SMAppService and the active displays; the
+  forbids hold on every system but Windows (`cfg_attr(not(windows))`).
+  `scripts/macos-check.sh` lints crake-os with `app` too.
   `scripts/check-unsafe.sh` (lint gate) fails on `unsafe` outside
-  crake-os but for `STILL_TO_MOVE`: macOS (`sys/macos/`, tests/macos*.rs),
-  then Windows (`sys/windows/`, the most). It shrinks to nothing; then
-  the forbids lose their cfg.
+  crake-os but for `STILL_TO_MOVE`: Windows (`sys/windows/`, the most).
+  It shrinks to nothing; then the forbids lose their cfg.
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with

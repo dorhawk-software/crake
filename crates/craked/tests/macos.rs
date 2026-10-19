@@ -9,7 +9,7 @@
 #![cfg(target_os = "macos")]
 
 use std::net::{IpAddr, Ipv4Addr, UdpSocket};
-use std::os::fd::{FromRawFd, OwnedFd};
+use std::os::fd::OwnedFd;
 use std::process::Command;
 
 use craked::hosts::Target;
@@ -27,61 +27,7 @@ fn enabled() -> bool {
 
 /// A utun device of our own: gone when the socket closes.
 fn utun() -> (OwnedFd, String) {
-    // SAFETY: the kernel control API as openconnect uses it; every buffer
-    // is the size the call is told.
-    unsafe {
-        let fd = libc::socket(libc::PF_SYSTEM, libc::SOCK_DGRAM, libc::SYSPROTO_CONTROL);
-        assert!(fd >= 0, "a kernel control socket");
-        let fd = OwnedFd::from_raw_fd(fd);
-        let mut info: libc::ctl_info = std::mem::zeroed();
-        for (i, b) in b"com.apple.net.utun_control".iter().enumerate() {
-            info.ctl_name[i] = *b as libc::c_char;
-        }
-        assert_eq!(
-            libc::ioctl(
-                std::os::fd::AsRawFd::as_raw_fd(&fd),
-                libc::CTLIOCGINFO,
-                &raw mut info
-            ),
-            0,
-            "utun's control id"
-        );
-        let addr = libc::sockaddr_ctl {
-            sc_len: size_of::<libc::sockaddr_ctl>() as u8,
-            sc_family: libc::AF_SYSTEM as u8,
-            ss_sysaddr: libc::AF_SYS_CONTROL as u16,
-            sc_id: info.ctl_id,
-            sc_unit: 0,
-            sc_reserved: [0; 5],
-        };
-        assert_eq!(
-            libc::connect(
-                std::os::fd::AsRawFd::as_raw_fd(&fd),
-                (&raw const addr).cast(),
-                size_of::<libc::sockaddr_ctl>() as u32,
-            ),
-            0,
-            "a new utun device"
-        );
-        let mut name = [0u8; 32];
-        let mut len = name.len() as libc::socklen_t;
-        assert_eq!(
-            libc::getsockopt(
-                std::os::fd::AsRawFd::as_raw_fd(&fd),
-                libc::SYSPROTO_CONTROL,
-                libc::UTUN_OPT_IFNAME,
-                name.as_mut_ptr().cast(),
-                &raw mut len,
-            ),
-            0,
-            "its name"
-        );
-        let name = std::ffi::CStr::from_bytes_until_nul(&name)
-            .unwrap()
-            .to_string_lossy()
-            .into_owned();
-        (fd, name)
-    }
+    crake_os::macos::open_utun().expect("a new utun device")
 }
 
 fn sh(program: &str, args: &[&str]) -> String {
@@ -341,19 +287,9 @@ fn syn_to(fd: std::os::fd::RawFd, dst: Ipv4Addr) -> Option<Ipv4Addr> {
     let end = std::time::Instant::now() + std::time::Duration::from_secs(8);
     let mut buf = [0u8; 2048];
     while std::time::Instant::now() < end {
-        let mut poll = libc::pollfd {
-            fd,
-            events: libc::POLLIN,
-            revents: 0,
+        let Some(n) = crake_os::macos::read_within(&fd, &mut buf, 500) else {
+            continue;
         };
-        // SAFETY: one pollfd; then a read into `buf`, as long as it is.
-        let n = unsafe {
-            if libc::poll(&raw mut poll, 1, 500) <= 0 {
-                continue;
-            }
-            libc::read(fd, buf.as_mut_ptr().cast(), buf.len())
-        };
-        let Ok(n) = usize::try_from(n) else { continue };
         if n < 24 {
             continue;
         }
@@ -457,29 +393,7 @@ async fn another_vpn_clients_domains_are_seen() {
 /// table can't be read: each record (offset, length, kind), and the
 /// offsets of the address and port within the one that has them.
 fn layout() -> String {
-    let name = c"net.inet.tcp.pcblist_n";
-    let mut len = 0;
-    // SAFETY: a size query, then a buffer of that size.
-    let buf = unsafe {
-        libc::sysctlbyname(
-            name.as_ptr(),
-            std::ptr::null_mut(),
-            &raw mut len,
-            std::ptr::null_mut(),
-            0,
-        );
-        len += 65536;
-        let mut buf = vec![0u8; len];
-        libc::sysctlbyname(
-            name.as_ptr(),
-            buf.as_mut_ptr().cast(),
-            &raw mut len,
-            std::ptr::null_mut(),
-            0,
-        );
-        buf.truncate(len);
-        buf
-    };
+    let buf = crake_os::macos::sysctl(c"net.inet.tcp.pcblist_n", 65536).unwrap_or_default();
     let mut out = format!("{} bytes\n", buf.len());
     let mut at = 24;
     while at + 24 < buf.len() {

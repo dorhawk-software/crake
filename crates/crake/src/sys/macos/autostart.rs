@@ -10,18 +10,15 @@
 
 use std::path::{Path, PathBuf};
 
-use objc2::rc::Retained;
-use objc2_foundation::NSString;
-use objc2_service_management::{SMAppService, SMAppServiceStatus};
+use crake_os::macos::service::{Service, Status as SMAppServiceStatus};
 
 const AGENT: &str = "software.dorhawk.crake.login.plist";
 /// The file older Crakes wrote (its label's record macOS keeps, so the
 /// app's agent has a label of its own).
 const OLDER: &str = "software.dorhawk.crake.plist";
 
-fn agent() -> Retained<SMAppService> {
-    // SAFETY: a constructor taking a valid string.
-    unsafe { SMAppService::agentServiceWithPlistName(&NSString::from_str(AGENT)) }
+fn agent() -> Service {
+    Service::agent(AGENT)
 }
 
 /// What an older Crake wrote.
@@ -31,9 +28,7 @@ fn older() -> Option<PathBuf> {
 }
 
 pub fn enabled() -> bool {
-    // SAFETY: a plain call on a valid service object.
-    older().is_some_and(|p| p.exists())
-        || unsafe { agent().status() } == SMAppServiceStatus::Enabled
+    older().is_some_and(|p| p.exists()) || agent().status() == SMAppServiceStatus::Enabled
 }
 
 /// On or off. The agent names its program and flag itself (`_exe`, `_flag`:
@@ -45,13 +40,10 @@ pub fn set(on: bool, _exe: &Path, _flag: &str) {
         let _ = std::fs::remove_file(p);
     }
     let agent = agent();
-    // SAFETY: plain calls on a valid service object.
-    let done = unsafe {
-        if on {
-            agent.registerAndReturnError()
-        } else {
-            agent.unregisterAndReturnError()
-        }
+    let done = if on {
+        agent.register()
+    } else {
+        agent.unregister()
     };
     if let Err(e) = done {
         eprintln!("start at login: {e:?}");

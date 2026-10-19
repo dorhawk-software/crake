@@ -1,8 +1,8 @@
 //! `crake`: Crake in the user session. Tray icon, the panel, notifications.
 //! Everything Crake decides happens in craked; this shows it and passes on
 //! what the user chooses.
-// Unsafe code lives in crake-os alone (Windows and macOS follow).
-#![cfg_attr(target_os = "linux", forbid(unsafe_code))]
+// Unsafe code lives in crake-os alone (Windows follows).
+#![cfg_attr(not(windows), forbid(unsafe_code))]
 // Windows: a windowed app, so no console window opens beside it (release
 // builds; development builds keep the console for their debug lines).
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]

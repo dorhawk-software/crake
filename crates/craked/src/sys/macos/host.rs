@@ -60,31 +60,10 @@ fn direct_device(tunnels: &BTreeMap<u32, String>) -> std::io::Result<String> {
 /// socket, IPV6_BOUND_IF for an IPv6 one. The socket's family isn't asked:
 /// each is tried, and one taking it is enough.
 pub fn bind_device(sock: &impl AsRawFd, device: &str) -> std::io::Result<()> {
-    let name = std::ffi::CString::new(device).map_err(std::io::Error::other)?;
-    // SAFETY: a NUL-terminated name.
-    let index = unsafe { libc::if_nametoindex(name.as_ptr()) };
-    if index == 0 {
-        return Err(std::io::Error::last_os_error());
-    }
-    let set = |level: libc::c_int, option: libc::c_int| {
-        // SAFETY: plain setsockopt with a u32 on a socket we own.
-        let r = unsafe {
-            libc::setsockopt(
-                sock.as_raw_fd(),
-                level,
-                option,
-                (&raw const index).cast(),
-                std::mem::size_of::<u32>() as u32,
-            )
-        };
-        if r == 0 {
-            Ok(())
-        } else {
-            Err(std::io::Error::last_os_error())
-        }
-    };
-    let v4 = set(libc::IPPROTO_IP, libc::IP_BOUND_IF);
-    let v6 = set(libc::IPPROTO_IPV6, libc::IPV6_BOUND_IF);
+    let index = crake_os::unix::index_of(device)
+        .ok_or_else(|| std::io::Error::other(format!("no interface {device}")))?;
+    let v4 = crake_os::unix::set_option(sock, libc::IPPROTO_IP, libc::IP_BOUND_IF, index);
+    let v6 = crake_os::unix::set_option(sock, libc::IPPROTO_IPV6, libc::IPV6_BOUND_IF, index);
     v4.or(v6)
 }
 
@@ -92,37 +71,14 @@ pub fn bind_device(sock: &impl AsRawFd, device: &str) -> std::io::Result<()> {
 /// tunnel device), both directions: each link's `if_data` (getifaddrs).
 pub fn counters(devices: &HashMap<String, String>) -> (u64, u64, HashMap<String, u64>) {
     let (mut physical, mut tunnels, mut each) = (0, 0, HashMap::new());
-    // SAFETY: getifaddrs/freeifaddrs pair; an AF_LINK entry's data is its
-    // if_data, only read.
-    unsafe {
-        let mut head: *mut libc::ifaddrs = std::ptr::null_mut();
-        if libc::getifaddrs(&raw mut head) != 0 {
-            return (0, 0, each);
+    for (name, bytes) in crake_os::macos::link_bytes() {
+        if devices.contains_key(&name) {
+            tunnels += bytes;
+            each.insert(name, bytes);
+        } else if name.starts_with("en") {
+            // Ethernet and Wi-Fi: not loopback, bridges or other tunnels.
+            physical += bytes;
         }
-        let mut p = head;
-        while !p.is_null() {
-            let ifa = &*p;
-            p = ifa.ifa_next;
-            if ifa.ifa_addr.is_null()
-                || i32::from((*ifa.ifa_addr).sa_family) != libc::AF_LINK
-                || ifa.ifa_data.is_null()
-            {
-                continue;
-            }
-            let name = std::ffi::CStr::from_ptr(ifa.ifa_name)
-                .to_string_lossy()
-                .into_owned();
-            let data = &*ifa.ifa_data.cast::<libc::if_data>();
-            let bytes = u64::from(data.ifi_ibytes) + u64::from(data.ifi_obytes);
-            if devices.contains_key(&name) {
-                tunnels += bytes;
-                each.insert(name, bytes);
-            } else if name.starts_with("en") {
-                // Ethernet and Wi-Fi: not loopback, bridges or other tunnels.
-                physical += bytes;
-            }
-        }
-        libc::freeifaddrs(head);
     }
     (physical, tunnels, each)
 }

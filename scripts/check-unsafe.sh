@@ -8,7 +8,7 @@
 # shrinks to nothing as each one moves; don't add to it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-STILL_TO_MOVE='/sys/windows/|/sys/macos/|crates/craked/tests/macos(_openvpn)?\.rs'
+STILL_TO_MOVE='/sys/windows/'
 found=$(grep -rnE '\bunsafe\b' crates --include='*.rs' |
     grep -v '^crates/crake-os/' |
     grep -vE "$STILL_TO_MOVE" |

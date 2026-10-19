@@ -10,4 +10,4 @@ cd "$(dirname "$0")/.."
 exec docker run --rm -v "$PWD:/src:ro" -v crake-mac-cargo:/usr/local/cargo/registry \
   -v crake-mac-target:/target -e CARGO_TARGET_DIR=/target rust:1-bookworm sh -c \
   "rustup target add aarch64-apple-darwin >/dev/null 2>&1 && rustup component add clippy >/dev/null 2>&1 &&
-   cd /src && cargo clippy --target aarch64-apple-darwin -p craked -p crake-proto --all-targets"
+   cd /src && cargo clippy --target aarch64-apple-darwin -p craked -p crake-proto -p crake-os -F crake-os/app --all-targets"

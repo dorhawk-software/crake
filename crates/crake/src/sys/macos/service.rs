@@ -6,9 +6,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use objc2::rc::Retained;
-use objc2_foundation::NSString;
-use objc2_service_management::{SMAppService, SMAppServiceStatus};
+use crake_os::macos::service::{Service, Status as SMAppServiceStatus};
 
 /// Not 0.6's label (software.dorhawk.craked): macOS keeps that daemon's
 /// record, and SMAppService answered for it ("enabled"), registering
@@ -18,9 +16,8 @@ const DAEMON: &str = "software.dorhawk.crake.daemon.plist";
 /// Registered once this run already (or tried).
 static REGISTERED: AtomicBool = AtomicBool::new(false);
 
-fn daemon() -> Retained<SMAppService> {
-    // SAFETY: a constructor taking a valid string.
-    unsafe { SMAppService::daemonServiceWithPlistName(&NSString::from_str(DAEMON)) }
+fn daemon() -> Service {
+    Service::daemon(DAEMON)
 }
 
 /// Whether macOS lets craked run, registering it first if it isn't yet
@@ -29,8 +26,7 @@ fn daemon() -> Retained<SMAppService> {
 /// development build outside Crake.app).
 pub fn on() -> Option<bool> {
     let service = daemon();
-    // SAFETY: plain calls on a valid service object.
-    let mut status = unsafe { service.status() };
+    let mut status = service.status();
     // Never registered reads "not found" as well as "not registered" (CI's
     // Mac said NotFound while the launchd file was in the app): either way
     // it's registered, once a run; still not found then, it isn't there (a
@@ -40,10 +36,8 @@ pub fn on() -> Option<bool> {
     if !settled && !REGISTERED.swap(true, Ordering::Relaxed) {
         // "Operation not permitted" until the user switches it on; the
         // status says what's needed either way.
-        // SAFETY: as above.
-        let registered = unsafe { service.registerAndReturnError() };
-        // SAFETY: as above.
-        status = unsafe { service.status() };
+        let registered = service.register();
+        status = service.status();
         crate::debug(&format!(
             "craked registered with SMAppService: {registered:?}, now {status:?}"
         ));
@@ -61,6 +55,5 @@ pub fn on() -> Option<bool> {
 
 /// System Settings, at Login Items & Extensions.
 pub fn open_settings() {
-    // SAFETY: a class method without arguments.
-    unsafe { SMAppService::openSystemSettingsLoginItems() };
+    crake_os::macos::service::open_login_items();
 }
