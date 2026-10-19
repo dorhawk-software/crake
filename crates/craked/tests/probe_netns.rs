@@ -329,6 +329,7 @@ async fn start_probe(race: bool) -> Probe {
         openconnect: fake,
         openvpn: "openvpn".into(),
         charon: "charon".into(),
+        charon_unit: None,
         log_path: dir.path().join("log"),
         state_path: dir.path().join("hosts.json"),
         learned_expiry_days: 7,

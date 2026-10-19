@@ -449,6 +449,7 @@ async fn a_gateway_without_offload_runs_without_it() {
         managed_dir: managed,
         openvpn: openvpn.clone(),
         charon: "charon".into(),
+        charon_unit: None,
         ..config(dir.path())
     };
     cfg.add_managed();

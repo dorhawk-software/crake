@@ -13,6 +13,9 @@ Restart=on-failure
 # the session off, or keeping it for a package upgrade's handover);
 # whatever is left after it exits is killed.
 KillMode=mixed
+# IPsec tunnels' charon runs as packaging/crake-charon.service, which
+# craked starts (crates/craked/src/ipsec/unit.rs).
+Environment=CRAKE_CHARON_UNIT=crake-charon.service
 RuntimeDirectory=crake
 # Kept across a restart: a package upgrade hands the tunnels over in it.
 RuntimeDirectoryPreserve=restart

@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 pub mod charon;
 pub mod env;
 #[cfg(target_os = "linux")]
+mod unit;
+#[cfg(target_os = "linux")]
 pub mod vici;
 
 /// What the gateway proves itself with, as IT hands it out (a FortiClient

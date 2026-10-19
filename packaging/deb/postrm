@@ -7,10 +7,12 @@ if [ "$1" = remove ]; then
     deb-systemd-helper mask craked.service >/dev/null || true
 fi
 if [ "$1" = remove ] || [ "$1" = purge ]; then
-    # Unload craked's AppArmor profile (its file stays until purge).
-    if [ -f /etc/apparmor.d/usr.sbin.craked ] && aa-enabled --quiet 2>/dev/null; then
-        apparmor_parser -R /etc/apparmor.d/usr.sbin.craked >/dev/null 2>&1 || true
-    fi
+    # Unload craked's AppArmor profiles (their files stay until purge).
+    for p in usr.sbin.craked crake-charon; do
+        if [ -f "/etc/apparmor.d/$p" ] && aa-enabled --quiet 2>/dev/null; then
+            apparmor_parser -R "/etc/apparmor.d/$p" >/dev/null 2>&1 || true
+        fi
+    done
 fi
 if [ "$1" = purge ]; then
     deb-systemd-helper purge craked.service >/dev/null || true

@@ -17,6 +17,7 @@ makedepends=('rust' 'cmake' 'pkgconf' 'fontconfig' 'freetype2')
 optdepends=('openconnect: AnyConnect, GlobalProtect, Fortinet and the other openconnect protocols'
             'openvpn: OpenVPN profiles, run by Crake'
             'openvpn3: OpenVPN 3 profiles (AUR)'
+            'strongswan: IPsec (IKEv2) gateways'
             'gnome-shell-extension-appindicator: the tray icon on GNOME'
             'gnome-keyring: keeping passwords and certificates')
 backup=('etc/crake/craked.toml')
@@ -47,6 +48,9 @@ package() {
   # Arch keeps helpers in /usr/lib/<package>, not /usr/libexec.
   install -Dm755 "${CARGO_TARGET_DIR:-target}"/release/crake-hook "$pkgdir/usr/lib/crake/hook"
   install -Dm644 packaging/craked.service "$pkgdir/usr/lib/systemd/system/craked.service"
+  # IPsec's charon as a unit of its own, Arch's charon in it.
+  sed 's#@CHARON@#/usr/lib/strongswan/charon#' packaging/crake-charon.service > crake-charon.service
+  install -Dm644 crake-charon.service "$pkgdir/usr/lib/systemd/system/crake-charon.service"
   install -Dm644 packaging/software.dorhawk.Crake1.conf "$pkgdir/usr/share/dbus-1/system.d/software.dorhawk.Crake1.conf"
   install -Dm644 packaging/software.dorhawk.crake.policy "$pkgdir/usr/share/polkit-1/actions/software.dorhawk.crake.policy"
   install -Dm644 packaging/deb/crake.desktop "$pkgdir/usr/share/applications/software.dorhawk.crake.desktop"

@@ -16,7 +16,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
   the company's domains; then your username. Crake runs strongSwan's charon itself and asks your
   password when you switch the tunnel on, keeping it in your keyring if you tick Remember. As
   always, only the hosts that need the tunnel go through it. Needs strongSwan (New tunnel says the
-  command). A wrong key is said as such: "The key doesn't match".
+  command); Crake's runs beside a strongSwan of your own and leaves it alone. A wrong key is said as
+  such: "The key doesn't match". Not yet on Fedora, where SELinux keeps strongSwan from reading
+  Crake's settings.
 
 - **You choose whether a password is kept.** Every password the sign-in window asks for has
   "Remember the password in your keyring", ticked to start with; before, a gateway's password was

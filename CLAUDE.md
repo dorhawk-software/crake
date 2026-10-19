@@ -1342,9 +1342,9 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    - **Packages:** strongswan-charon, strongswan-swanctl (its vici
      plugin), libstrongswan-standard-plugins (openssl's crypto: without
      it Ubuntu 24.04's charon refused to start, "unmet dependency:
-     HASHER:HASH_SHA1", CI 2026-10-19) and the two EAP plugin packages
-     as a Recommended engine (as openvpn), AppArmor rules for charon
-     under craked's profile; never strongswan-starter's running service.
+     HASHER:HASH_SHA1", CI 2026-10-19) and the two EAP plugin packages,
+     suggested; never strongswan-starter's running service (built as
+     slice 3, below).
    - **Other systems, to find out once Linux works:** macOS (Homebrew's
      strongSwan uses PF_KEY policies, no tunnel device, so a host would
      be an IPsec policy rather than a route; or Apple's IKEv2, which
@@ -1430,10 +1430,48 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    switched on and "its sign-in opens" found ACME's window, still open
    (its close is a timer too); the journeys now move the clock and wait
    for that tunnel's own window (`journey_kit::sign_in_of`, `decline`).
+   **Slice 3, packages: built (2026-10-19).** charon runs as
+   `crake-charon.service` (packaging/), which craked starts over systemd's
+   D-Bus (RestartUnit, GetUnit, the unit's ActiveState, StopUnit;
+   `ipsec/unit.rs`) when craked.service names it
+   (`CRAKE_CHARON_UNIT`, Config `charon_unit`); run by hand or in the
+   tests craked runs charon itself, as before. Why a unit: charon's pid
+   file's path is built in (/var/run/charon.pid), so beside a system
+   strongSwan it won't start, and craked's own /run is read-only
+   (ProtectSystem=strict); the unit has a /run of its own
+   (`TemporaryFileSystem=/run`, `/run/crake` bound back in), binds to
+   craked (stops with it) and asks for Crake's own named AppArmor profile
+   (`AppArmorProfile=-crake-charon`, packaging/apparmor/crake-charon):
+   Ubuntu's profile for charon's path allows /etc/strongswan* and
+   /run/charon.* only, and refused Crake's settings. craked's profile may
+   make those calls (Properties `Get` only: zbus's caching proxy asked
+   GetAll and followed PropertiesChanged, both refused, and craked took
+   charon for stopped). strongSwan is **suggested**, not recommended as
+   the plan said: Debian's strongswan-charon recommends
+   strongswan-starter, which would start a system strongSwan on every
+   install; New tunnel says the command, with --no-install-recommends.
+   Fedora recommends `strongswan` (its service stays off), Arch an
+   optdepend. The package test has an IPsec phase (strongSwan as ACME's
+   gateway in its namespace, its charon a copy at another path holding
+   the container's /run/charon.pid as a system strongSwan would, its
+   plugins named: without a list it loaded kernel-libipsec, which took
+   the gateway's traffic); `scripts/vm-test.sh 26.04` passes it with both
+   profiles enforced. Locally the containers fail it: the kernel attaches
+   this computer's Ubuntu charon (and swanctl) profiles by path in
+   containers too. **Not yet:** SELinux (Fedora): charon runs as
+   strongSwan's own `ipsec_t` whatever starts it (unconfined_service_t
+   may not use its file as an entry point; through /bin/sh it moves to
+   ipsec_t at charon's exec), and ipsec_t may read neither
+   /run/crake/ipsec nor reach craked's socket (`vm-test.sh fedora:44`
+   shows the denials): it needs a policy module of Crake's own (a type
+   for /run/crake/ipsec and the hook's connect), built and loaded by the
+   RPM. CI's Fedora containers run without SELinux. NixOS: the module
+   has no charon unit, and the app looks for charon at the
+   distributions' paths.
    Not yet: "Change the key…" in the sign-in window's failure (the
    failure says to use Edit), IPsec in craked.toml and IT's managed
-   files, certificates (the gateway's or the user's), the package's
-   charon unit and package test, the FortiGate by hand.
+   files, certificates (the gateway's or the user's), the FortiGate by
+   hand.
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or
    Windows problem without a colleague's machine):** `.github/workflows/
    doctor.yml`, started by hand (system, tunnel anyconnect/openvpn/none,

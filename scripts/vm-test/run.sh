@@ -12,12 +12,13 @@ fail=0
 echo "== $(. /etc/os-release; echo "$NAME $VERSION_ID"), kernel $(uname -r), AppArmor $(aa-enabled 2>/dev/null || echo no), SELinux $(getenforce 2>/dev/null || echo no)"
 sh /deb-test/check.sh install || fail=1
 if [ -f /test/complain ] && command -v apparmor_parser >/dev/null; then
-    echo "  (craked's profile in complain mode)"
-    apparmor_parser -r -C /etc/apparmor.d/usr.sbin.craked && systemctl restart craked
+    echo "  (craked's profiles in complain mode: its own and its charon's)"
+    apparmor_parser -r -C /etc/apparmor.d/usr.sbin.craked && apparmor_parser -r -C /etc/apparmor.d/crake-charon \
+        && systemctl restart craked
 fi
 sh /deb-test/check.sh tunnel || fail=1
-echo "  AppArmor's log for craked:"
-journalctl -k --no-pager -o cat | grep 'apparmor=' | grep craked | sed 's/^/        /'
+echo "  AppArmor's log for craked and its charon:"
+journalctl -k --no-pager -o cat | grep 'apparmor=' | grep -E 'craked|crake-charon' | sed 's/^/        /'
 echo "  SELinux's denials:"
 journalctl --no-pager -o cat | grep 'avc:  denied' | sed 's/^/        /'
 sh /deb-test/check.sh remove || fail=1

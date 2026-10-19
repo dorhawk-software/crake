@@ -7,6 +7,7 @@
 #            service: ocserv in its own namespace (gateway.sh), probing,
 #            DNS through systemd-resolved, keeping names private; then an
 #            OpenVPN one (openvpn, a password sign-in answered over D-Bus)
+#            and an IPsec one (strongSwan's charon as Crake's own unit)
 #   journey  the journey suite (the app and its craked) on this system
 #   remove   remove and purge; nothing is left
 # Prints each check; exits non-zero if any failed.
@@ -29,6 +30,7 @@ install() {
         # What its install message says to do: an engine, and the services
         # (Arch packages enable none themselves).
         check "openconnect, as the message says" pacman -S --noconfirm --needed openconnect openvpn
+        check "strongSwan, as New tunnel says" pacman -S --noconfirm --needed strongswan
         check "and the services" systemctl enable --now systemd-resolved craked
     elif [ "$PM" = dnf ]; then
         check "installs with its Requires only" dnf install -y -q --setopt=install_weak_deps=False /pkg/crake.rpm
@@ -66,9 +68,14 @@ install() {
     elif [ "$PM" = dnf ]; then
         check "the gateway's software" dnf install -y -q ocserv gnutls-utils dnsmasq busybox curl openssl python3
         check "openvpn, as Recommends would" dnf install -y -q openvpn
+        check "strongSwan, as Recommends would" dnf install -y -q strongswan
     else
         check "the gateway's software" apt-get install -y -qq --no-install-recommends ocserv gnutls-bin dnsmasq-base busybox curl openssl python3
         check "openvpn, as Recommends would" apt-get install -y -qq --no-install-recommends openvpn
+        # IPsec: what New tunnel's IPsec card says to run (engines.rs),
+        # also the gateway's.
+        check "strongSwan, as New tunnel says" apt-get install -y -qq --no-install-recommends strongswan-charon \
+            strongswan-swanctl libstrongswan-standard-plugins libcharon-extauth-plugins libcharon-extra-plugins
     fi
     # systemd-resolved, when apt just pulled it in (24.04 and newer), started
     # before D-Bus read its policy and isn't on the bus; on a real desktop
@@ -151,14 +158,16 @@ tunnel() {
     for _ in $(seq 1 20); do resolvectl domain crake-hush 2>/dev/null | grep -q acme.internal && break; sleep 0.5; done
     check "acme.internal is kept private again" sh -c 'resolvectl domain crake-hush | grep -q acme.internal'
     openvpn_tunnel
+    ipsec_tunnel
     check "nothing went wrong in craked's journal" sh -c '! journalctl -b -u craked --no-pager -o cat | grep -E "ERROR|panicked"'
     if aa-enabled --quiet 2>/dev/null; then
         # Complain mode (scripts/vm-test.sh --complain) lists what the
         # profile would have refused: ALLOWED instead of DENIED.
         check "AppArmor refused craked nothing" sh -c '! journalctl -k --no-pager -o cat | grep -E "apparmor=\"(DENIED|ALLOWED)\"" | grep "craked"'
+        check "AppArmor refused Crake's charon nothing" sh -c '! journalctl -k --no-pager -o cat | grep -E "apparmor=\"(DENIED|ALLOWED)\"" | grep "crake-charon"'
     fi
     if [ "$(getenforce 2>/dev/null)" = Enforcing ]; then
-        check "SELinux refused craked nothing" sh -c '! journalctl --no-pager -o cat | grep "avc:  denied" | grep -E "comm=\"(craked|openconnect|nft|ip|hook|sh)\""'
+        check "SELinux refused craked nothing" sh -c '! journalctl --no-pager -o cat | grep "avc:  denied" | grep -E "comm=\"(craked|openconnect|nft|ip|hook|sh|charon)\""'
         check "craked runs as a confined-or-unconfined service" sh -c 'ps -eZ | grep -E " craked$"'
     fi
     echo "  craked's journal:"
@@ -211,6 +220,41 @@ openvpn_tunnel() {
     check "its profile went with it" test ! -e /var/lib/crake/profiles/initech.ovpn
 }
 
+# An IPsec (IKEv2) tunnel through the installed service (CLAUDE.md, 7k):
+# craked starts its charon as crake-charon.service (a /run of its own,
+# its own AppArmor profile), beside the gateway's charon, which holds
+# this container's /run/charon.pid as a system strongSwan would. On a
+# computer with strongSwan installed, its AppArmor profile for charon's
+# path attaches in containers too and refuses Crake's settings (Crake's
+# profile, which the unit asks for, isn't loaded there): proven by
+# scripts/vm-test.sh, as AppArmor rules are.
+ipsec_tunnel() {
+    if [ -e /tmp/ipsec-gw-load.log ]; then
+        check "ACME's IPsec gateway is up" sh -c 'grep -q "loaded connection .acme." /tmp/ipsec-gw-load.log || { cat /tmp/ipsec-gw-load.log /tmp/ipsec-gw.log; pgrep -a gw-charon; false; }'
+    fi
+    check "Nordbank (IPsec) added" call AddTunnel 'a{ss}' 8 display_name Nordbank protocol ipsec gateway 198.51.100.10 \
+        gateway_key hunter2hunter2 gateway_id vpn.acme.example user alice domains acme.internal sign_in password
+    check "its key is root's alone" sh -c 'test "$(stat -c %a /var/lib/crake/profiles/nordbank.ipsec)" = 600'
+    check "switched on" call Connect s nordbank
+    check "asked for the password" answer nordbank password hunter2
+    for _ in $(seq 1 40); do call GetTunnel s nordbank | grep -q '"connected"' && break; sleep 0.5; done
+    check "Nordbank connected" sh -c "busctl --system call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 GetTunnel s nordbank | grep -q '\"connected\"' || { systemctl status crake-charon --no-pager; journalctl -b -u crake-charon --no-pager -o cat | tail -40; false; }"
+    check "its charon runs as Crake's unit" systemctl is-active crake-charon
+    if [ -e /tmp/ipsec-gw-load.log ]; then
+        check "beside the system's strongSwan" pgrep -x gw-charon
+    fi
+    if aa-enabled --quiet 2>/dev/null; then
+        check "charon runs confined by Crake's profile" sh -c 'grep -Eq "^crake-charon \((enforce|complain)\)" /proc/$(systemctl show -p MainPID --value crake-charon)/attr/current'
+    fi
+    check "its address on crake-nordbank" sh -c 'ip -4 -o addr show crake-nordbank | grep -q "inet 10.40.9."'
+    check "a host that doesn't answer directly gets through Nordbank" sh -c 'curl -s -m 15 http://10.40.1.13/ | grep -q crex'
+    check "Nordbank switches off" call Disconnect s nordbank
+    sleep 2
+    check "its interface went" sh -c '! ip link show crake-nordbank 2>/dev/null'
+    check "Nordbank removed" call RemoveTunnel s nordbank
+    check "its key went with it" test ! -e /var/lib/crake/profiles/nordbank.ipsec
+}
+
 # The journey (crates/crake/src/journey_tests.rs): the real app and its own
 # craked against this system's openconnect, nft and ip, with the packaged
 # hook, through the gateway the tunnel phase started. The service steps
@@ -235,6 +279,7 @@ remove() {
         check "removes" apt-get remove -y -qq crake
     fi
     check "craked stopped" sh -c '! systemctl is-active -q craked'
+    check "and its charon with it" sh -c '! systemctl is-active -q crake-charon'
     check "and stopped without an error" sh -c '! journalctl -b -u craked --no-pager -o cat | grep -E "ERROR|panicked"'
     check "no crake links left" sh -c '! ip -o link | grep -q crake-'
     check "no nftables table left" sh -c '! nft list tables 2>/dev/null | grep -q crake'

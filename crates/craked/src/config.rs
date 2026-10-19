@@ -37,6 +37,12 @@ pub struct Config {
     /// strongSwan's charon, for IPsec tunnels (`crate::ipsec::charon`).
     #[serde(default = "default_charon")]
     pub charon: PathBuf,
+    /// The systemd unit that runs it, when there is one: the package's
+    /// crake-charon.service, named by craked.service
+    /// (`CRAKE_CHARON_UNIT`), gives charon a /run of its own. Without one
+    /// craked runs charon itself.
+    #[serde(default = "default_charon_unit")]
+    pub charon_unit: Option<String>,
     /// Append-only JSON lines.
     #[serde(default = "default_log_path")]
     pub log_path: PathBuf,
@@ -283,6 +289,7 @@ impl Default for Config {
             openconnect: default_openconnect(),
             openvpn: default_openvpn(),
             charon: default_charon(),
+            charon_unit: default_charon_unit(),
             log_path: default_log_path(),
             state_path: default_state_path(),
             learned_expiry_days: default_expiry_days(),
@@ -346,6 +353,16 @@ fn default_openvpn() -> PathBuf {
     }
     "openvpn".into()
 }
+/// The unit craked.service names for charon, if any.
+fn default_charon_unit() -> Option<String> {
+    std::env::var(CHARON_UNIT_ENV)
+        .ok()
+        .filter(|u| !u.is_empty())
+}
+
+/// Where craked.service names charon's unit.
+const CHARON_UNIT_ENV: &str = "CRAKE_CHARON_UNIT";
+
 /// Where each distribution puts strongSwan's charon: Debian and Ubuntu,
 /// Fedora, Arch. The first that's there; Debian's when none is.
 fn default_charon() -> PathBuf {

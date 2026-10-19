@@ -7,8 +7,10 @@
 //! log on stderr, which craked reads.
 //!
 //! charon refuses to start while another runs on the computer (its pid
-//! file's path is built in, /var/run/charon.pid): the package runs it as a
-//! unit with a /run of its own for that (CLAUDE.md, 7k; not built yet).
+//! file's path is built in, /var/run/charon.pid), and craked's service may
+//! not write /run: the package runs it as a unit with a /run of its own
+//! (crake-charon.service, `unit`), which craked starts. Run by hand or in
+//! the tests, craked runs charon itself.
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -87,10 +89,16 @@ fn last_words(said: &str) -> String {
     }
 }
 
+/// How charon runs: craked's child, or the package's unit.
+enum Runs {
+    Child(Child),
+    Unit(super::unit::Unit),
+}
+
 pub struct Charon {
-    child: Child,
+    runs: Runs,
     pub socket: PathBuf,
-    /// Its last lines, for a refusal's reason.
+    /// Its last lines (run as craked's child), for why it didn't start.
     heard: Arc<Mutex<Vec<String>>>,
 }
 
@@ -98,8 +106,10 @@ pub struct Charon {
 const HEARD: usize = 20;
 
 impl Charon {
-    /// Start `program` with its settings and socket in `dir` (root's).
-    pub async fn start(program: &Path, dir: &Path) -> Result<Self> {
+    /// Start `program` with its settings and socket in `dir` (root's), or
+    /// `unit` with them when the package has one (its unit reads the same
+    /// settings: craked.service names it, crake-charon.service says where).
+    pub async fn start(program: &Path, dir: &Path, unit: Option<&str>) -> Result<Self> {
         crate::sys::create_private_dir(dir).with_context(|| format!("making {}", dir.display()))?;
         let socket = dir.join("charon.vici");
         let settings = dir.join("strongswan.conf");
@@ -110,32 +120,13 @@ impl Charon {
             f.write_all(conf(&socket).as_bytes())?;
         }
         let _ = std::fs::remove_file(&socket);
-        let mut child = Command::new(program)
-            .env("STRONGSWAN_CONF", &settings)
-            .env("LC_ALL", "C")
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true)
-            .spawn()
-            .with_context(|| format!("starting {}", program.display()))?;
         let heard = Arc::new(Mutex::new(Vec::new()));
-        if let Some(err) = child.stderr.take() {
-            let heard = Arc::clone(&heard);
-            tokio::spawn(async move {
-                let mut lines = BufReader::new(err).lines();
-                while let Ok(Some(line)) = lines.next_line().await {
-                    tracing::debug!(target: "charon", "{line}");
-                    let mut h = heard.lock().unwrap();
-                    if h.len() == HEARD {
-                        h.remove(0);
-                    }
-                    h.push(line);
-                }
-            });
-        }
+        let runs = match unit {
+            Some(name) => Runs::Unit(super::unit::Unit::start(name).await?),
+            None => Runs::Child(spawn(program, &settings, &heard)?),
+        };
         let mut charon = Self {
-            child,
+            runs,
             socket,
             heard,
         };
@@ -145,11 +136,11 @@ impl Charon {
         loop {
             if charon.socket.exists() {
                 tokio::time::sleep(SETTLE).await;
-                if charon.running() {
+                if charon.running().await {
                     break;
                 }
             }
-            if !charon.running() || tokio::time::Instant::now() > deadline {
+            if !charon.running().await || tokio::time::Instant::now() > deadline {
                 // Its last words arrive a moment after it ends.
                 tokio::time::sleep(POLL).await;
                 let said = charon.heard.lock().unwrap().join("\n");
@@ -160,6 +151,13 @@ impl Charon {
                     );
                 }
                 charon.stop().await;
+                if let Runs::Unit(u) = &charon.runs {
+                    bail!(
+                        "strongSwan's charon didn't start ({}): journalctl -u {} says why.",
+                        u.name,
+                        u.name
+                    );
+                }
                 bail!("strongSwan's charon didn't start: {}", last_words(&said));
             }
             tokio::time::sleep(POLL).await;
@@ -168,22 +166,55 @@ impl Charon {
     }
 
     /// It hasn't ended.
-    pub fn running(&mut self) -> bool {
-        matches!(self.child.try_wait(), Ok(None))
+    pub async fn running(&mut self) -> bool {
+        match &mut self.runs {
+            Runs::Child(child) => matches!(child.try_wait(), Ok(None)),
+            Runs::Unit(unit) => unit.running().await,
+        }
     }
 
     pub async fn stop(&mut self) {
-        if let Some(pid) = self.child.id() {
-            let _ = crake_os::unix::signal(pid, libc::SIGTERM);
-        }
-        if tokio::time::timeout(STOP_WAIT, self.child.wait())
-            .await
-            .is_err()
-        {
-            let _ = self.child.kill().await;
+        match &mut self.runs {
+            Runs::Child(child) => {
+                if let Some(pid) = child.id() {
+                    let _ = crake_os::unix::signal(pid, libc::SIGTERM);
+                }
+                if tokio::time::timeout(STOP_WAIT, child.wait()).await.is_err() {
+                    let _ = child.kill().await;
+                }
+            }
+            Runs::Unit(unit) => unit.stop().await,
         }
         let _ = std::fs::remove_file(&self.socket);
     }
+}
+
+/// charon as craked's child, its log kept in `heard`.
+fn spawn(program: &Path, settings: &Path, heard: &Arc<Mutex<Vec<String>>>) -> Result<Child> {
+    let mut child = Command::new(program)
+        .env("STRONGSWAN_CONF", settings)
+        .env("LC_ALL", "C")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()
+        .with_context(|| format!("starting {}", program.display()))?;
+    if let Some(err) = child.stderr.take() {
+        let heard = Arc::clone(heard);
+        tokio::spawn(async move {
+            let mut lines = BufReader::new(err).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                tracing::debug!(target: "charon", "{line}");
+                let mut h = heard.lock().unwrap();
+                if h.len() == HEARD {
+                    h.remove(0);
+                }
+                h.push(line);
+            }
+        });
+    }
+    Ok(child)
 }
 
 #[cfg(test)]

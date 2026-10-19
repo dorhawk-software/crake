@@ -35,11 +35,16 @@ install -Dm755 /target/release/crake "$root/usr/bin/crake"
 install -Dm755 /target/release/craked "$root/usr/sbin/craked"
 install -Dm755 /target/release/crake-hook "$root/usr/libexec/crake/hook"
 install -Dm644 /src/packaging/craked.service "$root/usr/lib/systemd/system/craked.service"
+# IPsec's charon as a unit of its own; Debian's and Ubuntu's charon (the
+# RPM's spec puts Fedora's in).
+sed 's#@CHARON@#/usr/lib/ipsec/charon#' /src/packaging/crake-charon.service > /tmp/crake-charon.service
+install -Dm644 /tmp/crake-charon.service "$root/usr/lib/systemd/system/crake-charon.service"
 install -Dm644 /src/packaging/software.dorhawk.Crake1.conf "$root/usr/share/dbus-1/system.d/software.dorhawk.Crake1.conf"
 install -Dm644 /src/packaging/software.dorhawk.crake.policy "$root/usr/share/polkit-1/actions/software.dorhawk.crake.policy"
 install -Dm644 /src/packaging/deb/craked.toml "$root/etc/crake/craked.toml"
 install -d "$root/etc/crake/managed.d"
 install -Dm644 /src/packaging/apparmor/usr.sbin.craked "$root/etc/apparmor.d/usr.sbin.craked"
+install -Dm644 /src/packaging/apparmor/crake-charon "$root/etc/apparmor.d/crake-charon"
 install -Dm644 /src/packaging/deb/crake.desktop "$root/usr/share/applications/software.dorhawk.crake.desktop"
 # The app icon (assets/icons/app: the bird in the grass), for the icon themes.
 install -Dm644 /src/assets/icons/app/crake.svg "$root/usr/share/icons/hicolor/scalable/apps/software.dorhawk.crake.svg"
@@ -61,7 +66,7 @@ shlibs=$(cd "$work" && dpkg-shlibdeps -O "$root/usr/bin/crake" "$root/usr/sbin/c
 install -d "$root/DEBIAN"
 sed -e "s/@VERSION@/$VERSION/" -e "s/@SHLIBS@/$shlibs/" /src/packaging/deb/control.in > "$root/DEBIAN/control"
 echo "Installed-Size: $(du -sk --exclude=DEBIAN "$root" | cut -f1)" >> "$root/DEBIAN/control"
-printf '/etc/crake/craked.toml\n/etc/apparmor.d/usr.sbin.craked\n' > "$root/DEBIAN/conffiles"
+printf '/etc/crake/craked.toml\n/etc/apparmor.d/usr.sbin.craked\n/etc/apparmor.d/crake-charon\n' > "$root/DEBIAN/conffiles"
 install -m755 /src/packaging/deb/postinst /src/packaging/deb/prerm /src/packaging/deb/postrm "$root/DEBIAN/"
 # The same tree for the RPM (scripts/build-rpm.sh): one build, two packages.
 rm -rf /out/root && cp -a "$root" /out/root && rm -rf /out/root/DEBIAN

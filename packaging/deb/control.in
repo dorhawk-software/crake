@@ -7,11 +7,12 @@ Priority: optional
 Homepage: https://dorhawk.software
 Depends: @SHLIBS@, nftables, iproute2, systemd-resolved | systemd (<< 252), polkitd | policykit-1, dbus, openconnect | openvpn3
 Recommends: openvpn, gnome-shell-extension-appindicator, gnome-keyring
-Suggests: openvpn3
+Suggests: openvpn3, strongswan-charon, strongswan-swanctl, libstrongswan-standard-plugins,
+ libcharon-extauth-plugins, libcharon-extra-plugins
 Description: VPN client that routes only what needs the tunnel
  Crake connects to AnyConnect-compatible gateways (and the other protocols
- openconnect speaks) and to OpenVPN profiles, routes nothing by default,
- and learns per host what needs a tunnel: a host that doesn't answer
- directly but answers through a tunnel is sent through just that tunnel.
- Several tunnels can be up side by side. Everything it decides happens on
- this computer; nothing is sent anywhere.
+ openconnect speaks), OpenVPN profiles and IPsec (IKEv2) gateways, routes
+ nothing by default, and learns per host what needs a tunnel: a host that
+ doesn't answer directly but answers through a tunnel is sent through just
+ that tunnel. Several tunnels can be up side by side. Everything it decides
+ happens on this computer; nothing is sent anywhere.

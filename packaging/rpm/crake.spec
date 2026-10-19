@@ -22,19 +22,25 @@ Recommends:     openvpn
 Recommends:     gnome-shell-extension-appindicator
 Recommends:     gnome-keyring
 Suggests:       openvpn3
+# IPsec (IKEv2) tunnels: craked's charon (its unit, crake-charon.service).
+# Fedora's strongswan service is off until someone enables it.
+Recommends:     strongswan
 
 %description
 Crake connects to AnyConnect-compatible gateways (and the other protocols
-openconnect speaks) and to OpenVPN 3 profiles, routes nothing by default,
-and learns per host what needs a tunnel: a host that doesn't answer
-directly but answers through a tunnel is sent through just that tunnel.
-Several tunnels can be up side by side. Everything it decides happens on
-this computer; nothing is sent anywhere.
+openconnect speaks), OpenVPN profiles and IPsec (IKEv2) gateways, routes
+nothing by default, and learns per host what needs a tunnel: a host that
+doesn't answer directly but answers through a tunnel is sent through just
+that tunnel. Several tunnels can be up side by side. Everything it decides
+happens on this computer; nothing is sent anywhere.
 
 %install
 cp -a %{crake_root}/. %{buildroot}/
 # Fedora confines services with SELinux, not AppArmor.
 rm -rf %{buildroot}/etc/apparmor.d
+# Fedora's charon, where Debian's is in the staged unit.
+sed -i 's#/usr/lib/ipsec/charon#/usr/libexec/strongswan/charon#' \
+    %{buildroot}/usr/lib/systemd/system/crake-charon.service
 
 %post
 if [ -d /run/systemd/system ]; then
@@ -69,6 +75,7 @@ fi
 /usr/sbin/craked
 /usr/libexec/crake
 /usr/lib/systemd/system/craked.service
+/usr/lib/systemd/system/crake-charon.service
 /usr/share/dbus-1/system.d/software.dorhawk.Crake1.conf
 /usr/share/polkit-1/actions/software.dorhawk.crake.policy
 /usr/share/applications/software.dorhawk.crake.desktop

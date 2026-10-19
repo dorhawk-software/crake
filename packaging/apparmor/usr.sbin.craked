@@ -2,7 +2,8 @@
 # /etc/apparmor.d/usr.sbin.craked). craked runs as root and reads what the
 # network sends (DNS answers, connection events), so it gets only what it
 # needs: its own files, netlink (routes, nftables, the DNS queue,
-# conntrack), its D-Bus name and the calls it makes (resolved, polkit), ip,
+# conntrack), its D-Bus name and the calls it makes (resolved, polkit,
+# systemd for IPsec's charon), ip,
 # nft and ss, and openconnect and openvpn with the hook they run.
 # Tested enforced by scripts/vm-test.sh.
 
@@ -61,6 +62,14 @@ profile craked /usr/sbin/craked flags=(attach_disconnected) {
   # resolved telling its clients what changed (zbus listens for it).
   dbus receive bus=system path=/org/freedesktop/resolve1
        interface=org.freedesktop.DBus.Properties member=PropertiesChanged,
+  # IPsec's charon runs as its own unit (crake-charon.service), which
+  # craked starts, looks at and stops through systemd.
+  dbus send bus=system path=/org/freedesktop/systemd1
+       interface=org.freedesktop.systemd1.Manager member={RestartUnit,StopUnit,GetUnit}
+       peer=(name=org.freedesktop.systemd1),
+  dbus send bus=system path=/org/freedesktop/systemd1/unit/crake_2dcharon_2eservice
+       interface=org.freedesktop.DBus.Properties member=Get
+       peer=(name=org.freedesktop.systemd1),
   dbus send bus=system path=/org/freedesktop/PolicyKit1/Authority
        interface=org.freedesktop.PolicyKit1.Authority member=CheckAuthorization
        peer=(name=org.freedesktop.PolicyKit1),

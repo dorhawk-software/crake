@@ -1,0 +1,58 @@
+# AppArmor profile for Crake's IPsec engine, strongSwan's charon run as
+# crake-charon.service (installed as /etc/apparmor.d/crake-charon). A
+# named profile with no path of its own: the unit asks for it
+# (AppArmorProfile=), so the distribution's profile for charon's path,
+# which allows /etc/strongswan* and /run/charon.* only, doesn't apply.
+# What charon needs as Crake runs it: its settings and vici socket in
+# /run/crake/ipsec (craked's), the kernel's IPsec (netlink, XFRM), IKE's
+# UDP, its pid file in the unit's own /run, and the hook it runs as
+# updown, through /bin/sh, which talks to craked's socket.
+# Tested enforced by scripts/vm-test.sh.
+
+abi <abi/3.0>,
+
+include <tunables/global>
+
+profile crake-charon flags=(attach_disconnected) {
+  include <abstractions/base>
+  include <abstractions/nameservice>
+  include <abstractions/openssl>
+  include <abstractions/p11-kit>
+
+  # As the unit allows (crake-charon.service).
+  capability net_admin,
+  capability net_raw,
+  capability ipc_lock,
+
+  network inet dgram,
+  network inet6 dgram,
+  network inet raw,
+  network inet6 raw,
+  network netlink raw,
+  # The kernel's IPsec (XFRM) over netlink.
+  network netlink dgram,
+  network unix stream,
+
+  # charon, its libraries and plugins (Debian's and Ubuntu's paths; where
+  # else AppArmor runs, the others).
+  /usr/lib/ipsec/charon rmix,
+  /usr/lib/ipsec/** mr,
+  /usr/lib{,exec}/strongswan/charon rmix,
+  /usr/lib{,exec}/strongswan/** mr,
+  /etc/strongswan.d/ r,
+  /etc/strongswan.d/** r,
+
+  # craked's settings for it and its vici socket.
+  /run/crake/ipsec/ r,
+  /run/crake/ipsec/** rw,
+  # Its pid file, in the unit's own /run.
+  /run/charon.* rw,
+
+  /proc/sys/net/core/xfrm_acq_expires w,
+  @{PROC}/@{pid}/fd/ r,
+
+  # updown: the hook, through /bin/sh, telling craked the tunnel is up.
+  /{usr/,}bin/{,da}sh ix,
+  /usr/libexec/crake/hook ix,
+  /run/crake/hook.sock rw,
+}

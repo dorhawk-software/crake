@@ -190,7 +190,7 @@ impl Manager {
     async fn charon_socket(&self) -> Result<PathBuf> {
         let mut charon = self.charon.lock().await;
         if let Some(c) = charon.as_mut()
-            && c.running()
+            && c.running().await
         {
             return Ok(c.socket.clone());
         }
@@ -198,7 +198,7 @@ impl Manager {
             || self.cfg.state_path.with_file_name("ipsec"),
             |p| p.join("ipsec"),
         );
-        let c = Charon::start(&self.cfg.charon, &dir).await?;
+        let c = Charon::start(&self.cfg.charon, &dir, self.cfg.charon_unit.as_deref()).await?;
         let socket = c.socket.clone();
         *charon = Some(c);
         Ok(socket)

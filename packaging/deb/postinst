@@ -1,9 +1,11 @@
 #!/bin/sh
 set -e
 if [ "$1" = configure ]; then
-    # craked's AppArmor profile, in place before craked (re)starts.
+    # craked's AppArmor profiles (its own and IPsec charon's), in place
+    # before craked (re)starts.
     if aa-enabled --quiet 2>/dev/null; then
         apparmor_parser -r -T -W /etc/apparmor.d/usr.sbin.craked || true
+        apparmor_parser -r -T -W /etc/apparmor.d/crake-charon || true
     fi
     # D-Bus reads the new policy; systemd the new unit.
     if [ -d /run/systemd/system ]; then

@@ -23,6 +23,7 @@ fn config(dir: &std::path::Path) -> Config {
         openconnect: "/bin/false".into(),
         openvpn: "openvpn".into(),
         charon: "charon".into(),
+        charon_unit: None,
         log_path: dir.join("log"),
         state_path: dir.join("hosts.json"),
         learned_expiry_days: 7,

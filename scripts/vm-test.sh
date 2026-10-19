@@ -9,8 +9,8 @@
 #   scripts/vm-test.sh [--complain] [release]     # default 26.04; or fedora:44
 #                                                 # (the RPM, SELinux enforcing)
 #
-# --complain loads craked's profile in complain mode and lists what it
-# would have refused.
+# --complain loads craked's profiles (its own, its charon's) in complain
+# mode and lists what they would have refused.
 set -eu
 cd "$(dirname "$0")/.."
 COMPLAIN=

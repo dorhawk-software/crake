@@ -32,6 +32,7 @@ pub(crate) fn config(dir: &std::path::Path) -> Config {
         openconnect: "openconnect".into(),
         openvpn: "openvpn".into(),
         charon: "/usr/lib/ipsec/charon".into(),
+        charon_unit: None,
         log_path: dir.join("log"),
         state_path: dir.join("hosts.json"),
         learned_expiry_days: 7,

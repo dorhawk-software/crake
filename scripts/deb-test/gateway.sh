@@ -35,9 +35,9 @@ nsenter --net=/run/netns/gw ip addr add 198.51.100.10/24 dev lan
 nsenter --net=/run/netns/gw ip link set lan up
 nsenter --net=/run/netns/gw ip link add acme type dummy
 nsenter --net=/run/netns/gw ip link set acme up
-# 10.40.1.12: one only the OpenVPN phase tries (craked probes a host
-# again only after 10 minutes).
-for a in 10.40.0.2 10.40.1.10 10.40.1.11 10.40.1.12; do nsenter --net=/run/netns/gw ip addr add "$a/32" dev acme; done
+# 10.40.1.12 and .13: ones only the OpenVPN and IPsec phases try (craked
+# probes a host again only after 10 minutes).
+for a in 10.40.0.2 10.40.1.10 10.40.1.11 10.40.1.12 10.40.1.13; do nsenter --net=/run/netns/gw ip addr add "$a/32" dev acme; done
 nsenter --net=/run/netns/gw nft -f - <<'NFT'
 table ip lan {
   chain input {
@@ -64,3 +64,28 @@ cp ca.crt /tmp/openvpn-ca.crt
 # In the background, not --daemon (which never returned in the AppArmor VM).
 nsenter --net=/run/netns/gw openvpn --config /e2e/openvpn.conf > /tmp/openvpn-gw.log 2>&1 &
 nsenter --net=/run/netns/gw python3 /e2e/sso.py /run/openvpn-mgmt.sock 198.51.100.10 8080 /tmp/openvpn-seen >/dev/null 2>&1 &
+# IPsec's (IKEv2): strongSwan as the gateway (scripts/e2e/ipsec.conf), its
+# tunnel ending on ipsec0 (if_id 7), where the pool's replies go back
+# through. Its charon runs in this container's own /run, as a system
+# strongSwan would: craked's (crake-charon.service) has to start beside it.
+# A copy of charon, at a path no AppArmor profile names: on a computer
+# with strongSwan installed, the kernel attaches Ubuntu's charon profile
+# to /usr/lib/ipsec/charon in containers too, and it refuses this
+# gateway's settings (seen 2026-10-19). Still a system strongSwan to
+# Crake's: it holds this container's /run/charon.pid.
+for c in /usr/lib/ipsec/charon /usr/libexec/strongswan/charon /usr/lib/strongswan/charon; do
+    [ -x "$c" ] && cp "$c" /usr/local/sbin/gw-charon && break
+done
+charon=/usr/local/sbin/gw-charon
+# swanctl too (Ubuntu's profile for it allows /run/charon.vici only).
+cp "$(command -v swanctl)" /usr/local/sbin/gw-swanctl
+nsenter --net=/run/netns/gw ip link add ipsec0 type xfrm if_id 7
+nsenter --net=/run/netns/gw ip link set ipsec0 up
+nsenter --net=/run/netns/gw ip route add 10.40.9.0/24 dev ipsec0
+# Its vici socket named: each distribution builds in another place. Its
+# plugins named too: all of them, as without a list, would include
+# kernel-libipsec, which takes the gateway's traffic (ocserv went quiet).
+printf 'charon {\n  install_routes = no\n  install_virtual_ip = no\n  load = random nonce openssl aes sha1 sha2 hmac gmp kdf curve25519 pem pkcs1 pkcs8 x509 revocation constraints pubkey drbg kernel-netlink socket-default vici eap-identity eap-mschapv2\n  plugins {\n    vici {\n      socket = unix:///tmp/ipsec-gw.vici\n    }\n  }\n  filelog {\n    gw {\n      path = /tmp/ipsec-gw.log\n      default = 1\n    }\n  }\n}\n' > /tmp/ipsec-gw.conf
+STRONGSWAN_CONF=/tmp/ipsec-gw.conf nsenter --net=/run/netns/gw "$charon" >/dev/null 2>&1 &
+for _ in $(seq 1 50); do [ -S /tmp/ipsec-gw.vici ] && break; sleep 0.1; done
+gw-swanctl --load-all --uri unix:///tmp/ipsec-gw.vici --file /e2e/ipsec.conf > /tmp/ipsec-gw-load.log 2>&1
