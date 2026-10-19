@@ -316,8 +316,8 @@ impl SignIn {
         &self.stage
     }
 
-    /// Whose sign-in it is (journey tests).
-    #[cfg(test)]
+    /// Whose sign-in it is (the journeys, Linux's and Windows').
+    #[cfg(all(test, any(target_os = "linux", windows)))]
     pub(crate) fn tunnel(&self) -> &str {
         &self.spec.tunnel
     }
