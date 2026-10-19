@@ -193,7 +193,7 @@ impl NewTunnel {
                                     .text_color(t.muted),
                             )
                         })
-                        .when_some(asking, |d, since| d.child(crate::head::under_way(t.accent, since)))
+                        .when_some(asking, |d, since| d.child(crate::head::under_way(t.ink, since)))
                         .child(line),
                 )
             })

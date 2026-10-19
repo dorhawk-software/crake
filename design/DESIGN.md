@@ -86,7 +86,10 @@ One accent. Teal means **"Crake made a decision"**: the ticks, "Sent …
 through"; and with it the **on or chosen state** of a control (a switch, the
 Listening dot, a chosen filter or step card, "Recommended") and the **one
 primary action**. Never information: a path in a graph, an acknowledgement
-("Got it"), a confirmation ("Found a gateway" wears a plain check). Where
+("Got it"), a confirmation ("Found a gateway" wears a plain check), or
+something under way (the dashed head beside "Asking the gateway…" and
+"Saving the report…" is ink; the user, 2026-10-19: "teal is for
+decisions"). Where
 a way is told apart, it's by its name (the audit of 2026-10-17,
 design/proposals/audit-2026-10-17.html, settled this: the Traffic graph's
 teal paths had made teal mean "through a tunnel"). Two status colours,

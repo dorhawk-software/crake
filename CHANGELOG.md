@@ -13,6 +13,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 - **The seconds count where you'd expect.** "Asking the gateway…" and "Saving the report…" stay
   quiet for two seconds, then count from 3 s, the second you're in, not a 2 you've just sat through.
+  The bird beside "Asking the gateway…" is drawn in the text's colour now: teal is kept for what
+  Crake decided.
 
 ## 0.11.1 (2026-10-19)
 
