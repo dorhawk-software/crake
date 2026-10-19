@@ -1233,11 +1233,80 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    stage (the fake servers carry no traffic). A regression guard for
    sign-in, not proof against a company's real gateway (forms, ports,
    SAML through ADFS, host checks, EMS): those protocols stay Beta until
-   one is used. Array has no fake server. Not yet through Cloudflare for
-   the Mac and Windows (four more hostnames), nor a vendor's own virtual
-   appliance (FortiGate-VM's free evaluation would carry traffic; it needs
-   a Fortinet account of the user's, and FortiOS 7.4: 7.6.3 dropped the
-   SSL-VPN tunnel mode openconnect speaks, to check first).
+   one is used. Array has no fake server. Through Cloudflare on the Mac
+   and Windows too since 2026-10-19 (`e2e_protocols::each_protocols_sign_in`,
+   portable).
+   **A vendor's own appliance, FortiGate-VM (tried 2026-10-19, with the
+   user's FortiCloud account; `scripts/fortigate-vm.sh`, uncommitted
+   until it works):** the free "permanent trial" licence (one per
+   account, no expiry, 1 CPU, 2 GB, three interfaces/policies/routes,
+   **low encryption only**) is fetched from FortiCare inside the VM
+   (`execute vm-license-options account-id|account-password`, then
+   `execute vm-license`). FortiOS 7.4.12 (the only 7.4 a free account
+   may download: older builds need a support contract) can't fetch it
+   under qemu: its FortiGuard client fails before any connection
+   ("ssl_ctx_create_new: Falied in setting cipher list", "Failed creating
+   SSL struct"), with -cpu host, working DNS (qemu's 10.0.2.3, not
+   FortiGuard's 96.45.45.45) and TCP to Fortinet's servers proven;
+   `strong-crypto` doesn't exist unlicensed. And even licensed, a
+   low-encryption unit can't run SSL-VPN (a Fortinet article, 2020), and
+   7.6.3+ dropped the tunnel mode openconnect speaks: Crake over SSL-VPN
+   against a real FortiGate needs a full evaluation licence from
+   Fortinet's sales (not asked yet: the user, 2026-10-19). 8.0.1, tried
+   for the FortiClient side only (7f's "adopt FortiClient's interface":
+   the gateway's protocol doesn't matter there; its limits no longer say
+   low encryption), gets past the cipher error but still can't fetch the
+   licence: "Requesting FortiCare Trial license" then "Failed to download
+   VM license", nothing more with `diagnose debug application
+   forticldd|update -1`, though DNS works and TCP 443 to
+   forticare.fortinet.com connects (ping never does on qemu's user
+   network). The web page's licence dialog said why: FortiCare error 61,
+   "Invalid serial number", for FGVMEV0000000000: qemu gives a VM an
+   all-zero SMBIOS UUID unless told, and FortiCare refuses a unit
+   without one. With `-uuid` (made once, kept in target/vm/fortigate/
+   uuid: the licence is bound to the unit) **8.0.1 is licensed**
+   (2026-10-19, the user's account; serial FGVMEV_ plus letters, "License
+   Status: Valid"). Its trial says low encryption only, yet IPsec IKEv2
+   offers every strong proposal (AES-CBC and GCM 128-256, ChaCha20-
+   Poly1305, SHA-256 to 512): FortiClient can connect to it, and so could
+   strongSwan. 7.4.12 booted as the same unit (`fortigate-vm.sh console
+   7.4`: its own disk, the same UUID) took the same licence, so its
+   cipher-list error had been the zero UUID too; but SSL-VPN never runs
+   on the trial: `config vpn ssl settings` says enabled and accepts a
+   tunnel portal, user, policy and port 10443, yet `diagnose sys process
+   pidof sslvpnd` is empty and nothing listens (low encryption, as the
+   2020 article says). So openconnect's Fortinet SSL-VPN against a real
+   FortiGate still needs a full evaluation; the trial serves IPsec (8.0).
+   FortiClient for Linux does IPsec only under EMS (Fortinet's admin
+   guide), so 7f's "ride on FortiClient" can't be tried against it on
+   Linux; on Windows it could (the free client does IKEv2 there).
+   **strongSwan against it, proven by hand (2026-10-19)**, the first step
+   of Crake's own IPsec engine (decided with the user: before FortiClient):
+   `fortigate-vm.sh console` gives the FortiGate a second card, port2
+   (192.0.2.1), whose only cable is a socket file to `fortigate-vm.sh
+   client`, a throwaway Ubuntu 26.04 VM that installs strongSwan from the
+   archive inside itself (`scripts/fortigate-client/`: acme.conf, run.sh)
+   and reports CLIENT-RESULT. The FortiGate's side, pasted into its
+   console: port2 static; a phase1-interface `acme` (type dynamic, IKEv2,
+   peertype any, mode-cfg with 10.40.9.10-20, a pre-shared key, aes256-
+   sha256, DH 19: 8.0 warns that 14 is insecure); a phase2 with the same;
+   10.40.0.1/32 on the tunnel's interface with ping (the host only the
+   tunnel reaches); and one firewall policy from `acme` (FortiOS answers
+   a dial-up gateway that no policy uses with NO_PROPOSAL_CHOSEN, its log
+   saying "ignoring IKEv2 request, no policy configured"). The client got
+   10.40.9.10, an ESP SA (AES-256, no PFS: strongSwan offered no group
+   for ESP and the FortiGate took it) for 10.40.0.0/16, and 10.40.0.1
+   answered through it only. Next: a DNS server on the FortiGate for
+   acme.internal ("mode-cfg IPv4 DNS ignored, no IPv4 DNS servers
+   found"), EAP sign-in with a user (as FortiClient signs in), then the
+   engine in craked: charon driven over vici, an XFRM interface per
+   tunnel (`if_id`) so the nftables sets and fwmark routing apply as
+   they are, the CP payload's address, DNS and split networks handed to
+   `tunnel_up` as the hook's are. Other systems, to find out once Linux
+   works: macOS (Homebrew's strongSwan uses PF_KEY policies, no tunnel
+   device, so a host would be an IPsec policy rather than a route; or
+   Apple's IKEv2, which needs a Network Extension) and Windows (its own
+   IKEv2 client makes an adapter Crake could route through).
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or
    Windows problem without a colleague's machine):** `.github/workflows/
    doctor.yml`, started by hand (system, tunnel anyconnect/openvpn/none,
@@ -1251,7 +1320,13 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    pinned by commit, `limit-access-to-actor`: the starter's GitHub SSH
    keys only; detached, so the snapshots go on). The Mac builds the
    branch; Windows takes main's latest green CI installer and tests. CI's
-   and the Doctor's gateways jobs share one concurrency group. Its first
+   and the Doctor's gateways jobs share one concurrency group (the one
+   tunnel), so a run's gateways may queue behind another's: the Mac and
+   Windows jobs follow their gateways job's state rather than a fixed
+   wait (2026-10-19: main's queued 20 minutes behind a run started by
+   hand while they gave up at 10); GitHub keeps one queued job per group,
+   so a newer one cancels the one queued before it, which a branch skips
+   with a warning and main fails (ci-through-cloudflare.sh). Its first
    run (macOS, AnyConnect) found pf left on with Crake's NAT rule after
    the tunnel was off and craked gone (macOS `down` gave up at the first
    route a gone utun refused; fixed, and the gateway tests check the
