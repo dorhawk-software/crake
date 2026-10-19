@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.11.0 (2026-10-19)
+
 - **Crake runs OpenVPN profiles itself.** Import the .ovpn file your IT team gave you (New
   tunnel, beside Gateway): Crake picks OpenVPN, takes the gateway and a name from the file, and
   keeps its own copy, which only its service can read. Signing in through your browser, with a
