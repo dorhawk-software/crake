@@ -11,6 +11,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Everything stays on a small screen.** On a 1366×768 laptop, Settings ran off the bottom of the
+  screen, the panel's footer went missing once there were four tunnels, and a gateway's long list
+  of groups pushed Cancel out of the sign-in window. Each now fits its screen and scrolls what
+  doesn't fit, with its buttons kept in view; New tunnel's dropdowns scroll too.
+
 - **Crake's notifications carry the bird.** They name Crake's icon and its desktop entry, so the
   desktop shows them with Crake's icon and files them under Crake, as other apps' are.
 

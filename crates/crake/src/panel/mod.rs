@@ -41,6 +41,8 @@ const SECTION: f32 = 44.;
 const DECISION: f32 = 66.;
 const TUNNEL: f32 = 62.;
 const FOOTER: f32 = 72.;
+/// The scrolling middle's least height, however small the screen.
+const MIDDLE_LEAST: f32 = 240.;
 /// No tunnel yet: the bird, a sentence and the button.
 const FIRST_RUN: f32 = 270.;
 /// Motion (CLAUDE.md, 7c): the panel opens rising RISE px over OPENS ms; a
@@ -181,13 +183,25 @@ impl Render for Panel {
         if reachable && model.tunnels.is_empty() {
             panel = panel.child(self.first_run(&t, window, cx));
         } else if reachable {
+            // Never taller than its screen: what's between the header and
+            // the footer scrolls, so the footer stays in view (four tunnels
+            // pushed it off a 1366x768 screen, 2026-10-19).
+            let middle = (crate::place::max_window_height() - HEADER - FOOTER).max(MIDDLE_LEAST);
             panel = panel
-                .children(self.version_notice(model, &t, cx))
-                .children(self.leftover_notices(model, &t, cx))
-                .children(self.staying_notices(model, &t, cx))
-                .child(self.chart(model, &t, window, cx))
-                .child(self.decisions(model, &t, window, cx))
-                .child(self.tunnels(model, &t, cx))
+                .child(
+                    div()
+                        .id("panel-middle")
+                        .flex()
+                        .flex_col()
+                        .max_h(px(middle))
+                        .overflow_y_scroll()
+                        .children(self.version_notice(model, &t, cx))
+                        .children(self.leftover_notices(model, &t, cx))
+                        .children(self.staying_notices(model, &t, cx))
+                        .child(self.chart(model, &t, window, cx))
+                        .child(self.decisions(model, &t, window, cx))
+                        .child(self.tunnels(model, &t, cx)),
+                )
                 .child(self.footer(model, &t, cx));
         } else {
             panel = panel.child(not_running(model, &t, cx));
@@ -466,7 +480,9 @@ impl Panel {
         }
         let decisions = model.decisions(DECISIONS).len().max(1) as f32;
         let tunnels = model.tunnels.len().max(1) as f32;
-        HEADER + CHART + SECTION + decisions * DECISION + SECTION + tunnels * TUNNEL + FOOTER
+        let middle = CHART + SECTION + decisions * DECISION + SECTION + tunnels * TUNNEL;
+        let room = (crate::place::max_window_height() - HEADER - FOOTER).max(MIDDLE_LEAST);
+        HEADER + middle.min(room) + FOOTER
     }
 
     fn send(&self, r: Request) {

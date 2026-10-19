@@ -250,8 +250,32 @@ impl Render for SignIn {
             .on_mouse_down(gpui_kit::MouseButton::Left, |_, window, _| {
                 window.start_window_move()
             })
-            .child(card.child(fit_window()))
+            .child(
+                // Never past its screen's bottom: a gateway's long list of
+                // groups, or a long error, scrolls inside the card instead
+                // (Cancel and Try again had gone below a 768 px screen,
+                // 2026-10-19).
+                card.id("sign-in-card")
+                    .max_h(px(room(window)))
+                    .overflow_y_scroll()
+                    .child(fit_window()),
+            )
     }
+}
+
+/// Least room below the window's top, and what's kept clear above the
+/// screen's bottom edge (a bottom bar's place).
+const ROOM_LEAST: f32 = 240.;
+const SCREEN_BOTTOM: f32 = 56.;
+
+/// The card's tallest: from where the window is down to its screen's bottom.
+fn room(window: &Window) -> f32 {
+    let top = f32::from(window.bounds().origin.y);
+    crate::place::monitors()
+        .first()
+        .map_or_else(crate::place::max_window_height, |m| {
+            (m.y + m.h - top - SCREEN_BOTTOM).max(ROOM_LEAST)
+        })
 }
 
 /// The window follows the card's height (it grows and shrinks downward).

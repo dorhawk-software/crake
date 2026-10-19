@@ -250,7 +250,10 @@ pub(super) fn open_settings(cx: &mut App) {
         Ok(v) if v.starts_with("settings:diagnostics") => settings_view::Section::Diagnostics,
         _ => settings_view::Section::Tunnels,
     };
-    let bounds = centered(settings_view::WIDTH, settings_view::HEIGHT, cx);
+    // Never taller than its screen (a 1366x768 laptop cut 52 px off, 2026-10-19):
+    // the main column scrolls.
+    let height = settings_view::HEIGHT.min(place::max_window_height());
+    let bounds = centered(settings_view::WIDTH, height, cx);
     // Like the log: a transparent window, the card draws its 12 px frame.
     let opened = cx.open_window(
         WindowOptions {

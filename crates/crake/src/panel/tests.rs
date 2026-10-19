@@ -498,3 +498,21 @@ fn a_tunnel_staying_on_openvpn3_says_what_to_do(cx: &mut TestAppContext) {
     }
     assert!(!w.shows_element(("staying", 0usize), cx), "not now: hidden");
 }
+
+/// Never taller than its screen, however many tunnels: what's between the
+/// header and the footer scrolls (four tunnels pushed the footer off a
+/// 1366x768 screen, 2026-10-19). With no screen known, a laptop's.
+#[test]
+fn many_tunnels_keep_the_panel_on_its_screen() {
+    let mut m = crate::model::demo();
+    let one = m.tunnels[0].clone();
+    for i in 0..20 {
+        let mut t = one.clone();
+        t.name = format!("t{i}");
+        m.tunnels.push(t);
+    }
+    assert!(Panel::height(&m) <= crate::place::max_window_height() + 1.);
+    // A few tunnels still get the panel's own height, below the cap.
+    let few = crate::model::demo();
+    assert!(Panel::height(&few) < Panel::height(&m));
+}

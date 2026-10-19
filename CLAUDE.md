@@ -1555,6 +1555,21 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   tests included (they no longer set the environment: fake scripts get
   their paths written in). Not yet: unit tests of crake-os's Windows and
   macOS parts on their CI runners beyond what the journeys exercise.
+- **Small screens (audit 2026-10-19, the user's question; fixed then:
+  Settings capped to its screen, the panel's middle scrolls with its
+  header and footer fixed, the sign-in card stops at its screen's bottom
+  and scrolls, New tunnel's dropdowns scroll; `panel::tests::
+  many_tunnels_keep_the_panel_on_its_screen`).** Not yet: tunnel detail
+  builds every host row at once and puts "Add a host" after them (fine
+  on screen, slow and far down with hundreds of hosts: `uniform_list`,
+  and "Add a host" above the list, a design question); no window but the
+  profile editor can be resized (`is_resizable: false`); the room left
+  for bars is a fixed 120 px off the primary monitor, not the work area
+  of the monitor the window opens on (X11's work area was unreliable
+  across monitors, place.rs); Traffic and the profile editor open as
+  tall as a big screen allows (`max_window_height_or` ignores its
+  fallback when a monitor is known); the panel's scrolling middle shows
+  no sign it scrolls but its cut-off last row.
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with

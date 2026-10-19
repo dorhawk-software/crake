@@ -50,9 +50,14 @@ impl NewTunnel {
                 .test_support(),
         );
         if open {
+            // A long list (a gateway's groups, OpenVPN 3's profiles)
+            // scrolls rather than running past the window's edge.
             let mut menu = div()
+                .id((id, usize::MAX))
                 .absolute()
                 .top(px(46.))
+                .max_h(px(MENU_TALLEST))
+                .overflow_y_scroll()
                 .left_0()
                 .min_w(px(180.))
                 .py(px(4.))
@@ -86,6 +91,9 @@ impl NewTunnel {
         picker
     }
 }
+
+/// A dropdown's tallest: about seven rows.
+const MENU_TALLEST: f32 = 240.;
 
 pub(super) fn heading(text: &'static str) -> impl IntoElement {
     div()
