@@ -132,12 +132,35 @@ const OPENVPN_PREFIXES: &[&str] = &[
     "tun_mtu",
 ];
 
+/// What strongSwan's updown gives its script that craked reads
+/// (`craked::ipsec::env`).
+const STRONGSWAN_PREFIXES: &[&str] = &["PLUTO_"];
+
+/// Set by strongSwan's updown for its script: `up-client`, `down-client`, ...
+pub const STRONGSWAN_VERB: &str = "PLUTO_VERB";
+
+/// The hook's reason for one of strongSwan's updown calls, in openconnect's
+/// words: the tunnel's SA up (`up-client`, `up-host`, their IPv6 forms) is a
+/// connect, down a disconnect.
+pub fn strongswan_reason(verb: &str) -> &'static str {
+    if verb.starts_with("up-") {
+        "connect"
+    } else if verb.starts_with("down-") {
+        "disconnect"
+    } else {
+        "other"
+    }
+}
+
 /// Keep only the variables openconnect documents for its script, or, when
-/// openvpn runs it (it sets `script_type`), openvpn's.
+/// openvpn runs it (it sets `script_type`), openvpn's, or strongSwan's when
+/// its updown does (`PLUTO_VERB`).
 pub fn collect_env(vars: impl IntoIterator<Item = (String, String)>) -> BTreeMap<String, String> {
     let vars: Vec<(String, String)> = vars.into_iter().collect();
     let prefixes = if vars.iter().any(|(k, _)| k == OPENVPN_SCRIPT_TYPE) {
         OPENVPN_PREFIXES
+    } else if vars.iter().any(|(k, _)| k == STRONGSWAN_VERB) {
+        STRONGSWAN_PREFIXES
     } else {
         ENV_PREFIXES
     };
@@ -354,6 +377,31 @@ mod tests {
         assert_eq!(openvpn_reason("down", "restart"), "attempt-reconnect");
         assert_eq!(openvpn_reason("down", "init"), "disconnect");
         assert_eq!(openvpn_reason("route-up", "init"), "other");
+    }
+
+    #[test]
+    fn strongswans_updown_calls_in_openconnects_words() {
+        assert_eq!(strongswan_reason("up-client"), "connect");
+        assert_eq!(strongswan_reason("up-client-v6"), "connect");
+        assert_eq!(strongswan_reason("down-client"), "disconnect");
+        assert_eq!(strongswan_reason("prepare-client"), "other");
+    }
+
+    #[test]
+    fn strongswans_variables_are_kept_when_its_updown_calls() {
+        let vars = [
+            ("PLUTO_VERB", "up-client"),
+            ("PLUTO_MY_SOURCEIP", "10.40.9.10"),
+            ("PLUTO_DNS4_1", "10.40.0.2"),
+            ("PATH", "/usr/bin"),
+            ("TUNDEV", "x"),
+        ]
+        .map(|(k, v)| (k.to_owned(), v.to_owned()));
+        let kept = collect_env(vars);
+        assert_eq!(
+            kept.keys().collect::<Vec<_>>(),
+            ["PLUTO_DNS4_1", "PLUTO_MY_SOURCEIP", "PLUTO_VERB"]
+        );
     }
 
     #[test]

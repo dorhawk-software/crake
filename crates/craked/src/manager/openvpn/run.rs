@@ -325,7 +325,7 @@ impl Manager {
     }
 
     /// A question for the user, shown by the app's sign-in window.
-    fn ask(
+    pub(in crate::manager) fn ask(
         &self,
         name: &str,
         ask: (AskKind, String, Option<String>, bool),
@@ -348,7 +348,7 @@ impl Manager {
     }
 
     /// Nothing more to ask.
-    fn asked(&self, name: &str) {
+    pub(in crate::manager) fn asked(&self, name: &str) {
         let had = self
             .tunnels
             .lock()

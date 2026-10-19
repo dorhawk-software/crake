@@ -57,6 +57,21 @@ impl Manager {
             tokio::spawn(async move { this.supervise_openvpn(config, stop_rx).await });
             return Ok(());
         }
+        if config.protocol == crate::config::Protocol::Ipsec {
+            #[cfg(target_os = "linux")]
+            tokio::spawn(async move { this.supervise_ipsec(config, stop_rx).await });
+            #[cfg(not(target_os = "linux"))]
+            {
+                drop(stop_rx);
+                self.set_state(name, TunnelState::Off, false);
+                if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
+                    e.running = false;
+                    e.stop = None;
+                }
+                bail!("IPsec tunnels aren\u{2019}t built for this system yet.");
+            }
+            return Ok(());
+        }
         tokio::spawn(async move { this.supervise(config, session, stop_rx).await });
         Ok(())
     }
@@ -133,6 +148,8 @@ impl Manager {
             }
             tokio::time::sleep(POLL).await;
         }
+        #[cfg(target_os = "linux")]
+        self.stop_charon().await;
         // Leave nothing behind: Crake off is Crake gone. Its own nftables
         // table, policy rules and routing tables (OpenVPN 3 sessions, which
         // outlive craked, included) and its dummy links.
@@ -279,6 +296,15 @@ impl Manager {
                             p.fill(&mut env);
                         }
                         crate::openvpn::env::info(&env)?
+                    }
+                    crate::config::Protocol::Ipsec => {
+                        // charon calls updown once per pair of traffic
+                        // selectors, and again when it signs in anew: one
+                        // tunnel coming up once.
+                        if state == TunnelState::Connected {
+                            return Ok(());
+                        }
+                        crate::ipsec::env::info(&msg.env, &interface_name(name))?
                     }
                     _ => TunnelInfo::from_env(&msg.env)?,
                 };

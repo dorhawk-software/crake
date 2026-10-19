@@ -116,6 +116,7 @@ async fn an_openvpn_tunnel_on_this_mac() {
         hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
         hook_socket: dir.path().join("hook.sock"),
         openvpn: openvpn(),
+        charon: "charon".into(),
         log_path: dir.path().join("log"),
         state_path: dir.path().join("hosts.json"),
         probing: false,

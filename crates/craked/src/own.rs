@@ -83,6 +83,11 @@ pub struct OwnTunnel {
     /// For "only what I list": names ("*.nordbank.example") and networks.
     #[serde(default)]
     pub list: Vec<String>,
+    /// Domains whose names belong to it, on top of what its gateway hands
+    /// over: an IPsec gateway's can't reach Crake (strongSwan passes on no
+    /// INTERNAL_DNS_DOMAIN), so whoever sets it up names them.
+    #[serde(default)]
+    pub domains: Vec<String>,
     /// Forget learned hosts unused for this many days: None for the
     /// Settings value, Some(None) never.
     #[serde(default)]
@@ -154,6 +159,19 @@ impl OwnTunnel {
                 bail!("{item:?} is neither a name nor a network.");
             }
         }
+        let mut domains: Vec<String> = Vec::new();
+        for d in get("domains").unwrap_or("").split([',', '\n', ' ']) {
+            let d = crate::dns::normalize(d.trim());
+            if d.is_empty() {
+                continue;
+            }
+            if !crate::dns::valid_domain(&d) {
+                bail!("{d:?} isn't a domain, like acme.internal.");
+            }
+            if !domains.contains(&d) {
+                domains.push(d);
+            }
+        }
         let forget_after_days = match get("forget_after_days") {
             None => None,
             Some("never") => Some(None),
@@ -173,6 +191,7 @@ impl OwnTunnel {
             certificate: safe("certificate")?,
             mode,
             list,
+            domains,
             forget_after_days,
             weak_ciphers: flag("weak_ciphers"),
             client_version: flag("client_version"),
@@ -195,6 +214,7 @@ impl OwnTunnel {
         );
         m.insert("mode".into(), self.mode.as_str().into());
         m.insert("list".into(), self.list.join("\n"));
+        m.insert("domains".into(), self.domains.join("\n"));
         m.insert(
             "forget_after_days".into(),
             match self.forget_after_days {
@@ -259,7 +279,7 @@ impl OwnTunnel {
                 .clone()
                 .filter(|_| self.sign_in == SignIn::Password),
             passwd_file: None,
-            dns_domains: Vec::new(),
+            dns_domains: self.domains.clone(),
             auth_args,
             extra_args,
             profile: None,
@@ -328,6 +348,29 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect()
+    }
+
+    #[test]
+    fn an_ipsec_tunnel_names_its_domains() {
+        let t = OwnTunnel::from_map(
+            "acme",
+            &map(&[
+                ("display_name", "ACME"),
+                ("gateway", "vpn.acme.example"),
+                ("protocol", "ipsec"),
+                ("domains", "ACME.internal, acme.example\nacme.internal"),
+            ]),
+        )
+        .unwrap();
+        assert_eq!(t.protocol, Protocol::Ipsec);
+        assert_eq!(t.to_config().dns_domains, ["acme.internal", "acme.example"]);
+        assert_eq!(t.to_map()["domains"], "acme.internal\nacme.example");
+        let bad = map(&[
+            ("display_name", "ACME"),
+            ("gateway", "vpn.acme.example"),
+            ("domains", "not a domain!"),
+        ]);
+        assert!(OwnTunnel::from_map("acme", &bad).is_err());
     }
 
     #[test]

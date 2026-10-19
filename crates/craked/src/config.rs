@@ -34,6 +34,9 @@ pub struct Config {
     pub openconnect: PathBuf,
     #[serde(default = "default_openvpn")]
     pub openvpn: PathBuf,
+    /// strongSwan's charon, for IPsec tunnels (`crate::ipsec::charon`).
+    #[serde(default = "default_charon")]
+    pub charon: PathBuf,
     /// Append-only JSON lines.
     #[serde(default = "default_log_path")]
     pub log_path: PathBuf,
@@ -85,6 +88,8 @@ pub enum Protocol {
     /// A profile craked runs with the `openvpn` program (`crate::openvpn`;
     /// the gateway field is the gateway it names).
     Openvpn,
+    /// IPsec (IKEv2), with craked's own strongSwan charon (`crate::ipsec`).
+    Ipsec,
 }
 
 impl std::str::FromStr for Protocol {
@@ -101,6 +106,7 @@ impl std::str::FromStr for Protocol {
             "array" => Self::Array,
             "openvpn3" => Self::Openvpn3,
             "openvpn" => Self::Openvpn,
+            "ipsec" => Self::Ipsec,
             other => bail!("{other:?} isn't a protocol Crake speaks"),
         })
     }
@@ -118,6 +124,7 @@ impl Protocol {
             Self::Array => "array",
             Self::Openvpn3 => "openvpn3",
             Self::Openvpn => "openvpn",
+            Self::Ipsec => "ipsec",
         }
     }
 }
@@ -275,6 +282,7 @@ impl Default for Config {
             hook_socket: default_hook_socket(),
             openconnect: default_openconnect(),
             openvpn: default_openvpn(),
+            charon: default_charon(),
             log_path: default_log_path(),
             state_path: default_state_path(),
             learned_expiry_days: default_expiry_days(),
@@ -337,6 +345,19 @@ fn default_openvpn() -> PathBuf {
         return found;
     }
     "openvpn".into()
+}
+/// Where each distribution puts strongSwan's charon: Debian and Ubuntu,
+/// Fedora, Arch. The first that's there; Debian's when none is.
+fn default_charon() -> PathBuf {
+    [
+        "/usr/lib/ipsec/charon",
+        "/usr/libexec/strongswan/charon",
+        "/usr/lib/strongswan/charon",
+    ]
+    .iter()
+    .map(PathBuf::from)
+    .find(|p| p.exists())
+    .unwrap_or_else(|| "/usr/lib/ipsec/charon".into())
 }
 fn default_log_path() -> PathBuf {
     PathBuf::from(STATE_DIR).join("log")

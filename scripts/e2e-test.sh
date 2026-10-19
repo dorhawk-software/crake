@@ -35,4 +35,4 @@ docker run -d --rm --name "$GW" --network none --cap-add NET_ADMIN --device /dev
 docker run --rm --network none --cap-add NET_ADMIN --device /dev/net/tun \
   -v /:/host:ro -v "$WORK/tmp:/host/mnt" -v "$WORK/link:/link" -v "$WORK/link:/host/mnt/link:ro" --tmpfs /host/run \
   crake-e2e-gateway sh /client.sh env CRAKE_E2E_HOOK="$HOOK" LLVM_PROFILE_FILE=/dev/null \
-  env ${CRAKE_JOURNEY_DEBUG:+CRAKE_JOURNEY_DEBUG=$CRAKE_JOURNEY_DEBUG} ${CRAKE_DEBUG:+CRAKE_DEBUG=$CRAKE_DEBUG} "$BIN" e2e_tests e2e_openvpn e2e_protocols journey_tests --test-threads=1 --nocapture "$@"
+  env ${CRAKE_JOURNEY_DEBUG:+CRAKE_JOURNEY_DEBUG=$CRAKE_JOURNEY_DEBUG} ${CRAKE_DEBUG:+CRAKE_DEBUG=$CRAKE_DEBUG} "$BIN" e2e_tests e2e_openvpn e2e_ipsec e2e_protocols journey_tests --test-threads=1 --nocapture "$@"

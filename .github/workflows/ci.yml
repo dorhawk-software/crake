@@ -38,6 +38,7 @@ env:
     libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
     libfontconfig-dev libfreetype-dev libvulkan-dev
     openconnect openvpn nftables iproute2
+    strongswan-charon strongswan-swanctl libcharon-extauth-plugins libcharon-extra-plugins
 
 jobs:
   check:

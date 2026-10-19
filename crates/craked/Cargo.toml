@@ -40,6 +40,9 @@ base64 = "0.23"
 # Linux only: answers held in NFQUEUE until their addresses are routed.
 [target.'cfg(target_os = "linux")'.dependencies]
 nfq-updated = "0.2.6"
+# IPsec: craked's charon, driven over vici (`ipsec`).
+rsvici = "0.1.5"
+futures-util = { version = "0.3", default-features = false }
 
 # Windows: the service, openconnect's console, the console session.
 [target.'cfg(windows)'.dependencies]

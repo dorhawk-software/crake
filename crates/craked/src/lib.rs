@@ -10,6 +10,7 @@ pub mod hook_server;
 pub mod hosts;
 pub mod hush;
 pub mod info;
+pub mod ipsec;
 pub mod keep;
 pub mod log;
 pub mod manager;

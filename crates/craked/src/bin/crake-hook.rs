@@ -1,4 +1,4 @@
-//! openconnect's `--script` (and openvpn's `--up`/`--down`). Forwards the call and its environment to `craked`
+//! openconnect's `--script` (and openvpn's `--up`/`--down`, strongSwan's updown). Forwards the call and its environment to `craked`
 //! over a Unix socket (Windows: a named pipe) and waits for the answer, so openconnect doesn't carry on
 //! before the address is set. Std only, no async runtime.
 // Unsafe code lives in crake-os alone.
@@ -9,7 +9,7 @@ use std::process::ExitCode;
 
 use crake_proto::{
     DEFAULT_HOOK_SOCKET, ENV_SOCKET, ENV_TUNNEL, HookMessage, HookReply, OPENVPN_SCRIPT_TYPE,
-    collect_env, openvpn_reason,
+    STRONGSWAN_VERB, collect_env, openvpn_reason, strongswan_reason,
 };
 
 fn main() -> ExitCode {
@@ -18,7 +18,10 @@ fn main() -> ExitCode {
             let context = std::env::var("script_context").unwrap_or_default();
             openvpn_reason(&script, &context).to_owned()
         }
-        Err(_) => std::env::var("reason").unwrap_or_default(),
+        Err(_) => match std::env::var(STRONGSWAN_VERB) {
+            Ok(verb) => strongswan_reason(&verb).to_owned(),
+            Err(_) => std::env::var("reason").unwrap_or_default(),
+        },
     };
     // Steps that must succeed for the tunnel to be usable. For the rest, never
     // make openconnect stumble over Crake's bookkeeping.

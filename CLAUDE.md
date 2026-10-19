@@ -1346,7 +1346,52 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
      strongSwan uses PF_KEY policies, no tunnel device, so a host would
      be an IPsec policy rather than a route; or Apple's IKEv2, which
      needs a Network Extension) and Windows (its own IKEv2 client makes
-     an adapter Crake could route through).
+     an adapter Crake could route through). CI there reaches the test
+     gateways through Cloudflare Tunnel, which carries TCP only, and IKE
+     is UDP (500/4500): a UDP-capable link (Tailscale's ephemeral nodes,
+     Cloudflare's WARP private networks), IKE over TCP (RFC 8229) if
+     those clients speak it, or a gateway on the runner made to look
+     remote; to choose then.
+   **Slice 1, craked's engine on Linux: built (2026-10-19).** `ipsec/`
+   (`Secret`, kept as `profiles/<name>.ipsec`, root's: the gateway's key
+   and IKE identity, AddTunnel's `gateway_key`/`gateway_id`, never in
+   tunnels.json; `charon.rs`, craked's charon with STRONGSWAN_CONF:
+   random ports, no routes or virtual IP of its own, an explicit plugin
+   list without resolve, updown's `dns_handler`, its log on stderr;
+   `vici.rs`, rsvici: load-conn with `auth = eap` (whatever method the
+   gateway asks), load-shared, initiate with charon's log for a refusal
+   (`ERROR_AUTHENTICATION_FAILURE`, "method failed") or a failure's most
+   telling line, list-sas every 2 s, terminate; `env.rs`, updown's
+   PLUTO_* (the virtual IP, PLUTO_DNS4_n/6_n, the narrowed selector as a
+   split-network hint) as a TunnelInfo), `manager/ipsec.rs` (the user's
+   name and password asked through `Asking`, again with `retry` after a
+   refusal; an XFRM interface `crake-<name>`, MTU 1400, `if_id` from the
+   tunnel's index; the hook named in updown's command line, since
+   charon gives its script only PLUTO_*; a second "connect" while
+   connected is the same tunnel). Protocol `ipsec`; Config `charon`
+   (Debian's, Fedora's or Arch's path). The hook reads PLUTO_VERB
+   (`crake_proto::strongswan_reason`). OwnTunnel `domains` (an IPsec
+   gateway's domain never reaches Crake: strongSwan 6 passes no
+   INTERNAL_DNS_DOMAIN on, "handling INTERNAL_DNS_DOMAIN attribute
+   failed", and DNS learning only routes names under a tunnel's
+   domains). Proven by `e2e_ipsec.rs` against strongSwan as the gateway
+   in the e2e image (scripts/e2e/ipsec.conf: the key, alice's password
+   over EAP-MSCHAPv2, a pool, DNS, ACME's network on its own XFRM
+   interface): a refused password asked again, connected, the internet
+   direct, a name only its DNS knows routed before the first packet, a
+   host learned by probing, nothing left after (interface, SAs, charon).
+   Ubuntu's strongswan-charon recommends strongswan-starter, which starts
+   the system's charon at once (seen on the user's machine, 2026-10-19:
+   switched off with `systemctl disable --now strongswan-starter`); the
+   vici plugin is strongswan-swanctl's. Not yet: the package's
+   `crake-charon` unit (charon refuses to start beside another, its pid
+   file's path built in: a unit with `TemporaryFileSystem=/run` and
+   `/run/crake` bound back in; until then craked runs charon itself and
+   says plainly when another strongSwan runs), the app (New tunnel's
+   IPsec card with the key, identity and domains; the sign-in window's
+   questions already work through `Asking`), a kept password, IPsec in
+   craked.toml and IT's managed files, certificates (the gateway's or
+   the user's), the journey and package tests, the FortiGate by hand.
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or
    Windows problem without a colleague's machine):** `.github/workflows/
    doctor.yml`, started by hand (system, tunnel anyconnect/openvpn/none,

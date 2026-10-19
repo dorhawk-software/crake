@@ -31,6 +31,8 @@ mod diagnostics;
 mod entry;
 mod handover;
 mod host_ops;
+#[cfg(target_os = "linux")]
+mod ipsec;
 mod live;
 mod naming;
 mod openvpn;
@@ -144,6 +146,9 @@ pub struct Manager {
     /// What each OpenVPN tunnel's gateway pushed, as openvpn's output says
     /// (`openvpn::env::Pushed`): Windows' openvpn hands its hook no DNS.
     pushed: Arc<Mutex<HashMap<String, crate::openvpn::env::Pushed>>>,
+    /// craked's own strongSwan charon, for IPsec tunnels (`ipsec`).
+    #[cfg(target_os = "linux")]
+    charon: tokio::sync::Mutex<Option<crate::ipsec::charon::Charon>>,
     /// Names no tunnel knew lately; not asked again for a while.
     unknown: Mutex<HashMap<(String, RecordType), Instant>>,
     /// Addresses another tunnel's DNS also gave (tunnel, address), when
@@ -315,6 +320,8 @@ impl Manager {
             traffic: Arc::default(),
             transport: Arc::default(),
             pushed: Arc::default(),
+            #[cfg(target_os = "linux")]
+            charon: tokio::sync::Mutex::new(None),
             unknown: Mutex::new(HashMap::new()),
             contested: Mutex::new(HashMap::new()),
             asked: Mutex::new(HashMap::new()),

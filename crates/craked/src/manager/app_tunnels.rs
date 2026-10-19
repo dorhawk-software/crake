@@ -38,9 +38,13 @@ impl Manager {
         };
         let mut fields = fields.clone();
         let profile = take_profile(&mut fields, true)?;
+        let secret = take_secret(&mut fields, true)?;
         let own = crate::own::OwnTunnel::from_map(&name, &fields)?;
         if let Some(text) = &profile {
             self.keep_profile(&name, text)?;
+        }
+        if let Some(secret) = &secret {
+            self.keep_secret(&name, secret)?;
         }
         {
             let mut map = self.tunnels.lock().unwrap();
@@ -67,6 +71,7 @@ impl Manager {
     pub async fn update_tunnel(&self, name: &str, fields: &HashMap<String, String>) -> Result<()> {
         let mut fields = fields.clone();
         let profile = take_profile(&mut fields, false)?;
+        let secret = take_secret(&mut fields, false)?;
         let own = crate::own::OwnTunnel::from_map(name, &fields)?;
         let (was, routed, moved) = {
             let mut map = self.tunnels.lock().unwrap();
@@ -96,6 +101,9 @@ impl Manager {
         };
         if let Some(text) = &profile {
             self.keep_profile(name, text)?;
+        }
+        if let Some(secret) = &secret {
+            self.keep_secret(name, secret)?;
         }
         self.save_own();
         // A new scope or a full tunnel: rebuild its routing now.
@@ -174,6 +182,7 @@ impl Manager {
         }
         self.tunnels.lock().unwrap().remove(name);
         let _ = std::fs::remove_file(crate::openvpn::profile_path(&self.cfg.state_path, name));
+        let _ = std::fs::remove_file(crate::ipsec::secret_path(&self.cfg.state_path, name));
         {
             let mut store = self.hosts.lock().unwrap();
             store.tunnels.remove(name);
@@ -195,21 +204,33 @@ impl Manager {
         Ok(())
     }
 
+    /// An IPsec tunnel's gateway key and identity: root's only.
+    fn keep_secret(&self, name: &str, secret: &crate::ipsec::Secret) -> Result<()> {
+        let path = crate::ipsec::secret_path(&self.cfg.state_path, name);
+        keep_private(&path, &serde_json::to_string(secret)?)
+    }
+
     /// An OpenVPN tunnel's profile, as the user gave it (read again, against
     /// what may run, each time it starts): root's only.
     fn keep_profile(&self, name: &str, text: &str) -> Result<()> {
-        use std::io::Write;
         let path = crate::openvpn::profile_path(&self.cfg.state_path, name);
-        if let Some(dir) = path.parent() {
-            crate::sys::create_private_dir(dir)
-                .with_context(|| format!("making {}", dir.display()))?;
-        }
-        let mut f = crate::sys::create_private(&path)
-            .with_context(|| format!("writing {}", path.display()))?;
-        f.write_all(text.as_bytes())?;
-        Ok(())
+        keep_private(&path, text)
     }
+}
 
+/// `text` in a file of root's only, its folder too.
+fn keep_private(path: &std::path::Path, text: &str) -> Result<()> {
+    use std::io::Write;
+    if let Some(dir) = path.parent() {
+        crate::sys::create_private_dir(dir).with_context(|| format!("making {}", dir.display()))?;
+    }
+    let mut f =
+        crate::sys::create_private(path).with_context(|| format!("writing {}", path.display()))?;
+    f.write_all(text.as_bytes())?;
+    Ok(())
+}
+
+impl Manager {
     /// One of the user's own tunnels in text form, for editing.
     pub fn own_fields(&self, name: &str) -> Option<BTreeMap<String, String>> {
         let map = self.tunnels.lock().unwrap();
@@ -234,4 +255,28 @@ fn take_profile(fields: &mut HashMap<String, String>, adding: bool) -> Result<Op
     let profile = crate::openvpn::profile::check(&text).map_err(anyhow::Error::msg)?;
     fields.insert("gateway".into(), profile.remote);
     Ok(Some(text))
+}
+
+/// An IPsec tunnel's gateway key and identity from AddTunnel's fields
+/// (the key needed when adding, optional when changing one): never kept
+/// with the rest of the tunnel.
+fn take_secret(
+    fields: &mut HashMap<String, String>,
+    adding: bool,
+) -> Result<Option<crate::ipsec::Secret>> {
+    let ipsec = fields.get("protocol").map(String::as_str) == Some("ipsec");
+    let key = fields
+        .remove("gateway_key")
+        .filter(|k| !k.trim().is_empty());
+    let id = fields.remove("gateway_id");
+    if !ipsec {
+        return Ok(None);
+    }
+    let Some(key) = key else {
+        if adding {
+            bail!("An IPsec tunnel needs the gateway\u{2019}s key (its pre-shared key).");
+        }
+        return Ok(None);
+    };
+    crate::ipsec::Secret::from_fields(&key, id.as_deref()).map(Some)
 }

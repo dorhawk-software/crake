@@ -47,6 +47,7 @@ fn setup(dir: &std::path::Path, script: &str) -> Config {
         hook_socket: dir.join("hook.sock"),
         openconnect: fake,
         openvpn: "openvpn".into(),
+        charon: "charon".into(),
         log_path: dir.join("log"),
         state_path: dir.join("hosts.json"),
         learned_expiry_days: 7,

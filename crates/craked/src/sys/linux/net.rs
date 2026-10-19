@@ -64,6 +64,25 @@ impl Net {
         ip(&["link", "set", "dev", dev, "up"]).await
     }
 
+    /// An IPsec tunnel's own XFRM interface (`if_id`): what's routed into
+    /// it goes through the tunnel's SA with that ID. Made again if it's
+    /// there from before.
+    pub async fn xfrm(&self, dev: &str, if_id: u32, mtu: u32) -> Result<()> {
+        let Self::Ip = self else { return Ok(()) };
+        let _ = ip(&["link", "del", dev]).await;
+        ip(&[
+            "link",
+            "add",
+            dev,
+            "type",
+            "xfrm",
+            "if_id",
+            &if_id.to_string(),
+        ])
+        .await?;
+        ip(&["link", "set", "dev", dev, "mtu", &mtu.to_string(), "up"]).await
+    }
+
     /// Remove a link; fine if it's gone.
     pub async fn remove(&self, dev: &str) {
         if let Self::Ip = self {

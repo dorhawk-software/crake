@@ -448,6 +448,7 @@ async fn a_gateway_without_offload_runs_without_it() {
     let mut cfg = craked::config::Config {
         managed_dir: managed,
         openvpn: openvpn.clone(),
+        charon: "charon".into(),
         ..config(dir.path())
     };
     cfg.add_managed();
