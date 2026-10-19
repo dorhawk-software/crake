@@ -11,18 +11,12 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
 
 use anyhow::Result;
+use crake_os::windows::tcp::{self, Row};
 use windows_sys::Win32::NetworkManagement::IpHelper::{
-    GetExtendedTcpTable, GetPerTcp6ConnectionEStats, GetPerTcpConnectionEStats,
     MIB_TCP_STATE_CLOSED, MIB_TCP_STATE_DELETE_TCB, MIB_TCP_STATE_ESTAB, MIB_TCP_STATE_LISTEN,
-    MIB_TCP_STATE_SYN_RCVD, MIB_TCP_STATE_SYN_SENT, MIB_TCP6ROW, MIB_TCP6ROW_OWNER_PID,
-    MIB_TCP6TABLE_OWNER_PID, MIB_TCPROW_LH, MIB_TCPROW_LH_0, MIB_TCPROW_OWNER_PID,
-    MIB_TCPTABLE_OWNER_PID, SetPerTcp6ConnectionEStats, SetPerTcpConnectionEStats, SetTcpEntry,
-    TCP_ESTATS_DATA_ROD_v0, TCP_ESTATS_DATA_RW_v0, TCP_TABLE_OWNER_PID_CONNECTIONS,
-    TcpConnectionEstatsData,
+    MIB_TCP_STATE_SYN_RCVD, MIB_TCP_STATE_SYN_SENT, MIB_TCP6ROW, MIB_TCPROW_LH, MIB_TCPROW_LH_0,
 };
-use windows_sys::Win32::Networking::WinSock::{
-    ADDRESS_FAMILY, AF_INET, AF_INET6, IN6_ADDR, IN6_ADDR_0,
-};
+use windows_sys::Win32::Networking::WinSock::{IN6_ADDR, IN6_ADDR_0};
 
 pub use crate::flows::{Event, Flow, Kind, TcpState};
 
@@ -80,14 +74,7 @@ fn port(raw: u32) -> u16 {
 /// states.
 fn table() -> io::Result<HashMap<Flow, TcpState>> {
     let mut found = HashMap::new();
-    let v4 = raw_table(AF_INET, size_of::<MIB_TCPROW_OWNER_PID>())?;
-    // SAFETY: Windows filled `v4` with a MIB_TCPTABLE_OWNER_PID, whose
-    // `dwNumEntries` rows follow its header.
-    let rows: &[MIB_TCPROW_OWNER_PID] = unsafe {
-        let table = &*v4.as_ptr().cast::<MIB_TCPTABLE_OWNER_PID>();
-        std::slice::from_raw_parts(table.table.as_ptr(), table.dwNumEntries as usize)
-    };
-    for r in rows {
+    for r in tcp::table_v4()? {
         let flow = Flow {
             src: Ipv4Addr::from(r.dwLocalAddr.to_ne_bytes()).into(),
             dst: Ipv4Addr::from(r.dwRemoteAddr.to_ne_bytes()).into(),
@@ -98,13 +85,8 @@ fn table() -> io::Result<HashMap<Flow, TcpState>> {
         found.insert(flow, state(r.dwState));
     }
     // A machine without IPv6 has no IPv6 table: IPv4's is enough.
-    let Ok(v6) = raw_table(AF_INET6, size_of::<MIB_TCP6ROW_OWNER_PID>()) else {
+    let Ok(rows) = tcp::table_v6() else {
         return Ok(found);
-    };
-    // SAFETY: as above, a MIB_TCP6TABLE_OWNER_PID.
-    let rows: &[MIB_TCP6ROW_OWNER_PID] = unsafe {
-        let table = &*v6.as_ptr().cast::<MIB_TCP6TABLE_OWNER_PID>();
-        std::slice::from_raw_parts(table.table.as_ptr(), table.dwNumEntries as usize)
     };
     for r in rows {
         let flow = Flow {
@@ -122,55 +104,15 @@ fn table() -> io::Result<HashMap<Flow, TcpState>> {
 /// The process whose loopback connection comes from `from` to `to` (two
 /// ports on 127.0.0.1): who it is that connected to a port of craked's.
 pub fn loopback_owner(from: u16, to: u16) -> Option<u32> {
-    let v4 = raw_table(AF_INET, size_of::<MIB_TCPROW_OWNER_PID>()).ok()?;
-    // SAFETY: as in `table`, a MIB_TCPTABLE_OWNER_PID.
-    let rows: &[MIB_TCPROW_OWNER_PID] = unsafe {
-        let table = &*v4.as_ptr().cast::<MIB_TCPTABLE_OWNER_PID>();
-        std::slice::from_raw_parts(table.table.as_ptr(), table.dwNumEntries as usize)
-    };
-    rows.iter()
+    tcp::table_v4()
+        .ok()?
+        .iter()
         .find(|r| {
             Ipv4Addr::from(r.dwLocalAddr.to_ne_bytes()).is_loopback()
                 && port(r.dwLocalPort) == from
                 && port(r.dwRemotePort) == to
         })
         .map(|r| r.dwOwningPid)
-}
-
-/// One family's connection table, as GetExtendedTcpTable writes it (its
-/// rows `row` bytes each), in an 8-byte aligned buffer.
-fn raw_table(family: ADDRESS_FAMILY, row: usize) -> io::Result<Vec<u64>> {
-    let mut size = 0;
-    // SAFETY: a size query (null table), then a table of that size.
-    unsafe {
-        GetExtendedTcpTable(
-            std::ptr::null_mut(),
-            &raw mut size,
-            0,
-            u32::from(family),
-            TCP_TABLE_OWNER_PID_CONNECTIONS,
-            0,
-        );
-    }
-    // Room for connections opened meanwhile.
-    const ROOM_ROWS: u32 = 64;
-    size += ROOM_ROWS * row as u32;
-    let mut buf = vec![0u64; (size as usize).div_ceil(size_of::<u64>())];
-    // SAFETY: `buf` holds `size` bytes, 8-byte aligned.
-    let err = unsafe {
-        GetExtendedTcpTable(
-            buf.as_mut_ptr().cast(),
-            &raw mut size,
-            0,
-            u32::from(family),
-            TCP_TABLE_OWNER_PID_CONNECTIONS,
-            0,
-        )
-    };
-    if err != 0 {
-        return Err(io::Error::from_raw_os_error(err as i32));
-    }
-    Ok(buf)
 }
 
 /// Close this machine's TCP connections to `target`, so the apps open new
@@ -201,11 +143,7 @@ pub fn delete(flow: Flow) -> io::Result<()> {
         dwRemoteAddr: u32::from_ne_bytes(dst.octets()),
         dwRemotePort: net(flow.dport),
     };
-    // SAFETY: a filled row, only read.
-    match unsafe { SetTcpEntry(&raw const row) } {
-        0 => Ok(()),
-        e => Err(io::Error::from_raw_os_error(e as i32)),
-    }
+    tcp::set_entry(&row)
 }
 
 /// Statistics are switched back off this long after the window's last look.
@@ -262,12 +200,6 @@ pub fn connections_idle(force: bool) {
     }
 }
 
-/// A connection as the statistics calls name it.
-enum Row {
-    V4(MIB_TCPROW_LH),
-    V6(MIB_TCP6ROW),
-}
-
 fn row(flow: Flow) -> Option<Row> {
     let net = |port: u16| u32::from(port.to_be());
     match (flow.src, flow.dst) {
@@ -300,69 +232,12 @@ fn row(flow: Flow) -> Option<Row> {
 /// Switch a connection's data statistics on or off; true when Windows
 /// took it (it needs the service's rights).
 fn statistics(flow: Flow, on: bool) -> bool {
-    let rw = TCP_ESTATS_DATA_RW_v0 {
-        EnableCollection: on,
-    };
-    let (rw_ptr, rw_len) = (
-        (&raw const rw).cast::<u8>(),
-        size_of::<TCP_ESTATS_DATA_RW_v0>() as u32,
-    );
-    // SAFETY: a filled row and a filled settings struct, both only read.
-    let err = match row(flow) {
-        Some(Row::V4(r)) => unsafe {
-            SetPerTcpConnectionEStats(&raw const r, TcpConnectionEstatsData, rw_ptr, 0, rw_len, 0)
-        },
-        Some(Row::V6(r)) => unsafe {
-            SetPerTcp6ConnectionEStats(&raw const r, TcpConnectionEstatsData, rw_ptr, 0, rw_len, 0)
-        },
-        None => return false,
-    };
-    err == 0
+    row(flow).is_some_and(|r| tcp::statistics(&r, on))
 }
 
 /// A connection's bytes both ways since its statistics came on.
 fn bytes(flow: Flow) -> Option<u64> {
-    let mut rod = TCP_ESTATS_DATA_ROD_v0::default();
-    let (rod_ptr, rod_len) = (
-        (&raw mut rod).cast::<u8>(),
-        size_of::<TCP_ESTATS_DATA_ROD_v0>() as u32,
-    );
-    let null = std::ptr::null_mut();
-    // SAFETY: a filled row (read) and our own struct of the size given
-    // (written); the other two outputs aren't asked for.
-    let err = match row(flow)? {
-        Row::V4(r) => unsafe {
-            GetPerTcpConnectionEStats(
-                &raw const r,
-                TcpConnectionEstatsData,
-                null,
-                0,
-                0,
-                null,
-                0,
-                0,
-                rod_ptr,
-                0,
-                rod_len,
-            )
-        },
-        Row::V6(r) => unsafe {
-            GetPerTcp6ConnectionEStats(
-                &raw const r,
-                TcpConnectionEstatsData,
-                null,
-                0,
-                0,
-                null,
-                0,
-                0,
-                rod_ptr,
-                0,
-                rod_len,
-            )
-        },
-    };
-    (err == 0).then(|| rod.DataBytesIn + rod.DataBytesOut)
+    tcp::data_bytes(&row(flow)?)
 }
 
 #[cfg(test)]

@@ -3,16 +3,11 @@
 
 use std::path::{Path, PathBuf};
 
-/// Windows' 100 %: 96 dots an inch; its small icon at that scale.
-const BASE_DPI: u32 = 96;
+/// Windows' small icon at 100 %.
 const SMALL_ICON: u32 = 16;
+const BASE_DPI: u32 = ui::BASE_DPI;
 
-use windows_sys::Win32::Foundation::{LPARAM, RECT};
-use windows_sys::Win32::Graphics::Gdi::{
-    EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO,
-};
-use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
-use windows_sys::Win32::UI::WindowsAndMessaging::MONITORINFOF_PRIMARY;
+use crake_os::windows::ui;
 
 use crate::place::Rect;
 
@@ -22,53 +17,24 @@ pub fn monitors() -> Vec<Rect> {
     if cfg!(test) {
         return Vec::new();
     }
-    let mut found: Vec<(bool, Rect)> = Vec::new();
-    // SAFETY: the callback only runs during the call, with `found` alive.
-    unsafe {
-        EnumDisplayMonitors(
-            std::ptr::null_mut(),
-            std::ptr::null(),
-            Some(each_monitor),
-            &raw mut found as LPARAM,
-        );
-    }
+    let mut found: Vec<(bool, Rect)> = ui::monitors()
+        .into_iter()
+        .map(|m| {
+            let scale = m.dpi.max(1) as f32 / BASE_DPI as f32;
+            let r = m.bounds;
+            (
+                m.primary,
+                Rect {
+                    x: r.left as f32 / scale,
+                    y: r.top as f32 / scale,
+                    w: (r.right - r.left) as f32 / scale,
+                    h: (r.bottom - r.top) as f32 / scale,
+                },
+            )
+        })
+        .collect();
     found.sort_by_key(|(primary, _)| !primary);
     found.into_iter().map(|(_, r)| r).collect()
-}
-
-unsafe extern "system" fn each_monitor(
-    monitor: HMONITOR,
-    _: HDC,
-    _: *mut RECT,
-    found: LPARAM,
-) -> windows_sys::core::BOOL {
-    // SAFETY: `found` is the Vec `monitors` passed in, alive for the call.
-    let found = unsafe { &mut *(found as *mut Vec<(bool, Rect)>) };
-    let mut info = MONITORINFO {
-        cbSize: size_of::<MONITORINFO>() as u32,
-        // SAFETY: a plain C struct, all zero is valid.
-        ..unsafe { std::mem::zeroed() }
-    };
-    let (mut dpi, mut _y) = (BASE_DPI, BASE_DPI);
-    // SAFETY: `monitor` comes from Windows for this call; `info` is sized.
-    unsafe {
-        if GetMonitorInfoW(monitor, &raw mut info) == 0 {
-            return 1;
-        }
-        GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &raw mut dpi, &raw mut _y);
-    }
-    let scale = dpi.max(1) as f32 / BASE_DPI as f32;
-    let r = info.rcMonitor;
-    found.push((
-        info.dwFlags & MONITORINFOF_PRIMARY != 0,
-        Rect {
-            x: r.left as f32 / scale,
-            y: r.top as f32 / scale,
-            w: (r.right - r.left) as f32 / scale,
-            h: (r.bottom - r.top) as f32 / scale,
-        },
-    ));
-    1
 }
 
 /// A folder only this user can read, for files that live as long as a
@@ -121,72 +87,38 @@ pub fn rounded_frame(window: &gpui_kit::Window, border: gpui_kit::Rgba) {
 /// pixels): resized and moved in one step, its bottom staying at the
 /// taskbar, instead of being opened again at the new size (which blinked).
 pub fn resize_upward(window: &gpui_kit::Window, height: f32) -> bool {
-    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-    use windows_sys::Win32::Foundation::RECT;
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetWindowRect, SWP_NOACTIVATE, SWP_NOZORDER, SetWindowPos,
-    };
-    let Ok(handle) = HasWindowHandle::window_handle(window) else {
+    let Some(hwnd) = hwnd(window) else {
         return false;
     };
-    let RawWindowHandle::Win32(win32) = handle.as_raw() else {
+    let Some(rect) = ui::window_rect(hwnd) else {
         return false;
     };
-    let hwnd = win32.hwnd.get() as windows_sys::Win32::Foundation::HWND;
-    let mut rect = RECT {
-        left: 0,
-        top: 0,
-        right: 0,
-        bottom: 0,
-    };
-    // SAFETY: a live window of this process, a RECT to fill.
-    if unsafe { GetWindowRect(hwnd, &mut rect) } == 0 {
-        return false;
-    }
     let new_height = (height * window.scale_factor()).round().max(1.) as u32;
     let old_height = u32::try_from(rect.bottom - rect.top).unwrap_or(0);
     let top = crate::place::top_keeping_bottom(rect.top, old_height, new_height);
     let width = rect.right - rect.left;
-    // SAFETY: a live window of this process; position and size in pixels.
-    unsafe {
-        SetWindowPos(
-            hwnd,
-            std::ptr::null_mut(),
-            rect.left,
-            top,
-            width,
-            i32::try_from(new_height).unwrap_or(i32::MAX),
-            SWP_NOZORDER | SWP_NOACTIVATE,
-        ) != 0
-    }
+    ui::move_window(
+        hwnd,
+        rect.left,
+        top,
+        width,
+        i32::try_from(new_height).unwrap_or(i32::MAX),
+    )
+}
+
+/// A GPUI window's handle.
+fn hwnd(window: &gpui_kit::Window) -> Option<isize> {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    let handle = HasWindowHandle::window_handle(window).ok()?;
+    let RawWindowHandle::Win32(win32) = handle.as_raw() else {
+        return None;
+    };
+    Some(win32.hwnd.get())
 }
 
 fn frame(window: &gpui_kit::Window, corners: i32, border: u32) {
-    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-    use windows_sys::Win32::Graphics::Dwm::{
-        DWMWA_BORDER_COLOR, DWMWA_WINDOW_CORNER_PREFERENCE, DwmSetWindowAttribute,
-    };
-    let Ok(handle) = HasWindowHandle::window_handle(window) else {
-        return;
-    };
-    let RawWindowHandle::Win32(win32) = handle.as_raw() else {
-        return;
-    };
-    let hwnd = win32.hwnd.get() as windows_sys::Win32::Foundation::HWND;
-    // SAFETY: a live window of this process; each value is the size given.
-    unsafe {
-        DwmSetWindowAttribute(
-            hwnd,
-            DWMWA_BORDER_COLOR as u32,
-            (&raw const border).cast(),
-            size_of::<u32>() as u32,
-        );
-        DwmSetWindowAttribute(
-            hwnd,
-            DWMWA_WINDOW_CORNER_PREFERENCE as u32,
-            (&raw const corners).cast(),
-            size_of_val(&corners) as u32,
-        );
+    if let Some(hwnd) = hwnd(window) {
+        ui::set_frame(hwnd, corners, border);
     }
 }
 
@@ -230,44 +162,9 @@ pub async fn connect_craked() -> zbus::Result<(zbus::Connection, bool)> {
 
 /// The process listening on `address` (TCP, IPv4).
 fn listening_pid(address: std::net::SocketAddrV4) -> Option<u32> {
-    use windows_sys::Win32::NetworkManagement::IpHelper::{
-        GetExtendedTcpTable, MIB_TCPROW_OWNER_PID, MIB_TCPTABLE_OWNER_PID,
-        TCP_TABLE_OWNER_PID_LISTENER,
-    };
-    use windows_sys::Win32::Networking::WinSock::AF_INET;
-    let mut size = 0;
-    // SAFETY: a size query (null table); then a table of that size.
-    unsafe {
-        GetExtendedTcpTable(
-            std::ptr::null_mut(),
-            &raw mut size,
-            0,
-            u32::from(AF_INET),
-            TCP_TABLE_OWNER_PID_LISTENER,
-            0,
-        );
-    }
-    let mut buf = vec![0u64; (size as usize).div_ceil(size_of::<u64>())];
-    // SAFETY: `buf` holds `size` bytes, 8-byte aligned.
-    let got = unsafe {
-        GetExtendedTcpTable(
-            buf.as_mut_ptr().cast(),
-            &raw mut size,
-            0,
-            u32::from(AF_INET),
-            TCP_TABLE_OWNER_PID_LISTENER,
-            0,
-        )
-    };
-    if got != 0 {
-        return None;
-    }
-    // SAFETY: Windows filled `buf` with a MIB_TCPTABLE_OWNER_PID.
-    let table = unsafe { &*buf.as_ptr().cast::<MIB_TCPTABLE_OWNER_PID>() };
-    // SAFETY: `dwNumEntries` rows follow the header in `buf`.
-    let rows: &[MIB_TCPROW_OWNER_PID] =
-        unsafe { std::slice::from_raw_parts(table.table.as_ptr(), table.dwNumEntries as usize) };
-    rows.iter()
+    crake_os::windows::tcp::listeners_v4()
+        .ok()?
+        .into_iter()
         .find(|r| {
             // Network byte order: the address as it sits in memory, the
             // port in the low 16 bits.
@@ -279,34 +176,7 @@ fn listening_pid(address: std::net::SocketAddrV4) -> Option<u32> {
 
 /// The process of a running service.
 fn service_pid(name: &str) -> Option<u32> {
-    use windows_sys::Win32::System::Services::{
-        CloseServiceHandle, OpenSCManagerW, OpenServiceW, QueryServiceStatusEx, SC_MANAGER_CONNECT,
-        SC_STATUS_PROCESS_INFO, SERVICE_QUERY_STATUS, SERVICE_STATUS_PROCESS,
-    };
-    let name: Vec<u16> = name.encode_utf16().chain([0]).collect();
-    // SAFETY: handles are closed before returning; `status` is sized.
-    unsafe {
-        let manager = OpenSCManagerW(std::ptr::null(), std::ptr::null(), SC_MANAGER_CONNECT);
-        if manager.is_null() {
-            return None;
-        }
-        let service = OpenServiceW(manager, name.as_ptr(), SERVICE_QUERY_STATUS);
-        let mut status: SERVICE_STATUS_PROCESS = std::mem::zeroed();
-        let mut needed = 0;
-        let ok = !service.is_null()
-            && QueryServiceStatusEx(
-                service,
-                SC_STATUS_PROCESS_INFO,
-                (&raw mut status).cast(),
-                size_of::<SERVICE_STATUS_PROCESS>() as u32,
-                &raw mut needed,
-            ) != 0;
-        if !service.is_null() {
-            CloseServiceHandle(service);
-        }
-        CloseServiceHandle(manager);
-        (ok && status.dwProcessId != 0).then_some(status.dwProcessId)
-    }
+    crake_os::windows::services::pid(name)
 }
 
 /// Where the panel goes from: the click, in the logical pixels windows are
@@ -318,57 +188,25 @@ pub fn tray_click(at: tray_icon::dpi::PhysicalPosition<f64>, _icon: tray_icon::R
 /// A click's screen position in the logical pixels windows are placed in
 /// (the tray reports physical ones): scaled by its monitor's DPI.
 fn logical(x: f64, y: f64) -> (i32, i32) {
-    use windows_sys::Win32::Foundation::POINT;
-    use windows_sys::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromPoint};
-    use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
-    let point = POINT {
-        x: x as i32,
-        y: y as i32,
-    };
-    let (mut dpi, mut _y) = (BASE_DPI, BASE_DPI);
-    // SAFETY: a monitor handle from Windows, out pointers for the call.
-    unsafe {
-        let monitor = MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST);
-        GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &raw mut dpi, &raw mut _y);
-    }
+    let dpi = ui::dpi_at(x as i32, y as i32);
     let scale = f64::from(dpi.max(1)) / f64::from(BASE_DPI);
     ((x / scale) as i32, (y / scale) as i32)
 }
 
 /// Windows' own setting for the taskbar: "Choose your Windows mode".
 pub fn light_bar() -> bool {
-    use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RegGetValueW};
-    let key = wide(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-    let value = wide("SystemUsesLightTheme");
-    let mut light: u32 = 0;
-    let mut size = size_of::<u32>() as u32;
-    // SAFETY: NUL-terminated names; `light` holds the DWORD asked for.
-    let read = unsafe {
-        RegGetValueW(
-            HKEY_CURRENT_USER,
-            key.as_ptr(),
-            value.as_ptr(),
-            RRF_RT_REG_DWORD,
-            std::ptr::null_mut(),
-            (&raw mut light).cast(),
-            &raw mut size,
-        )
-    };
-    read == 0 && light == 1
-}
-
-fn wide(s: &str) -> Vec<u16> {
-    s.encode_utf16().chain([0]).collect()
+    use crake_os::windows::registry::{Root, dword};
+    dword(
+        Root::CurrentUser,
+        r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+        "SystemUsesLightTheme",
+    ) == Some(1)
 }
 
 /// The notification area's icon size in pixels: Windows' small icon at the
 /// screen's scaling (16 at 100 %, 20 at 125 %, 24 at 150 %, 32 at 200 %).
 pub fn tray_icon_size() -> u32 {
-    use windows_sys::Win32::UI::HiDpi::{GetDpiForSystem, GetSystemMetricsForDpi};
-    use windows_sys::Win32::UI::WindowsAndMessaging::SM_CXSMICON;
-    // SAFETY: plain queries.
-    let size = unsafe { GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForSystem()) };
-    u32::try_from(size)
+    u32::try_from(ui::small_icon_size())
         .ok()
         .filter(|s| *s > 0)
         .unwrap_or(SMALL_ICON)
@@ -377,9 +215,5 @@ pub fn tray_icon_size() -> u32 {
 /// A command run from a console (`crake report`): its output goes there.
 /// Release builds are windowed (no console of their own).
 pub fn attach_console() {
-    use windows_sys::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
-    // SAFETY: no arguments but a constant; failing (no parent console) is fine.
-    unsafe {
-        AttachConsole(ATTACH_PARENT_PROCESS);
-    }
+    ui::attach_parent_console();
 }

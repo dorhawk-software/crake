@@ -5,56 +5,22 @@
 
 use std::path::Path;
 
-use windows_sys::Win32::System::Registry::{
-    HKEY_CURRENT_USER, REG_SZ, RRF_RT_REG_SZ, RegDeleteKeyValueW, RegGetValueW, RegSetKeyValueW,
-};
+use crake_os::windows::registry::{self, Root, Value};
 
 const RUN: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const VALUE: &str = "Crake";
 
-fn wide(s: &str) -> Vec<u16> {
-    s.encode_utf16().chain([0]).collect()
-}
-
 pub fn enabled() -> bool {
-    let (key, value) = (wide(RUN), wide(VALUE));
-    let mut size = 0u32;
-    // SAFETY: NUL-terminated names; only the size is asked for.
-    let found = unsafe {
-        RegGetValueW(
-            HKEY_CURRENT_USER,
-            key.as_ptr(),
-            value.as_ptr(),
-            RRF_RT_REG_SZ,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            &raw mut size,
-        )
-    };
-    found == 0
+    registry::has_string(Root::CurrentUser, RUN, VALUE)
 }
 
 pub fn set(on: bool, exe: &Path, flag: &str) {
-    let (key, value) = (wide(RUN), wide(VALUE));
-    if !on {
-        // SAFETY: NUL-terminated names.
-        unsafe { RegDeleteKeyValueW(HKEY_CURRENT_USER, key.as_ptr(), value.as_ptr()) };
-        return;
+    if on {
+        let command = command(&exe.display().to_string(), flag);
+        let _ = registry::set_value(Root::CurrentUser, RUN, VALUE, &Value::Sz(&command));
+    } else {
+        registry::delete_value(Root::CurrentUser, RUN, VALUE);
     }
-    let command = wide(&command(&exe.display().to_string(), flag));
-    let bytes = (command.len() * size_of::<u16>()) as u32;
-    // SAFETY: NUL-terminated names; `command` is the REG_SZ's data, `bytes`
-    // long, its NUL included.
-    unsafe {
-        RegSetKeyValueW(
-            HKEY_CURRENT_USER,
-            key.as_ptr(),
-            value.as_ptr(),
-            REG_SZ,
-            command.as_ptr().cast(),
-            bytes,
-        )
-    };
 }
 
 /// The command line: the binary quoted (Program Files has a space).

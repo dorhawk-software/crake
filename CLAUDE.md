@@ -1354,32 +1354,23 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   it comes back after that, the cause is elsewhere: the gateway's side
   (ocserv's routes to the client right after connect) is next to look at.
 - **All unsafe code behind one safe layer (asked for by the user,
-  2026-10-14).** About 100 unsafe uses today (craked 68 in 13 files, the
-  app 32 in 7), nearly all in the `sys/` modules (system calls, netlink,
-  the Windows and macOS APIs), plus clearing WAYLAND_DISPLAY in the app's
-  main. Plan: a crate of its own (e.g. `crake-os`) holding every unsafe
-  call behind safe functions, each with its `// SAFETY:` reasoning and
-  tests; `#![forbid(unsafe_code)]` in crake, craked, crake-proto and
-  lint-literals (forbid can't be allowed again further down), and a lint
-  gate check that `unsafe` appears nowhere else. Mechanical but sizeable.
-  **In progress (2026-10-19), system by system.** `crates/crake-os`
-  exists: Linux and the shared Unix calls are in it (getifaddrs,
-  interface names and indexes, signals, netlink sockets, SO_MARK, tun
-  devices for tests, tokio's `AsyncFd::register` only for `OwnsFd`
-  types, and WAYLAND_DISPLAY unset only while /proc says the app has one
-  thread). crake-proto, crake-hook and lint-literals forbid unsafe;
-  craked and the app forbid it per system (`cfg_attr`); the tests share a
-  helper that writes paths into fake scripts instead of setting the
-  environment (racy with the harness's threads).
-  macOS too (2026-10-19): sysctl, each link's byte counters,
-  CoreFoundation's array items and dictionary values and pairs, the run
-  loop's common modes, utun devices and a timed read for tests, and
-  (feature `app`, the app's) SMAppService and the active displays; the
-  forbids hold on every system but Windows (`cfg_attr(not(windows))`).
-  `scripts/macos-check.sh` lints crake-os with `app` too.
-  `scripts/check-unsafe.sh` (lint gate) fails on `unsafe` outside
-  crake-os but for `STILL_TO_MOVE`: Windows (`sys/windows/`, the most).
-  It shrinks to nothing; then the forbids lose their cfg.
+  2026-10-14). Done 2026-10-19.** `crates/crake-os` holds every unsafe
+  call Crake makes, each behind a safe function whose contract the crate
+  keeps itself, with its `// SAFETY:` reasoning: Unix and Linux
+  (getifaddrs, interface names and indexes, signals, socket options,
+  netlink sockets, tun devices for tests, tokio's `AsyncFd::register` only
+  for `OwnsFd` types, WAYLAND_DISPLAY unset only while /proc says the app
+  has one thread), macOS (sysctl, link counters, CoreFoundation's arrays,
+  dictionaries and run loop, utun devices for tests; with `app`,
+  SMAppService and the displays), Windows (IP Helper, adapters, interface
+  counters, the TCP tables and their statistics, the registry, Credential
+  Manager, the service manager, console events and sessions; with `app`,
+  monitors, window placement and frames by the handle's value). crake,
+  craked, crake-hook, crake-proto and lint-literals `#![forbid(unsafe_code)]`;
+  `scripts/check-unsafe.sh` (lint gate) fails on `unsafe` anywhere else,
+  tests included (they no longer set the environment: fake scripts get
+  their paths written in). Not yet: unit tests of crake-os's Windows and
+  macOS parts on their CI runners beyond what the journeys exercise.
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with

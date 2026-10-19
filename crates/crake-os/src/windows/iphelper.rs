@@ -1,10 +1,11 @@
-//! The IP Helper API, as craked uses it: a tunnel's interface by name (its
+//! The IP Helper API, as craked uses it (moved here from craked, its
+//! unsafe calls with it): a tunnel's interface by name (its
 //! alias, `crake-<name>`, as openconnect gives Wintun's adapter), its
 //! address and MTU, and routes on it, IPv4 and IPv6.
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use anyhow::{Result, bail};
+use std::io::{Error, Result};
 use windows_sys::Win32::NetworkManagement::IpHelper::{
     ConvertInterfaceAliasToLuid, ConvertInterfaceLuidToIndex, CreateIpForwardEntry2,
     CreateUnicastIpAddressEntry, DeleteIpForwardEntry2, GetBestRoute2, GetIpInterfaceEntry,
@@ -18,6 +19,9 @@ use windows_sys::Win32::Networking::WinSock::{
 };
 
 const ERROR_NOT_FOUND: u32 = 1168;
+/// A host's prefix: all of its address.
+const V4_BITS: u8 = 32;
+const V6_BITS: u8 = 128;
 const ERROR_OBJECT_ALREADY_EXISTS: u32 = 5010;
 
 /// An interface, by its alias.
@@ -27,14 +31,17 @@ pub fn luid(alias: &str) -> Result<NET_LUID_LH> {
     let mut luid: NET_LUID_LH = unsafe { std::mem::zeroed() };
     let err = unsafe { ConvertInterfaceAliasToLuid(wide.as_ptr(), &raw mut luid) };
     if err != 0 {
-        bail!("no interface {alias} ({})", os_error(err));
+        return Err(Error::other(format!(
+            "no interface {alias} ({})",
+            os_error(err)
+        )));
     }
     Ok(luid)
 }
 
 /// An interface's index, by its alias.
 pub fn index(alias: &str) -> Result<u32> {
-    index_of(luid(alias)?).map_err(|e| anyhow::anyhow!("{alias}: {e}"))
+    index_of(luid(alias)?).map_err(|e| Error::other(format!("{alias}: {e}")))
 }
 
 /// An interface's index, by its LUID.
@@ -43,7 +50,7 @@ pub fn index_of(luid: NET_LUID_LH) -> Result<u32> {
     // SAFETY: a LUID from Windows, an out pointer for the call.
     let err = unsafe { ConvertInterfaceLuidToIndex(&raw const luid, &raw mut index) };
     if err != 0 {
-        bail!("no index ({})", os_error(err));
+        return Err(Error::other(format!("no index ({})", os_error(err))));
     }
     Ok(index)
 }
@@ -114,7 +121,10 @@ pub fn set_address(luid: NET_LUID_LH, addr: IpAddr, prefix: u8) -> Result<()> {
     };
     match err {
         0 | ERROR_OBJECT_ALREADY_EXISTS => Ok(()),
-        e => bail!("setting {addr}/{prefix}: {}", os_error(e)),
+        e => Err(Error::other(format!(
+            "setting {addr}/{prefix}: {}",
+            os_error(e)
+        ))),
     }
 }
 
@@ -140,7 +150,10 @@ pub fn set_mtu(luid: NET_LUID_LH, mtu: u32, v6: bool) -> Result<()> {
     };
     match err {
         0 => Ok(()),
-        e => bail!("setting the MTU to {mtu}: {}", os_error(e)),
+        e => Err(Error::other(format!(
+            "setting the MTU to {mtu}: {}",
+            os_error(e)
+        ))),
     }
 }
 
@@ -200,13 +213,16 @@ pub fn best_route(dest: IpAddr) -> Result<(Route, u8)> {
         (err, best)
     };
     if err != 0 {
-        bail!("no route to {dest} ({})", os_error(err));
+        return Err(Error::other(format!(
+            "no route to {dest} ({})",
+            os_error(err)
+        )));
     }
     Ok((
         Route {
             luid: best.InterfaceLuid,
             dest,
-            prefix: crate::hosts::Target::host(dest).prefix_len(),
+            prefix: if dest.is_ipv4() { V4_BITS } else { V6_BITS },
             via: address_of(&best.NextHop),
         },
         best.DestinationPrefix.PrefixLength,
@@ -219,7 +235,12 @@ pub fn add(r: Route) -> Result<()> {
     // SAFETY: a filled row, only read.
     match unsafe { CreateIpForwardEntry2(&raw const row) } {
         0 | ERROR_OBJECT_ALREADY_EXISTS => Ok(()),
-        e => bail!("routing {}/{}: {}", r.dest, r.prefix, os_error(e)),
+        e => Err(Error::other(format!(
+            "routing {}/{}: {}",
+            r.dest,
+            r.prefix,
+            os_error(e)
+        ))),
     }
 }
 
@@ -229,12 +250,12 @@ pub fn delete(r: Route) -> Result<()> {
     // SAFETY: a filled row, only read.
     match unsafe { DeleteIpForwardEntry2(&raw const row) } {
         0 | ERROR_NOT_FOUND => Ok(()),
-        e => bail!(
+        e => Err(Error::other(format!(
             "removing the route to {}/{}: {}",
             r.dest,
             r.prefix,
             os_error(e)
-        ),
+        ))),
     }
 }
 
@@ -249,7 +270,10 @@ pub fn add_route_metric(luid: NET_LUID_LH, dest: IpAddr, prefix: u8, metric: u32
     // SAFETY: a filled row, only read.
     match unsafe { CreateIpForwardEntry2(&raw const row) } {
         0 | ERROR_OBJECT_ALREADY_EXISTS => Ok(()),
-        e => bail!("routing {dest}/{prefix}: {}", os_error(e)),
+        e => Err(Error::other(format!(
+            "routing {dest}/{prefix}: {}",
+            os_error(e)
+        ))),
     }
 }
 
@@ -259,7 +283,10 @@ pub fn delete_route(luid: NET_LUID_LH, dest: IpAddr, prefix: u8) -> Result<()> {
     // SAFETY: a filled row, only read.
     match unsafe { DeleteIpForwardEntry2(&raw const row) } {
         0 | ERROR_NOT_FOUND => Ok(()),
-        e => bail!("removing the route to {dest}/{prefix}: {}", os_error(e)),
+        e => Err(Error::other(format!(
+            "removing the route to {dest}/{prefix}: {}",
+            os_error(e)
+        ))),
     }
 }
 

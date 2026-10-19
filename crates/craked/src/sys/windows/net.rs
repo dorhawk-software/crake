@@ -33,7 +33,11 @@ impl Net {
         if let Self::Noop = self {
             return Ok(());
         }
-        iphelper::set_address(iphelper::luid(dev)?, addr.into(), prefix)
+        Ok(iphelper::set_address(
+            iphelper::luid(dev)?,
+            addr.into(),
+            prefix,
+        )?)
     }
 
     pub async fn assign(
@@ -75,9 +79,11 @@ impl Net {
     /// The same for an IPv6 DNS server.
     pub async fn route_dns6(&self, dev: &str, dns: std::net::Ipv6Addr) -> Result<()> {
         match self {
-            Self::Ip => {
-                iphelper::add_route(iphelper::luid(dev)?, dns.into(), crate::hosts::V6_BITS)
-            }
+            Self::Ip => Ok(iphelper::add_route(
+                iphelper::luid(dev)?,
+                dns.into(),
+                crate::hosts::V6_BITS,
+            )?),
             Self::Noop => Ok(()),
         }
     }
@@ -86,9 +92,11 @@ impl Net {
     /// adds up front).
     pub async fn route_dns(&self, dev: &str, dns: Ipv4Addr) -> Result<()> {
         match self {
-            Self::Ip => {
-                iphelper::add_route(iphelper::luid(dev)?, dns.into(), crate::hosts::V4_BITS)
-            }
+            Self::Ip => Ok(iphelper::add_route(
+                iphelper::luid(dev)?,
+                dns.into(),
+                crate::hosts::V4_BITS,
+            )?),
             Self::Noop => Ok(()),
         }
     }

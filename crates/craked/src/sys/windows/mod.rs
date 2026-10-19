@@ -14,7 +14,7 @@ pub mod syn_queue;
 
 mod firewall;
 mod host;
-mod iphelper;
+use crake_os::windows::iphelper;
 pub use host::*;
 
 /// openconnect names Wintun's adapter as told: `crake-<name>`.

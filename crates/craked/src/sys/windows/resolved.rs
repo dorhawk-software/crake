@@ -10,16 +10,9 @@ use std::net::Ipv4Addr;
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 /// An NRPT rule's ConfigOptions: it names generic DNS servers.
 const GENERIC_DNS_SERVERS: u32 = 8;
-/// Room for a registry key's name (they're at most 255 characters).
-const NAME_LEN: usize = 256;
 
 use anyhow::{Result, bail};
-use windows_sys::Win32::Foundation::ERROR_SUCCESS;
-use windows_sys::Win32::System::Registry::{
-    HKEY, HKEY_LOCAL_MACHINE, KEY_ALL_ACCESS, KEY_READ, REG_DWORD, REG_MULTI_SZ,
-    REG_OPTION_VOLATILE, REG_SZ, RRF_RT_REG_MULTI_SZ, RRF_RT_REG_SZ, RegCloseKey, RegCreateKeyExW,
-    RegDeleteTreeW, RegEnumKeyExW, RegGetValueW, RegOpenKeyExW, RegSetValueExW,
-};
+use crake_os::windows::registry::{self, Key, Root, Value};
 
 /// Where Windows keeps local NRPT rules.
 const POLICY: &str = r"SYSTEM\CurrentControlSet\Services\Dnscache\Parameters\DnsPolicyConfig";
@@ -109,7 +102,7 @@ impl Resolved {
         }
         let mut found = super::adapter_domains();
         for root in [POLICY, GROUP_POLICY] {
-            for rule in subkeys(root, KEY_READ) {
+            for rule in subkeys(root, false) {
                 if !rule.starts_with(PREFIX) {
                     found.extend(namespaces(&multi_sz(&format!("{root}\\{rule}"), "Name")));
                 }
@@ -143,171 +136,53 @@ impl Resolved {
     }
 }
 
-fn wide(s: &str) -> Vec<u16> {
-    s.encode_utf16().chain([0]).collect()
-}
-
 /// One rule: the domains (each with and without a leading dot: the name
 /// itself and everything under it) to craked's server; with `everything`,
 /// the root (".", every name) too.
 fn write_rule(device: &str, domains: &[String], everything: bool) -> Result<()> {
-    let path = wide(&format!("{POLICY}\\{PREFIX}{device}"));
-    let mut key: HKEY = std::ptr::null_mut();
-    // SAFETY: a NUL-terminated path; `key` is closed below.
-    let err = unsafe {
-        RegCreateKeyExW(
-            HKEY_LOCAL_MACHINE,
-            path.as_ptr(),
-            0,
-            std::ptr::null(),
-            REG_OPTION_VOLATILE,
-            KEY_ALL_ACCESS,
-            std::ptr::null(),
-            &raw mut key,
-            std::ptr::null_mut(),
-        )
-    };
-    if err != ERROR_SUCCESS {
-        bail!("writing the DNS rule for {device}: error {err}");
-    }
-    let mut names: Vec<u16> = Vec::new();
     let root = everything.then(|| ".".to_owned());
-    let each = domains.iter().flat_map(|d| [d.clone(), format!(".{d}")]);
-    for n in each.chain(root) {
-        names.extend(n.encode_utf16());
-        names.push(0);
-    }
-    names.push(0);
-    let server = wide(&super::dns_queue::ADDR.to_string());
-    let restriction = wide("");
-    let results = [
-        set(key, "Version", REG_DWORD, &2u32.to_le_bytes()),
+    let names: Vec<String> = domains
+        .iter()
+        .flat_map(|d| [d.clone(), format!(".{d}")])
+        .chain(root)
+        .collect();
+    let server = super::dns_queue::ADDR.to_string();
+    let written = (|| {
+        let key = Key::create_volatile(Root::LocalMachine, &format!("{POLICY}\\{PREFIX}{device}"))?;
+        key.set("Version", &Value::Dword(2))?;
         // Generic DNS servers: ours.
-        set(
-            key,
-            "ConfigOptions",
-            REG_DWORD,
-            &GENERIC_DNS_SERVERS.to_le_bytes(),
-        ),
-        set(key, "GenericDNSServers", REG_SZ, bytes(&server)),
-        set(key, "IPSECCARestriction", REG_SZ, bytes(&restriction)),
-        set(key, "Name", REG_MULTI_SZ, bytes(&names)),
-    ];
-    // SAFETY: the key opened above.
-    unsafe { RegCloseKey(key) };
-    if let Some(err) = results.into_iter().find(|e| *e != ERROR_SUCCESS) {
-        bail!("writing the DNS rule for {device}: error {err}");
+        key.set("ConfigOptions", &Value::Dword(GENERIC_DNS_SERVERS))?;
+        key.set("GenericDNSServers", &Value::Sz(&server))?;
+        key.set("IPSECCARestriction", &Value::Sz(""))?;
+        key.set("Name", &Value::MultiSz(&names))
+    })();
+    if let Err(e) = written {
+        bail!("writing the DNS rule for {device}: {e}");
     }
     Ok(())
 }
 
-fn bytes(w: &[u16]) -> &[u8] {
-    // SAFETY: the same memory, as bytes.
-    unsafe { std::slice::from_raw_parts(w.as_ptr().cast(), std::mem::size_of_val(w)) }
-}
-
-fn set(key: HKEY, name: &str, kind: u32, data: &[u8]) -> u32 {
-    let name = wide(name);
-    // SAFETY: an open key, a NUL-terminated name, `data` as long as given.
-    unsafe {
-        RegSetValueExW(
-            key,
-            name.as_ptr(),
-            0,
-            kind,
-            data.as_ptr(),
-            data.len() as u32,
-        )
-    }
-}
-
 fn delete(path: &str) {
-    let path = wide(path);
-    // SAFETY: a NUL-terminated path.
-    unsafe { RegDeleteTreeW(HKEY_LOCAL_MACHINE, path.as_ptr()) };
+    registry::delete_tree(Root::LocalMachine, path);
 }
 
 /// Crake's rules, whoever left them.
 fn rule_keys() -> Vec<String> {
-    subkeys(POLICY, KEY_ALL_ACCESS)
+    subkeys(POLICY, true)
         .into_iter()
         .filter(|name| name.starts_with(PREFIX))
         .map(|name| format!("{POLICY}\\{name}"))
         .collect()
 }
 
-/// The names of the keys under `path` (in HKLM), opened with `access`.
-fn subkeys(path: &str, access: u32) -> Vec<String> {
-    let path = wide(path);
-    let mut key: HKEY = std::ptr::null_mut();
-    // SAFETY: a NUL-terminated path; `key` is closed below.
-    if unsafe { RegOpenKeyExW(HKEY_LOCAL_MACHINE, path.as_ptr(), 0, access, &raw mut key) }
-        != ERROR_SUCCESS
-    {
-        return Vec::new();
-    }
-    let mut found = Vec::new();
-    for i in 0.. {
-        let mut name = [0u16; NAME_LEN];
-        let mut len = name.len() as u32;
-        // SAFETY: `name` holds `len` characters.
-        let err = unsafe {
-            RegEnumKeyExW(
-                key,
-                i,
-                name.as_mut_ptr(),
-                &raw mut len,
-                std::ptr::null(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-            )
-        };
-        if err != ERROR_SUCCESS {
-            break;
-        }
-        found.push(String::from_utf16_lossy(&name[..len as usize]));
-    }
-    // SAFETY: the key opened above.
-    unsafe { RegCloseKey(key) };
-    found
+/// The names of the keys under `path` (in HKLM).
+fn subkeys(path: &str, write: bool) -> Vec<String> {
+    Key::open(Root::LocalMachine, path, write).map_or_else(Vec::new, |k| k.subkeys())
 }
 
 /// A REG_MULTI_SZ (or REG_SZ) value under `path` in HKLM, as UTF-16.
 fn multi_sz(path: &str, value: &str) -> Vec<u16> {
-    let (path, value) = (wide(path), wide(value));
-    let flags = RRF_RT_REG_MULTI_SZ | RRF_RT_REG_SZ;
-    let mut size: u32 = 0;
-    // SAFETY: NUL-terminated names; a size query, then a buffer that size.
-    unsafe {
-        if RegGetValueW(
-            HKEY_LOCAL_MACHINE,
-            path.as_ptr(),
-            value.as_ptr(),
-            flags,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            &raw mut size,
-        ) != ERROR_SUCCESS
-        {
-            return Vec::new();
-        }
-        let mut data = vec![0u16; (size as usize).div_ceil(2)];
-        if RegGetValueW(
-            HKEY_LOCAL_MACHINE,
-            path.as_ptr(),
-            value.as_ptr(),
-            flags,
-            std::ptr::null_mut(),
-            data.as_mut_ptr().cast(),
-            &raw mut size,
-        ) != ERROR_SUCCESS
-        {
-            return Vec::new();
-        }
-        data.truncate((size as usize) / 2);
-        data
-    }
+    registry::multi_sz(Root::LocalMachine, path, value)
 }
 
 /// An NRPT rule's namespaces as domains: ".corp.example" (a suffix) and

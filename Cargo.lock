@@ -1462,6 +1462,7 @@ dependencies = [
  "objc2-service-management",
  "system-configuration 0.8.0",
  "tokio",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

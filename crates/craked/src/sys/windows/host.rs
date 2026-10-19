@@ -3,98 +3,58 @@
 //! console session.
 
 use std::collections::BTreeMap;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::path::Path;
 use std::sync::Mutex;
 use std::time::Duration;
 
+use crake_os::windows::host as adapters;
 use tokio::process::{Child, Command};
-use windows_sys::Win32::System::Console::{
-    AttachConsole, CTRL_BREAK_EVENT, CTRL_C_EVENT, FreeConsole, GenerateConsoleCtrlEvent,
-    SetConsoleCtrlHandler,
-};
-use windows_sys::Win32::System::RemoteDesktop::{
-    ProcessIdToSessionId, WTSGetActiveConsoleSessionId,
-};
 use windows_sys::Win32::System::Threading::CREATE_NEW_CONSOLE;
 
 /// Every IPv4 address on the machine: interface (its alias, as `crake-acme`
 /// for a tunnel), address, netmask.
 pub fn interfaces() -> Vec<(String, Ipv4Addr, u32)> {
     let mut found = Vec::new();
-    each_adapter(
-        windows_sys::Win32::Networking::WinSock::AF_INET,
-        |a, name| {
-            // SAFETY: Windows' list of the adapter's addresses, walked by its
-            // own links.
-            unsafe {
-                let mut unicast = a.FirstUnicastAddress;
-                while !unicast.is_null() {
-                    let u = &*unicast;
-                    if let Some(addr) = ipv4(u.Address.lpSockaddr) {
-                        let prefix = u32::from(u.OnLinkPrefixLength.min(crate::hosts::V4_BITS));
-                        let mask = u32::MAX.checked_shl(Ipv4Addr::BITS - prefix).unwrap_or(0);
-                        found.push((name.to_owned(), addr, mask));
-                    }
-                    unicast = u.Next;
-                }
+    for a in adapters::adapters(windows_sys::Win32::Networking::WinSock::AF_INET) {
+        for &(addr, prefix) in &a.unicast {
+            if let IpAddr::V4(addr) = addr {
+                let prefix = u32::from(prefix.min(crate::hosts::V4_BITS));
+                let mask = u32::MAX.checked_shl(Ipv4Addr::BITS - prefix).unwrap_or(0);
+                found.push((a.name.clone(), addr, mask));
             }
-        },
-    );
+        }
+    }
     found
 }
 
 /// Every IPv6 address on the machine: interface, address, prefix length.
 pub fn interfaces6() -> Vec<(String, std::net::Ipv6Addr, u8)> {
-    use windows_sys::Win32::Networking::WinSock::{AF_INET6, SOCKADDR_IN6};
     let mut found = Vec::new();
-    each_adapter(AF_INET6, |a, name| {
-        // SAFETY: as in `interfaces`; AF_INET6 means a SOCKADDR_IN6.
-        unsafe {
-            let mut unicast = a.FirstUnicastAddress;
-            while !unicast.is_null() {
-                let u = &*unicast;
-                let sa = u.Address.lpSockaddr;
-                if !sa.is_null() && (*sa).sa_family == AF_INET6 {
-                    let sin6 = &*sa.cast::<SOCKADDR_IN6>();
-                    let addr = std::net::Ipv6Addr::from(sin6.sin6_addr.u.Byte);
-                    let prefix = u.OnLinkPrefixLength.min(crate::hosts::V6_BITS);
-                    found.push((name.to_owned(), addr, prefix));
-                }
-                unicast = u.Next;
+    for a in adapters::adapters(windows_sys::Win32::Networking::WinSock::AF_INET6) {
+        for &(addr, prefix) in &a.unicast {
+            if let IpAddr::V6(addr) = addr {
+                found.push((a.name.clone(), addr, prefix.min(crate::hosts::V6_BITS)));
             }
         }
-    });
+    }
     found
 }
 
 /// The DNS servers Windows was given (DHCP, or by hand) on the adapters
 /// that are up, Crake's own tunnels left out: where public names go.
 pub fn system_dns() -> Vec<std::net::IpAddr> {
-    let mut found = Vec::new();
-    each_adapter(
-        windows_sys::Win32::Networking::WinSock::AF_INET,
-        |a, name| {
-            // 1: IfOperStatusUp.
-            if a.OperStatus != 1 || name.starts_with("crake-") {
-                return;
+    let mut found: Vec<IpAddr> = Vec::new();
+    for a in adapters::adapters(windows_sys::Win32::Networking::WinSock::AF_INET) {
+        if !a.up || a.name.starts_with("crake-") {
+            continue;
+        }
+        for addr in a.dns_servers {
+            if addr.is_ipv4() && !addr.is_loopback() && !found.contains(&addr) {
+                found.push(addr);
             }
-            // SAFETY: as in `interfaces`.
-            unsafe {
-                let mut server = a.FirstDnsServerAddress;
-                while !server.is_null() {
-                    let s = &*server;
-                    if let Some(addr) = ipv4(s.Address.lpSockaddr)
-                        && !addr.is_loopback()
-                        && !found.contains(&addr.into())
-                    {
-                        found.push(addr.into());
-                    }
-                    server = s.Next;
-                }
-            }
-        },
-    );
+        }
+    }
     found
 }
 
@@ -102,106 +62,11 @@ pub fn system_dns() -> Vec<std::net::IpAddr> {
 /// each one's own (DHCP's, or a VPN client's on its adapter, as
 /// AnyConnect sets) and its suffix search list.
 pub fn adapter_domains() -> Vec<String> {
-    let mut found = Vec::new();
-    each_adapter(
-        windows_sys::Win32::Networking::WinSock::AF_UNSPEC,
-        |a, name| {
-            // 1: IfOperStatusUp.
-            if a.OperStatus != 1 || name.starts_with("crake-") {
-                return;
-            }
-            // SAFETY: as in `interfaces`: strings and a list Windows wrote.
-            unsafe {
-                found.push(wide(a.DnsSuffix));
-                let mut suffix = a.FirstDnsSuffix;
-                while !suffix.is_null() {
-                    let s = &*suffix;
-                    found.push(wide(s.String.as_ptr()));
-                    suffix = s.Next;
-                }
-            }
-        },
-    );
-    found.retain(|d| !d.is_empty());
-    found
-}
-
-/// Each adapter with addresses of `family`, with its alias.
-fn each_adapter(
-    family: windows_sys::Win32::Networking::WinSock::ADDRESS_FAMILY,
-    mut f: impl FnMut(&windows_sys::Win32::NetworkManagement::IpHelper::IP_ADAPTER_ADDRESSES_LH, &str),
-) {
-    use windows_sys::Win32::NetworkManagement::IpHelper::{
-        GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_MULTICAST, GetAdaptersAddresses,
-        IP_ADAPTER_ADDRESSES_LH,
-    };
-    const ERROR_BUFFER_OVERFLOW: u32 = 111;
-    let flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST;
-    // A first guess at the size; the call says if it needs more.
-    const FIRST_SIZE: u32 = 16 * 1024;
-    let mut size: u32 = FIRST_SIZE;
-    let mut buf: Vec<u64>;
-    loop {
-        buf = vec![0; (size as usize).div_ceil(size_of::<u64>())];
-        // SAFETY: `buf` holds `size` bytes, 8-byte aligned.
-        let err = unsafe {
-            GetAdaptersAddresses(
-                u32::from(family),
-                flags,
-                std::ptr::null(),
-                buf.as_mut_ptr().cast(),
-                &raw mut size,
-            )
-        };
-        match err {
-            0 => break,
-            ERROR_BUFFER_OVERFLOW => continue,
-            _ => return,
-        }
-    }
-    // SAFETY: a list Windows wrote into `buf`, walked by its own links.
-    unsafe {
-        let mut adapter = buf.as_ptr().cast::<IP_ADAPTER_ADDRESSES_LH>();
-        while !adapter.is_null() {
-            let a = &*adapter;
-            f(a, &wide(a.FriendlyName));
-            adapter = a.Next;
-        }
-    }
-}
-
-/// An IPv4 socket address's address.
-///
-/// # Safety
-/// `sa` is null or points to a socket address Windows filled in.
-unsafe fn ipv4(sa: *const windows_sys::Win32::Networking::WinSock::SOCKADDR) -> Option<Ipv4Addr> {
-    use windows_sys::Win32::Networking::WinSock::{AF_INET, SOCKADDR_IN};
-    // SAFETY: as the caller promises; AF_INET means a SOCKADDR_IN.
-    unsafe {
-        if sa.is_null() || (*sa).sa_family != AF_INET {
-            return None;
-        }
-        let sin = &*sa.cast::<SOCKADDR_IN>();
-        Some(Ipv4Addr::from(sin.sin_addr.S_un.S_addr.to_ne_bytes()))
-    }
-}
-
-/// A NUL-terminated UTF-16 string Windows owns, copied.
-///
-/// # Safety
-/// `p` is null or points to a NUL-terminated UTF-16 string.
-unsafe fn wide(p: *const u16) -> String {
-    if p.is_null() {
-        return String::new();
-    }
-    let mut len = 0;
-    // SAFETY: up to the NUL, as the caller promises.
-    unsafe {
-        while *p.add(len) != 0 {
-            len += 1;
-        }
-        String::from_utf16_lossy(std::slice::from_raw_parts(p, len))
-    }
+    adapters::adapters(windows_sys::Win32::Networking::WinSock::AF_UNSPEC)
+        .into_iter()
+        .filter(|a| a.up && !a.name.starts_with("crake-"))
+        .flat_map(|a| a.suffixes)
+        .collect()
 }
 
 /// Which tunnel interface each routing mark stands for. Probing names a
@@ -279,29 +144,7 @@ fn unicast_if(raw: std::os::windows::io::RawSocket, device: &str) -> std::io::Re
 
 /// The same, by the interface's index.
 fn unicast_index(raw: std::os::windows::io::RawSocket, index: u32) -> std::io::Result<()> {
-    use windows_sys::Win32::Networking::WinSock::{
-        IP_UNICAST_IF, IPPROTO_IP, IPPROTO_IPV6, IPV6_UNICAST_IF, SOCKET, setsockopt,
-    };
-    let set = |level: i32, option: i32, value: u32| {
-        // SAFETY: a live socket of ours; `value` is the u32 the option takes.
-        let err = unsafe {
-            setsockopt(
-                raw as SOCKET,
-                level,
-                option,
-                (&raw const value).cast(),
-                size_of::<u32>() as i32,
-            )
-        };
-        if err == 0 {
-            Ok(())
-        } else {
-            Err(std::io::Error::last_os_error())
-        }
-    };
-    let v4 = set(IPPROTO_IP, IP_UNICAST_IF, index.to_be());
-    let v6 = set(IPPROTO_IPV6, IPV6_UNICAST_IF, index);
-    v4.or(v6)
+    adapters::unicast_index(raw, index)
 }
 
 /// openconnect gets a console of its own (in the service's session, so
@@ -349,36 +192,18 @@ async fn send_console_event(pid: u32, event: &str) -> bool {
 /// send the event to everything on it, this process swallowing its own copy
 /// until it exits.
 pub fn deliver_console_event(pid: u32, event: &str) -> bool {
-    let event = match event {
-        "c" => CTRL_C_EVENT,
-        "break" => CTRL_BREAK_EVENT,
+    let ctrl_c = match event {
+        "c" => true,
+        "break" => false,
         _ => return false,
     };
-    // SAFETY: plain console calls; `swallow` lives for the whole program.
-    unsafe {
-        FreeConsole();
-        if AttachConsole(pid) == 0 {
-            return false;
-        }
-        SetConsoleCtrlHandler(Some(swallow), 1);
-        let sent = GenerateConsoleCtrlEvent(event, 0) != 0;
-        // The event arrives on a thread of its own: be here for it.
-        std::thread::sleep(EVENT_ARRIVES);
-        sent
-    }
-}
-
-unsafe extern "system" fn swallow(_event: u32) -> windows_sys::core::BOOL {
-    1
+    // The event arrives on a thread of its own: be here for it.
+    adapters::deliver_console_event(pid, ctrl_c, EVENT_ARRIVES)
 }
 
 /// `pid` runs in the session at the console (the signed-in user's).
 pub fn in_console_session(pid: u32) -> bool {
-    let mut session = 0;
-    // SAFETY: `session` is a valid out pointer for the call.
-    let found = unsafe { ProcessIdToSessionId(pid, &raw mut session) } != 0;
-    // SAFETY: no arguments.
-    found && session == unsafe { WTSGetActiveConsoleSessionId() }
+    adapters::in_console_session(pid)
 }
 
 /// A folder for SYSTEM and administrators alone (craked's own, OpenVPN's
@@ -431,32 +256,14 @@ pub fn create_private(path: &Path) -> std::io::Result<std::fs::File> {
 pub fn counters(
     devices: &std::collections::HashMap<String, String>,
 ) -> (u64, u64, std::collections::HashMap<String, u64>) {
-    use windows_sys::Win32::NetworkManagement::IpHelper::{
-        FreeMibTable, GetIfTable2, MIB_IF_TABLE2,
-    };
     let (mut physical, mut tunnels, mut each) = (0, 0, std::collections::HashMap::new());
-    let mut table: *mut MIB_IF_TABLE2 = std::ptr::null_mut();
-    // SAFETY: Windows allocates the table; it's read, then freed.
-    unsafe {
-        if GetIfTable2(&raw mut table) != 0 {
-            return (0, 0, each);
+    for (name, bytes, hardware) in adapters::interface_bytes() {
+        if name.starts_with("crake-") || devices.contains_key(&name) {
+            tunnels += bytes;
+            each.insert(name, bytes);
+        } else if hardware {
+            physical += bytes;
         }
-        let rows =
-            std::slice::from_raw_parts((*table).Table.as_ptr(), (*table).NumEntries as usize);
-        for row in rows {
-            let name = wide(row.Alias.as_ptr());
-            let bytes = row.InOctets + row.OutOctets;
-            // Bit 0 of the flags: a hardware interface (not loopback,
-            // virtual switches or other filters stacked on one).
-            let hardware = row.InterfaceAndOperStatusFlags._bitfield & 1 != 0;
-            if name.starts_with("crake-") || devices.contains_key(&name) {
-                tunnels += bytes;
-                each.insert(name, bytes);
-            } else if hardware {
-                physical += bytes;
-            }
-        }
-        FreeMibTable(table.cast());
     }
     (physical, tunnels, each)
 }

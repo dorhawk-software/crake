@@ -1,5 +1,5 @@
-// Unsafe code lives in crake-os alone (Windows follows).
-#![cfg_attr(not(windows), forbid(unsafe_code))]
+// Unsafe code lives in crake-os alone.
+#![forbid(unsafe_code)]
 pub mod auth;
 pub mod config;
 pub mod dbus;

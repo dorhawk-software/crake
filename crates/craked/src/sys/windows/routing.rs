@@ -267,7 +267,7 @@ fn keep_ways(except: &[Target]) -> Result<Vec<iphelper::Route>> {
             // An IPv6 exception without an IPv6 way (no IPv6 here): nothing
             // to keep.
             Err(_) if t.is_ipv6() => continue,
-            Err(e) => return Err(e),
+            Err(e) => return Err(e.into()),
         };
         if prefix > 0 {
             continue;
