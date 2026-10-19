@@ -91,7 +91,7 @@ const LAST_HOST: u8 = 250;
 // With craked over its socket, openconnect and nftables: Linux.
 #[cfg(all(test, target_os = "linux"))]
 mod e2e_openvpn;
-#[cfg(all(test, target_os = "linux"))]
+#[cfg(test)]
 mod e2e_protocols;
 // Real gateways through Cloudflare, on CI's Mac and Windows (CLAUDE.md, 7j).
 #[cfg(all(test, target_os = "linux"))]

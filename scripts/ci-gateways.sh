@@ -1,7 +1,8 @@
 #!/bin/sh
 # ACME's gateways for CI's Mac (and, next, Windows) job (CLAUDE.md, 7j): the
 # e2e gateway's image (scripts/e2e, its ci-start.sh) on the Linux runner,
-# ocserv on 127.0.0.1:8443 and openvpn over TCP on 127.0.0.1:1194, where
+# ocserv on 127.0.0.1:8443, openvpn over TCP on 127.0.0.1:1194, its browser
+# sign-in page on 8080 and openconnect's fake servers on 4431-4434, where
 # Cloudflare Tunnel (cloudflared, started by the workflow) picks them up.
 #   scripts/ci-gateways.sh up OUT   the gateways; their CA and logs in OUT
 #   scripts/ci-gateways.sh wait JOB… until this run's jobs JOB… have finished
@@ -18,7 +19,8 @@ case "${1:-}" in
     mkdir -p "$OUT"
     docker build -q -t crake-e2e-gateway scripts/e2e >/dev/null
     docker run -d --rm --name "$NAME" --cap-add NET_ADMIN --device /dev/net/tun \
-      -p 127.0.0.1:8443:443/tcp -p 127.0.0.1:1194:1194/tcp \
+      -p 127.0.0.1:8443:443/tcp -p 127.0.0.1:1194:1194/tcp -p 127.0.0.1:8080:8080/tcp \
+      -p 127.0.0.1:4431-4434:4431-4434/tcp \
       -v "$OUT:/link" crake-e2e-gateway sh /ci-start.sh >/dev/null
     i=0
     until [ -s "$OUT/openvpn-ca.crt" ] && curl -sk -o /dev/null https://127.0.0.1:8443; do

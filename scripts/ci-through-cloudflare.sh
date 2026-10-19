@@ -17,8 +17,16 @@ cd "$(dirname "$0")/.."
 # The gateways' names in Cloudflare (each a TCP route of the tunnel).
 ANYCONNECT_HOST=crake-ci-anyconnect.dorhawk.software
 OPENVPN_HOST=crake-ci-openvpn.dorhawk.software
-# How long the gateways job gets to be up, and the tunnel to carry them.
+# OpenVPN's browser sign-in page, and openconnect's fake servers for the
+# protocols without an open-source gateway (e2e_protocols.rs), each on the
+# port the gateways job publishes it on.
+SSO_HOST=crake-ci-sso.dorhawk.software
+FAKE_HOSTS="crake-ci-fortinet:4431 crake-ci-gp:4432 crake-ci-f5:4433 crake-ci-pulse:4434"
+# How long the tunnel gets to carry the gateways once they're up (5 s a
+# try), and the gateways job, queued behind other runs', to be up at all
+# (10 s a try: an hour).
 READY_TRIES=60
+WAIT_TRIES=360
 SYSTEM=$1
 WORK=${RUNNER_TEMP:-/tmp}/through-cloudflare
 mkdir -p "$WORK"
@@ -42,11 +50,43 @@ access() {
 }
 access "$ANYCONNECT_HOST" 8443
 access "$OPENVPN_HOST" 1194
+access "$SSO_HOST" 8080
+for fake in $FAKE_HOSTS; do
+  access "${fake%%:*}.dorhawk.software" "${fake##*:}"
+done
 # The gateways job hands its OpenVPN CA over as an artifact once they're up.
+# It waits its turn for the one tunnel behind other runs' (2026-10-19: 20
+# minutes behind a run started by hand, while this waited 10 and failed),
+# so this follows the job: waiting while it's queued or running, giving up
+# once it ended without the artifact. GitHub keeps one queued job per
+# group and cancels the one before when another queues: a newer run took
+# this one's turn and tests the gateways itself, so a branch skips them
+# (said as a warning); main, whose run a release waits on, fails.
+gateways_job() {
+  gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
+    --jq '.jobs[] | select(.name == "gateways") | .status + " " + .conclusion' 2>/dev/null || true
+}
 i=0
 until gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n gateways-ready -D "$WORK/ready" >/dev/null 2>&1; do
   i=$((i + 1))
-  [ "$i" -lt "$READY_TRIES" ] || { echo "the gateways never said they're up" >&2; exit 1; }
+  job=$(gateways_job)
+  case "$job" in
+    "completed cancelled")
+      if [ "${GITHUB_REF:-}" = refs/heads/main ]; then
+        echo "the gateways job was cancelled: another run took its turn" >&2
+        exit 1
+      fi
+      echo "::warning::The gateways job was cancelled (a newer run took its turn with the tunnel); the real-gateway tests are skipped in this run."
+      exit 0
+      ;;
+    completed*)
+      # Its artifact may land a moment after it ends: one more look.
+      gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n gateways-ready -D "$WORK/ready" >/dev/null 2>&1 && break
+      echo "the gateways job ended ($job) without saying they're up" >&2
+      exit 1
+      ;;
+  esac
+  [ "$i" -lt "$WAIT_TRIES" ] || { echo "the gateways never said they're up (their job: ${job:-not found})" >&2; exit 1; }
   sleep 10
 done
 i=0
@@ -56,7 +96,13 @@ until curl -sk -o /dev/null https://127.0.0.1:8443; do
   sleep 5
 done
 # Words, each a filter: a test that matches any runs.
-FILTER=${CRAKE_GATEWAY_FILTER:-gateway_tests ${SYSTEM}_journey}
+# The newer gateways, where Cloudflare lets CI reach them (their hostnames
+# in the Access application): the tests that use them skip otherwise.
+SSO= FAKES=
+curl -s -o /dev/null --max-time 20 http://127.0.0.1:8080/ && SSO=127.0.0.1:8080
+curl -sk -o /dev/null --max-time 20 https://127.0.0.1:4431/ && FAKES=127.0.0.1
+echo "browser sign-in page: ${SSO:-not reached}; fake servers: ${FAKES:-not reached}"
+FILTER=${CRAKE_GATEWAY_FILTER:-gateway_tests ${SYSTEM}_journey e2e_protocols::each_protocols_sign_in}
 DOCTOR="CRAKE_DOCTOR_TUNNEL=${CRAKE_DOCTOR_TUNNEL:-} CRAKE_DOCTOR_MINUTES=${CRAKE_DOCTOR_MINUTES:-} CRAKE_DOCTOR_PHASE=${CRAKE_DOCTOR_PHASE:-}"
 [ -n "${CRAKE_DOCTOR_PHASE:-}" ] || DOCTOR=
 status=0
@@ -67,11 +113,13 @@ if [ "$SYSTEM" = macos ]; then
     jq -r 'select(.executable != null and .target.name == "crake" and .profile.test) | .executable' | head -n1)
   [ -n "$BIN" ] || { echo "could not build the tests" >&2; exit 1; }
   sudo env CRAKE_E2E=1 CRAKE_E2E_GATEWAY=https://127.0.0.1:8443 \
+    CRAKE_GATEWAY_SSO="$SSO" CRAKE_FAKE_GATEWAY="$FAKES" \
     CRAKE_GATEWAY_OPENVPN="127.0.0.1 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
     CRAKE_E2E_HOOK="$HOOK" CRAKE_E2E_CRAKED="$PWD/target/debug/craked" $DOCTOR \
     "$BIN" $FILTER --test-threads=1 --nocapture || status=$?
 else
   CRAKE_E2E=1 CRAKE_E2E_GATEWAY=https://127.0.0.1:8443 \
+    CRAKE_GATEWAY_SSO="$SSO" CRAKE_FAKE_GATEWAY="$FAKES" \
     CRAKE_GATEWAY_OPENVPN="127.0.0.1 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
     CRAKE_OPENCONNECT="C:/Program Files/Crake/openconnect/openconnect.exe" \
     "$3" $FILTER --test-threads=1 --nocapture || status=$?

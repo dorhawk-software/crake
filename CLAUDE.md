@@ -1179,6 +1179,18 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
      Auth, include Service Token crake-ci): nobody else gets in.
    - GitHub, dorhawk-software/crake → Settings → Secrets → Actions:
      CLOUDFLARE_TUNNEL_TOKEN, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET.
+   - **Added 2026-10-19 (the user):** five more routes on `crake-ci` and
+     the same hostnames in `Crake CI gateways`: crake-ci-sso →
+     tcp://localhost:8080 (OpenVPN's browser sign-in page, sso.py), and
+     openconnect's fake servers crake-ci-fortinet/-gp/-f5/-pulse →
+     tcp://localhost:4431–4434. The gateways job publishes those ports
+     (`ci-gateways.sh`, `ci-start.sh` starts the fake servers);
+     ci-through-cloudflare.sh carries them to the same local ports and
+     sets CRAKE_GATEWAY_SSO / CRAKE_FAKE_GATEWAY only when they answer, so
+     `gateway_tests::openvpn_browser_sign_in_through_cloudflare` and
+     `e2e_protocols::each_protocols_sign_in` (now portable) skip without
+     them. Taking it down: the same as below, these five routes and
+     hostnames with the rest.
    To take it down: delete the application, the policy and the service
    token (Access), the tunnel (its routes go with it; check the two
    CNAMEs are gone from the zone's DNS), and the three secrets; CI then
