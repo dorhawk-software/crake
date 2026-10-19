@@ -1,4 +1,6 @@
 //! Types shared by `craked`, `crake-hook` and (later) the UI.
+// Unsafe code lives in crake-os alone.
+#![forbid(unsafe_code)]
 
 use std::collections::BTreeMap;
 

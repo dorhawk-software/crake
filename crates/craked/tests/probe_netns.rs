@@ -9,10 +9,9 @@
 #![cfg(target_os = "linux")]
 
 use std::collections::HashSet;
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpStream};
-use std::os::fd::AsRawFd;
 use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -23,6 +22,10 @@ use crake_proto::TunnelState;
 use craked::config::{Config, Protocol, TunnelConfig};
 use craked::hook_server;
 use craked::manager::Manager;
+
+#[path = "common/script.rs"]
+mod script;
+use script::scripted;
 
 const FAKE: &str = r#"#!/bin/sh
 export TUNDEV=crake-acme VPNGATEWAY=192.0.2.10 INTERNAL_IP4_ADDRESS=10.40.255.7 \
@@ -41,29 +44,7 @@ fn sh(cmd: &str) -> String {
 }
 
 fn open_tun(name: &str) -> File {
-    let f = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open("/dev/net/tun")
-        .unwrap();
-    #[repr(C)]
-    struct IfReq {
-        name: [u8; 16],
-        flags: libc::c_short,
-        _pad: [u8; 22],
-    }
-    let mut req = IfReq {
-        name: [0; 16],
-        flags: (libc::IFF_TUN | libc::IFF_NO_PI) as libc::c_short,
-        _pad: [0; 22],
-    };
-    req.name[..name.len()].copy_from_slice(name.as_bytes());
-    const TUNSETIFF: libc::c_ulong = 0x4004_54ca;
-    // SAFETY: TUNSETIFF with a properly sized ifreq.
-    let r = unsafe { libc::ioctl(f.as_raw_fd(), TUNSETIFF, &mut req) };
-    assert!(r >= 0, "TUNSETIFF: {}", std::io::Error::last_os_error());
-    unsafe { libc::fcntl(f.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK) };
-    f
+    crake_os::linux::open_tun(name, true).expect("a tun device")
 }
 
 fn sum16(data: &[u8]) -> u32 {
@@ -340,9 +321,8 @@ async fn start_probe(race: bool) -> Probe {
 
     let dir = tempfile::tempdir().unwrap();
     let fake = dir.path().join("openconnect");
-    std::fs::write(&fake, FAKE).unwrap();
+    std::fs::write(&fake, scripted(FAKE, dir.path())).unwrap();
     std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
-    unsafe { std::env::set_var("CRAKE_TEST_HOOK", env!("CARGO_BIN_EXE_crake-hook")) };
     let cfg = Config {
         hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
         hook_socket: dir.path().join("hook.sock"),

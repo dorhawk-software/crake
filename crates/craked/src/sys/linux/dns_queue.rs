@@ -10,13 +10,11 @@
 //! an answer over TCP spread over segments is put together first, in the order
 //! they came (`dns_tcp`), and only the segment that completes it is held.
 
-use std::ffi::CStr;
 use std::io::ErrorKind;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use nfq_updated::{Message, Queue, Verdict};
-use tokio::io::unix::AsyncFd;
 use tokio::sync::mpsc;
 
 use crate::dns;
@@ -31,11 +29,7 @@ pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
     // If craked falls behind, let answers through rather than drop them.
     q.set_fail_open(QUEUE_NUM, true).ok();
     q.set_nonblocking(true);
-    // SAFETY: the queue owns its netlink socket and the AsyncFd owns the
-    // queue: open, the same descriptor, for as long as the AsyncFd holds it.
-    let mut fd = unsafe { AsyncFd::register(q) }
-        .map_err(std::io::Error::from)
-        .context("watching NFQUEUE")?;
+    let mut fd = crake_os::linux::watch(q).context("watching NFQUEUE")?;
     let (done_tx, mut done) = mpsc::unbounded_channel::<Message>();
 
     tokio::spawn(async move {
@@ -111,12 +105,5 @@ async fn handle(mgr: &Arc<Manager>, mut msg: Message, whole: Vec<Vec<u8>>) -> Me
 
 /// The interface's name (`crake-acme`, `tun0`).
 fn device_of(ifindex: u32) -> Option<String> {
-    let mut buf = [0 as libc::c_char; libc::IF_NAMESIZE];
-    // SAFETY: buffer is IF_NAMESIZE as required.
-    let p = unsafe { libc::if_indextoname(ifindex, buf.as_mut_ptr()) };
-    if p.is_null() {
-        return None;
-    }
-    let name = unsafe { CStr::from_ptr(buf.as_ptr()) }.to_str().ok()?;
-    Some(name.to_owned())
+    crake_os::unix::name_of(ifindex)
 }

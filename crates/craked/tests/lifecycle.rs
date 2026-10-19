@@ -10,6 +10,10 @@ use craked::config::{Config, Protocol, TunnelConfig};
 use craked::hook_server;
 use craked::manager::Manager;
 
+#[path = "common/script.rs"]
+mod script;
+use script::scripted;
+
 const FAKE: &str = r#"#!/bin/sh
 HOOK="$CRAKE_TEST_HOOK"
 export TUNDEV=crake-acme INTERNAL_IP4_ADDRESS=10.40.1.7 INTERNAL_IP4_NETMASK=255.255.255.0 \
@@ -36,10 +40,8 @@ async fn wait_for(mgr: &Manager, name: &str, want: TunnelState) {
 
 fn setup(dir: &std::path::Path, script: &str) -> Config {
     let fake = dir.join("openconnect");
-    std::fs::write(&fake, script).unwrap();
+    std::fs::write(&fake, scripted(script, dir)).unwrap();
     std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
-    // The fake finds the hook through the environment.
-    unsafe { std::env::set_var("CRAKE_TEST_HOOK", env!("CARGO_BIN_EXE_crake-hook")) };
     Config {
         hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
         hook_socket: dir.join("hook.sock"),
@@ -221,8 +223,6 @@ async fn where_udp_is_blocked_it_carries_on_over_tcp() {
     let dir = tempfile::tempdir().unwrap();
     let cfg = setup(dir.path(), FAKE_NO_UDP);
     let calls = dir.path().join("calls");
-    // SAFETY: only this test reads it.
-    unsafe { std::env::set_var("CRAKE_TEST_CALLS", &calls) };
     let socket = cfg.hook_socket.clone();
     let mgr = Manager::new(cfg).unwrap();
     let _srv = hook_server::serve(mgr.clone(), &socket).unwrap();
@@ -822,8 +822,6 @@ async fn an_upgrade_hands_the_tunnels_to_the_new_craked() {
     let dir = tempfile::tempdir().unwrap();
     let cfg = setup(dir.path(), FAKE_HANDOVER);
     let calls = dir.path().join("calls");
-    // SAFETY: only this test reads it.
-    unsafe { std::env::set_var("CRAKE_TEST_HANDOVER", &calls) };
     let socket = cfg.hook_socket.clone();
     let log = || std::fs::read_to_string(dir.path().join("log")).unwrap();
 

@@ -10,6 +10,8 @@
 //! The files are found as rustc finds them: from the crate's roots (src/lib.rs,
 //! src/main.rs, src/bin/*.rs) along their `mod` declarations, so a test module
 //! (`#[cfg(test)] mod tests;`) and everything in it is left out.
+// Unsafe code lives in crake-os alone.
+#![forbid(unsafe_code)]
 
 mod check;
 

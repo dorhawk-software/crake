@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/crake-proto", "crates/craked", "crates/crake", "crates/lint-literals"]
+members = ["crates/crake-proto", "crates/crake-os", "crates/craked", "crates/crake", "crates/lint-literals"]
 
 [workspace.package]
 version = "0.11.1"

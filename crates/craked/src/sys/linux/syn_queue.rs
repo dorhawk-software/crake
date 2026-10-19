@@ -15,7 +15,6 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use nfq_updated::{Message, Queue, Verdict};
-use tokio::io::unix::AsyncFd;
 use tokio::sync::mpsc;
 
 use crate::manager::Manager;
@@ -28,11 +27,7 @@ pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
     // If craked falls behind, let connections through rather than hold them.
     q.set_fail_open(QUEUE_NUM, true).ok();
     q.set_nonblocking(true);
-    // SAFETY: the queue owns its netlink socket and the AsyncFd owns the
-    // queue: open, the same descriptor, for as long as the AsyncFd holds it.
-    let mut fd = unsafe { AsyncFd::register(q) }
-        .map_err(std::io::Error::from)
-        .context("watching the SYN NFQUEUE")?;
+    let mut fd = crake_os::linux::watch(q).context("watching the SYN NFQUEUE")?;
     let (done_tx, mut done) = mpsc::unbounded_channel::<Message>();
 
     tokio::spawn(async move {

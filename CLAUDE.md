@@ -1362,6 +1362,19 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   tests; `#![forbid(unsafe_code)]` in crake, craked, crake-proto and
   lint-literals (forbid can't be allowed again further down), and a lint
   gate check that `unsafe` appears nowhere else. Mechanical but sizeable.
+  **In progress (2026-10-19), system by system.** `crates/crake-os`
+  exists: Linux and the shared Unix calls are in it (getifaddrs,
+  interface names and indexes, signals, netlink sockets, SO_MARK, tun
+  devices for tests, tokio's `AsyncFd::register` only for `OwnsFd`
+  types, and WAYLAND_DISPLAY unset only while /proc says the app has one
+  thread). crake-proto, crake-hook and lint-literals forbid unsafe;
+  craked and the app forbid it on Linux (`cfg_attr`); the tests share a
+  helper that writes paths into fake scripts instead of setting the
+  environment (racy with the harness's threads).
+  `scripts/check-unsafe.sh` (lint gate) fails on `unsafe` outside
+  crake-os but for `STILL_TO_MOVE`: macOS (`sys/macos/`, tests/macos*.rs),
+  then Windows (`sys/windows/`, the most). It shrinks to nothing; then
+  the forbids lose their cfg.
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with

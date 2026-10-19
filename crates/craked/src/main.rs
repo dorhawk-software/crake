@@ -1,3 +1,5 @@
+// Unsafe code lives in crake-os alone (Windows and macOS follow).
+#![cfg_attr(target_os = "linux", forbid(unsafe_code))]
 use std::path::PathBuf;
 use std::sync::Arc;
 

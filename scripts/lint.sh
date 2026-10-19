@@ -7,7 +7,8 @@
 # (scripts/check-size.sh, clippy::too_many_lines), Crake's patched GPUI
 # the one built (scripts/check-gpui-patch.sh), and no magic numbers in the
 # crates' own code: each named, or kept with `// literal: <reason>`
-# (crates/lint-literals). Exits non-zero if any fails.
+# (crates/lint-literals), and unsafe code only in crates/crake-os
+# (scripts/check-unsafe.sh). Exits non-zero if any fails.
 #
 #   scripts/lint.sh            # run it by hand
 #
@@ -33,7 +34,8 @@ step "cargo machete" cargo machete
 step "private names" scripts/check-private.sh
 step "file sizes" scripts/check-size.sh
 step "patched GPUI in use" scripts/check-gpui-patch.sh
+step "unsafe only in crake-os" scripts/check-unsafe.sh
 # Crates join this list as their magic numbers get names.
-step "magic numbers" cargo run --quiet -p lint-literals -- crates/crake-proto crates/craked crates/crake crates/lint-literals
+step "magic numbers" cargo run --quiet -p lint-literals -- crates/crake-proto crates/crake-os crates/craked crates/crake crates/lint-literals
 
 exit $fail

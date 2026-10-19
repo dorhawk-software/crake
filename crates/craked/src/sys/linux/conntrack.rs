@@ -5,7 +5,6 @@
 
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -85,7 +84,7 @@ impl TcpState {
 
 /// Subscribed to conntrack events (needs CAP_NET_ADMIN).
 pub struct Events {
-    fd: AsyncFd<OwnedFd>,
+    fd: AsyncFd<crake_os::linux::Netlink>,
     buf: Vec<u8>,
 }
 
@@ -94,20 +93,9 @@ impl Events {
         let groups =
             NF_NETLINK_CONNTRACK_NEW | NF_NETLINK_CONNTRACK_UPDATE | NF_NETLINK_CONNTRACK_DESTROY;
         let fd = netlink_socket(groups, true).context("conntrack events")?;
-        let size = SOCKET_BUFFER;
-        // SAFETY: plain setsockopt with an int.
-        unsafe {
-            libc::setsockopt(
-                fd.as_raw_fd(),
-                libc::SOL_SOCKET,
-                libc::SO_RCVBUFFORCE,
-                (&size as *const libc::c_int).cast(),
-                std::mem::size_of::<libc::c_int>() as u32,
-            );
-        }
-        // SAFETY: the netlink socket is an OwnedFd the AsyncFd owns: open,
-        // the same descriptor for as long as the AsyncFd holds it.
-        let fd = unsafe { AsyncFd::register(fd) }.map_err(std::io::Error::from)?;
+        // Best effort: without it, a burst may lose events (ENOBUFS).
+        let _ = fd.force_receive_buffer(SOCKET_BUFFER);
+        let fd = crake_os::linux::watch(fd)?;
         Ok(Self {
             fd,
             buf: vec![0; EVENT_BUFFER],
@@ -118,49 +106,23 @@ impl Events {
     pub async fn next(&mut self) -> io::Result<Vec<Event>> {
         loop {
             let mut guard = self.fd.readable().await?;
-            let fd = self.fd.get_ref().as_raw_fd();
-            // SAFETY: reading into our own buffer.
-            let n = unsafe { libc::recv(fd, self.buf.as_mut_ptr().cast(), self.buf.len(), 0) };
-            if n < 0 {
-                let e = io::Error::last_os_error();
-                match e.raw_os_error() {
+            match self.fd.get_ref().recv(&mut self.buf) {
+                Ok(n) => return Ok(parse_messages(&self.buf[..n])),
+                Err(e) => match e.raw_os_error() {
                     Some(libc::EAGAIN) => {
                         guard.clear_ready();
-                        continue;
                     }
                     // Overflow: some events were lost; carry on.
-                    Some(libc::ENOBUFS) => continue,
+                    Some(libc::ENOBUFS) => {}
                     _ => return Err(e),
-                }
+                },
             }
-            return Ok(parse_messages(&self.buf[..n as usize]));
         }
     }
 }
 
-fn netlink_socket(groups: u32, nonblocking: bool) -> io::Result<OwnedFd> {
-    let flags =
-        libc::SOCK_RAW | libc::SOCK_CLOEXEC | if nonblocking { libc::SOCK_NONBLOCK } else { 0 };
-    // SAFETY: plain socket/bind calls; the fd is owned right away.
-    unsafe {
-        let fd = libc::socket(libc::AF_NETLINK, flags, NETLINK_NETFILTER);
-        if fd < 0 {
-            return Err(io::Error::last_os_error());
-        }
-        let owned = OwnedFd::from_raw_fd(fd);
-        let mut addr: libc::sockaddr_nl = std::mem::zeroed();
-        addr.nl_family = libc::AF_NETLINK as u16;
-        addr.nl_groups = groups;
-        let r = libc::bind(
-            fd,
-            (&addr as *const libc::sockaddr_nl).cast(),
-            std::mem::size_of::<libc::sockaddr_nl>() as u32,
-        );
-        if r < 0 {
-            return Err(io::Error::last_os_error());
-        }
-        Ok(owned)
-    }
+fn netlink_socket(groups: u32, nonblocking: bool) -> io::Result<crake_os::linux::Netlink> {
+    crake_os::linux::Netlink::open(NETLINK_NETFILTER, groups, nonblocking)
 }
 
 /// Close this machine's TCP connections to `target` (iproute2's `ss -K`,
@@ -215,23 +177,18 @@ pub fn delete(flow: Flow) -> io::Result<()> {
         &body,
     );
 
-    // SAFETY: send/recv on our own socket and buffers.
-    unsafe {
-        if libc::send(fd.as_raw_fd(), msg.as_ptr().cast(), msg.len(), 0) < 0 {
-            return Err(io::Error::last_os_error());
-        }
-        let mut ack = [0u8; netlink::ACK_BUFFER];
-        let n = libc::recv(fd.as_raw_fd(), ack.as_mut_ptr().cast(), ack.len(), 0);
-        let code = usize::try_from(n)
-            .ok()
-            .and_then(|n| netlink::ack_code(&ack[..n]));
-        // ENOENT: already gone, which is what we wanted.
-        if let Some(err) = code
-            && err != 0
-            && -err != libc::ENOENT
-        {
-            return Err(io::Error::from_raw_os_error(-err));
-        }
+    fd.send(&msg)?;
+    let mut ack = [0u8; netlink::ACK_BUFFER];
+    let code = fd
+        .recv(&mut ack)
+        .ok()
+        .and_then(|n| netlink::ack_code(&ack[..n]));
+    // ENOENT: already gone, which is what we wanted.
+    if let Some(err) = code
+        && err != 0
+        && -err != libc::ENOENT
+    {
+        return Err(io::Error::from_raw_os_error(-err));
     }
     Ok(())
 }
@@ -305,16 +262,9 @@ fn dump() -> io::Result<Vec<(Flow, u64)>> {
     );
     let mut out = Vec::new();
     let mut buf = vec![0u8; DUMP_BUFFER];
-    // SAFETY: send/recv on our own socket and buffers.
-    unsafe {
-        if libc::send(fd.as_raw_fd(), msg.as_ptr().cast(), msg.len(), 0) < 0 {
-            return Err(io::Error::last_os_error());
-        }
-    }
+    fd.send(&msg)?;
     loop {
-        // SAFETY: as above.
-        let n = unsafe { libc::recv(fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len(), 0) };
-        let n = usize::try_from(n).map_err(|_| io::Error::last_os_error())?;
+        let n = fd.recv(&mut buf)?;
         if let Some(err) = netlink::ack_code(&buf[..n])
             && err != 0
         {

@@ -22,6 +22,7 @@ path = "src/bin/crake-hook.rs"
 
 [dependencies]
 crake-proto = { path = "../crake-proto" }
+crake-os = { path = "../crake-os" }
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true

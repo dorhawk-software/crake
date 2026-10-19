@@ -81,12 +81,9 @@ impl Net {
     /// works where /proc/sys is read-only.
     pub fn loose_rp_filter(&self, dev: &str) -> Result<()> {
         let Self::Ip = self else { return Ok(()) };
-        let name = std::ffi::CString::new(dev)?;
-        // SAFETY: a valid NUL-terminated name.
-        let index = unsafe { libc::if_nametoindex(name.as_ptr()) };
-        if index == 0 {
+        let Some(index) = crake_os::unix::index_of(dev) else {
             bail!("no interface {dev}");
-        }
+        };
         set_link(&rp_filter_message(index, 2))
             .with_context(|| format!("loose reverse-path filtering on {dev}"))
     }
@@ -147,12 +144,7 @@ pub fn tun_index(dev: &str) -> Option<u32> {
 /// IFLA_INFO_KIND).
 fn link_kind(dev: &str) -> Option<(u32, String)> {
     use std::mem::offset_of;
-    let name = std::ffi::CString::new(dev).ok()?;
-    // SAFETY: a valid NUL-terminated name.
-    let index = unsafe { libc::if_nametoindex(name.as_ptr()) };
-    if index == 0 {
-        return None;
-    }
+    let index = crake_os::unix::index_of(dev)?;
     let mut body = vec![0u8; size_of::<libc::ifinfomsg>()];
     let at = offset_of!(libc::ifinfomsg, ifi_index);
     body[at..at + size_of::<i32>()].copy_from_slice(&index.to_ne_bytes());
@@ -189,32 +181,11 @@ fn set_link(msg: &[u8]) -> Result<()> {
 /// Send one rtnetlink request; what the kernel answers first (up to
 /// `room` bytes).
 fn exchange(msg: &[u8], room: usize) -> Result<Vec<u8>> {
-    use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
-    // SAFETY: plain socket(2); the descriptor is owned below.
-    let fd = unsafe {
-        libc::socket(
-            libc::AF_NETLINK,
-            libc::SOCK_RAW | libc::SOCK_CLOEXEC,
-            libc::NETLINK_ROUTE,
-        )
-    };
-    if fd < 0 {
-        return Err(std::io::Error::last_os_error().into());
-    }
-    // SAFETY: a fresh descriptor nothing else owns.
-    let sock = unsafe { OwnedFd::from_raw_fd(fd) };
-    // SAFETY: sending from a valid buffer of the given length.
-    let sent = unsafe { libc::send(sock.as_raw_fd(), msg.as_ptr().cast(), msg.len(), 0) };
-    if sent < 0 {
-        return Err(std::io::Error::last_os_error().into());
-    }
+    let sock = crake_os::linux::Netlink::open(libc::NETLINK_ROUTE, 0, false)?;
+    sock.send(msg)?;
     let mut buf = vec![0u8; room];
-    // SAFETY: receiving into a valid buffer of the given length.
-    let n = unsafe { libc::recv(sock.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len(), 0) };
-    if n < 0 {
-        return Err(std::io::Error::last_os_error().into());
-    }
-    buf.truncate(usize::try_from(n).unwrap_or(0));
+    let n = sock.recv(&mut buf)?;
+    buf.truncate(n);
     Ok(buf)
 }
 

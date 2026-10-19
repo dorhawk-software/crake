@@ -5,21 +5,7 @@ use std::os::fd::AsRawFd;
 
 /// The tunnel's mark on a socket: its packets take the tunnel's route.
 pub fn mark(sock: &impl AsRawFd, mark: u32) -> std::io::Result<()> {
-    // SAFETY: plain setsockopt with a u32 on a socket we own.
-    let r = unsafe {
-        libc::setsockopt(
-            sock.as_raw_fd(),
-            libc::SOL_SOCKET,
-            libc::SO_MARK,
-            (&mark as *const u32).cast(),
-            std::mem::size_of::<u32>() as u32,
-        )
-    };
-    if r == 0 {
-        Ok(())
-    } else {
-        Err(std::io::Error::last_os_error())
-    }
+    crake_os::linux::set_mark(sock, mark)
 }
 
 /// A socket bound to a device: it leaves through that interface.

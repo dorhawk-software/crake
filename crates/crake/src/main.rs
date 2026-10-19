@@ -1,7 +1,8 @@
 //! `crake`: Crake in the user session. Tray icon, the panel, notifications.
 //! Everything Crake decides happens in craked; this shows it and passes on
 //! what the user chooses.
-
+// Unsafe code lives in crake-os alone (Windows and macOS follow).
+#![cfg_attr(target_os = "linux", forbid(unsafe_code))]
 // Windows: a windowed app, so no console window opens beside it (release
 // builds; development builds keep the console for their debug lines).
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
@@ -373,10 +374,12 @@ fn main() {
     // (the panel then goes where the desktop puts it).
     let x11 = std::env::var_os("CRAKE_WAYLAND").is_none() && std::env::var_os("DISPLAY").is_some();
     if x11 {
-        // SAFETY: first thing in main, before any other thread exists.
-        unsafe { std::env::remove_var("WAYLAND_DISPLAY") };
+        // First thing in main, while there's one thread (crake-os checks).
         #[cfg(target_os = "linux")]
-        sys::keep_root_cursor();
+        {
+            crake_os::linux::unset_env_while_alone("WAYLAND_DISPLAY");
+            sys::keep_root_cursor();
+        }
     }
     gpui_kit::application()
         .with_assets(Assets)

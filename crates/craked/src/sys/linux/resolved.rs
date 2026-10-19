@@ -2,7 +2,6 @@
 //! tunnel's domains as routing-only domains: names under those domains are
 //! asked of the tunnel's DNS (and of no one else), all other names are not.
 
-use std::ffi::CString;
 use std::future::Future;
 use std::net::Ipv4Addr;
 use std::time::Duration;
@@ -262,29 +261,17 @@ impl Resolved {
 
 /// An interface's name ("" for 0, the global settings, or one that's gone).
 fn ifname(index: i32) -> String {
-    let mut buf = [0 as libc::c_char; libc::IF_NAMESIZE];
-    let Ok(index) = u32::try_from(index) else {
-        return String::new();
-    };
-    // SAFETY: a buffer of IF_NAMESIZE, as if_indextoname wants.
-    let name = unsafe { libc::if_indextoname(index, buf.as_mut_ptr()) };
-    if name.is_null() {
-        return String::new();
-    }
-    // SAFETY: if_indextoname wrote a NUL-terminated name into buf.
-    unsafe { std::ffi::CStr::from_ptr(buf.as_ptr()) }
-        .to_string_lossy()
-        .into_owned()
+    u32::try_from(index)
+        .ok()
+        .and_then(crake_os::unix::name_of)
+        .unwrap_or_default()
 }
 
 fn ifindex(device: &str) -> Result<i32> {
-    let c = CString::new(device)?;
-    // SAFETY: valid NUL-terminated string.
-    let i = unsafe { libc::if_nametoindex(c.as_ptr()) };
-    if i == 0 {
+    let Some(i) = crake_os::unix::index_of(device) else {
         bail!("no interface {device}");
-    }
-    Ok(i as i32)
+    };
+    Ok(i32::try_from(i)?)
 }
 
 /// resolved's domains for a link (name, routing only) and its default

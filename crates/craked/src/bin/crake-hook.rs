@@ -1,6 +1,8 @@
 //! openconnect's `--script` (and openvpn's `--up`/`--down`). Forwards the call and its environment to `craked`
 //! over a Unix socket (Windows: a named pipe) and waits for the answer, so openconnect doesn't carry on
 //! before the address is set. Std only, no async runtime.
+// Unsafe code lives in crake-os alone.
+#![forbid(unsafe_code)]
 
 use std::io::{BufRead, BufReader, Write};
 use std::process::ExitCode;

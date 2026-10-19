@@ -1424,6 +1424,7 @@ version = "0.11.1"
 dependencies = [
  "async-channel",
  "base64 0.23.1",
+ "crake-os",
  "crake-proto",
  "craked",
  "embed-resource",
@@ -1453,6 +1454,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "crake-os"
+version = "0.11.1"
+dependencies = [
+ "libc",
+ "nfq-updated",
+ "tokio",
+]
+
+[[package]]
 name = "crake-proto"
 version = "0.11.1"
 dependencies = [
@@ -1467,6 +1477,7 @@ dependencies = [
  "anyhow",
  "base64 0.23.1",
  "clap",
+ "crake-os",
  "crake-proto",
  "hickory-proto",
  "libc",

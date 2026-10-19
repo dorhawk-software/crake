@@ -13,6 +13,10 @@ use craked::config::{Config, Protocol, TunnelConfig};
 use craked::hook_server;
 use craked::manager::Manager;
 
+#[path = "common/script.rs"]
+mod script;
+use script::scripted;
+
 const FAKE: &str = r#"#!/bin/sh
 ip link add crake-acme type dummy 2>/dev/null
 ip link set crake-acme up
@@ -114,9 +118,8 @@ async fn routes_only_what_it_is_told() {
     strict_rp_filter();
     let dir = tempfile::tempdir().unwrap();
     let fake = dir.path().join("openconnect");
-    std::fs::write(&fake, FAKE).unwrap();
+    std::fs::write(&fake, scripted(FAKE, dir.path())).unwrap();
     std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
-    unsafe { std::env::set_var("CRAKE_TEST_HOOK", env!("CARGO_BIN_EXE_crake-hook")) };
     let state_path = dir.path().join("hosts.json");
     let cfg = Config {
         hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
@@ -266,9 +269,8 @@ async fn routes_an_ipv6_host() {
     strict_rp_filter();
     let dir = tempfile::tempdir().unwrap();
     let fake = dir.path().join("openconnect");
-    std::fs::write(&fake, FAKE6).unwrap();
+    std::fs::write(&fake, scripted(FAKE6, dir.path())).unwrap();
     std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
-    unsafe { std::env::set_var("CRAKE_TEST_HOOK", env!("CARGO_BIN_EXE_crake-hook")) };
     let cfg = Config {
         hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
         hook_socket: dir.path().join("hook.sock"),
@@ -360,9 +362,8 @@ async fn a_full_tunnel_takes_everything_but_the_gateway_and_the_lan() {
     strict_rp_filter();
     let dir = tempfile::tempdir().unwrap();
     let fake = dir.path().join("openconnect");
-    std::fs::write(&fake, FAKE).unwrap();
+    std::fs::write(&fake, scripted(FAKE, dir.path())).unwrap();
     std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
-    unsafe { std::env::set_var("CRAKE_TEST_HOOK", env!("CARGO_BIN_EXE_crake-hook")) };
     let managed_dir = dir.path().join("managed.d");
     std::fs::create_dir_all(&managed_dir).unwrap();
     std::fs::write(
@@ -431,7 +432,11 @@ async fn a_full_tunnel_takes_everything_but_the_gateway_and_the_lan() {
 
     // With an IPv6 address from the gateway: craked gives it to the
     // device, and IPv6 goes through too (but the LAN's).
-    std::fs::write(dir.path().join("openconnect"), FAKE_IP6).unwrap();
+    std::fs::write(
+        dir.path().join("openconnect"),
+        scripted(FAKE_IP6, dir.path()),
+    )
+    .unwrap();
     mgr.connect("acme").unwrap();
     wait_for(&mgr, TunnelState::Connected).await;
     assert!(
@@ -686,22 +691,7 @@ async fn an_openvpn3_tunnel_whose_device_is_gone_is_down() {
 /// A tun device named `name`, held open by this process, as openvpn3's
 /// backend holds its session's.
 fn hold_tun(name: &str) -> std::fs::File {
-    use std::os::fd::AsRawFd;
-    const IFREQ: usize = 40;
-    const FLAGS_AT: usize = 16;
-    let tun = std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open("/dev/net/tun")
-        .unwrap();
-    let mut req = [0u8; IFREQ];
-    req[..name.len()].copy_from_slice(name.as_bytes());
-    let flags = (libc::IFF_TUN | libc::IFF_NO_PI) as i16;
-    req[FLAGS_AT..FLAGS_AT + 2].copy_from_slice(&flags.to_ne_bytes());
-    // SAFETY: TUNSETIFF with a struct ifreq-sized buffer we own.
-    let r = unsafe { libc::ioctl(tun.as_raw_fd(), libc::TUNSETIFF, req.as_mut_ptr()) };
-    assert_eq!(r, 0, "TUNSETIFF: {}", std::io::Error::last_os_error());
-    tun
+    crake_os::linux::open_tun(name, false).expect("a tun device")
 }
 
 /// OpenVPN 3 doesn't always name a session's device (seen with an Azure

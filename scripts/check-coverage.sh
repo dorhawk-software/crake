@@ -15,6 +15,7 @@ cd "$(dirname "$0")/.."
 declare -A floor=(
     [crake]=66
     [craked]=63
+    [crake-os]=70
     [crake-proto]=98
     [lint-literals]=82
 )
