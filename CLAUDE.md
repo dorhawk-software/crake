@@ -1296,17 +1296,57 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    saying "ignoring IKEv2 request, no policy configured"). The client got
    10.40.9.10, an ESP SA (AES-256, no PFS: strongSwan offered no group
    for ESP and the FortiGate took it) for 10.40.0.0/16, and 10.40.0.1
-   answered through it only. Next: a DNS server on the FortiGate for
-   acme.internal ("mode-cfg IPv4 DNS ignored, no IPv4 DNS servers
-   found"), EAP sign-in with a user (as FortiClient signs in), then the
-   engine in craked: charon driven over vici, an XFRM interface per
-   tunnel (`if_id`) so the nftables sets and fwmark routing apply as
-   they are, the CP payload's address, DNS and split networks handed to
-   `tunnel_up` as the hook's are. Other systems, to find out once Linux
-   works: macOS (Homebrew's strongSwan uses PF_KEY policies, no tunnel
-   device, so a host would be an IPsec policy rather than a route; or
-   Apple's IKEv2, which needs a Network Extension) and Windows (its own
-   IKEv2 client makes an adapter Crake could route through).
+   answered through it only. Then sign-in as FortiClient does it: a user
+   (alice, group vpn; phase1 `eap enable`, `eap-identity send-request`,
+   `authusrgrp vpn`), the gateway still proving itself with the key, the
+   user with EAP-MSCHAPv2 (Ubuntu: EAP-Identity is in
+   libcharon-extra-plugins, universe; MSCHAPv2 in
+   libcharon-extauth-plugins); and a DNS server (`system dns-server` on
+   the tunnel's interface, non-recursive, its `dns-database` zone
+   acme.internal in the **public** view: in the default shadow view it
+   answered NXDOMAIN) handed over as `ipv4-dns-server1`: the client got
+   10.40.0.1 as DNS and wiki.acme.internal from it. The engine: 7k.
+7k. **IPsec (IKEv2) with strongSwan (decided with the user, 2026-10-19:
+   before 7f's FortiClient road).** Why: FortiOS 7.6.3+ and 8.0 have no
+   SSL-VPN tunnel (openconnect's Fortinet support covers older units
+   only), so a new FortiGate's remote access is IPsec IKEv2, as are
+   many others' (strongSwan, Windows' and Apple's built-in clients).
+   Proven by hand against a real FortiGate (7j). Plan (Linux first):
+   - **craked runs its own charon** (strongswan-charon's
+     /usr/lib/ipsec/charon with Crake's strongswan.conf through
+     STRONGSWAN_CONF: its own vici socket, no system config, the
+     system's strongswan service and the user's connections left alone),
+     one charon for every IPsec tunnel, started with the first, as it
+     runs openconnect and openvpn.
+   - **Driven over vici** (`rsvici`, tokio): load-conn, initiate,
+     terminate, the ike-updown/child-updown events for up, down and
+     reconnect; the CP payload (virtual IP, DNS, and FortiGate's split
+     networks and domains when it sends them) handed to `tunnel_up` as the
+     hook's are.
+   - **An XFRM interface per tunnel** (`crake-<name>`, `if_id` in and
+     out), traffic selectors wide (`remote_ts = 0.0.0.0/0`, `::/0`), so
+     nothing goes in until Crake's own routing sends it: the nftables
+     sets and fwmark routing apply as they are; no policies or routes of
+     charon's (`install_routes = no`, no virtual IP on another link).
+   - **Sign-in:** the gateway's key (a group key IT hands out, as in a
+     FortiClient profile) or its certificate; the user's password over
+     EAP (MSCHAPv2; GTC, MD5 if a gateway asks), asked through D-Bus
+     `Asking` as OpenVPN's are and kept in the keyring once it worked;
+     the user's certificate later. Never FortiClient's EMS or posture
+     (7f: no spoofing).
+   - **Tests:** e2e with strongSwan as the gateway (a responder in the
+     e2e image, EAP-MSCHAPv2, a pool, DNS, ACME's network behind it), the
+     journey, the package test; the FortiGate (`fortigate-vm.sh`) stays
+     a hand check, as the user's real gateways are (its licence is the
+     user's).
+   - **Packages:** strongswan-charon with the two plugin packages a
+     Recommended engine (as openvpn), AppArmor rules for charon under
+     craked's profile.
+   - **Other systems, to find out once Linux works:** macOS (Homebrew's
+     strongSwan uses PF_KEY policies, no tunnel device, so a host would
+     be an IPsec policy rather than a route; or Apple's IKEv2, which
+     needs a Network Extension) and Windows (its own IKEv2 client makes
+     an adapter Crake could route through).
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or
    Windows problem without a colleague's machine):** `.github/workflows/
    doctor.yml`, started by hand (system, tunnel anyconnect/openvpn/none,
