@@ -463,9 +463,14 @@ fn asking_the_gateway_says_for_how_long_after_a_moment() {
         said(Duration::from_millis(900)),
         "Asking the gateway\u{2026}"
     );
+    // The first number shown is the third second's.
+    assert_eq!(
+        said(Duration::from_millis(2000)),
+        "Asking the gateway\u{2026} 3 s"
+    );
     assert_eq!(
         said(Duration::from_millis(5400)),
-        "Asking the gateway\u{2026} 5 s"
+        "Asking the gateway\u{2026} 6 s"
     );
 }
 

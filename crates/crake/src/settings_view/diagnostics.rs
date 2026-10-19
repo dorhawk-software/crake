@@ -311,6 +311,9 @@ fn saving_said(for_: std::time::Duration) -> String {
     if for_ < SAY_SECONDS_AFTER {
         "Saving the report\u{2026}".into()
     } else {
-        format!("Saving the report\u{2026} {} s", for_.as_secs())
+        format!(
+            "Saving the report\u{2026} {} s",
+            crate::head::second_counted(for_)
+        )
     }
 }

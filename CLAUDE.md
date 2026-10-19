@@ -646,9 +646,10 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    adversarial audit (2026-10-19) found each of these; the tests in
    `model/scrub.rs` hold its lines. The setting is now "Hide
    names and addresses when sharing". Without craked the file says why
-   and holds the rest. Not decided: "Hide names and addresses when
-   sharing" is off by default, so a report names the hosts reached unless
-   it's switched on (asked of the user 2026-10-19). Tested: units, window
+   and holds the rest. "Hide names and addresses when sharing" stays off
+   by default (decided by the user, 2026-10-19): a report names the hosts
+   reached unless it's switched on, and its row says so before saving.
+   Tested: units, window
    tests (Settings', a stand-in craked, `report::Gatherer`), the wire test, e2e against ocserv, both journeys,
    the Mac and Windows gateway tests (each part on the real system), and
    the package test (resolvectl under craked's AppArmor profile, which now

@@ -553,6 +553,9 @@ pub(super) fn asking_said(asked: std::time::Duration) -> String {
     if asked < SAY_SECONDS_AFTER {
         "Asking the gateway\u{2026}".into()
     } else {
-        format!("Asking the gateway\u{2026} {} s", asked.as_secs())
+        format!(
+            "Asking the gateway\u{2026} {} s",
+            crate::head::second_counted(asked)
+        )
     }
 }

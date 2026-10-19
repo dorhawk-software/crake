@@ -74,6 +74,13 @@ fn dashes(phase: f32, s: f32) -> Vec<Pixels> {
     v.into_iter().map(|d| px(d * s)).collect()
 }
 
+/// The second something under way is in, as it's counted beside the head:
+/// quiet for two seconds, the first number shown is 3, not a 2 the person
+/// has just sat through (the user, 2026-10-19).
+pub fn second_counted(for_: Duration) -> u64 {
+    for_.as_secs() + 1
+}
+
 /// The head at 16 px, its dashes going round since `since`: Crake's sign
 /// that something is under way (New tunnel asking the gateway, a report
 /// being saved). Every frame until it's gone, which also keeps a caller's

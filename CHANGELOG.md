@@ -11,6 +11,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **The seconds count where you'd expect.** "Asking the gateway…" and "Saving the report…" stay
+  quiet for two seconds, then count from 3 s, the second you're in, not a 2 you've just sat through.
+
 ## 0.11.1 (2026-10-19)
 
 - **OpenVPN is no longer Beta.** Crake's own OpenVPN has signed in to a real company gateway
