@@ -256,7 +256,7 @@ fn header_button(id: &'static str, t: &Theme) -> Stateful<Div> {
 
 impl TunnelDetail {
     /// "Add a host"'s field (journey tests).
-    #[cfg(all(test, any(target_os = "linux", windows)))]
+    #[cfg(test)]
     pub(crate) fn add_field(&self) -> Entity<InputState> {
         self.add.clone()
     }

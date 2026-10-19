@@ -87,7 +87,6 @@ impl App {
         }
     }
 
-    #[cfg(any(target_os = "linux", windows))]
     pub fn state(&self, tunnel: &str) -> Option<String> {
         self.model
             .tunnels

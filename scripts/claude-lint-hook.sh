@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
-# Claude Code hook (PostToolUse, Bash): after a `cargo build` or `cargo test`,
-# run scripts/lint.sh. A failure exits 2, which Claude Code hands back to
+# Claude Code hook (PostToolUse, Bash): after every command, the disk's
+# floor (scripts/disk-guard.sh); after a `cargo build` or `cargo test`,
+# scripts/lint.sh. A failure exits 2, which Claude Code hands back to
 # Claude as an error to fix before going on.
 set -uo pipefail
 input=$(cat)
 command=$(printf '%s' "$input" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tool_input",{}).get("command",""))' 2>/dev/null)
+# Every command: the disk keeps its floor (scripts/disk-guard.sh).
+if ! said=$("$(dirname "$0")/disk-guard.sh" 2>&1); then
+    printf '%s\n' "$said" >&2
+    exit 2
+fi
 case "$command" in
     *"cargo build"* | *"cargo test"*) ;;
     *) exit 0 ;;
