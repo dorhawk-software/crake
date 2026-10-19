@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/media/banner.png" alt="Crake: your VPN, only where it's needed. A VPN client for Linux that learns which hosts only answer from inside, and stays out of the way everywhere else." width="760" />
+  <img src="docs/media/banner.png" alt="Crake: your VPN, only where it's needed. A VPN client for Linux, with Windows and macOS in preview, that learns which hosts only answer from inside, and stays out of the way everywhere else." width="760" />
 </p>
 
 <p align="center">
@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-GPL--3.0-0F766E?style=flat-square" alt="Licence GPL-3.0" /></a>
-  <a href="#building-and-trying-it"><img src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20Ubuntu%20%C2%B7%20Debian%20%C2%B7%20Fedora%20%C2%B7%20Arch%20%C2%B7%20NixOS-115E59?style=flat-square" alt="Platform: Linux, Ubuntu, Debian, Fedora, Arch and NixOS" /></a>
+  <a href="#building-and-trying-it"><img src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20Ubuntu%20%C2%B7%20Debian%20%C2%B7%20Fedora%20%C2%B7%20Arch%20%C2%B7%20NixOS%20%C2%B7%20Windows%20%C2%B7%20macOS%20%28preview%29-115E59?style=flat-square" alt="Platform: Linux, Ubuntu, Debian, Fedora, Arch and NixOS; Windows and macOS in preview" /></a>
   <a href="Cargo.toml"><img src="https://img.shields.io/badge/Rust-2024%20%C2%B7%20GPUI-0F766E?style=flat-square" alt="Rust 2024 and GPUI" /></a>
   <a href="https://github.com/dorhawk-software/crake/releases/latest"><img src="https://img.shields.io/github/v/release/dorhawk-software/crake?style=flat-square&label=release&color=5A5F64" alt="Latest release" /></a>
   <a href="#built-with-ai"><img src="https://img.shields.io/badge/built%20with-Claude-5A5F64?style=flat-square" alt="Built with Claude" /></a>
@@ -23,7 +23,7 @@
 
 # Your VPN, only where it's needed.
 
-A VPN client for Linux. It connects to your company VPNs, sends nothing through them until a host
+A VPN client for Linux, with Windows and macOS in preview. It connects to your company VPNs, sends nothing through them until a host
 only answers from inside, and then routes just that host and tells you why, in one sentence.
 
 **Company VPNs either take all your traffic, or only the networks someone wrote into a list years
@@ -88,10 +88,10 @@ Beta: openconnect speaks it, but Crake hasn't been used against a real gateway o
 | <img src="docs/screenshots/tunnels-light.webp" width="300"> | <img src="docs/screenshots/newtunnel-light.webp" width="260"> | <img src="docs/screenshots/signin-light.webp" width="260"> |
 | In the order traffic tries them, drag to change it. A full tunnel waits underneath. | Type the gateway: Crake asks it what it speaks and which groups it offers. | The gateway's questions in plain words. Browser sign-in for SSO; a certificate's password from the keyring. |
 
-| Traffic | An OpenVPN 3 profile | Is it safe? |
+| Traffic | Managed by IT | Is it safe? |
 |:---:|:---:|:---:|
-| <img src="docs/screenshots/traffic-light.webp" width="260"> | <img src="docs/screenshots/editor-light.webp" width="300"> | <img src="docs/screenshots/safe-light.webp" width="300"> |
-| Where everything goes right now: each tunnel and direct, the busiest places, packets on every path. | Change a line and save: Crake reconnects the tunnel. Certificates stay folded, kept as they are. | Four plain answers in Settings → About: what leaves this computer, whether Crake can break your internet, what your company sees, who can change what. |
+| <img src="docs/screenshots/traffic-light.webp" width="260"> | <img src="docs/screenshots/managed-light.webp" width="300"> | <img src="docs/screenshots/safe-light.webp" width="300"> |
+| Where everything goes right now: each tunnel and direct, the busiest places, packets on every path. | Tunnels your IT set up, and what they allow, in plain words. You switch them on and off; they stay as IT made them. | Four plain answers in Settings → About: what leaves this computer, whether Crake can break your internet, what your company sees, who can change what. |
 
 <br/>
 
@@ -143,11 +143,11 @@ Crake notices, falls back to TCP on the same session, and remembers the network 
 </td>
 <td align="center">
 <h3>🔑 Keyring, not files</h3>
-Passwords and certificates live in your GNOME keyring. Import a certificate once, then delete the file.
+Passwords and certificates live in your system's keyring (GNOME keyring, Credential Manager, the Keychain). Import a certificate once, then delete the file.
 </td>
 <td align="center">
 <h3>🧾 Copy for helpdesk</h3>
-What happened today in plain text, with host names left out if you like, ready to paste into a ticket.
+What happened today in plain text, with names and addresses left out if you like, ready to paste into a ticket. For someone helping you, Settings → Diagnostics saves a fuller report.
 </td>
 </tr>
 <tr>
@@ -160,8 +160,8 @@ Each tunnel and the direct way out, the busiest places each one reaches, and pac
 One lost packet isn't the company's: a public site is tried directly again before anything goes through a tunnel.
 </td>
 <td align="center">
-<h3>✏️ OpenVPN 3 profiles, edited in place</h3>
-Change a remote, a route or a DNS option and save. No exporting and importing again.
+<h3>📄 OpenVPN from your .ovpn file</h3>
+Import it beside Gateway: Crake picks OpenVPN, takes the gateway and a name from the file, and runs it itself.
 </td>
 </tr>
 </table>
@@ -188,9 +188,9 @@ Crake sits between you and your network. It's built accordingly.
 | -------------------------------- | ------------------------------------------------------------------------------------------------- |
 | **Nothing leaves your machine.** | No account, no server, no telemetry. Ever. Every decision is made on your computer.               |
 | **The log stays here.**          | Kept in your home folder for 30 days by default, or only in memory. Clearing it takes one click.  |
-| **Secrets in your keyring.**     | Passwords and certificates go to the GNOME keyring, never to Crake's own files.                    |
+| **Secrets in your keyring.**     | Passwords and certificates go to your system's keyring, never to Crake's own files.                |
 | **Internal names stay internal.**| With a tunnel off, its company's names aren't asked of public DNS.                                 |
-| **Helpdesk copies can be anonymous.** | One switch leaves host names out of what you paste into a ticket.                            |
+| **Sharing can be anonymous.**    | One switch, "Hide names and addresses when sharing", leaves them out of helpdesk copies and reports. A report is saved on your computer for you to read first; Crake sends it nowhere. |
 
 <br/>
 
@@ -204,7 +204,7 @@ it with it when it goes.
 | Its own firewall table, `inet crake`, marking only the hosts it learned | Your default route |
 | Its own routing tables, one per tunnel | `/etc/resolv.conf` |
 | Each tunnel's DNS, per link in systemd-resolved, gone with the tunnel | NetworkManager's connections and your firewall rules |
-| The tunnel device openconnect or OpenVPN 3 creates, there only while it's on | Kernel modules and drivers |
+| The tunnel device openconnect or OpenVPN creates, there only while it's on | Kernel modules and drivers |
 
 **Stop Crake, and all of it goes.** A tunnel switched off takes its routes and DNS with it; stopping
 Crake removes its table, rules and links. The namespace tests check that nothing of Crake's is left.
@@ -216,7 +216,7 @@ Crake removes its table, rules and links. The namespace tests check that nothing
 |                                       |                                                                                            |
 | ------------------------------------- | ------------------------------------------------------------------------------------------ |
 | **Not a VPN service.**                | It doesn't sell you a tunnel or an exit country. It connects to the VPNs you already have. |
-| **Not a reimplementation.**           | The protocols are openconnect's and OpenVPN 3's. Crake's part is the routing.              |
+| **Not a reimplementation.**           | The protocols are openconnect's and OpenVPN's. Crake's part is the routing.                |
 | **Not a way around your company.**    | It doesn't fake a compliance check or hide what it does. A managed rule is kept, and shown. |
 | **Not an official client.**           | It isn't made by Cisco, Palo Alto, Ivanti, Fortinet, F5, Array or OpenVPN Inc.             |
 
@@ -226,7 +226,7 @@ Crake removes its table, rules and links. The namespace tests check that nothing
 
 | | |
 |---|---|
-| **Daemon** | `craked`: Rust, tokio; runs openconnect per tunnel, attaches OpenVPN 3 sessions |
+| **Daemon** | `craked`: Rust, tokio; runs openconnect or openvpn per tunnel |
 | **Routing** | nftables sets with per-element timeouts, fwmark policy routing, a table per tunnel |
 | **DNS** | systemd-resolved per link, answers held in NFQUEUE until their route is in |
 | **Probing** | conntrack events, `SO_BINDTODEVICE` probes through each tunnel |
@@ -258,11 +258,11 @@ The repository is signed with the key `B17A 7118 E977 36C2 02AD 5EAF F1D1 52DA 1
 (dorhawk.software packages).
 
 **macOS on Apple Silicon and Intel (preview):** `brew install --cask dorhawk-software/tap/crake`, which brings
-openconnect along. The installer is signed and notarized. Crake opens when it's installed and asks you to switch its
+openconnect and OpenVPN along. The installer is signed and notarized. Crake opens when it's installed and asks you to switch its
 service on once: in System Settings, under Login Items & Extensions, where it's listed as Crake.
 
 **Windows 11 (preview):** the installer from [Releases](https://github.com/dorhawk-software/crake/releases),
-openconnect included. It isn't code-signed yet, so Windows asks before running it.
+openconnect and OpenVPN included. It isn't code-signed yet, so Windows asks before running it.
 
 **Arch Linux:** the PKGBUILD in `packaging/arch` (the AUR is coming).
 
@@ -313,7 +313,7 @@ Tests and checks:
 cargo test                                    # unit, lifecycle, D-Bus and headless window tests
 scripts/e2e-test.sh                           # the app and craked end to end, the journey suite included
 scripts/netns-test.sh                         # real nftables and routing, in a throwaway container
-scripts/lint.sh                               # rustfmt, clippy, cargo-deny, cargo-machete, private names, sizes
+scripts/lint.sh                               # rustfmt, clippy, cargo-deny, cargo-machete, private names, sizes, magic numbers, unsafe only in crake-os
 scripts/check-coverage.sh                     # each crate's tested share of lines stays above its floor
 scripts/build-deb.sh                          # the .deb, built in an Ubuntu 22.04 container
 scripts/build-rpm.sh                          # the RPM for Fedora, from the same files
@@ -323,9 +323,9 @@ scripts/deb-test.sh [release...]              # install and use it in containers
 scripts/vm-test.sh [release]                  # the same in a throwaway VM: AppArmor (Ubuntu) or SELinux (fedora:44) enforcing
 ```
 
-- **Needs:** openconnect, nftables, iproute2, systemd-resolved, and a tray: GNOME with the
-  AppIndicator extension, or KDE (without one, Crake says what would bring the bird back). OpenVPN 3
-  for its profiles.
+- **Needs:** openconnect, or openvpn for .ovpn profiles; nftables, iproute2, systemd-resolved, and a
+  tray: GNOME with the AppIndicator extension, or KDE (without one, Crake says what would bring the
+  bird back). OpenVPN 3 only for tunnels that stay on it.
 - **Config:** `packaging/craked.toml.example`.
 - **The design:** `design/DESIGN.md` and the approved screens in `design/screens/`, open in a browser.
 
@@ -335,7 +335,15 @@ scripts/vm-test.sh [release]                  # the same in a throwaway VM: AppA
 
 **Every warning is an error.** Clippy with all lints denied, `cargo-deny` (known vulnerabilities,
 licences, sources), `cargo-machete` (unused dependencies) and a check that nothing customer-specific
-is ever committed all have to pass; a failure stops the build.
+is ever committed all have to pass; a failure stops the build. No source file is over 700 lines (1000
+for an integration test), no function over 200, and a number without a name fails the build. All
+unsafe code sits in one crate, `crake-os`, behind safe functions; every other crate forbids it. Each
+crate's tested share of lines stays above its floor, and floors only rise.
+
+**The journey runs everywhere Crake ships.** A day in the real app against a real craked, on every
+Linux distribution, Windows and macOS, after every change. On macOS and Windows, CI connects to real
+AnyConnect and OpenVPN gateways, and checks sign-in against openconnect's own test servers for
+Fortinet, GlobalProtect, F5 and Pulse.
 
 Routing is tested where it can't lie: the namespace tests run real nftables and policy routing in a
 disposable container, with a fake gateway that drops packets not from the tunnel, the way a real one
@@ -355,7 +363,10 @@ forgotten so the app's next try goes through.
 - ✅ Public name, private address (split-horizon DNS)
 - ✅ Internal names kept private while a tunnel is off
 - ✅ Gateways that only admit Cisco's client, said openly
-- ✅ OpenVPN 3 profiles, including sessions started elsewhere, edited in place
+- ✅ OpenVPN, run by Crake itself from your .ovpn file, on Linux, Windows and macOS; OpenVPN 3
+  tunnels move to it
+- ✅ A report for whoever helps you: Settings → Diagnostics, or `crake report` in a terminal;
+  passwords, sign-ins and keys are never in it, and Crake sends it nowhere
 - ✅ Traffic: a live view of what goes direct and what goes through each tunnel
 - ✅ Tray, panel, log, settings, new tunnel, sign-in, tunnel detail; light and dark; usable from
   the keyboard
@@ -375,10 +386,10 @@ forgotten so the app's next try goes through.
 - ✅ An Arch package (PKGBUILD for the AUR), tested the same way
 - ✅ NixOS: a flake with the package and a module (`services.crake.enable`), tested in NixOS VMs
 - ✅ IPv6 alongside IPv4: learned, routed, kept from going around a full tunnel
-- 🟡 Windows 11: an installer with openconnect included, tested in a VM against a real gateway
-  (not code-signed yet: applied for)
-- 🟡 macOS on Apple Silicon and Intel: a signed and notarized installer, tested on GitHub's Macs
-  and first tried on a real Mac against a real gateway
+- 🟡 Windows 11: an installer with openconnect and OpenVPN included, tested in a VM and on GitHub's
+  Windows runners against real AnyConnect and OpenVPN gateways (not code-signed yet: applied for)
+- 🟡 macOS on Apple Silicon and Intel: a signed and notarized installer; the journey and real
+  AnyConnect and OpenVPN gateways on GitHub's Macs, and in use on a colleague's Mac
 
 <br/>
 
