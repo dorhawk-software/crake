@@ -1001,8 +1001,14 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    fails it). Not yet (later slices): the app's side; AppArmor's rules
    for openvpn and `profiles/`; smart cards
    (`pkcs11-providers`, refused today) and Windows' certificate store
-   (`cryptoapicert`); the DCO fallback has no test against a gateway that
-   needs it (the user's real one does: CLAUDE.local.md).
+   (`cryptoapicert`). The DCO fallback is proven end to end
+   (`e2e_openvpn::a_gateway_without_offload_runs_without_it`, 2026-10-19):
+   no open-source server refuses DCO, so a stand-in for openvpn says
+   "Use --disable-dco" unless started with it and runs the real openvpn
+   either way; craked notices, starts again without, connects to the real
+   gateway, logs it once and starts without from then on (a mutation that
+   ignores the line fails it). Not against a gateway that really refuses
+   it: the user's Azure profile does (CLAUDE.local.md).
    **Slice 2 (the app) and 6 (the move): built (2026-10-18;
    design/proposals/openvpn-tunnel.html, chosen by the user).** New
    tunnel: "Import .ovpn…" beside Gateway picks OpenVPN by itself (name

@@ -406,3 +406,119 @@ async fn an_openvpn_tunnel_it_set_up() {
     .await;
     mgr.shutdown().await;
 }
+
+/// A gateway that can't take data channel offload (the user's Azure
+/// profile, CLAUDE.local.md): openvpn 2.6+ says "Use --disable-dco" and
+/// restarts forever. This container's gateway always offers what DCO
+/// needs, so a stand-in for openvpn says what openvpn says against such a
+/// gateway unless it's started with --disable-dco, then runs the real
+/// openvpn either way, noting each start's arguments. What's Crake's is
+/// real: it notices, starts again without, connects to the real gateway,
+/// says so once, and starts without from then on.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_gateway_without_offload_runs_without_it() {
+    use std::os::unix::fs::PermissionsExt as _;
+    if !enabled() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let starts = dir.path().join("starts");
+    let openvpn = dir.path().join("openvpn");
+    std::fs::write(
+        &openvpn,
+        format!(
+            "#!/bin/sh\necho \"$*\" >> {starts:?}\n\
+             for a; do [ \"$a\" = --disable-dco ] && exec /usr/sbin/openvpn \"$@\"; done\n\
+             echo \"$(date '+%F %T') Server did not request DATA_V2 packet format required \
+             for data channel offload. Use --disable-dco to connect to this server.\"\n\
+             exec /usr/sbin/openvpn \"$@\"\n"
+        ),
+    )
+    .unwrap();
+    std::fs::set_permissions(&openvpn, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let managed = dir.path().join("managed.d");
+    std::fs::create_dir_all(&managed).unwrap();
+    std::fs::write(managed.join("initech.ovpn"), password_profile()).unwrap();
+    std::fs::write(
+        managed.join("initech.toml"),
+        "display_name = \"Initech\"\nprotocol = \"openvpn\"\nprofile = \"initech.ovpn\"\n\
+         learn = [\"10.40.1.10/32\"]\n",
+    )
+    .unwrap();
+    let mut cfg = craked::config::Config {
+        managed_dir: managed,
+        openvpn: openvpn.clone(),
+        ..config(dir.path())
+    };
+    cfg.add_managed();
+    let hook_socket = cfg.hook_socket.clone();
+    let log = cfg.log_path.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    mgr.init().await.unwrap();
+    craked::hook_server::serve(mgr.clone(), &hook_socket).unwrap();
+    let mut app = wire_tests::serve(mgr.clone(), dir.path());
+    app.until("IT's tunnel", |m| {
+        m.tunnels.iter().any(|t| t.name == "initech")
+    })
+    .await;
+    let on = |m: &crate::model::Model, s: &str| {
+        m.tunnels
+            .iter()
+            .any(|t| t.name == "initech" && t.state == s)
+    };
+    for round in ["first", "again"] {
+        app.send(Command::Connect("initech".into()));
+        // Whatever it asks, as often as it asks: the restart without
+        // offload may come between two questions.
+        tokio::time::timeout(WAIT, async {
+            while !on(&app.model, "connected") {
+                match app.updates.recv().await {
+                    Ok(crate::client::Update::Asking(_, ask)) => {
+                        let text = if ask["kind"] == "user" {
+                            "alice"
+                        } else {
+                            "hunter2"
+                        };
+                        app.send(Command::Answer(
+                            "initech".into(),
+                            ask["id"].parse().unwrap(),
+                            text.into(),
+                        ));
+                    }
+                    Ok(u) => {
+                        app.model.apply(u);
+                    }
+                    Err(_) => panic!("craked went away"),
+                }
+            }
+        })
+        .await
+        .unwrap_or_else(|_| panic!("never connected ({round}): {}", why(&mgr, "initech")));
+        let git = until("git through the tunnel", || {
+            get("10.40.1.10", Duration::from_secs(1)).ok()
+        })
+        .await;
+        assert!(git.contains("crex"), "{git}");
+        app.send(Command::Disconnect("initech".into()));
+        app.within(WAIT, "off", |m| on(m, "off")).await;
+    }
+    let starts = std::fs::read_to_string(&starts).unwrap();
+    let with: Vec<bool> = starts
+        .lines()
+        .map(|l| l.split(' ').any(|a| a == "--disable-dco"))
+        .collect();
+    assert_eq!(
+        with,
+        [false, true, true],
+        "with offload once, then without, and without from the start next time:\n{starts}"
+    );
+    let logged = std::fs::read_to_string(&log).unwrap();
+    assert_eq!(
+        logged
+            .matches("Initech starts without data channel offload.")
+            .count(),
+        1,
+        "{logged}"
+    );
+    mgr.shutdown().await;
+}
