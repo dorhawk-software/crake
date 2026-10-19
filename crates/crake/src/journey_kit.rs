@@ -215,7 +215,13 @@ pub(crate) fn save_a_report(cx: &mut TestAppContext) -> String {
     until(cx, "the report saved", Duration::from_secs(90), |_| {
         file.exists()
     });
-    click(cx, s, "close");
+    // macOS' own window buttons close it there (`chrome`); Crake's × elsewhere.
+    if cx.read(crate::chrome::system_buttons) {
+        cx.update_window(s, |_, window, _| window.remove_window())
+            .unwrap();
+    } else {
+        click(cx, s, "close");
+    }
     until(cx, "Settings closed", Duration::from_secs(10), |cx| {
         window::<crate::settings_view::Settings>(cx).is_none()
     });

@@ -97,7 +97,7 @@ mod e2e_protocols;
 mod e2e_tests;
 #[cfg(all(test, any(target_os = "macos", windows)))]
 mod gateway_tests;
-#[cfg(all(test, any(target_os = "linux", windows)))]
+#[cfg(test)]
 mod journey_kit;
 // What the macOS package installs, read from packaging/macos: any system.
 #[cfg(all(test, target_os = "linux"))]
@@ -114,6 +114,10 @@ mod wire_tests;
 // With the installed craked service and openconnect: Windows.
 #[cfg(all(test, windows))]
 mod windows_journey;
+// With craked as a process of its own, Homebrew's openconnect, and the CI
+// gateway through Cloudflare: macOS.
+#[cfg(all(test, target_os = "macos"))]
+mod macos_journey;
 #[cfg(all(test, windows))]
 mod windows_tests;
 

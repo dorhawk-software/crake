@@ -12,7 +12,7 @@ RUN apt-get update \
 ARG OPENCONNECT=9.12
 ARG OPENCONNECT_SHA256=a2bedce3aa4dfe75e36e407e48e8e8bc91d46def5335ac9564fbf91bd4b2413e
 RUN mkdir -p /fake && cd /tmp \
- && curl -fsSL -o oc.tar.gz "https://www.infradead.org/openconnect/download/openconnect-$OPENCONNECT.tar.gz" \
+ && curl -fsSL --retry 4 --retry-all-errors --connect-timeout 20 --max-time 120 -o oc.tar.gz "https://www.infradead.org/openconnect/download/openconnect-$OPENCONNECT.tar.gz" \
  && echo "$OPENCONNECT_SHA256  oc.tar.gz" | sha256sum -c - \
  && tar xzf oc.tar.gz "openconnect-$OPENCONNECT/tests" "openconnect-$OPENCONNECT/COPYING.LGPL" \
  && cp openconnect-$OPENCONNECT/tests/fake-fortinet-server.py openconnect-$OPENCONNECT/tests/fake-gp-server.py \

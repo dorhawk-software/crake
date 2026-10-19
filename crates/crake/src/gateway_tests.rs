@@ -454,7 +454,7 @@ async fn openvpn_through_cloudflare() {
 /// macOS: craked as a process of its own, serving the app where the
 /// installed one does (crake_proto::APP_SOCKET), its files in `dir`.
 #[cfg(target_os = "macos")]
-fn own_craked(dir: &std::path::Path) -> std::process::Child {
+pub(crate) fn own_craked(dir: &std::path::Path) -> std::process::Child {
     let hook = std::env::var("CRAKE_E2E_HOOK").expect("CRAKE_E2E_HOOK: craked's crake-hook");
     let bin = std::env::var("CRAKE_E2E_CRAKED").expect("CRAKE_E2E_CRAKED: craked itself");
     let cfg = dir.join("craked.toml");

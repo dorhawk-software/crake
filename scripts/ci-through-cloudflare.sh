@@ -9,8 +9,9 @@
 #   scripts/ci-through-cloudflare.sh macos
 #   scripts/ci-through-cloudflare.sh windows SETUP TESTS
 # Needs CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET, GH_TOKEN.
-# CRAKE_GATEWAY_FILTER picks the tests (default all of gateway_tests; the
-# Doctor workflow: gateway_tests::doctor, with its CRAKE_DOCTOR_* settings).
+# CRAKE_GATEWAY_FILTER picks the tests (default the gateway tests and that
+# system's journey, the regression suite; the Doctor workflow:
+# gateway_tests::doctor, with its CRAKE_DOCTOR_* settings).
 set -eu
 cd "$(dirname "$0")/.."
 # The gateways' names in Cloudflare (each a TCP route of the tunnel).
@@ -54,7 +55,8 @@ until curl -sk -o /dev/null https://127.0.0.1:8443; do
   [ "$i" -lt "$READY_TRIES" ] || { cat "$WORK"/access-*.log; echo "no gateway through Cloudflare" >&2; exit 1; }
   sleep 5
 done
-FILTER=${CRAKE_GATEWAY_FILTER:-gateway_tests}
+# Words, each a filter: a test that matches any runs.
+FILTER=${CRAKE_GATEWAY_FILTER:-gateway_tests ${SYSTEM}_journey}
 DOCTOR="CRAKE_DOCTOR_TUNNEL=${CRAKE_DOCTOR_TUNNEL:-} CRAKE_DOCTOR_MINUTES=${CRAKE_DOCTOR_MINUTES:-} CRAKE_DOCTOR_PHASE=${CRAKE_DOCTOR_PHASE:-}"
 [ -n "${CRAKE_DOCTOR_PHASE:-}" ] || DOCTOR=
 status=0
@@ -67,12 +69,12 @@ if [ "$SYSTEM" = macos ]; then
   sudo env CRAKE_E2E=1 CRAKE_E2E_GATEWAY=https://127.0.0.1:8443 \
     CRAKE_GATEWAY_OPENVPN="127.0.0.1 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
     CRAKE_E2E_HOOK="$HOOK" CRAKE_E2E_CRAKED="$PWD/target/debug/craked" $DOCTOR \
-    "$BIN" "$FILTER" --test-threads=1 --nocapture || status=$?
+    "$BIN" $FILTER --test-threads=1 --nocapture || status=$?
 else
   CRAKE_E2E=1 CRAKE_E2E_GATEWAY=https://127.0.0.1:8443 \
     CRAKE_GATEWAY_OPENVPN="127.0.0.1 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
     CRAKE_OPENCONNECT="C:/Program Files/Crake/openconnect/openconnect.exe" \
-    "$3" "$FILTER" --test-threads=1 --nocapture || status=$?
+    "$3" $FILTER --test-threads=1 --nocapture || status=$?
   [ "$status" = 0 ] || tail -n 60 "C:/ProgramData/Crake/craked.log"
 fi
 [ "$status" = 0 ] || tail -n 30 "$WORK"/access-*.log
