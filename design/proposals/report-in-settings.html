@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where the report lives</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8;
+    --ink: #1A1C1E; --muted: #5A5F64; --accent: #0F766E; --accentSoft: #E2F1EF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+      --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; --accentSoft: #17332F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+    --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; --accentSoft: #17332F;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--desk); color: var(--ink);
+    font: 14px/1.45 'Atkinson Hyperlegible Next', system-ui, sans-serif; }
+  main { max-width: 1000px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  h2 { font-size: 17px; margin: 36px 0 6px; }
+  p { margin: 6px 0; max-width: 70ch; }
+  .muted { color: var(--muted); }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  .window { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    box-shadow: 0 30px 60px -30px rgba(0,0,0,0.35); margin-top: 12px; }
+  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px 10px 20px;
+    border-bottom: 1px solid var(--line); }
+  .head .title { font-size: 17px; font-weight: 700; }
+  .head .sub { font-size: 13px; color: var(--muted); }
+  .grow { flex: 1 1 auto; }
+  .btn { height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel);
+    color: var(--ink); font: inherit; font-weight: 600; white-space: nowrap; flex: none; cursor: pointer; }
+  .close { width: 32px; height: 32px; margin-left: 4px; border: none; border-radius: 50%; background: var(--surface);
+    color: var(--ink); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .saved-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--line);
+    font-size: 13px; color: var(--muted); }
+  .link { border: none; background: none; padding: 0; color: var(--ink); font: inherit; font-weight: 600; text-decoration: underline;
+    text-decoration-color: var(--lineStrong); text-underline-offset: 3px; cursor: pointer; }
+  .rows { padding: 14px 20px; color: var(--muted); font-size: 13px; }
+  .note { font-size: 13px; color: var(--muted); padding: 0 20px 14px; }
+  .saved { font-size: 13px; color: var(--muted); }
+  .option { margin-top: 20px; }
+  .option h3 { font-size: 15px; margin: 0 0 4px; }
+  .file { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px;
+    font: 13px/1.5 'Atkinson Hyperlegible Mono', ui-monospace, monospace; white-space: pre-wrap; overflow-x: auto;
+    margin-top: 10px; }
+  .file .sec { font-weight: 600; color: var(--ink); }
+  .file .dim { color: var(--muted); }
+  .settings { display: grid; grid-template-columns: 220px 1fr; min-height: 260px; }
+  .side { background: var(--surface); padding: 16px 12px; font-size: 14px; border-right: 1px solid var(--line); }
+  .side div { height: 40px; display: flex; align-items: center; padding: 0 10px; border-radius: 6px; }
+  .side .brand { font-size: 17px; font-weight: 700; height: 44px; }
+  .side .on { background: var(--panel); font-weight: 600; }
+  .pane { padding: 22px 28px; }
+  .pane-title { font-size: 26px; font-weight: 700; }
+  .group { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-top: 12px; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .row .t { font-weight: 600; }
+  .row .d { font-size: 13px; color: var(--muted); }
+  .rec { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 14px 16px; margin-top: 20px; }
+  code { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; font-size: 13px; }
+  ul { margin: 6px 0; padding-left: 20px; max-width: 70ch; }
+  li { margin: 4px 0; }
+  @media (max-width: 640px) { .settings { grid-template-columns: 1fr; } .side { display: none; } }
+</style>
+<style>
+  .lbl { font-size: 13px; color: var(--muted); font-weight: 600; margin-top: 16px; }
+  .what { font-size: 13px; color: var(--muted); margin-top: 8px; max-width: 64ch; }
+  .side div { gap: 10px; }
+  .side svg { flex: none; }
+  .side .on { font-weight: 700; }
+  .pane .group { margin-top: 22px; }
+  .statement { margin-top: 22px; display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 8px; background: var(--surface); }
+  .btn[disabled] { color: var(--muted); cursor: default; }
+  .notes { margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .side div { font-weight: 500; }
+  .status { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px;
+    border-radius: 6px; background: var(--surface); font-size: 13px; color: var(--ink); }
+  .status .say { font-weight: 600; }
+  .status .more { color: var(--muted); }
+  .status svg { flex: none; }
+  .dashes { animation: round .7s linear infinite; }
+  @keyframes round { to { stroke-dashoffset: -7; } }
+  @media (prefers-reduced-motion: reduce) { .dashes { animation: none; } }
+  :root { --danger: #B42318; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --danger: #F97066; } }
+  :root[data-theme="dark"] { --danger: #F97066; }
+  .lede { margin: 4px 0 0; color: var(--muted); }
+  .group .row + .row { border-top: 1px solid var(--line); margin: 14px -16px 0; padding: 14px 16px 0; }
+  .sw { flex: none; width: 46px; height: 26px; border-radius: 13px; padding: 3px; background: var(--accent); display: flex; justify-content: flex-end; }
+  .sw span { width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; }
+  .sel { flex: none; height: 38px; padding: 0 10px; border: 1px solid var(--lineStrong); border-radius: 6px; display: inline-flex; align-items: center; }
+  .quiet { color: var(--muted); background: transparent; }
+  .saved-in { font-size: 13px; color: var(--muted); margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Where the report lives</h1>
+  <p class="muted">Proposal, 2026-10-19, following report.html. The report is a debugging dump: what someone helping you asks for when they need to see your computer ("go to Settings, Diagnostics, Save a report, and send me the file"). report.html put it in the log window's title row, beside Copy for helpdesk, where it's the first thing anyone opening the log sees, and the two read as two answers to "what do I send?". This moves it out of sight, to where you'd be told to find it.</p>
+
+  <h2>Today</h2>
+  <div class="window"><div class="head"><span class="title">Log</span><span class="sub">Kept for 30 days on this machine</span><span class="grow"></span><button class="btn" type="button">Copy for helpdesk</button><button class="btn" type="button">Save a report…</button><button class="close" type="button" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>
+      <div class="rows">Search, the day's chart, the decisions…</div></div>
+
+  <h2>The log, after (both options)</h2>
+  <div class="window"><div class="head"><span class="title">Log</span><span class="sub">Kept for 30 days on this machine</span><span class="grow"></span><button class="btn" type="button">Copy for helpdesk</button><button class="close" type="button" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>
+      <div class="rows">Search, the day's chart, the decisions…</div></div>
+  <p class="what">One action: the log's entries, as its search and filters leave them, for pasting. Export, which the report replaced, doesn't come back: the report is the file to send. The panel's Copy for helpdesk and the sign-in window's stay as they are.</p>
+
+  <div class="option">
+    <h2>A: Settings → Diagnostics</h2>
+    <p>A section of its own, before About: easy to say over the phone, and a name that tells the person sent there they're in the right place. Nothing else lives there today; it's where later debugging aids would go.</p>
+    <div class="window"><div class="settings"><div class="side"><div class="brand" style="gap:10px"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" aria-hidden="true" viewBox="0 0 24 24"><defs><mask id="bm0" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/><rect x="10" y="4" width="2" height="2.00" fill="#000"/><path d="M5.25 15.00L6.75 15.00L11.25 24.00L9.75 24.00Z" fill="#000"/></mask><mask id="bc0" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/></mask></defs><g fill="currentColor" mask="url(#bm0)" opacity="1.00"><path d="M4.82 15.30L3.09 12.73C1.16 7.45 2.73 4.08 6.61 2.67L9.78 1.52C11.19 1.00 12.77 1.63 13.52 3.03L19.35 2.58L15.00 4.89L15.25 5.59L19.81 4.73L15.32 7.96L14.81 9.42L14.94 12.41L14.62 16.88C14.62 19.88 19.50 21.38 21.75 24.00L1.50 24.00L3.38 16.50Z"/></g></svg>Settings</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V12a8 8 0 0 1 16 0v8M8 20v-8a4 4 0 0 1 8 0v8"/></svg>Tunnels</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6a3 3 0 1 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>General</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18V6M12 18V10M18 18V4"/></svg>Learning</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z"/></svg>Names</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/></svg>Privacy &amp; log</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 11h12v10H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>Managed by IT</div><div class="on"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/></svg>Diagnostics</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v6M12 7.5v.5"/></svg>About</div></div>
+      <div class="pane"><div style="display:flex;justify-content:flex-end;margin:-8px -12px 0 0"><button class="close" type="button" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>
+        <div class="pane-title">Diagnostics</div><p class="lede">When something isn't working and someone is looking into it with you.</p>
+        <div class="group"><div class="row" style="align-items:flex-start"><div class="grow"><div class="t">Save a report for someone helping you</div>
+  <div class="d">A text file showing how this computer connects to networks (Crake's rules among it), whether the internet answers, and Crake's logs.</div>
+  <div class="d" style="margin-top:4px">Never passwords, sign-ins or keys. It names the places you connected to; Privacy &amp; log can leave them out. It stays on this computer: open it and read it before you send it.</div></div>
+  <button class="btn" type="button">Save a report…</button></div></div><p class="what">Or in a terminal: <code>crake report</code></p></div></div></div>
+    <p class="what">The row says whether the places you connected to are in it, as Privacy &amp; log's switch has it (off by default today, as drawn); switched on: "The places you connected to are left out (Privacy &amp; log)." The terminal line is each system's own command: <code>crake report</code> on Linux, <code>/Applications/Crake.app/Contents/MacOS/crake report</code> on a Mac, <code>"C:\Program Files\Crake\crake.exe" report</code> on Windows (neither puts <code>crake</code> on the PATH).</p>
+    <div class="lbl">Saving (a few seconds; longer when the internet is what's broken), then saved or not</div>
+    <p class="what">The button keeps its words and its width while saving, only greyed out, so the row doesn't shift. What's happening has a box of its own under the row, on the surface tint: Crake's dashed head, its dashes going round (its sign for "under way": the tray's while a tunnel connects, New tunnel's while it asks a gateway; ink, not teal, which is for decisions; still when animations are off), and after 2 s how long it's been, so a slow save doesn't look stuck, then the result in the same box, so it appears once and changes in place.</p>
+    <div class="window"><div class="settings"><div class="side"><div class="brand" style="gap:10px"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" aria-hidden="true" viewBox="0 0 24 24"><defs><mask id="bm1" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/><rect x="10" y="4" width="2" height="2.00" fill="#000"/><path d="M5.25 15.00L6.75 15.00L11.25 24.00L9.75 24.00Z" fill="#000"/></mask><mask id="bc1" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/></mask></defs><g fill="currentColor" mask="url(#bm1)" opacity="1.00"><path d="M4.82 15.30L3.09 12.73C1.16 7.45 2.73 4.08 6.61 2.67L9.78 1.52C11.19 1.00 12.77 1.63 13.52 3.03L19.35 2.58L15.00 4.89L15.25 5.59L19.81 4.73L15.32 7.96L14.81 9.42L14.94 12.41L14.62 16.88C14.62 19.88 19.50 21.38 21.75 24.00L1.50 24.00L3.38 16.50Z"/></g></svg>Settings</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V12a8 8 0 0 1 16 0v8M8 20v-8a4 4 0 0 1 8 0v8"/></svg>Tunnels</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6a3 3 0 1 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>General</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18V6M12 18V10M18 18V4"/></svg>Learning</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z"/></svg>Names</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/></svg>Privacy &amp; log</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 11h12v10H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>Managed by IT</div><div class="on"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/></svg>Diagnostics</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v6M12 7.5v.5"/></svg>About</div></div>
+      <div class="pane"><div style="display:flex;justify-content:flex-end;margin:-8px -12px 0 0"><button class="close" type="button" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>
+        <div class="pane-title">Diagnostics</div><p class="lede">When something isn't working and someone is looking into it with you.</p>
+        <div class="group"><div class="row" style="align-items:flex-start"><div class="grow"><div class="t">Save a report for someone helping you</div>
+  <div class="d">A text file showing how this computer connects to networks (Crake's rules among it), whether the internet answers, and Crake's logs.</div>
+  <div class="d" style="margin-top:4px">Never passwords, sign-ins or keys. It names the places you connected to; Privacy &amp; log can leave them out. It stays on this computer: open it and read it before you send it.</div></div>
+  <button class="btn" type="button" disabled>Save a report…</button></div><div class="status" role="status"><svg class="turning" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3.2 2.9"/></svg><span class="say">Saving the report… 6 s</span><span class="more">Crake is looking at this computer and trying the internet.</span></div></div><p class="what">Or in a terminal: <code>crake report</code></p></div></div></div>
+    <div class="window"><div class="settings"><div class="side"><div class="brand" style="gap:10px"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" aria-hidden="true" viewBox="0 0 24 24"><defs><mask id="bm2" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/><rect x="10" y="4" width="2" height="2.00" fill="#000"/><path d="M5.25 15.00L6.75 15.00L11.25 24.00L9.75 24.00Z" fill="#000"/></mask><mask id="bc2" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/></mask></defs><g fill="currentColor" mask="url(#bm2)" opacity="1.00"><path d="M4.82 15.30L3.09 12.73C1.16 7.45 2.73 4.08 6.61 2.67L9.78 1.52C11.19 1.00 12.77 1.63 13.52 3.03L19.35 2.58L15.00 4.89L15.25 5.59L19.81 4.73L15.32 7.96L14.81 9.42L14.94 12.41L14.62 16.88C14.62 19.88 19.50 21.38 21.75 24.00L1.50 24.00L3.38 16.50Z"/></g></svg>Settings</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V12a8 8 0 0 1 16 0v8M8 20v-8a4 4 0 0 1 8 0v8"/></svg>Tunnels</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6a3 3 0 1 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>General</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18V6M12 18V10M18 18V4"/></svg>Learning</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z"/></svg>Names</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/></svg>Privacy &amp; log</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 11h12v10H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>Managed by IT</div><div class="on"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/></svg>Diagnostics</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v6M12 7.5v.5"/></svg>About</div></div>
+      <div class="pane"><div style="display:flex;justify-content:flex-end;margin:-8px -12px 0 0"><button class="close" type="button" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>
+        <div class="pane-title">Diagnostics</div><p class="lede">When something isn't working and someone is looking into it with you.</p>
+        <div class="group"><div class="row" style="align-items:flex-start"><div class="grow"><div class="t">Save a report for someone helping you</div>
+  <div class="d">A text file showing how this computer connects to networks (Crake's rules among it), whether the internet answers, and Crake's logs.</div>
+  <div class="d" style="margin-top:4px">Never passwords, sign-ins or keys. It names the places you connected to; Privacy &amp; log can leave them out. It stays on this computer: open it and read it before you send it.</div></div>
+  <button class="btn" type="button">Save a report…</button></div><div class="status" role="status"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM14 3v4h4"/></svg><span class="say">Saved crake-report-2026-10-19.txt in Documents.</span><button class="link" type="button">Open</button><button class="link" type="button">Show in folder</button></div></div><p class="what">Or in a terminal: <code>crake report</code></p></div></div></div>
+    <div class="window"><div class="settings"><div class="side"><div class="brand" style="gap:10px"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" aria-hidden="true" viewBox="0 0 24 24"><defs><mask id="bm3" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/><rect x="10" y="4" width="2" height="2.00" fill="#000"/><path d="M5.25 15.00L6.75 15.00L11.25 24.00L9.75 24.00Z" fill="#000"/></mask><mask id="bc3" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/></mask></defs><g fill="currentColor" mask="url(#bm3)" opacity="1.00"><path d="M4.82 15.30L3.09 12.73C1.16 7.45 2.73 4.08 6.61 2.67L9.78 1.52C11.19 1.00 12.77 1.63 13.52 3.03L19.35 2.58L15.00 4.89L15.25 5.59L19.81 4.73L15.32 7.96L14.81 9.42L14.94 12.41L14.62 16.88C14.62 19.88 19.50 21.38 21.75 24.00L1.50 24.00L3.38 16.50Z"/></g></svg>Settings</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V12a8 8 0 0 1 16 0v8M8 20v-8a4 4 0 0 1 8 0v8"/></svg>Tunnels</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6a3 3 0 1 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>General</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18V6M12 18V10M18 18V4"/></svg>Learning</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z"/></svg>Names</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/></svg>Privacy &amp; log</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 11h12v10H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>Managed by IT</div><div class="on"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/></svg>Diagnostics</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v6M12 7.5v.5"/></svg>About</div></div>
+      <div class="pane"><div style="display:flex;justify-content:flex-end;margin:-8px -12px 0 0"><button class="close" type="button" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>
+        <div class="pane-title">Diagnostics</div><p class="lede">When something isn't working and someone is looking into it with you.</p>
+        <div class="group"><div class="row" style="align-items:flex-start"><div class="grow"><div class="t">Save a report for someone helping you</div>
+  <div class="d">A text file showing how this computer connects to networks (Crake's rules among it), whether the internet answers, and Crake's logs.</div>
+  <div class="d" style="margin-top:4px">Never passwords, sign-ins or keys. It names the places you connected to; Privacy &amp; log can leave them out. It stays on this computer: open it and read it before you send it.</div></div>
+  <button class="btn" type="button">Save a report…</button></div><div class="status" role="status"><svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7" fill="none" stroke="var(--danger, #B42318)" stroke-width="1.6"/><path d="M6.5 6.5l5 5M11.5 6.5l-5 5" stroke="var(--danger, #B42318)" stroke-width="1.6" stroke-linecap="round"/></svg><span class="say">Couldn't save the report.</span><span class="more">Permission denied.</span></div></div><p class="what">Or in a terminal: <code>crake report</code></p></div></div></div>
+    <p class="what">"Open" opens the file in the system's text editor, to read before sending. The line under the row stays until Settings closes, through moving to other sections and back: whoever saved it may go looking for the file a minute later. The system's own reason follows "Couldn't save the report."</p>
+  </div>
+
+  <div class="option">
+    <h2>B: A row in Privacy &amp; log</h2>
+    <p>No new section: the report sits with the log it's made of and the setting that hides its hosts. But "Privacy" is an odd place to be sent to fetch a dump, and the section's other rows are about what Crake keeps, not about getting help.</p>
+    <div class="window"><div class="settings"><div class="side"><div class="brand" style="gap:10px"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" aria-hidden="true" viewBox="0 0 24 24"><defs><mask id="bm4" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/><rect x="10" y="4" width="2" height="2.00" fill="#000"/><path d="M5.25 15.00L6.75 15.00L11.25 24.00L9.75 24.00Z" fill="#000"/></mask><mask id="bc4" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/></mask></defs><g fill="currentColor" mask="url(#bm4)" opacity="1.00"><path d="M4.82 15.30L3.09 12.73C1.16 7.45 2.73 4.08 6.61 2.67L9.78 1.52C11.19 1.00 12.77 1.63 13.52 3.03L19.35 2.58L15.00 4.89L15.25 5.59L19.81 4.73L15.32 7.96L14.81 9.42L14.94 12.41L14.62 16.88C14.62 19.88 19.50 21.38 21.75 24.00L1.50 24.00L3.38 16.50Z"/></g></svg>Settings</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V12a8 8 0 0 1 16 0v8M8 20v-8a4 4 0 0 1 8 0v8"/></svg>Tunnels</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6a3 3 0 1 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>General</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18V6M12 18V10M18 18V4"/></svg>Learning</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z"/></svg>Names</div><div class="on"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/></svg>Privacy &amp; log</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 11h12v10H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>Managed by IT</div><div class=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v6M12 7.5v.5"/></svg>About</div></div>
+      <div class="pane"><div style="display:flex;justify-content:flex-end;margin:-8px -12px 0 0"><button class="close" type="button" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>
+        <div class="pane-title">Privacy &amp; log</div><p class="lede">What Crake remembers, and for how long.</p>
+        <div class="statement"><div><div style="font-weight:700">Everything Crake decides stays on this machine.</div><div class="d">It sends nothing to anyone, including us. Your tunnels' gateways see what passes through them, as with any VPN.</div></div></div><div class="group"><div class="row"><div class="grow"><div class="t">Keep the log for</div><div class="d mono">~/.local/share/crake/log</div></div><span class="sel">30 days ▾</span></div>
+  <div class="row"><div class="grow"><div class="t">Hide names and addresses when sharing</div><div class="d">Copy for helpdesk and reports leave out the hosts you reached.</div></div><span class="sw"><span></span></span></div>
+  <div class="row"><div class="grow"><div class="t">Clear the log</div><div class="d">Learned hosts stay. Only the history goes.</div></div><button class="btn quiet" type="button">Clear log…</button></div><div class="row" style="align-items:flex-start"><div class="grow"><div class="t">Save a report for someone helping you</div>
+  <div class="d">A text file showing how this computer connects to networks (Crake's rules among it), whether the internet answers, and Crake's logs.</div>
+  <div class="d" style="margin-top:4px">Never passwords, sign-ins or keys. It names the places you connected to; Privacy &amp; log can leave them out. It stays on this computer: open it and read it before you send it.</div></div>
+  <button class="btn" type="button">Save a report…</button></div></div></div></div></div>
+  </div>
+
+  <div class="option">
+    <h2>What's in it, and what never is</h2>
+    <ul>
+      <li><b>In it:</b> the tunnels and their state; this computer's DNS settings, routes and Crake's firewall rules, as the system reports them (another VPN client's domains among them); whether one.one.one.one answers, and each connected tunnel's most recently used host that has a name, and which way; the last day of Crake's decisions; Crake's service log for the last hour; the computer's own network addresses and its router's, without which the routes say nothing.</li>
+      <li><b>Never in it, whatever the setting:</b> passwords, sign-ins (session cookies, OpenVPN's tokens, sign-in pages), keys, certificates, profiles, file paths, web addresses, and hardware (MAC) addresses: a Mac's route list names the router's and other devices', Windows' each adapter's; they're taken out.</li>
+      <li><b>The hosts you reached</b> (names and addresses, IPv4 and IPv6) follow "Hide names and addresses when sharing". It's off by default today, so a report names them unless it's switched on; the row says which, before you save.</li>
+    </ul>
+  </div>
+
+  <div class="option">
+    <h2>Not shown</h2>
+    <ul>
+      <li><b>About</b>, where a Mac keeps its System Report: About is about Crake; the report is about this computer, and "Diagnostics" is the word a helper reaches for.</li>
+      <li><b>A menu in the log window</b> ("…" beside Copy for helpdesk): the log has none, and it would put the report back beside the copy, one click further away.</li>
+    </ul>
+  </div>
+
+  <h2>What else follows</h2>
+  <ul>
+    <li>The report's parts, the hiding and <code>crake report</code> stay. New: hardware (MAC) addresses are taken out (a Mac's <code>netstat -rn</code>, Windows' <code>route print</code> adapter list), and every line goes through the same filter, Crake's own decisions and tunnel lines too (a stopped tunnel's reason can carry what openconnect last said); a line naming sign-in material becomes "(a line left out: it named a sign-in)".</li>
+    <li>The "?" on "Hide names and addresses when sharing" says reports are in Diagnostics.</li>
+    <li>The screens: log.html loses the button, settings.html gains the section; DESIGN.md's screens table follows.</li>
+    <li>DESIGN.md's "Directions we tried and rejected" gains one: "Save a report…" beside "Copy for helpdesk" in the log's title row (report.html, A), two answers to "what do I send?".</li>
+    <li>In the app: a Diagnostics section with the save and its state (moved from the log window), <code>CRAKE_SHOW=settings:diagnostics</code>, the window tests moved with it, and the journeys saving their report from Settings.</li>
+    <li>The CHANGELOG's report line (still unreleased) says Settings → Diagnostics; CLAUDE.md likewise.</li>
+  </ul>
+
+  <div class="rec">
+    <h2 style="margin-top:0">Recommendation: A</h2>
+    <p>The log goes back to one thing to paste, the report is out of the way of anyone who doesn't need it, and someone helping you can say where it is in one breath: "go to Settings, Diagnostics, Save a report". B saves a section but puts the dump among privacy settings.</p>
+  </div>
+</main>
+</body>
+</html>

@@ -193,7 +193,7 @@ impl NewTunnel {
                                     .text_color(t.muted),
                             )
                         })
-                        .when_some(asking, |d, since| d.child(asking_head(t.accent, since)))
+                        .when_some(asking, |d, since| d.child(crate::head::under_way(t.accent, since)))
                         .child(line),
                 )
             })
@@ -559,29 +559,4 @@ pub(super) fn asking_said(asked: std::time::Duration) -> String {
     } else {
         format!("Asking the gateway\u{2026} {} s", asked.as_secs())
     }
-}
-
-/// The dashed head, its dashes going round while the gateway is asked
-/// (`crate::head`; design/proposals/newtunnel-asking.html): every frame
-/// until the answer comes, which also keeps the seconds counting. Still
-/// with reduce motion on.
-fn asking_head(color: gpui_kit::Rgba, since: std::time::Instant) -> impl IntoElement {
-    const SIZE: f32 = 16.;
-    gpui_kit::canvas(
-        |_, _, _| (),
-        move |bounds, (), window, _| {
-            let phase = if crate::motion::enabled() {
-                since.elapsed().as_secs_f32()
-                    / (crate::head::ROUND.as_secs_f32() * crate::motion::slowed() as f32)
-            } else {
-                0.
-            };
-            if let Some(p) = crate::head::path(bounds.origin, SIZE, phase) {
-                window.paint_path(p, color);
-            }
-            window.request_animation_frame();
-        },
-    )
-    .size(px(SIZE))
-    .flex_none()
 }

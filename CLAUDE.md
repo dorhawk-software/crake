@@ -581,12 +581,23 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    Helpdesk copies (panel, log) can leave host names out
    (`hide_hosts` in app.json, `model::scrub`); its switch arrives with the
    Settings screen, as does the "Managed by IT" settings section.
-   **Reports (requested 2026-10-18; design/proposals/report.html, option
-   A, "Save a report…", plumbing kept, the log only: the user's choices):**
-   the log window's Export became "Save a report…" (asks where, "Saving…"
-   while craked is asked, then "Saved <file> in <folder>." with Show in
-   folder, or "Couldn't save the report." with the system's reason, under
-   the title row until the window closes), and `crake report [file]
+   **Reports (requested 2026-10-18; design/proposals/report.html, A,
+   plumbing kept; moved 2026-10-19 to Settings → Diagnostics,
+   design/proposals/report-in-settings.html, A: the user, "a dump from
+   someone ... i dont think the report is a standard feature which should
+   be so visible", and beside Copy for helpdesk it read as a second answer
+   to "what do I send?"):** Settings' Diagnostics section
+   (`settings_view/diagnostics.rs`) has "Save a report for someone helping
+   you": what's in the file, that passwords, sign-ins and keys never are,
+   whether the places you connected to are (Privacy & log's switch), that
+   it stays on the computer to be read first; then "Save a report…" (asks
+   where; the button keeps its words while craked is asked, and a box
+   under the row says "Saving the report…" with the dashed head,
+   `head::under_way`, seconds after 2 s; then "Saved <file> in <folder>."
+   with Open and Show in folder, or "Couldn't save the report." with the
+   system's reason, until Settings closes), and the terminal command for
+   that system (crake isn't on the PATH on Windows or macOS). The log's
+   Export is gone for good. `crake report [file]
    [--hide-hosts|--show-hosts]` writes the same file without a window
    (`report.rs`; Windows attaches to the console it was run from). Always
    the same parts: craked's tunnels, "This computer" (D-Bus `Report`,
@@ -601,14 +612,21 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    through ACME", the last 24 hours of decisions, and craked's own log
    (the last hour, at most 200 lines, kept in memory by a tracing layer,
    `own_log`). Never in it: lines with sign-in material, web addresses,
-   file paths (`crake_proto::report::private`). Hidden, `scrub_keeping`
+   file paths, hardware (MAC) addresses (a Mac's netstat -rn names the
+   router's and other devices', Windows' route print each adapter's)
+   (`crake_proto::report::private`, which every line of the file goes
+   through, Crake's own decisions and tunnel lines too: a stopped tunnel's
+   reason can carry openconnect's last words; a line naming sign-in
+   material becomes "(a line left out: it named a sign-in)"). Hidden, `scrub_keeping`
    removes names and IPv4/IPv6 addresses but the computer's plumbing
    (craked's `keep`: its addresses and networks, the tunnels' addresses
    and DNS servers, the routers, 127.53.0.1) and what's never a host
    (loopback, link-local, multicast, netmasks); the setting is now "Hide
    names and addresses when sharing". Without craked the file says why
-   and holds the rest. Tested: units, window tests (a stand-in craked,
-   `report::Gatherer`), the wire test, e2e against ocserv, both journeys,
+   and holds the rest. Not decided: "Hide names and addresses when
+   sharing" is off by default, so a report names the hosts reached unless
+   it's switched on (asked of the user 2026-10-19). Tested: units, window
+   tests (Settings', a stand-in craked, `report::Gatherer`), the wire test, e2e against ocserv, both journeys,
    the Mac and Windows gateway tests (each part on the real system), and
    the package test (resolvectl under craked's AppArmor profile, which now
    allows it; proven by vm-test.sh only).

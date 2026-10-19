@@ -191,18 +191,33 @@ pub(crate) fn sign_in(cx: &mut TestAppContext) {
     click(cx, w, "continue");
 }
 
-/// The log's "Save a report…": the file the platform's dialog gives,
-/// written once craked has said its part. Its text.
-pub(crate) fn save_a_report(cx: &mut TestAppContext, log: AnyWindowHandle) -> String {
+/// Settings → Diagnostics → "Save a report…": the file the platform's
+/// dialog gives, written once craked has said its part. Its text; Settings
+/// closed again.
+pub(crate) fn save_a_report(cx: &mut TestAppContext) -> String {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("crake-report.txt");
-    click(cx, log, "report");
+    request(cx, crate::Request::Settings);
+    let (s, _) = wait_window::<crate::settings_view::Settings>(cx, "Settings opens");
+    click(
+        cx,
+        s,
+        (
+            "section",
+            crate::settings_view::Section::Diagnostics.position(),
+        ),
+    );
+    click(cx, s, "report");
     let chosen = file.clone();
     cx.simulate_new_path_selection(move |_| Some(chosen));
     // The internet tried, and each tunnel's name: seconds, more where
     // nothing answers.
     until(cx, "the report saved", Duration::from_secs(90), |_| {
         file.exists()
+    });
+    click(cx, s, "close");
+    until(cx, "Settings closed", Duration::from_secs(10), |cx| {
+        window::<crate::settings_view::Settings>(cx).is_none()
     });
     std::fs::read_to_string(&file).unwrap()
 }

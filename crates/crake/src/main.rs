@@ -348,6 +348,8 @@ impl gpui_kit::AssetSource for Assets {
             "disclose-right.svg",
             "disclose-down.svg",
             "broom.svg",
+            "section-diagnostics.svg",
+            "file.svg",
         );
         gpui_kit::assets::AllAssets.load(path)
     }
@@ -475,7 +477,7 @@ fn main() {
             }
             // CRAKE_SHOW=log[:saved] (development): open the log; ":saved",
             // with a report just saved (its row under the title).
-            if std::env::var("CRAKE_SHOW").is_ok_and(|v| v == "log" || v == "log:saved") {
+            if std::env::var("CRAKE_SHOW").is_ok_and(|v| v == "log") {
                 open_log(cx);
             }
             // CRAKE_SHOW=traffic (development): open the Traffic window.

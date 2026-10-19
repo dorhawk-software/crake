@@ -202,7 +202,7 @@ async fn a_real_gateway_end_to_end() {
     })
     .await;
 
-    // A report (the log's "Save a report…"), from this craked: ACME's
+    // A report (Settings → Diagnostics → "Save a report…"), from this craked: ACME's
     // name tried through ACME, its DNS route marked as Crake's, its
     // nftables table; hidden, the hosts go and ACME's plumbing stays.
     let report = crate::report::gather_from(Some(_dir.path().join("crake.sock"))).await;

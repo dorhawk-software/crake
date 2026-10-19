@@ -55,14 +55,15 @@ What's new in each Crake release, for the people using it. The newest is at the 
   says so; OpenVPN 3 keeps its own profile. One whose profile OpenVPN 3 keeps locked stays where it
   is, and the panel asks for its .ovpn file.
 
-- **Save a report when something's wrong.** In the log, "Save a report…" (where Export was) saves
-  one text file with what someone helping you needs to see: this computer's DNS and routes, what
-  Crake added to them, whether the internet and each tunnel's names answer right then, the last day
-  of Crake's decisions and its service's own log. Sign-ins, passwords and profiles are never in it.
-  With "Hide names and addresses when sharing" on (Settings → Privacy & log; it was "Hide host
-  names in helpdesk copies"), the hosts you reached are left out, IPv6 addresses too, and your
-  computer's own addresses stay, so the routes still make sense. Crake sends it nowhere. From a
-  terminal, `crake report` saves the same file.
+- **A report for whoever is helping you.** When something isn't working, Settings → Diagnostics →
+  "Save a report…" saves one text file with what they need to see: how this computer connects to
+  networks and what Crake added, whether the internet and each tunnel's names answer right then,
+  the last day of Crake's decisions and its service's own log. Passwords, sign-ins, keys, profiles
+  and your devices' hardware addresses are never in it; with "Hide names and addresses when
+  sharing" on (Settings → Privacy & log; it was "Hide host names in helpdesk copies"), the places
+  you connected to are left out too. Crake sends it nowhere: Open it, read it, then send it
+  yourself. From a terminal, `crake report` saves the same file. The log's Export, which saved its
+  rows as a file, is gone: Copy for helpdesk still copies them.
 
 - **On a Mac, switching a tunnel off undoes all of it.** Crake turns on the Mac's packet filter
   while a tunnel is up, for connections that started before a host was routed. Switching the

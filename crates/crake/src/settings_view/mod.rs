@@ -16,6 +16,7 @@ use crate::prefs::Prefs;
 use crate::theme::{Theme, fonts};
 
 mod about;
+mod diagnostics;
 mod general;
 mod learning;
 mod managed;
@@ -46,6 +47,7 @@ pub enum Section {
     Names,
     Privacy,
     Managed,
+    Diagnostics,
     About,
 }
 
@@ -53,15 +55,26 @@ pub enum Section {
 const NAV_TOP: f32 = 16.;
 
 impl Section {
-    const ALL: [Section; 7] = [
+    const ALL: [Section; 8] = [
         Self::Tunnels,
         Self::General,
         Self::Learning,
         Self::Names,
         Self::Privacy,
         Self::Managed,
+        Self::Diagnostics,
         Self::About,
     ];
+
+    /// Its place in the sidebar (its element id there is
+    /// `("section", position)`): for tests, which click it.
+    #[cfg(test)]
+    pub fn position(self) -> usize {
+        Self::ALL
+            .iter()
+            .position(|s| *s == self)
+            .unwrap_or_default()
+    }
 
     /// Title, lede and icon, as in settings.html.
     fn info(self) -> (&'static str, &'static str, &'static str) {
@@ -95,6 +108,11 @@ impl Section {
                 "Managed by IT",
                 "Tunnels your organisation set up for you.",
                 "crake/section-managed.svg",
+            ),
+            Self::Diagnostics => (
+                "Diagnostics",
+                "When something isn\u{2019}t working and someone is looking into it with you.",
+                "crake/section-diagnostics.svg",
             ),
             Self::About => (
                 "About",
@@ -157,6 +175,9 @@ pub struct Settings {
     removing: Option<String>,
     /// The setting whose plain-words explanation is showing (its label).
     hint: Option<&'static str>,
+    /// Diagnostics' report: where it stands, said under its row until the
+    /// window closes (moving between sections keeps it).
+    report: diagnostics::Report,
     focus: FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
@@ -178,6 +199,7 @@ impl Render for Settings {
             Section::Names => self.names(&model, &t, cx).into_any_element(),
             Section::Privacy => self.privacy(&model, &t, cx).into_any_element(),
             Section::Managed => managed(&model, &t).into_any_element(),
+            Section::Diagnostics => self.diagnostics(&t, cx).into_any_element(),
             Section::About => about(&t, cx).into_any_element(),
         };
         let failed = model
@@ -338,7 +360,7 @@ fn help(label: &str) -> Option<&'static str> {
             "Crake notes every decision: what went through which VPN, and why. This is how long it keeps those notes. They stay on this computer."
         }
         "Hide names and addresses when sharing" => {
-            "\u{201c}Copy for helpdesk\u{201d} copies a summary you can send to your IT helpdesk, and \u{201c}Save a report\u{2026}\u{201d} in the log saves a fuller one as a file. With this on, the names and addresses of the servers you reached become \u{201c}a host\u{201d}: you share which VPN and how fast, not where you went. A report keeps this computer's own addresses, its VPNs' and its router's, or its routes would say nothing."
+            "\u{201c}Copy for helpdesk\u{201d} copies a summary you can send to your IT helpdesk, and a report (Diagnostics) saves a fuller one as a file. With this on, the names and addresses of the servers you reached become \u{201c}a host\u{201d}: you share which VPN and how fast, not where you went. A report keeps this computer's own addresses, its VPNs' and its router's, or its routes would say nothing."
         }
         _ => return None,
     })
@@ -396,6 +418,7 @@ impl Settings {
             hint: std::env::var("CRAKE_HINT")
                 .ok()
                 .map(|h| &*Box::leak(h.into_boxed_str())),
+            report: diagnostics::Report::shown(),
             focus,
             _subscriptions: subscriptions,
         }

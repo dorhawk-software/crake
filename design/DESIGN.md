@@ -56,6 +56,15 @@ Don't drift back into these. Each was tried and dropped for a reason.
 - **Tray marks above the head** (design/proposals/tray-marks-above.html).
   The bar icon is a fixed square: room above the head shrinks the bird.
   The call marks stay off the beak and the "!" on the back of the head.
+- **A debugging dump beside the everyday copy** ("Save a report…" next to
+  "Copy for helpdesk" in the log's title row, design/proposals/report.html,
+  A): two answers to "what do I send?", side by side, and a tool for
+  someone helping you shown to everyone who opens the log. The report is
+  in Settings → Diagnostics (design/proposals/report-in-settings.html, A,
+  chosen by the user 2026-10-19), where a helper sends you. Also there:
+  a button that changes its words while working ("Saving…"), which
+  resizes it and moves the row; the button stays, and what's under way is
+  said in a box of its own with the dashed head.
 
 ## Principles
 
@@ -350,8 +359,8 @@ mark as dorhawk.software/crake's.
 | --- | --- |
 | `tray-panel.html` | The main surface: last hour, what Crake did, tunnels with policy, full log / copy for helpdesk |
 | `new-tunnel.html` | Three steps: server and protocol (auto-detect, AnyConnect/ocserv, GlobalProtect, Ivanti/Pulse, Juniper NC, Fortinet, F5, Array), sign-in method, routing mode |
-| `settings.html` | General, Learning, Names (DNS), Privacy & log, Managed by IT, About; plus Tunnels, first (`proposals/settings-tunnels.html`): the tunnels in traffic order, Edit / Remove…, + New tunnel |
-| `log.html` | Day chart and decisions as sentences, filters, search, export |
+| `settings.html` | General, Learning, Names (DNS), Privacy & log, Managed by IT, Diagnostics (the report), About; plus Tunnels, first (`proposals/settings-tunnels.html`): the tunnels in traffic order, Edit / Remove…, + New tunnel |
+| `log.html` | Day chart and decisions as sentences, filters, search, Copy for helpdesk |
 | `tunnel-detail.html` | Facts, policy, today's chart, learned / pinned / gateway hosts, add a host |
 | `sign-in.html` | Browser sign-on waiting, one-time code, couldn't reach gateway |
 

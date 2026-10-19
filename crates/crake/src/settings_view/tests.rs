@@ -356,3 +356,98 @@ fn a_question_mark_only_where_its_card_says_more() {
         assert!(super::help(dropped).is_none(), "{dropped}");
     }
 }
+
+/// craked for Save a report…, as a test has it: what it says arrives when
+/// the test sends it.
+fn stand_in(cx: &mut TestAppContext) -> async_channel::Sender<crate::report::Gathered> {
+    let (tx, rx) = async_channel::unbounded();
+    cx.update(|cx| {
+        cx.set_global(crate::report::Gatherer(std::rc::Rc::new(move || {
+            rx.clone()
+        })));
+    });
+    tx
+}
+
+fn gathered() -> crate::report::Gathered {
+    crate::report::Gathered {
+        service: String::new(),
+        tunnels: vec!["ACME: off".into()],
+        decisions: Vec::new(),
+        computer: Ok(crake_proto::report::Computer {
+            checks: vec!["The internet: one.one.one.one is 1.1.1.1".into()],
+            ..Default::default()
+        }),
+    }
+}
+
+#[gpui_kit::test]
+fn save_a_report_says_where_it_went(cx: &mut TestAppContext) {
+    let w = open(cx, Section::Diagnostics);
+    let craked = stand_in(cx);
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("crake-report-2026-10-18.txt");
+    w.click("report", cx);
+    assert!(cx.did_prompt_for_new_path(), "asks where to");
+    let chosen = file.clone();
+    cx.simulate_new_path_selection(move |_| Some(chosen));
+    cx.run_until_parked();
+    // craked is being asked: the button waits, as it is (nothing in the
+    // row moves), and the box under it says so.
+    assert!(matches!(
+        w.view.read_with(cx, |s, _| s.report.clone()),
+        diagnostics::Report::Saving(_)
+    ));
+    assert!(w.shown("report-status", cx), "the box under the row");
+    assert!(w.shown("report", cx), "the button stays");
+    w.click("report", cx);
+    assert!(!cx.did_prompt_for_new_path(), "one report at a time");
+
+    craked.send_blocking(gathered()).unwrap();
+    cx.run_until_parked();
+    let text = std::fs::read_to_string(&file).expect("the report written");
+    assert!(text.starts_with("Crake report, "), "{text}");
+    assert!(text.contains("\nThis computer\n  The internet: one.one.one.one"));
+    assert_eq!(
+        w.view.read_with(cx, |s, _| s.report.clone()),
+        diagnostics::Report::Saved(file.clone())
+    );
+    assert!(w.shown("report-said", cx), "said under the row");
+    assert!(w.shown("report-open", cx), "with Open, to read it first");
+    assert!(w.shown("report-show", cx), "and Show in folder");
+    // Still said after looking at another section.
+    w.click(("section", 0usize), cx);
+    w.click(("section", Section::Diagnostics.position()), cx);
+    assert!(w.shown("report-said", cx), "kept until the window closes");
+}
+
+#[gpui_kit::test]
+fn a_report_that_cant_be_written_says_why(cx: &mut TestAppContext) {
+    let w = open(cx, Section::Diagnostics);
+    let craked = stand_in(cx);
+    let dir = tempfile::tempdir().unwrap();
+    let nowhere = dir.path().join("gone").join("crake-report.txt");
+    w.click("report", cx);
+    cx.simulate_new_path_selection(move |_| Some(nowhere));
+    craked.send_blocking(gathered()).unwrap();
+    cx.run_until_parked();
+    match w.view.read_with(cx, |s, _| s.report.clone()) {
+        diagnostics::Report::Failed(why) => assert!(!why.is_empty()),
+        other => panic!("{other:?}"),
+    }
+    assert!(!w.shown("report-show", cx), "nothing to show in a folder");
+    assert!(!w.shown("report-open", cx), "nor to open");
+}
+
+#[gpui_kit::test]
+fn a_report_not_saved_after_all_changes_nothing(cx: &mut TestAppContext) {
+    let w = open(cx, Section::Diagnostics);
+    let _craked = stand_in(cx);
+    w.click("report", cx);
+    cx.simulate_new_path_selection(|_| None);
+    cx.run_until_parked();
+    assert_eq!(
+        w.view.read_with(cx, |s, _| s.report.clone()),
+        diagnostics::Report::None
+    );
+}

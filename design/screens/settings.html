@@ -163,6 +163,24 @@ button,input,select{font:inherit}
 <p style="margin: 16px 0 0; color: {{c.muted}}">You can switch managed tunnels on and off, but not change them. Your organisation gets nothing from Crake itself.</p>
 </sc-if>
 
+<sc-if value="{{is.diagnostics}}" hint-placeholder-val="{{false}}">
+<div style="margin-top: 22px; border: 1px solid {{c.line}}; border-radius: 8px; padding: 14px 16px">
+<div style="display: flex; align-items: flex-start; gap: 16px">
+<div style="flex: 1 1 auto"><div style="font-weight: 600">Save a report for someone helping you</div>
+<div style="font-size: 13px; color: {{c.muted}}">A text file showing how this computer connects to networks (Crake’s rules among it), whether the internet answers, and Crake’s logs.</div>
+<div style="margin-top: 4px; font-size: 13px; color: {{c.muted}}">Never passwords, sign-ins or keys. It names the places you connected to; Privacy &amp; log can leave them out. It stays on this computer: open it and read it before you send it.</div></div>
+<button type="button" style="flex: 0 0 auto; height: 38px; padding: 0 14px; border: 1px solid {{c.line}}; border-radius: 6px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">Save a report…</button>
+</div>
+<div style="margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; border-radius: 6px; background: {{c.surface}}; font-size: 13px">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{c.ink}}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM14 3v4h4"></path></svg>
+<span style="font-weight: 600">Saved crake-report-2026-10-19.txt in Documents.</span>
+<a href="#" style="color: {{c.ink}}; font-weight: 600">Open</a> <a href="#" style="color: {{c.ink}}; font-weight: 600">Show in folder</a>
+</div>
+</div>
+<div style="margin-top: 10px; font-size: 13px; color: {{c.muted}}">Or in a terminal: <span class="mono">crake report</span></div>
+<div style="margin-top: 6px; font-size: 13px; color: {{c.muted}}">While saving, the button stays as it is and the box reads “Saving the report…” beside the dashed head, its dashes going round (design/proposals/report-in-settings.html).</div>
+</sc-if>
+
 <sc-if value="{{is.about}}" hint-placeholder-val="{{false}}">
 <div style="margin-top: 22px; display: flex; gap: 16px; align-items: center">
 <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="{{c.ink}}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><defs><mask id="m-n2" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/><rect x="10" y="4" width="2" height="2.00" fill="{{c.ink}}"/><path d="M5.25 15.00L6.75 15.00L11.25 24.00L9.75 24.00Z" fill="{{c.ink}}"/></mask><mask id="c-n2" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/></mask></defs><g stroke="none" mask="url(#m-n2)" fill="{{c.ink}}" opacity="1.00"><path d="M4.82 15.30L3.09 12.73C1.16 7.45 2.73 4.08 6.61 2.67L9.78 1.52C11.19 1.00 12.77 1.63 13.52 3.03L19.35 2.58L15.00 4.89L15.25 5.59L19.81 4.73L15.32 7.96L14.81 9.42L14.94 12.41L14.62 16.88C14.62 19.88 19.50 21.38 21.75 24.00L1.50 24.00L3.38 16.50Z"/></g><path d="M20.85 3.30L22.80 1.35" fill="none" stroke="{{c.accent}}" stroke-width="1.6" stroke-linecap="round"/><path d="M21.15 6.30L22.80 5.81" fill="none" stroke="{{c.accent}}" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -202,6 +220,7 @@ class Component extends DCLogic {
       dns: ['Names', 'Which DNS answers which names.', 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z'],
       privacy: ['Privacy & log', 'What Crake remembers, and for how long.', 'M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z'],
       managed: ['Managed by IT', 'Tunnels your organisation set up for you.', 'M6 11h12v10H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3'],
+      diagnostics: ['Diagnostics', 'When something isn’t working and someone is looking into it with you.', 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z'],
       about: ['About', 'Named after the corncrake, Crex crex.', 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v6M12 7.5v.5']
     };
     const sections = Object.keys(info).map(k => ({

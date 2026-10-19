@@ -7,6 +7,7 @@
 
 use std::time::Duration;
 
+use gpui_kit::prelude::*;
 use gpui_kit::{Path, PathBuilder, Pixels, Point, point, px};
 
 /// One dash and gap goes by in this long, as in the tray and on
@@ -71,6 +72,31 @@ fn dashes(phase: f32, s: f32) -> Vec<Pixels> {
         v.extend([DASH, GAP]);
     }
     v.into_iter().map(|d| px(d * s)).collect()
+}
+
+/// The head at 16 px, its dashes going round since `since`: Crake's sign
+/// that something is under way (New tunnel asking the gateway, a report
+/// being saved). Every frame until it's gone, which also keeps a caller's
+/// seconds counting. Still with reduce motion on.
+pub fn under_way(color: gpui_kit::Rgba, since: std::time::Instant) -> impl IntoElement {
+    const SIZE: f32 = 16.;
+    gpui_kit::canvas(
+        |_, _, _| (),
+        move |bounds, (), window, _| {
+            let phase = if crate::motion::enabled() {
+                since.elapsed().as_secs_f32()
+                    / (ROUND.as_secs_f32() * crate::motion::slowed() as f32)
+            } else {
+                0.
+            };
+            if let Some(p) = path(bounds.origin, SIZE, phase) {
+                window.paint_path(p, color);
+            }
+            window.request_animation_frame();
+        },
+    )
+    .size(px(SIZE))
+    .flex_none()
 }
 
 #[cfg(test)]

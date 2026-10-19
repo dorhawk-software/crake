@@ -1,7 +1,7 @@
 //! A report to send when something's wrong (design/proposals/report.html,
-//! option A, chosen by the user): the log window's "Save a report…" and
-//! `crake report` write the same plain-text file, always the same parts
-//! whatever the log window shows: craked's tunnels, the computer's side
+//! and report-in-settings.html for where it lives): Settings → Diagnostics
+//! → "Save a report…" and `crake report` write the same plain-text file,
+//! always the same parts: craked's tunnels, the computer's side
 //! (craked's D-Bus `Report`: the internet and each tunnel's names tried
 //! now, the system's DNS, routes and Crake's rules), the last 24 hours of
 //! decisions and craked's own log. Sign-ins never go in (craked leaves them
@@ -160,6 +160,9 @@ pub fn default_folder() -> PathBuf {
 }
 
 /// The file, as text.
+/// In place of a line that named sign-in material.
+const LEFT_OUT: &str = "(a line left out: it named a sign-in)";
+
 pub fn text(g: &Gathered, hide: bool, now: &jiff::Zoned) -> String {
     let keep = Keep::new(g.computer.as_ref().map_or(&[][..], |c| &c.keep));
     let say = |t: &str| {
@@ -181,6 +184,12 @@ pub fn text(g: &Gathered, hide: bool, now: &jiff::Zoned) -> String {
         let mut any = false;
         for l in lines {
             any = true;
+            // Every line, Crake's own sentences too: a decision's reason
+            // can carry what openconnect last said.
+            let l = crake_proto::report::private(&l).unwrap_or_else(|| {
+                let indent = l.len() - l.trim_start().len();
+                format!("{}{LEFT_OUT}", &l[..indent])
+            });
             s += &format!("  {}\n", say(&l));
         }
         if !any {
@@ -408,6 +417,34 @@ mod tests {
             "{text}"
         );
         assert!(text.contains("ACME's names: a host is a host"), "{text}");
+    }
+
+    #[test]
+    fn crakes_own_lines_are_filtered_too() {
+        let mut g = sample();
+        g.decisions.push(LogEntry {
+            ts: "2026-10-18T15:45:00Z".into(),
+            kind: LogKind::System,
+            tunnel: Some("acme".into()),
+            message: "ACME stopped unexpectedly.".into(),
+            reason: Some(
+                "openconnect exited with 1: Set-Cookie: webvpn=4F2A; see https://vpn.acme.example/x"
+                    .into(),
+            ),
+            hosts: Vec::new(),
+            others: Vec::new(),
+        });
+        g.tunnels
+            .push("Initech: off, profile /var/lib/crake/profiles/initech.ovpn".into());
+        let text = text(&g, false, &now());
+        assert!(!text.contains("webvpn"), "{text}");
+        assert!(
+            text.contains(
+                "ACME stopped unexpectedly.\n         (a line left out: it named a sign-in)"
+            ),
+            "{text}"
+        );
+        assert!(text.contains("Initech: off, profile <a file>"), "{text}");
     }
 
     #[test]

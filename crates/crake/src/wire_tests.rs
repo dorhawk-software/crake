@@ -183,7 +183,7 @@ async fn the_app_and_craked_work_together_over_dbus() {
         .await;
     assert_eq!(app.model.live.lists_connections(), Some(false));
 
-    // A report (the log's "Save a report…"): craked's tunnels, its
+    // A report (Settings → Diagnostics → "Save a report…"): craked's tunnels, its
     // decisions and its side of the computer; this craked changes nothing,
     // so it tries nothing and shows no system parts, but says what hiding
     // keeps.

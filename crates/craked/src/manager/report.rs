@@ -1,5 +1,5 @@
-//! The computer's side of a report (D-Bus `Report`; the log window's
-//! "Save a report…", `crake report`): the system's DNS, routes and Crake's
+//! The computer's side of a report (D-Bus `Report`; Settings →
+//! Diagnostics → "Save a report…", `crake report`): the system's DNS, routes and Crake's
 //! rules (`sys::report`), with Crake's own lines marked; whether the
 //! internet answers and each tunnel's names do, tried now; craked's own
 //! log; and the computer's plumbing, which hiding keeps.

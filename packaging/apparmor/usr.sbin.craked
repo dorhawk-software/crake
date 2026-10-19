@@ -76,7 +76,7 @@ profile craked /usr/sbin/craked flags=(attach_disconnected) {
   /usr/share/iproute2/** r,
   /usr/lib/iproute2/** r,
   /etc/nftables.conf r,
-  # A report's DNS part (the log's "Save a report…"): resolved's own view,
+  # A report's DNS part (Settings → Diagnostics → "Save a report…"): resolved's own view,
   # asked over the bus as above.
   /{usr/,}bin/resolvectl ix,
 

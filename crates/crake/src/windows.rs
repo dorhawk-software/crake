@@ -247,6 +247,7 @@ pub(super) fn open_settings(cx: &mut App) {
         Ok("settings:privacy") => settings_view::Section::Privacy,
         Ok("settings:managed") => settings_view::Section::Managed,
         Ok("settings:about") => settings_view::Section::About,
+        Ok(v) if v.starts_with("settings:diagnostics") => settings_view::Section::Diagnostics,
         _ => settings_view::Section::Tunnels,
     };
     let bounds = centered(settings_view::WIDTH, settings_view::HEIGHT, cx);

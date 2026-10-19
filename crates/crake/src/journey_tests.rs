@@ -294,9 +294,9 @@ fn the_log(cx: &mut TestAppContext) {
         .and_then(|c| c.text())
         .unwrap_or_default();
     assert!(copied.contains("Sent 10.40.1.10 through ACME."), "{copied}");
-    // Save a report…: the same decisions, and craked's side of the
-    // computer, ACME's name tried through ACME.
-    let report = crate::journey_kit::save_a_report(cx, l);
+    // Settings → Diagnostics → Save a report…: the same decisions, and
+    // craked's side of the computer, ACME's name tried through ACME.
+    let report = crate::journey_kit::save_a_report(cx);
     assert!(report.contains("Sent 10.40.1.10 through ACME."), "{report}");
     assert!(
         report.contains("\nThis computer\n  The internet: "),

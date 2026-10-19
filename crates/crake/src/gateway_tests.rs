@@ -332,7 +332,7 @@ async fn the_split_holds(crake: &Crake, tunnel: &str) {
     );
     // 4. And by name: craked's DNS answers public names too.
     names_work("while a tunnel is up", WAIT).await;
-    // 5. A report (the log's "Save a report…") says so, part by part.
+    // 5. A report (Settings → Diagnostics → "Save a report…") says so, part by part.
     report_holds(crake, tunnel).await;
 }
 
