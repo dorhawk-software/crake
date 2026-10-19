@@ -11,6 +11,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Windows drawn with the newest GPUI.** The toolkit Crake draws its windows with is updated
+  (0.7.3), with Crake's own fix for placing the panel at the tray carried over. It needs about
+  thirty fewer libraries than before.
+
 - **The seconds count where you'd expect.** "Asking the gateway…" and "Saving the report…" stay
   quiet for two seconds, then count from 3 s, the second you're in, not a 2 you've just sat through.
   The bird beside "Asking the gateway…" is drawn in the text's colour now: teal is kept for what
