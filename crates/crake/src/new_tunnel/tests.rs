@@ -2,7 +2,7 @@
 //! steps, checked against what "Add and connect" asks the app to do.
 
 use gpui_kit::test::TestWindowExt;
-use gpui_kit::{AnyWindowHandle, TestAppContext, WindowOptions};
+use gpui_kit::{AnyWindowHandle, Focusable, TestAppContext, WindowOptions};
 
 use super::*;
 
@@ -93,7 +93,8 @@ impl Opened {
         self.view.read_with(cx, |this, _| f(this))
     }
 
-    fn shown(&self, id: &'static str, cx: &mut TestAppContext) -> bool {
+    fn shown(&self, id: impl Into<gpui_kit::ElementId>, cx: &mut TestAppContext) -> bool {
+        let id = id.into();
         cx.update_window(self.window, |_, window, cx| {
             window.render_frame(cx);
             window.try_find(id).is_some()
@@ -112,6 +113,7 @@ impl Opened {
 
 const OPENVPN: usize = 8;
 const ANYCONNECT: usize = 1;
+const IPSEC: usize = 9;
 
 /// OpenVPN 3's profiles are taken over (design/proposals/openvpn-tunnel.html,
 /// 2): chosen in the Profile list, Crake takes a copy; a locked one says
@@ -231,6 +233,8 @@ fn an_incomplete_step_says_what_is_missing(cx: &mut TestAppContext) {
         Some("Which profile? Import its .ovpn file.")
     );
 
+    // OpenVPN chosen folded the list: open it again to pick another.
+    w.click("protocols-more", cx);
     w.click(("protocol", ANYCONNECT), cx);
     w.click("next", cx);
     assert_eq!(
@@ -555,4 +559,59 @@ fn the_protocols_fold_once_the_gateway_answered(cx: &mut TestAppContext) {
     assert!(shows(("protocol", 8usize).into(), cx), "opened");
     w.click(("protocol", 1usize), cx);
     assert_eq!(w.view.read_with(cx, |v, _| v.protocol), "anyconnect");
+}
+
+/// IPsec (design/proposals/ipsec-tunnel.html, chosen 2026-10-19): chosen,
+/// the list folds and Import .ovpn… goes; the gateway's key is asked
+/// before Continue, the username before step 3; the key, the gateway's
+/// identity and the domains go to craked with the rest.
+#[gpui_kit::test]
+fn an_ipsec_gateway_with_its_key(cx: &mut TestAppContext) {
+    let w = open(cx);
+    w.type_into(|t| t.name.clone(), "Nordbank", cx);
+    assert!(
+        w.shown("import-ovpn", cx),
+        "the import while Detect is chosen"
+    );
+    w.click(("protocol", IPSEC), cx);
+    assert!(w.shown("protocols-more", cx), "folded after the choice");
+    assert!(
+        !w.shown(("protocol", ANYCONNECT), cx),
+        "the rest folded away"
+    );
+    assert!(!w.shown("import-ovpn", cx), "no import with IPsec chosen");
+    w.type_into(|t| t.gateway.clone(), "gw.nordbank.example", cx);
+    w.click("next", cx);
+    assert_eq!(w.read(cx, |t| t.step), 1, "no key yet");
+    assert!(
+        w.read(cx, |t| t.problem.clone())
+            .unwrap_or_default()
+            .contains("key"),
+        "the key is asked for"
+    );
+    w.type_into(|t| t.ipsec.key.clone(), "hunter2hunter2", cx);
+    w.type_into(
+        |t| t.ipsec.domains.clone(),
+        "nordbank.internal nordbank.example",
+        cx,
+    );
+    w.click("next", cx);
+    assert_eq!(w.read(cx, |t| t.step), 2);
+
+    w.click("next", cx);
+    assert_eq!(w.read(cx, |t| t.step), 2, "no username yet");
+    w.type_into(|t| t.user.clone(), "alice", cx);
+    w.click("advanced", cx);
+    w.type_into(|t| t.ipsec.identity.clone(), "vpn.nordbank.example", cx);
+    w.click("next", cx);
+    w.click("next", cx);
+
+    let fields = w.added();
+    assert_eq!(fields["protocol"], "ipsec");
+    assert_eq!(fields["gateway"], "gw.nordbank.example");
+    assert_eq!(fields["gateway_key"], "hunter2hunter2");
+    assert_eq!(fields["gateway_id"], "vpn.nordbank.example");
+    assert_eq!(fields["domains"], "nordbank.internal\nnordbank.example");
+    assert_eq!(fields["sign_in"], "password");
+    assert_eq!(fields["user"], "alice");
 }

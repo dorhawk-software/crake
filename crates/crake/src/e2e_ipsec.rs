@@ -174,3 +174,57 @@ async fn a_password_sign_in_over_ikev2() {
         "{left}"
     );
 }
+
+/// A key that doesn't match the gateway is said apart from a wrong
+/// password (only IT can help with it), and changed in Edit; a username
+/// set in the tunnel isn't asked again (ipsec-tunnel.html, 3 and 5).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_wrong_key_then_the_right_one() {
+    if !enabled() {
+        return;
+    }
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = config(dir.path());
+    let hook_socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    mgr.init().await.unwrap();
+    let _hooks = craked::hook_server::serve(mgr.clone(), &hook_socket).unwrap();
+    let mut f = fields();
+    f.insert("gateway_key".into(), "not-the-key".into());
+    f.insert("user".into(), "alice".into());
+    let name = mgr.add_tunnel(&f).unwrap();
+
+    mgr.connect(&name).unwrap();
+    // The username is the tunnel's: only the password is asked.
+    answer(&mgr, &name, "password", "hunter2").await;
+    let why = until("refused for its key", || {
+        (state(&mgr, &name) == TunnelState::Trouble).then(|| why(&mgr, &name))
+    })
+    .await;
+    assert!(why.contains(crake_proto::trouble::KEY_MISMATCH), "{why}");
+    assert_eq!(
+        crake_proto::trouble::label(why.split_once(": ").map_or(why.as_str(), |(_, w)| w)),
+        Some("Key doesn\u{2019}t match"),
+        "the panel's few words"
+    );
+
+    // Edit: the right key; switched on, it connects.
+    f.insert("gateway_key".into(), "hunter2hunter2".into());
+    mgr.update_tunnel(&name, &f).await.unwrap();
+    mgr.connect(&name).unwrap();
+    answer(&mgr, &name, "password", "hunter2").await;
+    until("connected with the right key", || {
+        (state(&mgr, &name) == TunnelState::Connected).then_some(())
+    })
+    .await;
+    mgr.disconnect(&name).unwrap();
+    until("off", || {
+        (state(&mgr, &name) == TunnelState::Off).then_some(())
+    })
+    .await;
+    mgr.shutdown().await;
+}

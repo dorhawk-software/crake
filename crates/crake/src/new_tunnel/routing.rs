@@ -221,10 +221,12 @@ impl NewTunnel {
             "f5" => "F5 BIG-IP",
             "openvpn3" => "OpenVPN 3",
             "openvpn" => "OpenVPN",
+            "ipsec" => "IPsec",
             _ => "Array Networks",
         };
         let sign_in = match self.method {
             _ if self.protocol.starts_with("openvpn") => "ask what the profile needs",
+            _ if self.protocol == "ipsec" => "ask for your password",
             "password" => "ask for your password",
             "certificate" => "use your certificate",
             _ => "sign you in through your browser",

@@ -304,6 +304,7 @@ pub fn protocol_name(protocol: &str) -> &str {
         "array" => "Array Networks",
         "openvpn3" => "OpenVPN 3",
         "openvpn" => "OpenVPN",
+        "ipsec" => "IPsec (IKEv2)",
         other => other,
     }
 }

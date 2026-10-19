@@ -17,6 +17,9 @@ pub struct Engines {
     /// The `openvpn` program, which craked runs for OpenVPN profiles.
     pub openvpn: bool,
     pub openvpn3: bool,
+    /// strongSwan's charon and its vici plugin, which craked runs for
+    /// IPsec tunnels (Linux only for now).
+    pub strongswan: bool,
     /// openconnect can sign in through the browser (`--external-browser`,
     /// openconnect 9 and newer; Ubuntu 22.04 has 8.20).
     pub browser: bool,
@@ -30,6 +33,7 @@ impl Engines {
         openconnect: true,
         openvpn: true,
         openvpn3: true,
+        strongswan: true,
         browser: true,
         openconnect_version: Some((9, 12)),
     };
@@ -62,6 +66,7 @@ impl Engines {
             openconnect,
             openvpn: openvpn_installed(),
             openvpn3: Path::new(OPENVPN3_SERVICE).exists(),
+            strongswan: strongswan_installed(),
             browser,
             openconnect_version,
         }
@@ -98,6 +103,12 @@ impl Engines {
                 "Needs openvpn, which isn\u{2019}t installed: sudo apt install openvpn"
             }),
             "openvpn" => None,
+            // Linux only for now (CLAUDE.md, 7k): on Windows and macOS the
+            // card says "Not available".
+            "ipsec" if !cfg!(target_os = "linux") => Some(IPSEC_LINUX_ONLY),
+            // The command to install it is shown under this, with Copy.
+            "ipsec" if !self.strongswan => Some("Needs strongSwan, which isn\u{2019}t installed:"),
+            "ipsec" => None,
             _ if !self.openconnect => Some(if cfg!(windows) {
                 "Needs openconnect, which comes with Crake but is missing. Reinstall Crake."
             } else if cfg!(target_os = "macos") {
@@ -107,6 +118,60 @@ impl Engines {
             }),
             _ => None,
         }
+    }
+}
+
+/// IPsec where Crake doesn't run it yet.
+pub const IPSEC_LINUX_ONLY: &str = "Crake runs IPsec on Linux only for now.";
+
+/// Where each distribution puts strongSwan's charon (Debian and Ubuntu,
+/// Fedora, Arch), and its plugins.
+const CHARONS: [(&str, &str); 4] = [
+    ("/usr/lib/ipsec/charon", "/usr/lib/ipsec/plugins"),
+    (
+        "/usr/libexec/strongswan/charon",
+        "/usr/lib64/strongswan/plugins",
+    ),
+    (
+        "/usr/libexec/strongswan/charon",
+        "/usr/lib/strongswan/plugins",
+    ),
+    ("/usr/lib/strongswan/charon", "/usr/lib/strongswan/plugins"),
+];
+
+/// charon and its vici plugin (Debian has the plugin in another package,
+/// strongswan-swanctl), where craked looks for them.
+pub fn strongswan_installed() -> bool {
+    cfg!(target_os = "linux")
+        && CHARONS.iter().any(|(charon, plugins)| {
+            crate::sys::executable(Path::new(charon))
+                && Path::new(plugins).join("libstrongswan-vici.so").is_file()
+        })
+}
+
+/// The command that installs what craked's charon needs here, from
+/// /etc/os-release: Debian and Ubuntu split it into five packages, and
+/// without --no-install-recommends bring a strongSwan service of their own.
+pub fn strongswan_install(os_release: &str) -> String {
+    let field = |key: &str| {
+        os_release
+            .lines()
+            .find_map(|l| l.strip_prefix(key)?.strip_prefix('='))
+            .map(|v| v.trim_matches('"').to_owned())
+            .unwrap_or_default()
+    };
+    let (id, like) = (field("ID"), field("ID_LIKE"));
+    let is = |name: &str| id == name || like.split_whitespace().any(|l| l == name);
+    if is("fedora") || is("rhel") {
+        "sudo dnf install strongswan".into()
+    } else if is("arch") {
+        "sudo pacman -S strongswan".into()
+    } else if is("suse") || id.starts_with("opensuse") {
+        "sudo zypper install strongswan".into()
+    } else {
+        "sudo apt install --no-install-recommends strongswan-charon strongswan-swanctl \
+         libstrongswan-standard-plugins libcharon-extauth-plugins libcharon-extra-plugins"
+            .into()
     }
 }
 
@@ -247,6 +312,7 @@ mod tests {
             openconnect: false,
             openvpn: false,
             openvpn3: false,
+            strongswan: false,
             browser: false,
             openconnect_version: None,
         };
@@ -274,6 +340,7 @@ mod tests {
         assert_eq!(both.missing("openvpn3"), None);
         let oc = Engines {
             openvpn3: false,
+            strongswan: false,
             ..Engines::ALL
         };
         assert_eq!(oc.missing("auto"), None);

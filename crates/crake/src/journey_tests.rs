@@ -22,19 +22,20 @@ use craked::manager::Manager;
 
 use crate::e2e_tests::{config, sh};
 use crate::journey_kit::{
-    click, index, model, panel, request, sign_in, state, type_into, until, wait_window, window,
+    click, decline, index, model, panel, request, sign_in, sign_in_of, state, type_into, until,
+    wait_window, window,
 };
 use crate::model::Model;
 use crate::test_app::{enabled, get};
 use crate::{Request, Setup, Shell, panel, settings_view, signin_view, start, tunnel_detail};
 
 /// craked, in a runtime of its own, serving the app on `socket`.
-struct Daemon {
-    rt: tokio::runtime::Runtime,
-    mgr: Arc<Manager>,
+pub(crate) struct Daemon {
+    pub(crate) rt: tokio::runtime::Runtime,
+    pub(crate) mgr: Arc<Manager>,
 }
 
-fn daemon(dir: &std::path::Path) -> Daemon {
+pub(crate) fn daemon(dir: &std::path::Path) -> Daemon {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()
@@ -241,8 +242,12 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
                 && model(cx).tunnels.iter().any(|t| t.name == "globex")
         },
     );
-    let (w, _) = wait_window::<signin_view::SignIn>(cx, "Globex's sign-in opens");
-    click(cx, w, "cancel");
+    // Switched on once the tunnel list has caught up (a timer: the test
+    // platform's clock moves only when told). Until 2026-10-19 this step
+    // found ACME's window, still open, and nothing switched Globex on.
+    cx.executor().advance_clock(Duration::from_secs(1));
+    let (w, view) = sign_in_of(cx, "globex");
+    decline(cx, w, &view);
     until(cx, "sign-in closed", Duration::from_secs(10), |cx| {
         window::<signin_view::SignIn>(cx).is_none()
     });

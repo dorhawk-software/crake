@@ -10,6 +10,8 @@ pub const GATEWAY_ENDED: &str = "Its gateway ended the session";
 pub const SIGN_IN_REFUSED: &str = "The gateway didn\u{2019}t accept the sign-in";
 /// craked: the session's device went away (openvpn3 ended it).
 pub const OPENVPN3_ENDED: &str = "OpenVPN 3 ended its session";
+/// IPsec: the gateway's key, as IT gave it, doesn't match the gateway.
+pub const KEY_MISMATCH: &str = "The key doesn\u{2019}t match";
 /// What to do about it.
 pub const SIGN_IN_AGAIN: &str = "Switch it on to sign in again.";
 
@@ -20,6 +22,7 @@ pub fn label(why: &str) -> Option<&'static str> {
         (GATEWAY_ENDED, "Ended by the gateway"),
         (SIGN_IN_REFUSED, "Sign-in refused"),
         (OPENVPN3_ENDED, "Ended by OpenVPN 3"),
+        (KEY_MISMATCH, "Key doesn\u{2019}t match"),
     ]
     .into_iter()
     .find(|(start, _)| why.starts_with(start))
@@ -50,6 +53,14 @@ pub fn from_openconnect(last: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_key_that_doesnt_match_is_said_in_a_few_words() {
+        let why = format!(
+            "{KEY_MISMATCH} Nordbank\u{2019}s gateway. Your IT team can tell you the right one."
+        );
+        assert_eq!(label(&why), Some("Key doesn\u{2019}t match"));
+    }
 
     #[test]
     fn openconnects_words_are_put_plainly() {

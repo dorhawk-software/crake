@@ -27,6 +27,10 @@ const REFUSED: [&str; 4] = [
     "method failed",
     "received EAP_FAILURE",
 ];
+/// What charon's log says when the gateway's key doesn't match: the
+/// gateway's proof checked with the key Crake has, and it failed ("tried 1
+/// shared key for 'a' - 'b', but MAC mismatched").
+const KEY_MISMATCH: &str = "MAC mismatched";
 /// Lines of charon's log worth giving as a failure's reason.
 const TELLING: [&str; 4] = ["failed", "error", "unable", "giving up"];
 
@@ -144,6 +148,8 @@ pub enum Signed {
     In,
     /// The gateway turned the user's password (or name) down.
     Refused,
+    /// The gateway's key doesn't match it (only IT can help).
+    KeyRefused,
     /// Anything else, in charon's words.
     Failed(String),
 }
@@ -235,6 +241,9 @@ impl Vici {
                 }
                 Ok(None) => return Signed::In,
                 Err(e) => {
+                    if said.iter().any(|l| l.contains(KEY_MISMATCH)) {
+                        return Signed::KeyRefused;
+                    }
                     if said.iter().any(|l| REFUSED.iter().any(|r| l.contains(r))) {
                         return Signed::Refused;
                     }
@@ -329,6 +338,15 @@ mod tests {
             "sending packet: from 198.51.100.20[37591] to 198.51.100.10[4500] (80 bytes)",
         ]);
         assert!(said.iter().any(|l| REFUSED.iter().any(|r| l.contains(r))));
+    }
+
+    #[test]
+    fn strongswans_words_for_a_key_that_doesnt_match() {
+        let said = lines(&[
+            "tried 1 shared key for '198.51.100.20' - 'vpn.acme.example', but MAC mismatched",
+            "generating INFORMATIONAL request 2 [ N(AUTH_FAILED) ]",
+        ]);
+        assert!(said.iter().any(|l| l.contains(KEY_MISMATCH)));
     }
 
     #[test]

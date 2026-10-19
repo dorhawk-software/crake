@@ -16,7 +16,8 @@ use gpui_kit::TestAppContext;
 
 use crate::client::{self, Command};
 use crate::journey_kit::{
-    click, index, model, panel, request, sign_in, state, type_into, until, wait_window, window,
+    click, decline, index, model, panel, request, sign_in, sign_in_of, state, type_into, until,
+    wait_window, window,
 };
 use crate::model::Model;
 use crate::test_app::{App, enabled, gateway, get};
@@ -249,8 +250,11 @@ fn a_day_with_crake_on_windows(cx: &mut TestAppContext) {
         Duration::from_secs(10),
         |cx| model(cx).tunnels.iter().any(|t| t.name == "globex"),
     );
-    let (w, _) = wait_window::<signin_view::SignIn>(cx, "Globex's sign-in opens");
-    click(cx, w, "cancel");
+    // Switched on once the tunnel list has caught up (a timer: the test
+    // platform's clock moves only when told).
+    cx.executor().advance_clock(Duration::from_secs(1));
+    let (w, view) = sign_in_of(cx, "globex");
+    decline(cx, w, &view);
     until(cx, "sign-in closed", Duration::from_secs(10), |cx| {
         window::<signin_view::SignIn>(cx).is_none()
     });

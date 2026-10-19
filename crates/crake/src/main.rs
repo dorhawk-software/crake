@@ -105,6 +105,9 @@ mod journey_kit;
 // What the macOS package installs, read from packaging/macos: any system.
 #[cfg(all(test, target_os = "linux"))]
 mod journey_tests;
+// An IPsec tunnel through the app (needs the e2e IPsec gateway).
+#[cfg(all(test, target_os = "linux"))]
+mod journey_ipsec;
 #[cfg(test)]
 mod macos_packaging_tests;
 // The app's side against a real craked: the Linux, Windows and macOS tests'.

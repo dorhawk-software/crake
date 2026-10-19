@@ -155,6 +155,69 @@ pub(crate) fn index(cx: &mut TestAppContext, tunnel: &str) -> usize {
         .expect("listed")
 }
 
+/// The sign-in window of that tunnel (another's may still be open: a
+/// window that's done closes on a timer, which the test platform runs only
+/// when its clock is moved).
+pub(crate) fn sign_in_of(
+    cx: &mut TestAppContext,
+    tunnel: &str,
+) -> (AnyWindowHandle, Entity<signin_view::SignIn>) {
+    let find = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            cx.windows().into_iter().find_map(|w| {
+                let view = w.downcast::<signin_view::SignIn>()?.root(cx).ok()?;
+                (view.read(cx).tunnel() == tunnel).then_some((w, view))
+            })
+        })
+    };
+    until(
+        cx,
+        &format!("{tunnel}'s sign-in opens"),
+        Duration::from_secs(10),
+        |cx| find(cx).is_some(),
+    );
+    find(cx).unwrap()
+}
+
+/// Not signed in after all: "Don't connect" to the gateway's certificate,
+/// then the window closed, as a person would.
+pub(crate) fn decline(
+    cx: &mut TestAppContext,
+    w: AnyWindowHandle,
+    view: &Entity<signin_view::SignIn>,
+) {
+    use crate::signin::Ask;
+    until(
+        cx,
+        "asked to trust the gateway",
+        Duration::from_secs(20),
+        |cx| {
+            view.read_with(cx, |v, _| {
+            matches!(v.stage(), signin_view::Stage::Asking(p) if matches!(p.ask, Ask::TrustServer { .. }))
+        })
+        },
+    );
+    click(cx, w, "no");
+    until(cx, "sign-in ended", Duration::from_secs(20), |cx| {
+        view.read_with(cx, |v, _| {
+            matches!(v.stage(), signin_view::Stage::Failed { .. })
+        })
+    });
+    // The window grows to its card on a next frame, which the test
+    // platform never sends: the height it would have grown to.
+    cx.simulate_window_resize(
+        w,
+        gpui_kit::size(
+            gpui_kit::px(signin_view::WIDTH),
+            gpui_kit::px(FAILED_HEIGHT),
+        ),
+    );
+    click(cx, w, "close");
+}
+
+/// A failed sign-in's window, grown to its card (more than any question's).
+const FAILED_HEIGHT: f32 = 700.;
+
 /// Sign in as the window asks: trust the gateway, give the password.
 pub(crate) fn sign_in(cx: &mut TestAppContext) {
     use crate::signin::Ask;

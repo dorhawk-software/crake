@@ -11,6 +11,17 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **IPsec (IKEv2) tunnels, on Linux (Beta).** New tunnel has an IPsec card for FortiGate's "IPsec
+  VPN" and other IKEv2 gateways: the gateway, the key your IT team gave you and, if they named them,
+  the company's domains; then your username. Crake runs strongSwan's charon itself and asks your
+  password when you switch the tunnel on, keeping it in your keyring if you tick Remember. As
+  always, only the hosts that need the tunnel go through it. Needs strongSwan (New tunnel says the
+  command). A wrong key is said as such: "The key doesn't match".
+
+- **You choose whether a password is kept.** Every password the sign-in window asks for has
+  "Remember the password in your keyring", ticked to start with; before, a gateway's password was
+  kept without a word, and only a certificate's had the box. One-time codes are never kept.
+
 - **Teal means one thing again.** Small actions and links (Import .ovpn…, Edit…, Copy for helpdesk,
   About's links) are ink and underlined, as Diagnostics' Open already was; the update notice's
   Restart and Download are buttons, as other notices' are. Teal is left to what Crake decided, what's

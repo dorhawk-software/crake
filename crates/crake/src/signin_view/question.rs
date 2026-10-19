@@ -128,7 +128,12 @@ impl SignIn {
                     .rounded(px(6.))
                     .child(Input::new(&self.field).appearance(false)),
             );
-        if let Ask::CertificatePassword { from_file, .. } = &prompt.ask {
+        // Every password says whether it's kept (it was kept without a word
+        // but a certificate's; design/proposals/ipsec-tunnel.html, 5); a
+        // one-time code is never kept.
+        if matches!(prompt.ask, Ask::CertificatePassword { .. })
+            || crate::signin::asks_password(prompt)
+        {
             body = body.child(
                 checkbox(
                     "remember",
@@ -144,7 +149,13 @@ impl SignIn {
                 }))
                 .test_support(),
             );
-            if let Some(path) = from_file {
+        }
+        if let Ask::CertificatePassword {
+            from_file: Some(path),
+            ..
+        } = &prompt.ask
+        {
+            {
                 let home = std::env::var("HOME").unwrap_or_default();
                 let shown = path.display().to_string().replacen(&home, "~", 1);
                 body = body.child(

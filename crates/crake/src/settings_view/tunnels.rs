@@ -124,6 +124,7 @@ impl Settings {
             "array" => "Array Networks",
             "openvpn3" => "OpenVPN 3",
             "openvpn" => "OpenVPN",
+            "ipsec" => "IPsec (IKEv2)",
             other => other,
         }
         .to_owned();

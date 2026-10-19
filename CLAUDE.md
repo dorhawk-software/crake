@@ -1390,20 +1390,50 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    `crake-charon` unit (charon refuses to start beside another, its pid
    file's path built in: a unit with `TemporaryFileSystem=/run` and
    `/run/crake` bound back in; until then craked runs charon itself and
-   says plainly when another strongSwan runs), the app (New tunnel's
-   IPsec card, design/proposals/ipsec-tunnel.html, chosen by the user
-   2026-10-19: the protocol list folds after a choice and "Import .ovpn…"
-   shows only with Detect or OpenVPN, for every protocol; IPsec's
-   "Gateway's key" and "Company domains" in step 1 under the gateway (A),
-   step 2 a plain "Username and password" card with the Username field
-   and "Gateway's identity" under Advanced; the sign-in window's password
-   question with "Remember the password in your keyring" ticked, a
-   refusal asking username and password again, a refused key in the
-   failure shape with "Change the key…"; Edit shows the key as kept;
-   needs craked to take the username from AddTunnel and to tell a
-   refused key from a refused password), a kept password, IPsec in
-   craked.toml and IT's managed files, certificates (the gateway's or
-   the user's), the journey and package tests, the FortiGate by hand.
+   says plainly when another strongSwan runs).
+   **Slice 2, the app: built (2026-10-19;
+   design/proposals/ipsec-tunnel.html, chosen by the user).** New tunnel
+   (`new_tunnel/ipsec.rs`): "IPsec (IKEv2)" last in the protocol list,
+   Beta ("FortiClient's “IPsec VPN”, and other IKEv2 gateways";
+   Fortinet's card now says "FortiClient's “SSL-VPN”"); the list folds
+   behind the chosen protocol (for every protocol) and "Import .ovpn…"
+   shows only with Detect; Detect that finds no SSL VPN points at IPsec;
+   step 1 has "Gateway's key" (Show/Hide; editing, "Kept by Crake's
+   service" with Change… and Keep the old key: the key never comes back
+   from craked) and "Company domains" (optional) under the gateway;
+   step 2 a "Username and password" card, the Username field, and
+   "Gateway's identity" under Advanced; without strongSwan the card says
+   the install command (`engines::strongswan_install`, from
+   /etc/os-release), and on Windows and macOS it's "Not available".
+   Switched on, craked signs in and asks (`signin::craked_asks`: OpenVPN
+   and IPsec; until then the app had started openconnect's sign-in for
+   anything not OpenVPN, "Unknown VPN protocol 'ipsec'", found by the
+   journey): only the password, with "Remember the password in your
+   keyring" (now on every password the window asks, openconnect's and
+   OpenVPN's too: kept only when ticked; never on a one-time code,
+   `signin::asks_password`), and
+   answered from the keyring the next time. A sign-in craked runs ends
+   at Up, not when its window goes (switched off before the window had
+   gone, craked's "off" was drawn as connecting). A refused key is its
+   own trouble ("The key doesn't match ACME's gateway...", label "Key
+   doesn't match", `vici::Signed::KeyRefused` from charon's "MAC
+   mismatched"). Tested: window tests (`an_ipsec_gateway_with_its_key`,
+   the remember toggle), e2e (`a_wrong_key_then_the_right_one`: the
+   username from the tunnel, the key changed with UpdateTunnel), and the
+   IPsec journey (`journey_ipsec.rs`, run by scripts/e2e-test.sh with
+   CRAKE_E2E_IPSEC=1, not by the package tests, which have no IPsec
+   gateway: New tunnel → the password asked → connected → off and on
+   with the kept password and no window → off, nothing left). It also
+   found the main journey's New tunnel step testing nothing: the app
+   switches an added tunnel on after a timer, and GPUI's test platform
+   runs timers only when its clock is moved, so Globex was never
+   switched on and "its sign-in opens" found ACME's window, still open
+   (its close is a timer too); the journeys now move the clock and wait
+   for that tunnel's own window (`journey_kit::sign_in_of`, `decline`).
+   Not yet: "Change the key…" in the sign-in window's failure (the
+   failure says to use Edit), IPsec in craked.toml and IT's managed
+   files, certificates (the gateway's or the user's), the package's
+   charon unit and package test, the FortiGate by hand.
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or
    Windows problem without a colleague's machine):** `.github/workflows/
    doctor.yml`, started by hand (system, tunnel anyconnect/openvpn/none,
@@ -1774,6 +1804,10 @@ Any lint stops the build; fix it and build again, never silence it.
 - Size (requested): at most 700 lines of code per source file (its tests
   not counted) and 1000 per integration test file (`scripts/check-size.sh`),
   at most 200 lines per function (`clippy::too_many_lines`, `clippy.toml`).
+  Only an inline test module (`#[cfg(test)]` over `mod x {`) isn't
+  counted: until 2026-10-19 any `#[cfg(test)]` was taken as the start of
+  the tests, and new_tunnel/mod.rs's `mod tests;` near the top had let it
+  reach 736 lines unseen.
   Past that, split by topic: a folder module with one file per part (the
   pattern of `manager/`, `new_tunnel/`, `settings_view/`, `panel/`), or a
   function's parts into named helpers.

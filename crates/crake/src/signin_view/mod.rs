@@ -100,13 +100,13 @@ fn start(
     cx: &mut Context<SignIn>,
 ) -> async_channel::Sender<Reply> {
     let (events, incoming) = async_channel::unbounded();
-    // OpenVPN 3 profiles run as openvpn3 sessions; OpenVPN's sign-in is
-    // craked's questions; the rest is openconnect.
+    // OpenVPN 3 profiles run as openvpn3 sessions; OpenVPN's and IPsec's
+    // sign-in is craked's questions; the rest is openconnect.
     let replies = match spec.protocol.as_str() {
         "openvpn3" => {
             crate::ovpn3::start(spec.tunnel.clone(), spec.gateway.clone(), events, requests)
         }
-        "openvpn" => {
+        p if crate::signin::craked_asks(p) => {
             let asks = cx.default_global::<crate::openvpn::Asks>();
             crate::openvpn::start(spec.tunnel.clone(), events, requests, asks)
         }
@@ -316,6 +316,12 @@ impl SignIn {
         &self.stage
     }
 
+    /// Whose sign-in it is (journey tests).
+    #[cfg(test)]
+    pub(crate) fn tunnel(&self) -> &str {
+        &self.spec.tunnel
+    }
+
     pub fn new(
         spec: Spec,
         model: Entity<Model>,
@@ -353,9 +359,9 @@ impl SignIn {
             }),
             // The tunnel coming up (or not) after sign-in.
             cx.observe(&model, |this, model, cx| {
-                // OpenVPN: craked signs in and connects; it's up (or not)
-                // whatever the window shows meanwhile.
-                let openvpn = this.spec.protocol == "openvpn"
+                // OpenVPN, IPsec: craked signs in and connects; it's up
+                // (or not) whatever the window shows meanwhile.
+                let openvpn = crate::signin::craked_asks(&this.spec.protocol)
                     && matches!(
                         this.stage,
                         Stage::Reaching | Stage::SigningIn | Stage::Browser { .. }
@@ -372,6 +378,14 @@ impl SignIn {
                 match state.as_deref() {
                     Some("connected") => {
                         this.stage = Stage::Up;
+                        // Up: craked's state takes over from "signing in"
+                        // now, not when the window goes (OpenVPN's and
+                        // IPsec's sign-in ends here; switched off before
+                        // then, craked's "off" was drawn as connecting).
+                        if !this.handed_over {
+                            this.handed_over = true;
+                            this.signing(false, true, cx);
+                        }
                         cx.spawn(async move |this, cx| {
                             cx.background_executor().timer(CONNECTED_SHOWN).await;
                             let _ = this.update(cx, |_, cx| cx.emit(Close));
@@ -514,8 +528,9 @@ impl SignIn {
         self.signing(true, false, cx);
         self.replies = start(self.spec.clone(), self.requests.clone(), window, cx);
         self.stage = Stage::Reaching;
-        // OpenVPN: craked runs the sign-in; switched on again, it asks.
-        if self.spec.protocol == "openvpn" {
+        // OpenVPN, IPsec: craked runs the sign-in; switched on again, it
+        // asks.
+        if crate::signin::craked_asks(&self.spec.protocol) {
             let _ = self
                 .requests
                 .send_blocking(Request::Switch(self.spec.tunnel.clone(), true));

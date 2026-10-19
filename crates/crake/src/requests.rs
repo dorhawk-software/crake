@@ -128,9 +128,9 @@ fn switch_on(t: String, cx: &mut App) {
         .iter()
         .find(|x| x.name == t)
         .cloned();
-    // An OpenVPN tunnel just connects: craked asks if it must.
+    // An OpenVPN or IPsec tunnel just connects: craked asks if it must.
     match tunnel {
-        Some(tunnel) if !tunnel.signed_in && tunnel.protocol != "openvpn" => {
+        Some(tunnel) if !tunnel.signed_in && !crate::signin::craked_asks(&tunnel.protocol) => {
             open_sign_in(tunnel, cx)
         }
         _ => {

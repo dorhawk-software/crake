@@ -14,7 +14,11 @@ TESTS=1000
 fail=0
 while IFS= read -r f; do
     total=$(wc -l <"$f")
-    tests_at=$(grep -n '^#\[cfg(test)\]' "$f" | head -1 | cut -d: -f1)
+    # Where the inline test module starts: a #[cfg(test)] just above a
+    # `mod name {`. Not any #[cfg(test)]: one on `mod tests;` near the top
+    # (its tests in a file of their own) once exempted the whole file.
+    tests_at=$(awk '/^#\[cfg\(test\)\]/ { at = NR }
+        /^(pub(\(crate\))? )?mod [a-z_0-9]+ \{/ && at && NR - at <= 3 { print at; exit }' "$f")
     code=$total
     [ -n "$tests_at" ] && code=$((tests_at - 1))
     case "$f" in

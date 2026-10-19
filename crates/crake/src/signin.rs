@@ -38,6 +38,12 @@ pub struct Spec {
     pub openconnect: Option<PathBuf>,
 }
 
+/// The engines craked signs in itself (OpenVPN, IPsec), asking the app
+/// what it must (`Update::Asking`); the rest is the app's openconnect.
+pub fn craked_asks(protocol: &str) -> bool {
+    matches!(protocol, "openvpn" | "ipsec")
+}
+
 impl Spec {
     /// Who does the signing in, for "… said:".
     pub fn program(&self) -> &'static str {
@@ -301,7 +307,7 @@ struct Attempt<'a> {
 
 /// The gateway asking for the account's password (not a one-time code, not
 /// the certificate's pass phrase).
-fn asks_password(prompt: &Prompt) -> bool {
+pub(crate) fn asks_password(prompt: &Prompt) -> bool {
     prompt.ask == Ask::Secret && prompt.label.to_ascii_lowercase().contains("password")
 }
 
@@ -423,8 +429,9 @@ fn attempt(
                 if is_cert && state.tried_stored && !remember {
                     state.forget_stored = true;
                 }
+                // Kept only when "Remember the password in your keyring" is.
                 if is_login {
-                    state.login_to_save = Some(text.clone());
+                    state.login_to_save = remember.then(|| text.clone());
                 }
                 if is_cert && (remember || keep_certificate) {
                     state.to_save = Some((
@@ -626,7 +633,11 @@ mod tests {
                 "Please enter your username and password.",
             ]),
         );
+        // A password says whether it's kept; a one-time code never is.
+        assert!(asks_password(&p));
         assert_eq!((p.ask, p.label.as_str()), (Ask::Secret, "Password"));
+        assert!(!asks_password(&classify("Response:", &[])));
+        assert!(!asks_password(&classify("OTP code:", &[])));
 
         let p = classify("Username:", &lines(&["Welcome to ACME VPN"]));
         assert_eq!(p.ask, Ask::Text);

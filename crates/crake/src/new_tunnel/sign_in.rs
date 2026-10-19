@@ -4,6 +4,9 @@ use super::*;
 
 impl NewTunnel {
     pub(super) fn sign_in(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
+        if self.protocol == "ipsec" {
+            return self.ipsec_sign_in(t, cx);
+        }
         if self.protocol == "openvpn" {
             return div()
                 .child(heading("How do you sign in?"))

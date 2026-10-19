@@ -215,6 +215,15 @@ fn a_group_and_a_password_give_a_session(cx: &mut TestAppContext) {
     w.click(("choice", 1usize), cx);
 
     w.until("the password question", cx, |s| asked(s, &Ask::Secret));
+    // It says the password is kept, ticked; unticked, it isn't
+    // (design/proposals/ipsec-tunnel.html, 5).
+    assert!(
+        w.view.read_with(cx, |s, _| s.remember),
+        "ticked as it starts"
+    );
+    w.click("remember", cx);
+    assert!(!w.view.read_with(cx, |s, _| s.remember), "unticked");
+    w.click("remember", cx);
     w.type_answer("hunter2", cx);
     w.click("continue", cx);
 

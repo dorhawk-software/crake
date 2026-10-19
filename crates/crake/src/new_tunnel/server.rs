@@ -4,7 +4,7 @@
 use super::*;
 
 /// The wider of the two columns grows this much more than the other.
-const WIDE_COLUMN: f32 = 1.4;
+pub(super) const WIDE_COLUMN: f32 = 1.4;
 
 impl NewTunnel {
     /// OpenVPN's Profile: OpenVPN 3's profiles to take over, with "Import
@@ -161,8 +161,16 @@ impl NewTunnel {
                                     self.kept_gateway(t, cx).into_any_element()
                                 }
                                 "openvpn" => self.profile_field(t, cx).into_any_element(),
-                                _ => div()
+                                // The import only while nothing else is
+                                // chosen (ipsec-tunnel.html, 1): with
+                                // another protocol picked it pointed at a
+                                // file that has nothing to do with it.
+                                "auto" => div()
                                     .child(self.import_row("Gateway", t, cx))
+                                    .child(field(&self.gateway, true, t))
+                                    .into_any_element(),
+                                _ => div()
+                                    .child(label("Gateway"))
                                     .child(field(&self.gateway, true, t))
                                     .into_any_element(),
                             },
@@ -208,6 +216,12 @@ impl NewTunnel {
                         .child(why),
                 )
             })
+            .when(
+                self.protocol == "ipsec"
+                    && cfg!(target_os = "linux")
+                    && self.missing("ipsec").is_some(),
+                |d| d.child(self.ipsec_install(t, cx)),
+            )
             .when_some(
                 PROTOCOLS
                     .iter()
@@ -220,13 +234,18 @@ impl NewTunnel {
                             .text_size(px(13.))
                             .line_height(px(19.))
                             .text_color(t.muted)
-                            .child(format!(
-                                "Beta: Crake hasn\u{2019}t been tried against a real {name} gateway yet. openconnect speaks it, so it should work. If it doesn\u{2019}t, Copy for helpdesk in the sign-in window says what happened."
-                            )),
+                            .child(if self.protocol == "ipsec" {
+                                "Beta: Crake hasn\u{2019}t been tried against a real IPsec gateway yet. If it doesn\u{2019}t connect, Copy for helpdesk in the sign-in window says why.".to_owned()
+                            } else {
+                                format!(
+                                    "Beta: Crake hasn\u{2019}t been tried against a real {name} gateway yet. openconnect speaks it, so it should work. If it doesn\u{2019}t, Copy for helpdesk in the sign-in window says what happened."
+                                )
+                            }),
                     )
                 },
             )
             .children(group_row)
+            .when(self.protocol == "ipsec", |d| d.child(self.ipsec_server(t, cx)))
     }
 
     /// The protocols: "Detect automatically" first, then those used with a
@@ -240,7 +259,9 @@ impl NewTunnel {
                 "Crake asks the gateway. It answered: AnyConnect."
             }
             Detect::Asking(_) => "Crake asks the gateway\u{2026}",
-            Detect::Done(_) => "Crake asked; the gateway didn\u{2019}t say.",
+            Detect::Done(_) => {
+                "It didn\u{2019}t answer as an SSL VPN. If your IT team said IPsec, choose IPsec (IKEv2) below."
+            }
             Detect::Idle => "Crake asks the gateway.",
         };
         let answered = matches!(self.detect, Detect::Done(Found::AnyConnect { .. }))
@@ -248,7 +269,10 @@ impl NewTunnel {
         // A .ovpn imported: OpenVPN, said so, the rest folded away.
         let imported =
             self.protocol == "openvpn" && self.ovpn.as_ref().is_some_and(|o| o.from_file);
-        let folded = (answered || imported) && !self.protocols_open;
+        // Picked by hand: that row and "Choose the protocol yourself", so
+        // what the protocol needs sits under the gateway (ipsec-tunnel.html, 1).
+        let picked = self.protocol != "auto" && !imported;
+        let folded = (answered || imported || picked) && !self.protocols_open;
         let mut protocols = div()
             .mt(px(8.))
             .border_1()
@@ -267,10 +291,19 @@ impl NewTunnel {
             if folded {
                 return protocols;
             }
+        } else if picked && folded {
+            let (i, p) = PROTOCOLS
+                .into_iter()
+                .enumerate()
+                .find(|(_, p)| p.0 == self.protocol)
+                .unwrap_or((0, PROTOCOLS[0]));
+            return protocols
+                .child(self.protocol_card(i, p, p.2, t, cx))
+                .child(self.choose_yourself(folded, t, cx));
         } else {
             protocols = protocols.child(self.protocol_card(0, PROTOCOLS[0], auto_sub, t, cx));
         }
-        if answered && !imported {
+        if (answered || picked) && !imported {
             protocols = protocols.child(self.choose_yourself(folded, t, cx));
         }
         if folded {
@@ -291,12 +324,22 @@ impl NewTunnel {
                     .text_color(t.muted)
                     .child(heading),
             );
-            for (i, p) in PROTOCOLS
+            let mut shown: Vec<(usize, _)> = PROTOCOLS
                 .into_iter()
                 .enumerate()
                 .skip(1)
                 .filter(|(_, p)| TRIED.contains(&p.0) == tried)
-            {
+                .collect();
+            // IPsec beside Fortinet SSL VPN: the two ways into a FortiGate.
+            if let Some(at) = shown.iter().position(|(_, p)| p.0 == "ipsec") {
+                let ipsec = shown.remove(at);
+                let after = shown
+                    .iter()
+                    .position(|(_, p)| p.0 == "fortinet")
+                    .map_or(shown.len(), |f| f + 1);
+                shown.insert(after, ipsec);
+            }
+            for (i, p) in shown {
                 protocols = protocols.child(self.protocol_card(i, p, p.2, t, cx));
             }
         }
@@ -384,7 +427,18 @@ impl NewTunnel {
                                 )
                             })
                             .when(id != "auto" && self.missing(id).is_some(), |d| {
-                                d.child(tag("Not installed", t))
+                                d.child(tag(
+                                    if id == "ipsec" && !cfg!(target_os = "linux") {
+                                        "Not available"
+                                    } else {
+                                        "Not installed"
+                                    },
+                                    t,
+                                ))
+                            })
+                            // Folded, the chosen row has no Beta heading above it.
+                            .when(on && beta(id) && !self.protocols_open, |d| {
+                                d.child(beta_tag(t))
                             }),
                     )
                     .child(
@@ -404,6 +458,8 @@ impl NewTunnel {
             )
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.protocol = id;
+                // Chosen: the list folds, as a menu closes after a choice.
+                this.protocols_open = false;
                 cx.notify();
             }))
             .test_support()

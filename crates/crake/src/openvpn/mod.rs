@@ -60,13 +60,15 @@ pub fn start(
     std::thread::spawn(move || {
         while let Ok(reply) = incoming.recv_blocking() {
             let request = match reply {
-                Reply::Answer { text, .. } => {
+                Reply::Answer { text, remember, .. } => {
                     let (id, kind) = shown.lock().unwrap().clone();
                     let mut typed = typed.lock().unwrap();
                     let entry = typed.entry(tunnel.clone()).or_default();
                     match kind.as_str() {
                         "user" => entry.user = Some(text.clone()),
-                        "password" => entry.password = Some(text.clone()),
+                        // Kept only when "Remember the password in your
+                        // keyring" is (OpenVPN's and IPsec's alike).
+                        "password" => entry.password = remember.then(|| text.clone()),
                         _ => {}
                     }
                     Request::Answer(tunnel.clone(), id, text)
@@ -476,11 +478,12 @@ mod tests {
             cx.run_until_parked();
         }
         assert_eq!(kept::read(tunnel, crate::keyring::Kind::Username), None);
-        // What the user types is noted, to be kept once the tunnel is up.
+        // What the user types is noted, to be kept once the tunnel is up
+        // ("Remember the password in your keyring", ticked as it starts).
         replies
             .send_blocking(Reply::Answer {
                 text: "hunter3".into(),
-                remember: false,
+                remember: true,
                 keep_certificate: false,
             })
             .unwrap();

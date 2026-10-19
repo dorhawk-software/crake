@@ -103,6 +103,17 @@ impl Manager {
                     vici.forget(name).await;
                     retry = true;
                 }
+                Some(Signed::KeyRefused) => {
+                    vici.forget(name).await;
+                    let who = config.display();
+                    return Ok((
+                        TunnelState::Trouble,
+                        Some(format!(
+                            "{} {who}\u{2019}s gateway. Your IT team can tell you the right one; change it in {who}\u{2019}s Edit.",
+                            crake_proto::trouble::KEY_MISMATCH
+                        )),
+                    ));
+                }
                 Some(Signed::Failed(why)) => {
                     vici.forget(name).await;
                     return Ok((TunnelState::Trouble, Some(why)));
@@ -125,7 +136,11 @@ impl Manager {
                         vici.forget(name).await;
                         return Ok((
                             TunnelState::Trouble,
-                            Some(format!("{}\u{2019}s gateway ended the tunnel.", config.display())),
+                            Some(format!(
+                                "{}. {}",
+                                crake_proto::trouble::GATEWAY_ENDED,
+                                crake_proto::trouble::SIGN_IN_AGAIN
+                            )),
                         ));
                     }
                 }

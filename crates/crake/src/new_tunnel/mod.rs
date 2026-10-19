@@ -8,8 +8,8 @@ use std::time::Duration;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    AnyElement, Context, Div, Entity, FocusHandle, Focusable, FontWeight, Pixels, Stateful,
-    Subscription, Task, TestSupportExt, Window, div, px, svg,
+    AnyElement, Context, Div, Entity, FocusHandle, FontWeight, Pixels, Stateful, Subscription,
+    Task, TestSupportExt, Window, div, px, svg,
 };
 
 use crate::Request;
@@ -21,12 +21,16 @@ use crate::theme::{Theme, fonts};
 mod view;
 
 mod import;
+// IPsec's key, domains and identity (ipsec-tunnel.html).
+mod ipsec;
 
 mod routing;
 
 mod server;
 
 mod sign_in;
+// Moving between the steps, and what Add sends.
+mod steps;
 
 mod widgets;
 
@@ -50,7 +54,7 @@ pub const WIDTH: f32 = 720.;
 pub const HEIGHT: f32 = 860.;
 
 /// The protocols openconnect speaks (step 1): id, name, sub, code.
-const PROTOCOLS: [(&str, &str, &str, &str); 9] = [
+const PROTOCOLS: [(&str, &str, &str, &str); 10] = [
     ("auto", "Detect automatically", "", ""),
     (
         "anyconnect",
@@ -71,7 +75,12 @@ const PROTOCOLS: [(&str, &str, &str, &str); 9] = [
         "Older Juniper servers",
         "nc",
     ),
-    ("fortinet", "Fortinet SSL VPN", "FortiGate", "fortinet"),
+    (
+        "fortinet",
+        "Fortinet SSL VPN",
+        "FortiClient\u{2019}s \u{201c}SSL-VPN\u{201d}",
+        "fortinet",
+    ),
     ("f5", "F5 BIG-IP", "Access Policy Manager", "f5"),
     ("array", "Array Networks", "AG / vxAG", "array"),
     // Crake runs it itself (CLAUDE.md, 7i); OpenVPN 3's profiles are
@@ -81,6 +90,14 @@ const PROTOCOLS: [(&str, &str, &str, &str); 9] = [
         "OpenVPN",
         "A .ovpn profile from your IT team",
         "openvpn",
+    ),
+    // craked runs it with strongSwan (CLAUDE.md, 7k); shown after Fortinet
+    // SSL VPN, the other way into a FortiGate (`server::protocol_list`).
+    (
+        "ipsec",
+        "IPsec (IKEv2)",
+        "FortiClient\u{2019}s \u{201c}IPsec VPN\u{201d}, and other IKEv2 gateways",
+        "ipsec",
     ),
 ];
 
@@ -195,6 +212,8 @@ pub struct NewTunnel {
     /// A name taken from an imported file, set in the field at the next
     /// frame (which has the window).
     pending_name: Option<String>,
+    /// IPsec's key, domains and the gateway's identity.
+    ipsec: ipsec::Ipsec,
     /// Editing: the tunnel's protocol and gateway as they were.
     editing_protocol: String,
     kept_gateway: String,
@@ -281,6 +300,7 @@ impl NewTunnel {
         let name = input(field("display_name"), "Nordbank", window, cx);
         let gateway = input(field("gateway"), "vpn.example.com", window, cx);
         let user = input(field("user"), "your.name", window, cx);
+        let ipsec = ipsec::Ipsec::new(&field("domains"), field("protocol") == "ipsec", window, cx);
         let list_input = input(
             String::new(),
             "*.example.internal or 10.0.0.0/16",
@@ -451,6 +471,7 @@ impl NewTunnel {
             pending_name: (demo && shown_protocol == Some("openvpn")).then(|| "Initech".into()),
             editing_protocol: field("protocol"),
             kept_gateway: field("gateway"),
+            ipsec,
             focus,
             _subscriptions: subscriptions,
         }
@@ -514,183 +535,5 @@ impl NewTunnel {
     /// Why the browser can't sign in here, if it can't.
     fn no_browser(&self) -> Option<String> {
         self.engines.and_then(|e| e.no_browser())
-    }
-
-    /// Can step `step` be left? Says what's missing if not.
-    /// The text fields of the step on screen, in the order Tab goes
-    /// through them.
-    fn tab_order(&self) -> Vec<Entity<InputState>> {
-        match self.step {
-            1 if self.protocol == "openvpn" => vec![self.name.clone()],
-            1 => vec![self.name.clone(), self.gateway.clone()],
-            2 => vec![self.user.clone()],
-            _ => Vec::new(),
-        }
-    }
-
-    /// Tab to the step's next text field (`back`: Shift+Tab, the one
-    /// before): nothing in GPUI moves the focus on Tab by itself here.
-    pub(super) fn tab(&mut self, back: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let fields = self.tab_order();
-        let Some(at) = fields
-            .iter()
-            .position(|f| f.read(cx).focus_handle(cx).is_focused(window))
-        else {
-            return;
-        };
-        let next = if back {
-            (at + fields.len() - 1) % fields.len()
-        } else {
-            (at + 1) % fields.len()
-        };
-        fields[next].update(cx, |f, cx| f.focus(window, cx));
-        cx.notify();
-    }
-
-    fn check(&mut self, step: usize, cx: &Context<Self>) -> bool {
-        if step == 2
-            && self.method == "browser"
-            && self.protocol != "openvpn"
-            && let Some(why) = self.no_browser()
-        {
-            self.problem = Some(why);
-            return false;
-        }
-        let problem = match step {
-            1 if self.display_name(cx).is_empty() => Some("Give it a name."),
-            1 if self.missing(self.protocol).is_some() => self.missing(self.protocol),
-            // A new one needs its profile; an OpenVPN 3 one moving over too.
-            1 if self.protocol == "openvpn"
-                && self.ovpn.is_none()
-                && self.editing_protocol != "openvpn" =>
-            {
-                Some("Which profile? Import its .ovpn file.")
-            }
-            1 if self.protocol != "openvpn" && self.gateway.read(cx).value().trim().is_empty() => {
-                Some("Which gateway? Its name or address, like vpn.example.com.")
-            }
-            1 if self.protocol().is_none() => match self.detect {
-                Detect::Asking(_) => Some("Still asking the gateway. A moment."),
-                _ => Some("Pick the protocol: the gateway didn\u{2019}t say."),
-            },
-            2 if self.method == "certificate"
-                && self.cert_source == "file"
-                && self.cert_file.is_none()
-                && self.editing.is_none() =>
-            {
-                Some("Choose the certificate file.")
-            }
-            _ => None,
-        };
-        self.problem = problem.map(str::to_owned);
-        problem.is_none()
-    }
-
-    fn fields(&self, cx: &Context<Self>) -> HashMap<String, String> {
-        let mut f = HashMap::new();
-        f.insert("display_name".into(), self.display_name(cx));
-        // OpenVPN: the gateway its profile names, and the profile (craked
-        // keeps it); changed only when one was chosen.
-        let gateway = match (&self.ovpn, self.protocol) {
-            (Some(o), "openvpn") => o.remote.clone(),
-            (None, "openvpn") => self.kept_gateway.clone(),
-            _ => self.gateway.read(cx).value().trim().to_owned(),
-        };
-        f.insert("gateway".into(), gateway);
-        if let (Some(o), "openvpn") = (&self.ovpn, self.protocol) {
-            f.insert("profile".into(), o.text.clone());
-        }
-        f.insert(
-            "protocol".into(),
-            self.protocol().unwrap_or("anyconnect").into(),
-        );
-        let group = match self.protocol {
-            "openvpn" => String::new(),
-            _ => self.group.clone().unwrap_or_default(),
-        };
-        f.insert("group".into(), group);
-        f.insert("sign_in".into(), self.method.into());
-        f.insert("user".into(), self.user.read(cx).value().trim().to_owned());
-        let certificate = match (self.method, self.cert_source) {
-            ("certificate", "pkcs11") => "pkcs11:".to_owned(),
-            // A chosen file is kept in the keyring (7e).
-            ("certificate", _) => "keyring".to_owned(),
-            _ => String::new(),
-        };
-        f.insert("certificate".into(), certificate);
-        f.insert("mode".into(), self.mode.into());
-        f.insert("list".into(), self.list.join("\n"));
-        f.insert("forget_after_days".into(), self.forget.clone());
-        f.insert("weak_ciphers".into(), self.weak_ciphers.to_string());
-        f.insert("client_version".into(), self.client_version.to_string());
-        f.insert("keep_signed_in".into(), self.keep_signed_in.to_string());
-        f
-    }
-
-    fn next(&mut self, cx: &mut Context<Self>) {
-        if !self.check(self.step, cx) {
-            cx.notify();
-            return;
-        }
-        if self.step < LAST_STEP {
-            self.step += 1;
-            cx.notify();
-            return;
-        }
-        let fields = self.fields(cx);
-        let certificate = self.cert_file.as_ref().map(|(_, b)| b.clone());
-        match &self.editing {
-            Some(name) => {
-                let _ = self.requests.send_blocking(Request::UpdateTunnel(
-                    name.clone(),
-                    fields,
-                    certificate,
-                ));
-                if self.send_suggested {
-                    let _ = self
-                        .requests
-                        .send_blocking(Request::Pin(name.clone(), self.suggested.clone()));
-                }
-            }
-            None => {
-                let _ = self
-                    .requests
-                    .send_blocking(Request::AddTunnel(fields, certificate));
-            }
-        }
-        cx.emit(Close);
-    }
-
-    fn choose_certificate(&mut self, cx: &mut Context<Self>) {
-        let picked = cx.prompt_for_paths(gpui_kit::PathPromptOptions {
-            files: true,
-            directories: false,
-            multiple: false,
-            prompt: Some("Choose".into()),
-        });
-        cx.spawn(async move |this, cx| {
-            let Ok(Ok(Some(paths))) = picked.await else {
-                return;
-            };
-            let Some(path) = paths.into_iter().next() else {
-                return;
-            };
-            let read = std::fs::read(&path);
-            let _ = this.update(cx, |this, cx| {
-                match read {
-                    Ok(bytes) => {
-                        let name = path
-                            .file_name()
-                            .map(|n| n.to_string_lossy().into_owned())
-                            .unwrap_or_default();
-                        this.cert_file = Some((name, bytes));
-                        this.problem = None;
-                    }
-                    Err(e) => this.problem = Some(format!("Couldn\u{2019}t read that file: {e}")),
-                }
-                cx.notify();
-            });
-        })
-        .detach();
     }
 }
