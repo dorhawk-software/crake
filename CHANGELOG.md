@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.11.1 (2026-10-19)
+
 - **OpenVPN is no longer Beta.** Crake's own OpenVPN has signed in to a real company gateway
   through the browser and reached its internal network, so New tunnel shows it beside AnyConnect,
   without the Beta tag.
