@@ -24,4 +24,9 @@ cp /etc/openvpn/e2e/ca.crt /link/openvpn-ca.crt
 sed -e 's/^proto udp$/proto tcp-server/' -e '/^local /d' /etc/openvpn/e2e/server.conf > /run/server.conf
 openvpn --config /run/server.conf > /link/openvpn-server.log 2>&1 &
 python3 /sso.py /run/openvpn-mgmt.sock 0.0.0.0 8080 /link/openvpn-seen &
+# The other protocols' sign-in (e2e_protocols.rs), one port each, as start.sh.
+for gw in fortinet:4431 gp:4432 f5:4433 juniper:4434; do
+  python3 "/fake/fake-${gw%%:*}-server.py" 0.0.0.0 "${gw##*:}" /etc/ocserv/cert.pem /etc/ocserv/key.pem \
+    > "/link/fake-${gw%%:*}.log" 2>&1 &
+done
 exec ocserv --foreground --config /etc/ocserv/ocserv.conf

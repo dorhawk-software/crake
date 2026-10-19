@@ -21,6 +21,8 @@ use std::time::Duration;
 use crate::client::Command;
 use crate::test_app::{App, connected, enabled, gateway, get, off, sign_in};
 
+mod sso;
+
 /// How long a tunnel, and a host through it, get.
 const WAIT: Duration = Duration::from_secs(60);
 /// A public address that answers anywhere: it must answer directly.

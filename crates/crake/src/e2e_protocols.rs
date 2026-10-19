@@ -6,21 +6,30 @@
 //! with a session; switched on with it, craked's tunnel ends in trouble
 //! when the gateway refuses the session at the tunnel stage, as the fake
 //! servers do (they carry no traffic). Skipped unless CRAKE_E2E=1; run it
-//! with `scripts/e2e-test.sh`.
+//! with `scripts/e2e-test.sh`. On CI's Mac and Windows the sign-ins run
+//! too, against the same servers through Cloudflare
+//! (scripts/ci-through-cloudflare.sh sets CRAKE_FAKE_GATEWAY when it
+//! reaches them; the tunnel stage needs the e2e container's craked: Linux).
 
 use std::time::Duration;
 
-use craked::config::{Config, Protocol, TunnelConfig};
-use craked::manager::Manager;
-
-use crate::client::Command;
-use crate::e2e_tests::{config, sh};
 use crate::signin::{self, Ask, Event, Reply, Spec};
-use crate::test_app::enabled;
-use crate::wire_tests;
 
-/// The gateway's address on the wire.
-const GATEWAY: &str = "198.51.100.10";
+/// The fake servers' address: the e2e gateway's on the wire, or where
+/// CRAKE_FAKE_GATEWAY says (CI's Mac and Windows: 127.0.0.1, through
+/// Cloudflare). None: not reachable from here, nothing to test.
+fn gateway() -> Option<String> {
+    match std::env::var("CRAKE_FAKE_GATEWAY") {
+        Ok(g) if !g.is_empty() => Some(g),
+        _ if cfg!(target_os = "linux") => Some("198.51.100.10".to_owned()),
+        _ => None,
+    }
+}
+
+/// The tests run: CRAKE_E2E=1 and the fake servers reachable.
+fn enabled() -> bool {
+    crate::test_app::enabled() && gateway().is_some()
+}
 /// How long a sign-in, and a tunnel, get.
 const WAIT: Duration = Duration::from_secs(30);
 /// More questions than any of these sign-ins asks: the same one again
@@ -58,15 +67,19 @@ const JUNIPER: Fake = Fake {
 
 impl Fake {
     fn url(&self, path: &str) -> String {
-        format!("https://{GATEWAY}:{}{path}", self.port)
+        let gateway = gateway().unwrap_or_default();
+        format!("https://{gateway}:{}{path}", self.port)
     }
 
     /// The fake server's own switches (two-factor, groups, ...).
     fn configure(&self, form: &str) {
-        let said = sh(&format!(
-            "curl -sk {} -d '{form}' -o /dev/null -w '%{{http_code}}'",
-            self.url("/CONFIGURE")
-        ));
+        let nowhere = if cfg!(windows) { "NUL" } else { "/dev/null" };
+        let out = std::process::Command::new("curl")
+            .args(["-sk", &self.url("/CONFIGURE"), "-d", form, "-o", nowhere])
+            .args(["-w", "%{http_code}"])
+            .output()
+            .expect("curl");
+        let said = String::from_utf8_lossy(&out.stdout).into_owned();
         let code = said.trim();
         assert!(
             code.len() >= 3 && code[code.len() - 3..].starts_with('2'),
@@ -249,9 +262,17 @@ async fn each_protocols_sign_in() {
 
 /// Switched on with a session the gateway then refuses at the tunnel
 /// stage (as the fake servers do): craked's tunnel ends in trouble, saying
-/// why, instead of hanging in "connecting".
+/// why, instead of hanging in "connecting". Linux: the e2e container's
+/// craked.
+#[cfg(target_os = "linux")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_session_refused_at_the_tunnel_stage_says_so() {
+    use craked::config::{Config, Protocol, TunnelConfig};
+    use craked::manager::Manager;
+
+    use crate::client::Command;
+    use crate::e2e_tests::config;
+    use crate::wire_tests;
     if !enabled() {
         return;
     }
