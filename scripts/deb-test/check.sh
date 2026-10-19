@@ -85,6 +85,16 @@ install() {
 
 # A lookup craked's own DNS answered REFUSED, within a second (not one
 # that failed because nothing answered).
+# What resolved and craked say about keeping names private, for a failure.
+hush_said() {
+    echo "resolved's domains:"; resolvectl domain
+    echo "craked's settings:"; busctl --system call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 Settings
+    echo "port 53:"; ss -lunp | grep ':53 '
+}
+# Kept private, or what resolved and craked say.
+refused_or_said() { refused_at_once "$1" || { hush_said; return 1; }; }
+private_or_said() { resolvectl domain crake-hush | grep -q "$1" || { hush_said; return 1; }; }
+
 refused_at_once() {
     start=$(date +%s%N)
     out=$(resolvectl query "$1" 2>&1) && return 1
@@ -148,7 +158,9 @@ tunnel() {
     # Keeping names private: with ACME off, its names are answered at once
     # by craked's own DNS (port 53 on crake-hush), never asked publicly.
     check "crake-hush is up" ip link show crake-hush
-    check "ACME's names are refused at once" refused_at_once wiki.acme.internal
+    # craked looks every 2 s; a slow VM (CI's) takes a moment longer.
+    for _ in $(seq 1 20); do resolvectl domain crake-hush 2>/dev/null | grep -q acme.internal && break; sleep 0.5; done
+    check "ACME's names are refused at once" refused_or_said wiki.acme.internal
     # Another VPN client serving ACME's domain (AnyConnect beside Crake, as
     # on a colleague's Mac): its names are left to it, not refused.
     check "another VPN client serves acme.internal" sh -c 'ip link add other0 type dummy && ip link set other0 up && resolvectl dns other0 10.40.0.2 && resolvectl domain other0 "~acme.internal"'
@@ -156,7 +168,7 @@ tunnel() {
     check "Crake leaves acme.internal to it" sh -c '! resolvectl domain crake-hush 2>/dev/null | grep -q acme.internal'
     check "the other client goes" ip link del other0
     for _ in $(seq 1 20); do resolvectl domain crake-hush 2>/dev/null | grep -q acme.internal && break; sleep 0.5; done
-    check "acme.internal is kept private again" sh -c 'resolvectl domain crake-hush | grep -q acme.internal'
+    check "acme.internal is kept private again" private_or_said acme.internal
     openvpn_tunnel
     ipsec_tunnel
     check "nothing went wrong in craked's journal" sh -c '! journalctl -b -u craked --no-pager -o cat | grep -E "ERROR|panicked"'
@@ -230,12 +242,6 @@ openvpn_tunnel() {
 # profile, which the unit asks for, isn't loaded there): proven by
 # scripts/vm-test.sh, as AppArmor rules are.
 ipsec_tunnel() {
-    # SELinux runs charon as strongSwan's own (ipsec_t), which may read
-    # neither Crake's settings nor reach craked: not yet (CLAUDE.md, 7k).
-    if [ "$(getenforce 2>/dev/null)" = Enforcing ]; then
-        echo "  skip  IPsec: not yet with SELinux enforcing (a policy module of Crake's own, CLAUDE.md 7k)"
-        return
-    fi
     if [ -e /tmp/ipsec-gw-load.log ]; then
         check "ACME's IPsec gateway is up" sh -c 'grep -q "loaded connection .acme." /tmp/ipsec-gw-load.log || { cat /tmp/ipsec-gw-load.log /tmp/ipsec-gw.log; pgrep -a gw-charon; false; }'
     fi

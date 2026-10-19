@@ -18,6 +18,9 @@ Requires:       iproute
 Requires:       systemd-resolved
 Requires:       polkit
 Requires:       dbus
+# Its SELinux module (IPsec's charon), loaded and unloaded by the scripts.
+Requires(post):   policycoreutils
+Requires(postun): policycoreutils
 Recommends:     openvpn
 Recommends:     gnome-shell-extension-appindicator
 Recommends:     gnome-keyring
@@ -38,11 +41,15 @@ happens on this computer; nothing is sent anywhere.
 cp -a %{crake_root}/. %{buildroot}/
 # Fedora confines services with SELinux, not AppArmor.
 rm -rf %{buildroot}/etc/apparmor.d
+# The SELinux module for IPsec's charon (packaging/selinux/crake.te).
+install -Dm644 %{crake_selinux} %{buildroot}/usr/share/selinux/packages/crake.pp
 # Fedora's charon, where Debian's is in the staged unit.
 sed -i 's#/usr/lib/ipsec/charon#/usr/libexec/strongswan/charon#' \
     %{buildroot}/usr/lib/systemd/system/crake-charon.service
 
 %post
+# IPsec's charon may use craked's folder (packaging/selinux/crake.te).
+semodule -i /usr/share/selinux/packages/crake.pp >/dev/null 2>&1 || :
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload >/dev/null 2>&1 || :
     systemctl reload dbus.service >/dev/null 2>&1 || :
@@ -65,6 +72,7 @@ fi
 
 %postun
 if [ "$1" -eq 0 ]; then
+    semodule -r crake >/dev/null 2>&1 || :
     [ -d /run/systemd/system ] && systemctl daemon-reload >/dev/null 2>&1 || :
     # What craked learned and logged goes with it.
     rm -rf /var/lib/crake
@@ -76,6 +84,7 @@ fi
 /usr/libexec/crake
 /usr/lib/systemd/system/craked.service
 /usr/lib/systemd/system/crake-charon.service
+/usr/share/selinux/packages/crake.pp
 /usr/share/dbus-1/system.d/software.dorhawk.Crake1.conf
 /usr/share/polkit-1/actions/software.dorhawk.crake.policy
 /usr/share/applications/software.dorhawk.crake.desktop

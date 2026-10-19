@@ -16,6 +16,10 @@ const WAIT: Duration = Duration::from_secs(5);
 /// How long the unit gets to stop.
 const STOP_WAIT: Duration = Duration::from_secs(5);
 const POLL: Duration = Duration::from_millis(100);
+/// How long a unit restarted gets to leave "inactive".
+const START_WAIT: Duration = Duration::from_secs(10);
+/// systemd's word for a unit that isn't running (nor starting).
+const INACTIVE: &str = "inactive";
 
 const SYSTEMD: &str = "org.freedesktop.systemd1";
 const MANAGER_PATH: &str = "/org/freedesktop/systemd1";
@@ -51,6 +55,17 @@ impl Unit {
                 .call("RestartUnit", &(name, "replace")),
         )
         .await?;
+        // RestartUnit answers once the job is queued: until it runs, the
+        // unit still says "inactive", which isn't "stopped" yet (on CI's
+        // slower VM craked asked in between and stopped charon, 2026-10-19).
+        // A unit that stays inactive (strongSwan not installed: its
+        // condition) is said once START_WAIT is out.
+        let deadline = tokio::time::Instant::now() + START_WAIT;
+        while unit.state().await.as_deref().is_ok_and(|s| s == INACTIVE)
+            && tokio::time::Instant::now() < deadline
+        {
+            tokio::time::sleep(POLL).await;
+        }
         Ok(unit)
     }
 

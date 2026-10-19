@@ -1,0 +1,44 @@
+# SELinux policy module for Crake's IPsec engine (Fedora; the RPM
+# installs it). SELinux runs strongSwan's charon as its own domain,
+# ipsec_t, whatever starts it; craked's charon (crake-charon.service)
+# reads its settings from, and makes its vici socket and Fedora's pid file
+# in, craked's /run/crake/ipsec, and its updown (the hook) tells craked
+# over craked's socket. This module lets them do exactly that: a type of
+# its own for that folder (given when craked, an unconfined service, makes
+# "ipsec" in /run/crake), and the hook's connection to craked.
+# Tested enforced by scripts/vm-test.sh fedora:44.
+module crake 1.0;
+
+require {
+    type ipsec_t;
+    type ipsec_mgmt_t;
+    type var_run_t;
+    type tmpfs_t;
+    type unconfined_service_t;
+    attribute file_type;
+    attribute non_security_file_type;
+    attribute non_auth_file_type;
+    class filesystem associate;
+    class dir { add_name create getattr open read remove_name rmdir search write setattr };
+    class file { append create getattr lock open read setattr unlink write };
+    class sock_file { create getattr setattr unlink write };
+    class unix_stream_socket connectto;
+}
+
+# craked's folder for its charon: settings, vici socket, pid file.
+type crake_ipsec_run_t;
+typeattribute crake_ipsec_run_t file_type, non_security_file_type, non_auth_file_type;
+allow crake_ipsec_run_t tmpfs_t:filesystem associate;
+type_transition unconfined_service_t var_run_t:dir crake_ipsec_run_t "ipsec";
+
+allow ipsec_t var_run_t:dir search;
+allow ipsec_t tmpfs_t:dir { getattr search };
+allow ipsec_t crake_ipsec_run_t:dir { add_name getattr open read remove_name search write };
+allow ipsec_t crake_ipsec_run_t:file { append create getattr lock open read setattr unlink write };
+allow ipsec_t crake_ipsec_run_t:sock_file { create getattr setattr unlink write };
+
+# The hook (updown, which SELinux runs as strongSwan's ipsec_mgmt_t)
+# telling craked the tunnel is up.
+allow ipsec_mgmt_t var_run_t:dir search;
+allow ipsec_mgmt_t var_run_t:sock_file write;
+allow ipsec_mgmt_t unconfined_service_t:unix_stream_socket connectto;

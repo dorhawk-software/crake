@@ -1453,7 +1453,10 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    /run/charon.* only, and refused Crake's settings. craked's profile may
    make those calls (Properties `Get` only: zbus's caching proxy asked
    GetAll and followed PropertiesChanged, both refused, and craked took
-   charon for stopped). strongSwan is **suggested**, not recommended as
+   charon for stopped; and RestartUnit answers once its job is queued,
+   so craked waits for the unit to leave "inactive" first: on CI's slower
+   VM it had asked in between and stopped charon). strongSwan is
+   **suggested**, not recommended as
    the plan said: Debian's strongswan-charon recommends
    strongswan-starter, which would start a system strongSwan on every
    install; New tunnel says the command, with --no-install-recommends.
@@ -1474,15 +1477,22 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    gateway's charon has a /run of its own (`unshare --mount`), and the
    IPsec phase stands in for a system strongSwan with a pid file and a
    live process in /run and /run/strongswan (Fedora's charon keeps its
-   pid file there; the unit makes the folder in its own /run).
-   **Not yet:** SELinux (Fedora): charon runs as
+   pid file there; the unit binds craked's /run/crake/ipsec/run there:
+   an ExecStartPre's mkdir made it in a /run of its own, and Ubuntu
+   26.04's mkdir is a path AppArmor's profile doesn't name).
+   **SELinux (Fedora): built (2026-10-19).** SELinux runs charon as
    strongSwan's own `ipsec_t` whatever starts it (unconfined_service_t
-   may not use its file as an entry point; through /bin/sh it moves to
-   ipsec_t at charon's exec), and ipsec_t may read neither
-   /run/crake/ipsec nor reach craked's socket (`vm-test.sh fedora:44`
-   shows the denials): it needs a policy module of Crake's own (a type
-   for /run/crake/ipsec and the hook's connect), built and loaded by the
-   RPM. CI's Fedora containers run without SELinux. NixOS: the module
+   may not use its file as an entry point, and through /bin/sh it moves
+   to ipsec_t at charon's exec), and its updown as `ipsec_mgmt_t`; the
+   RPM's policy module (packaging/selinux/crake.te, compiled by
+   build-rpm.sh with checkpolicy, installed with semodule in %post,
+   removed in %postun) gives craked's `/run/crake/ipsec` a type of its
+   own (`crake_ipsec_run_t`, by a named type transition when craked
+   makes "ipsec" there), lets ipsec_t use it, and lets ipsec_mgmt_t (the
+   hook) reach craked's socket. `vm-test.sh fedora:44` passes the IPsec
+   phase enforced with no denials. The IPsec journey still skips under
+   SELinux: its craked runs charon by hand from a temporary folder.
+   NixOS: the module
    has no charon unit, and the app looks for charon at the
    distributions' paths.
    Not yet: "Change the key…" in the sign-in window's failure (the

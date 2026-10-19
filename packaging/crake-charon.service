@@ -31,9 +31,8 @@ BindPaths=-/run/crake/ipsec/run:/run/strongswan
 # a distribution attaches to charon's path, which allows /etc/strongswan*
 # and /run/charon.* only. Ignored where AppArmor isn't on.
 AppArmorProfile=-crake-charon
-# SELinux (Fedora) runs charon as strongSwan's own (ipsec_t), which may
-# read neither craked's settings nor reach its socket: IPsec there waits
-# for a policy module of Crake's own (CLAUDE.md, 7k).
+# SELinux (Fedora) runs charon as strongSwan's own (ipsec_t): the RPM's
+# module (packaging/selinux/crake.te) lets it use craked's folder.
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_IPC_LOCK
 ProtectHome=yes
 PrivateTmp=yes

@@ -9,11 +9,15 @@ cd "$(dirname "$0")/.."
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
 [ -d target/deb/root/usr/sbin ] || scripts/build-deb.sh >/dev/null
 mkdir -p target/rpm
-docker run --rm -v "$PWD/packaging/rpm:/spec:ro" -v "$PWD/target/deb/root:/root-tree:ro" \
+docker run --rm -v "$PWD/packaging/rpm:/spec:ro" -v "$PWD/packaging/selinux:/selinux:ro" -v "$PWD/target/deb/root:/root-tree:ro" \
   -v "$PWD/target/rpm:/out" -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" fedora:43 sh -euc '
-    dnf install -q -y rpm-build >/dev/null
+    dnf install -q -y rpm-build checkpolicy policycoreutils >/dev/null
+    # The SELinux module for IPsec charon (packaging/selinux/crake.te).
+    mkdir -p /tmp/selinux
+    checkmodule -M -m -o /tmp/selinux/crake.mod /selinux/crake.te
+    semodule_package -o /tmp/selinux/crake.pp -m /tmp/selinux/crake.mod
     rpmbuild -bb --quiet /spec/crake.spec \
-      --define "crake_version '"$VERSION"'" --define "crake_root /root-tree" \
+      --define "crake_version '"$VERSION"'" --define "crake_root /root-tree" --define "crake_selinux /tmp/selinux/crake.pp" \
       --define "_rpmdir /tmp/rpms" --define "_build_name_fmt %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm" \
       --define "dist %{nil}"
     cp /tmp/rpms/*.rpm /out/ && chown "$HOST_UID:$HOST_GID" /out/*.rpm
