@@ -48,7 +48,7 @@
   .body h3 { margin: 0; font-size: 22px; font-weight: 700; }
   .fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; margin-top: 18px; align-items: start; }
   .lab { display: flex; align-items: baseline; justify-content: space-between; height: 20px; font-weight: 600; margin-bottom: 6px; }
-  .lab .act { font-size: 13px; font-weight: 600; color: var(--accent); }
+  .lab .act { font-size: 13px; font-weight: 600; color: var(--ink); text-decoration: underline; }
   .lab .opt { font-size: 13px; font-weight: 400; color: var(--muted); }
   .field { box-sizing: border-box; height: 42px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel);
     display: flex; align-items: center; justify-content: space-between; font-size: 15px; white-space: nowrap; overflow: hidden; }
@@ -59,7 +59,7 @@
   .line { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; font-size: 13px; line-height: 19px; color: var(--muted); }
   .line svg { flex: none; margin-top: 1px; }
   .line.ink { color: var(--ink); }
-  .line .act { color: var(--accent); font-weight: 600; white-space: nowrap; }
+  .line .act { color: var(--ink); font-weight: 600; white-space: nowrap; text-decoration: underline; }
   .ptitle { margin-top: 24px; font-weight: 600; }
   .list { margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   .p { box-sizing: border-box; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 56px;
@@ -102,7 +102,7 @@
   .steps .now { font-weight: 700; }
   .steps .later { color: var(--muted); }
   .said { margin-top: 12px; font-size: 13px; color: var(--muted); }
-  .link { margin-top: 10px; font-size: 13px; font-weight: 600; color: var(--accent); }
+  .link { margin-top: 10px; font-size: 13px; font-weight: 600; color: var(--ink); text-decoration: underline; }
   .sbuttons { display: flex; gap: 8px; margin-top: 18px; }
   .sbuttons .grow { flex: 1; }
   .sb { box-sizing: border-box; height: 40px; padding: 0 14px; border-radius: 6px; font-weight: 600; display: flex; align-items: center; }
@@ -114,8 +114,9 @@
   .states { width: 720px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 32px 20px; }
   .states .k { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 16px; }
   .states .k:first-child { margin-top: 0; }
-  .cmd { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 8px 12px; border-radius: 6px; background: var(--surface); font-size: 13px; }
-  .cmd .mono { flex: 1; }
+  .cmd { display: flex; align-items: center; margin-top: 8px; border-radius: 6px; background: var(--surface); font-size: 13px; overflow: hidden; }
+  .cmd .mono { flex: 1; padding: 8px 12px; }
+  .cmd .copy { display: flex; align-items: center; gap: 6px; align-self: stretch; padding: 0 12px; border-left: 1px solid var(--line); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -271,7 +272,7 @@
     <div class="line ink changed"><span>Not using initech.ovpn: IPsec doesn't take a profile. <span class="act">Use it again</span></span></div>
     <div class="k">strongSwan isn't installed (the card's “Not installed”, as for openconnect and openvpn)</div>
     <div class="line ink"><span>Needs strongSwan, which isn't installed:</span></div>
-    <div class="cmd"><span class="mono">sudo apt install --no-install-recommends strongswan-charon strongswan-swanctl libstrongswan-standard-plugins libcharon-extauth-plugins libcharon-extra-plugins</span><span class="act" style="color: var(--accent); font-weight: 600">Copy</span></div>
+    <div class="cmd"><span class="mono">sudo apt install --no-install-recommends strongswan-charon strongswan-swanctl libstrongswan-standard-plugins libcharon-extauth-plugins libcharon-extra-plugins</span><span class="copy"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Copy</span></div>
     <div class="k">On Windows and macOS, for now (the card's “Not available”)</div>
     <div class="line ink"><span>Crake runs IPsec on Linux only for now.</span></div>
     <div class="k">Not a domain</div>

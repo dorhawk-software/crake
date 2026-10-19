@@ -56,6 +56,12 @@ Don't drift back into these. Each was tried and dropped for a reason.
   by the user: the list folds once a protocol is chosen ("Choose the
   protocol yourself" opens it again), and "Import .ovpn…" shows only
   while the protocol is "Detect automatically" or OpenVPN.
+- **Teal text actions** (Import .ovpn…, Copy for helpdesk, About's links,
+  the new-version notice's Restart and Download, "Copied"; text-actions.html,
+  C: teal written into the rule as "something you can click"), and **small
+  bordered buttons for them** (its B, the panel's Dismiss everywhere: two
+  looks, since a link in a sentence stays text, and a faint fill in dark).
+  A was chosen (see Colour).
 - **An IPsec tunnel's domains in step 3** (ipsec-tunnel.html, 2, B):
   beside "Only what I list", whose list takes names for another purpose
   (what may go through, not where a name is asked). Chosen: step 1, under
@@ -114,6 +120,20 @@ by the user: "it must be tasteful, but maybe some colour, and an icon here
 and there"; design/proposals/leftover-warning.html). Amber colours a whole
 notice (its tint, its hairline) and its icon, the bird's head with an amber
 triangle; never an edge on one side of a box, never decoration.
+
+**Small actions and links** (chosen by the user 2026-10-19,
+design/proposals/text-actions.html, A): ink, 13 px, semibold, with an ink
+underline, as Settings → Diagnostics' Open and Show in folder; the hand
+when pointed at; nothing changes size. One look for an action in a label's
+row (Import .ovpn…, Edit…, Show, Change…), beside a sentence it acts on
+(Copy for helpdesk) and a link to the web (About's). Never teal: the only
+teal you click is the one primary action. A dismissal ("Not now") stays
+muted and plain, quieter than the action beside it. A command line's Copy
+is the leftover notice's segment (a hairline, the clipboard, Copy, then
+the check and Copied in place). "Copied" after a host's name, and after
+Copy for helpdesk for 3 s, is muted with the app's check (an
+acknowledgement). Keyboard focus keeps the 2 px accent ring, with 2 px of
+room inside an underlined action so it clears the letters.
 
 **Notices** (the leftover process, "acting as AnyConnect", no tray, a new
 version, the service's approval on macOS) share one shape: a title at 600,

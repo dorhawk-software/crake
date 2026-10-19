@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: text actions</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --line-strong: #BDBDB8; --ink: #1A1C1E;
+    --muted: #5A5F64; --accent: #0F766E; --accent-ink: #FFFFFF; --accent-soft: #E2F1EF; --danger: #B42318;
+    --warning-soft: #FCF4E4; --warning-line: #EFD9AE; }
+  body.dark { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --line-strong: #4A4E53; --ink: #ECEDEE;
+    --muted: #A9AEB4; --accent: #2DD4BF; --accent-ink: #0B1514; --accent-soft: #17332F; --danger: #F97066;
+    --warning-soft: #2C2618; --warning-line: #5C4A22; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 56px; }
+  h1 { font-size: 20px; margin: 0 0 10px; }
+  h2.sec { font-size: 17px; margin: 36px 0 6px; }
+  .intro, .note { color: var(--muted); font-size: 13px; max-width: 84ch; }
+  .intro b, .note b { color: var(--ink); }
+  .note { margin: 4px 0 12px; }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  table.inv { border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+  table.inv td, table.inv th { text-align: left; padding: 6px 16px 6px 0; border-bottom: 1px solid var(--line-strong); vertical-align: top; }
+  table.inv th { color: var(--muted); font-weight: 600; }
+  .grid { display: grid; grid-template-columns: 200px repeat(4, 420px); width: max-content; margin-top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .grid > div { padding: 16px 18px; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+  .grid > .h { border-top: none; font-weight: 700; background: var(--surface); }
+  .grid > .rowh { border-left: none; font-weight: 600; font-size: 13px; color: var(--muted); }
+  .grid > .rowh b { display: block; color: var(--ink); font-size: 14px; }
+  .grid > .same { grid-column: 2 / span 4; }
+  .shot { display: block; border-radius: 6px; }
+  .choice { display: inline-block; font-size: 12px; font-weight: 700; color: var(--panel); background: var(--ink); border-radius: 4px; padding: 1px 7px; margin-right: 6px; }
+  .cap { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+  .lab { display: flex; align-items: baseline; justify-content: space-between; height: 20px; font-weight: 600; margin-bottom: 6px; }
+  .field { box-sizing: border-box; height: 42px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel); display: flex; align-items: center; font-size: 14px; }
+  .dots { letter-spacing: 3px; font-size: 18px; }
+  .sbuttons { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+  .sb { box-sizing: border-box; height: 40px; padding: 0 14px; border-radius: 6px; font-weight: 600; display: flex; align-items: center; }
+  .sb.bord { border: 1px solid var(--line); }
+  .sb.primary2 { background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 0 18px; }
+  .grow { flex: 1; }
+  .muted { color: var(--muted); }
+  .said { font-size: 13px; color: var(--muted); }
+
+  /* A: ink, underlined in ink (as Diagnostics' Open draws it). */
+  .a { color: var(--ink); font-weight: 600; font-size: 13px; text-decoration: underline; text-decoration-color: var(--ink); text-decoration-thickness: 1px; }
+  .a.n { font-size: 14px; font-weight: 400; }
+  /* B: the panel's Dismiss (12 px, 16 px line, 1 px x 7 px inside, surface, a hairline). */
+  .b { display: inline-flex; align-items: center; padding: 1px 7px; line-height: 16px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--ink); font-size: 12px; vertical-align: 1px; }
+  .b.on-surface { background: var(--panel); }
+  .box { padding: 10px 12px; border-radius: 8px; background: var(--surface); }
+  .lab .b { align-self: center; }
+  /* C: today's teal. */
+  .c { color: var(--accent); font-weight: 600; font-size: 13px; }
+  .c.u { text-decoration: underline; }
+  .c.n { font-size: 14px; font-weight: 400; }
+
+  /* What's the same in every option. */
+  .cmd { display: flex; align-items: center; border-radius: 6px; background: var(--surface); font-size: 13px; overflow: hidden; width: 560px; }
+  .cmd .mono { flex: 1; padding: 8px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cmd .copy { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-left: 1px solid var(--line); font-weight: 600; min-width: 74px; }
+  .notice { width: 420px; box-sizing: border-box; padding: 10px 12px; background: var(--warning-soft); border: 1px solid var(--warning-line); border-radius: 8px; font-size: 13px; }
+  .notice .t { font-weight: 600; }
+  .notice .acts { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
+  .notice .bordered { height: 30px; padding: 0 12px; border: 1px solid var(--warning-line); border-radius: 6px; background: var(--panel); font-weight: 600; display: flex; align-items: center; }
+  .copied { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); margin-left: 8px; }
+</style>
+</head>
+<body>
+<script>if (new URLSearchParams(location.search).get('dark') === 'true') document.body.classList.add('dark');</script>
+<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+  <symbol id="clip" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="check" viewBox="0 0 18 18"><path d="M4 9.5l3.2 3.2L14 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+<div class="page">
+  <h1>Proposal: how small text actions look</h1>
+  <div class="intro">You noticed (2026-10-19) that “Copy”, “Show”, “Change…” and “Keep the old key” in the IPsec proposal
+    are teal, though DESIGN.md keeps teal for three things: <b>a decision Crake made</b>, <b>the on or chosen state</b>, and
+    <b>the one primary action</b>. They copied what parts of the app already do. The app already has three other looks for
+    actions: the <b>bordered button</b> (Edit, Remove…, Undo, the panel's footer), its <b>small form</b> (the panel's
+    “Dismiss”), and <b>ink, underlined</b> text (Settings → Diagnostics' “Open” and “Show in folder”). This settles one
+    look for the small ones, everywhere. <b>One choice for you</b> (2). You liked B; the two assessments recommend A. Both
+    are drawn here as the app would build them.</div>
+
+  <h2 class="sec">1 · Where teal text is an action today</h2>
+  <table class="inv">
+    <tr><th>Where</th><th>What</th><th>Size today</th><th>Kind</th></tr>
+    <tr><td>New tunnel: Gateway's label row, and the OpenVPN card's Profile row</td><td>Import .ovpn…</td><td>13 px</td><td>an action</td></tr>
+    <tr><td>Tunnel detail: Profile's label row</td><td>Edit…</td><td>12 px</td><td>an action</td></tr>
+    <tr><td>The sign-in window, when it can't connect</td><td>Copy for helpdesk</td><td>13 px</td><td>an action (it copies, and says nothing)</td></tr>
+    <tr><td>The panel's new-version notice</td><td>Restart, Download</td><td>13 px</td><td>a notice's action: DESIGN.md says notices use a bordered one</td></tr>
+    <tr><td>Settings → About</td><td>Crex crex, Source on GitHub, dorhawk.software</td><td>14 px</td><td>links to the web</td></tr>
+    <tr><td>A host's whole name (tunnel detail, Traffic)</td><td>Copied</td><td>12 px</td><td>an acknowledgement: DESIGN.md says teal is never one</td></tr>
+    <tr><td>The IPsec proposal</td><td>Show, Change…, Keep the old key, Use it again</td><td>13 px</td><td>actions</td></tr>
+  </table>
+  <div class="note" style="margin-top: 10px">Teal stays where DESIGN.md puts it: Traffic's ticks and the bird's call marks
+    (decisions, the brand), “Recommended”, the chosen rows and the switches that are on (the chosen state), Continue (the
+    primary action). Whatever you choose, the approved screens that draw teal actions (sign-in.html, settings.html) change
+    with the app.</div>
+
+  <h2 class="sec">2 · Your choice</h2>
+  <div class="grid">
+    <div class="h"></div>
+    <div class="h">Today</div>
+    <div class="h"><span class="choice">A</span>Ink, underlined</div>
+    <div class="h"><span class="choice">B</span>Small bordered buttons</div>
+    <div class="h"><span class="choice">C</span>Teal, written into the rule</div>
+
+    <div class="rowh"><b>A label row's action</b>Import .ovpn…, Edit…, Show, Change…</div>
+    <div><img class="shot" src="text-actions/import-light.png" data-dark="text-actions/import-dark.png" alt="Today: Import .ovpn… in teal beside Gateway"></div>
+    <div><div class="lab">Gateway's key<span class="a">Show</span></div><div class="field"><span class="dots">••••••••••</span></div>
+      <div class="cap">As Diagnostics' Open: ink, a full ink underline. Pointed at, the hand.</div></div>
+    <div><div class="lab">Gateway's key<span class="b">Show</span></div><div class="field"><span class="dots">••••••••••</span></div>
+      <div class="cap">As the panel's Dismiss: 20 px tall, so the label row keeps its 20 px. Pointed at, its border darkens.</div></div>
+    <div><div class="lab">Gateway's key<span class="c">Show</span></div><div class="field"><span class="dots">••••••••••</span></div></div>
+
+    <div class="rowh"><b>Beside a sentence it acts on</b>the sign-in window's Copy for helpdesk</div>
+    <div><div class="said">openconnect said: Server certificate verify failed</div><div style="margin-top: 8px"><span class="c">Copy for helpdesk</span></div>
+      <div class="sbuttons"><span class="grow"></span><span class="sb">Close</span><span class="sb primary2">Try again</span></div>
+      <div class="cap">Two teal things in one window, as sign-in.html draws it.</div></div>
+    <div><div class="said">openconnect said: Server certificate verify failed</div><div style="margin-top: 8px"><span class="a">Copy for helpdesk</span></div>
+      <div class="sbuttons"><span class="grow"></span><span class="sb">Close</span><span class="sb primary2">Try again</span></div></div>
+    <div><div class="said">openconnect said: Server certificate verify failed</div><div style="margin-top: 8px"><span class="b">Copy for helpdesk</span></div>
+      <div class="sbuttons"><span class="grow"></span><span class="sb">Close</span><span class="sb primary2">Try again</span></div></div>
+    <div><div class="said">openconnect said: Server certificate verify failed</div><div style="margin-top: 8px"><span class="c">Copy for helpdesk</span></div>
+      <div class="sbuttons"><span class="grow"></span><span class="sb">Close</span><span class="sb primary2">Try again</span></div></div>
+
+    <div class="rowh"><b>A result's actions</b>Settings → Diagnostics, after saving a report</div>
+    <div><div class="box"><div style="font-size: 13px">Saved crake-report.txt in Documents.</div><div style="margin-top: 6px"><span class="a">Open</span> &nbsp; <span class="a">Show in folder</span></div></div>
+      <div class="cap">Today: ink, underlined (A's look, built and approved), in its grey box.</div></div>
+    <div><div class="box"><div style="font-size: 13px">Saved crake-report.txt in Documents.</div><div style="margin-top: 6px"><span class="a">Open</span> &nbsp; <span class="a">Show in folder</span></div></div>
+      <div class="cap">Unchanged.</div></div>
+    <div><div class="box"><div style="font-size: 13px">Saved crake-report.txt in Documents.</div><div style="margin-top: 6px; display: flex; gap: 6px"><span class="b on-surface">Open</span><span class="b on-surface">Show in folder</span></div></div>
+      <div class="cap">They become buttons too; on a grey box the button takes the panel's colour (as the staying notice's does), or it vanishes.</div></div>
+    <div><div class="box"><div style="font-size: 13px">Saved crake-report.txt in Documents.</div><div style="margin-top: 6px"><span class="c">Open</span> &nbsp; <span class="c">Show in folder</span></div></div>
+      <div class="cap">They become teal.</div></div>
+
+    <div class="rowh"><b>Links to the web</b>Settings → About</div>
+    <div><img class="shot" src="text-actions/about-light.png" data-dark="text-actions/about-dark.png" alt="Today: teal underlined links in About"><div class="cap">The two lines with links, cut from the window.</div></div>
+    <div><div style="font-size: 14px">Named after the corncrake, <i class="a n">Crex crex</i>.</div>
+      <div style="margin-top: 12px"><span class="a n">Source on GitHub</span> <span class="muted">·</span> <span class="a n">dorhawk.software</span></div></div>
+    <div><div style="font-size: 14px">Named after the corncrake, <i class="a n">Crex crex</i>.</div>
+      <div style="margin-top: 12px; display: flex; gap: 6px"><span class="b">Source on GitHub</span><span class="b">dorhawk.software</span></div>
+      <div class="cap">A link inside a sentence stays underlined text, as in any document.</div></div>
+    <div><div style="font-size: 14px">Named after the corncrake, <i class="c u n">Crex crex</i>.</div>
+      <div style="margin-top: 12px"><span class="c u n">Source on GitHub</span> <span class="muted">·</span> <span class="c u n">dorhawk.software</span></div></div>
+
+    <div class="rowh"><b>The same in every option</b>not part of the choice</div>
+    <div class="same">
+      <div style="display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap">
+        <div><div style="font-size: 13px; font-weight: 600; margin-bottom: 6px">A command line's Copy: the leftover notice's, as built</div>
+          <div class="cmd"><span class="mono">sudo apt install --no-install-recommends strongswan-charon strongswan-swanctl …</span><span class="copy"><svg width="14" height="14"><use href="#clip"/></svg>Copy</span></div>
+          <div class="cmd" style="margin-top: 6px"><span class="mono">sudo apt install --no-install-recommends strongswan-charon strongswan-swanctl …</span><span class="copy muted"><svg width="14" height="14"><use href="#check"/></svg>Copied</span></div></div>
+        <div><div style="font-size: 13px; font-weight: 600; margin-bottom: 6px">A notice's actions: a bordered one and a muted “Not now”</div>
+          <div class="notice"><div class="t">Crake was updated to 0.12.0. Restart it to finish.</div><div class="acts"><span class="bordered">Restart</span><span class="muted" style="font-weight: 600">Not now</span></div></div></div>
+        <div><div style="font-size: 13px; font-weight: 600; margin-bottom: 6px">An acknowledgement: muted, with the app's check</div>
+          <div><span class="mono" style="font-size: 13px">git.acme.internal</span><span class="copied"><svg width="12" height="12"><use href="#check"/></svg>Copied</span></div>
+          <div style="margin-top: 8px; font-size: 13px">The sign-in window's step under way: its dots in ink, not teal (DESIGN.md: something under way is ink).</div>
+          <div style="margin-top: 8px; font-size: 13px">And Copy for helpdesk says <span class="copied" style="margin-left: 0"><svg width="12" height="12"><use href="#check"/></svg>Copied</span> for 3 s after it, as the leftover notice does.</div></div>
+      </div>
+      <div class="cap">“Not now” stays muted and plain on purpose: a dismissal, quieter than the action beside it. Keyboard focus keeps
+        DESIGN.md's 2 px accent ring in every option: a passing state, not a second teal thing; an underlined action gets 2 px of
+        room inside it (taken back outside), so the ring clears its letters and nothing moves.</div>
+    </div>
+  </div>
+  <div class="note" style="margin-top: 14px"><span class="choice">A</span>An action reads as one by its underline, in the
+    text's own colour, as Diagnostics' Open already does and as a link in a document does. Nothing in a row changes size
+    (all at 13 px: tunnel detail's Edit… comes up from 12), and the only teal you click is the primary action. On a screen share it reads at once (the underline is ink, 17:1),
+    but beside an ink label of the same weight it's quieter than B.
+    <span class="choice" style="margin-left: 6px">B</span>Every action looks like a button, the way Dismiss, Edit and Undo
+    already do, so nobody wonders what's clickable, and Diagnostics' Open and Show in folder become buttons too. The
+    small button keeps a label row at its 20 px, at 12 px text (Import .ovpn… and Show come down from 13). Two looks
+    remain: the button, and underlined text for a link inside a sentence (“Crex crex”), where A has one look for both.
+    A window with several buttons reads a little busier, and the button's hairline is light (the line token, as Dismiss
+    has it), so it's the fill that says “button”, which in dark is faint (surface on panel).
+    <span class="choice" style="margin-left: 6px">C</span>Nothing moves, and the rule gets a fourth use: teal then means
+    “something you can click” as well as “Crake decided”, the drift the audit of 2026-10-17 cleared out of Traffic.</div>
+</div>
+<script>
+  if (document.body.classList.contains('dark'))
+    document.querySelectorAll('img[data-dark]').forEach(i => i.src = i.dataset.dark);
+</script>
+</body>
+</html>
