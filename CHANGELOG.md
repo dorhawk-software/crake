@@ -11,6 +11,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Crake's notifications carry the bird.** They name Crake's icon and its desktop entry, so the
+  desktop shows them with Crake's icon and files them under Crake, as other apps' are.
+
 - **Windows drawn with the newest GPUI.** The toolkit Crake draws its windows with is updated
   (0.7.3), with Crake's own fix for placing the panel at the tray carried over. It needs about
   thirty fewer libraries than before.

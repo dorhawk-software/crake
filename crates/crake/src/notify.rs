@@ -15,6 +15,22 @@ use crate::Request;
 #[cfg(target_os = "macos")]
 pub use plain::{also_answered, asked, left_running, no_tray, routed, stopped};
 
+/// The desktop entry and icon name the packages install
+/// (`software.dorhawk.crake.desktop`, the hicolor theme's
+/// `software.dorhawk.crake`).
+const APP_ID: &str = "software.dorhawk.crake";
+
+/// What every notification starts from: Crake's name and the bird, and,
+/// on Linux, its desktop entry, so the desktop shows them as Crake's
+/// (GNOME showed a generic glyph and no icon without them, 2026-10-19).
+fn crakes() -> Notification {
+    let mut n = Notification::new();
+    n.appname("Crake").icon(APP_ID);
+    #[cfg(target_os = "linux")]
+    n.hint(notify_rust::Hint::DesktopEntry(APP_ID.into()));
+    n
+}
+
 /// A sentence with nothing to do about it, the same on every system: a
 /// report that finished saving after Settings, which would have said so,
 /// was closed. Never from a test.
@@ -22,8 +38,8 @@ pub fn said(summary: &str, body: &str) {
     if cfg!(test) {
         return;
     }
-    let mut n = Notification::new();
-    n.appname("Crake").summary(summary).body(body);
+    let mut n = crakes();
+    n.summary(summary).body(body);
     std::thread::spawn(move || {
         let _ = n.show();
     });
@@ -51,9 +67,8 @@ const STOPPED_SHOWN: u32 = 0;
 /// What every notification starts from: the entry's message and reason.
 #[cfg(not(target_os = "macos"))]
 fn note(entry: &LogEntry, urgency: Urgency, timeout_ms: u32) -> Notification {
-    let mut n = Notification::new();
-    n.appname("Crake")
-        .summary(&entry.message)
+    let mut n = crakes();
+    n.summary(&entry.message)
         .body(entry.reason.as_deref().unwrap_or(""))
         .urgency(urgency)
         .timeout(Timeout::Milliseconds(timeout_ms));
@@ -172,9 +187,8 @@ pub fn left_running(entry: &LogEntry) {
 /// bring the bird back, with the button that does it when Crake can.
 #[cfg(not(target_os = "macos"))]
 pub fn no_tray(remedy: &crate::no_tray::Remedy, requests: async_channel::Sender<Request>) {
-    let mut n = Notification::new();
-    n.appname("Crake")
-        .summary(crate::no_tray::NOTIFICATION_TITLE)
+    let mut n = crakes();
+    n.summary(crate::no_tray::NOTIFICATION_TITLE)
         .body(remedy.notification())
         .urgency(Urgency::Normal)
         .timeout(Timeout::Milliseconds(STOPPED_SHOWN));
@@ -203,12 +217,11 @@ pub fn no_tray(remedy: &crate::no_tray::Remedy, requests: async_channel::Sender<
 
 #[cfg(target_os = "macos")]
 mod plain {
-    use super::{LogEntry, Notification, Request};
+    use super::{LogEntry, Request, crakes};
 
     fn show(entry: &LogEntry) {
-        let mut n = Notification::new();
-        n.appname("Crake")
-            .summary(&entry.message)
+        let mut n = crakes();
+        n.summary(&entry.message)
             .body(entry.reason.as_deref().unwrap_or(""));
         std::thread::spawn(move || {
             let _ = n.show();
@@ -242,9 +255,8 @@ mod plain {
     /// macOS always has its menu bar, so this isn't expected there; plain
     /// like the rest, should it come.
     pub fn no_tray(remedy: &crate::no_tray::Remedy, _requests: async_channel::Sender<Request>) {
-        let mut n = Notification::new();
-        n.appname("Crake")
-            .summary(crate::no_tray::NOTIFICATION_TITLE)
+        let mut n = crakes();
+        n.summary(crate::no_tray::NOTIFICATION_TITLE)
             .body(remedy.notification());
         std::thread::spawn(move || {
             let _ = n.show();
