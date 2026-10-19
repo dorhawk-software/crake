@@ -15,6 +15,20 @@ use crate::Request;
 #[cfg(target_os = "macos")]
 pub use plain::{also_answered, asked, left_running, no_tray, routed, stopped};
 
+/// A sentence with nothing to do about it, the same on every system: a
+/// report that finished saving after Settings, which would have said so,
+/// was closed. Never from a test.
+pub fn said(summary: &str, body: &str) {
+    if cfg!(test) {
+        return;
+    }
+    let mut n = Notification::new();
+    n.appname("Crake").summary(summary).body(body);
+    std::thread::spawn(move || {
+        let _ = n.show();
+    });
+}
+
 /// Crake decided it, not you.
 pub fn worth_telling(entry: &LogEntry) -> bool {
     entry.kind == LogKind::Routed

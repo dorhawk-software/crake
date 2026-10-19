@@ -86,7 +86,7 @@ const PROTOCOLS: [(&str, &str, &str, &str); 9] = [
 
 /// Protocols Crake has been used with against a real gateway. Every other
 /// one says "Beta" until it has been (CLAUDE.md: Beta protocols).
-pub const TRIED: [&str; 2] = ["anyconnect", "openvpn3"];
+pub const TRIED: [&str; 3] = ["anyconnect", "openvpn", "openvpn3"];
 
 /// Sign-in methods (step 2): id, name, sub.
 const METHODS: [(&str, &str, &str); 3] = [

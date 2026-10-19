@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>When the line goes</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8;
+    --ink: #1A1C1E; --muted: #5A5F64; --accent: #0F766E; --accentSoft: #E2F1EF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+      --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; --accentSoft: #17332F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+    --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; --accentSoft: #17332F;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--desk); color: var(--ink);
+    font: 14px/1.45 'Atkinson Hyperlegible Next', system-ui, sans-serif; }
+  main { max-width: 1000px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  h2 { font-size: 17px; margin: 36px 0 6px; }
+  p { margin: 6px 0; max-width: 70ch; }
+  .muted { color: var(--muted); }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  .window { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    box-shadow: 0 30px 60px -30px rgba(0,0,0,0.35); margin-top: 12px; }
+  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px 10px 20px;
+    border-bottom: 1px solid var(--line); }
+  .head .title { font-size: 17px; font-weight: 700; }
+  .head .sub { font-size: 13px; color: var(--muted); }
+  .grow { flex: 1 1 auto; }
+  .btn { height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel);
+    color: var(--ink); font: inherit; font-weight: 600; white-space: nowrap; flex: none; cursor: pointer; }
+  .close { width: 32px; height: 32px; margin-left: 4px; border: none; border-radius: 50%; background: var(--surface);
+    color: var(--ink); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .saved-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--line);
+    font-size: 13px; color: var(--muted); }
+  .link { border: none; background: none; padding: 0; color: var(--ink); font: inherit; font-weight: 600; text-decoration: underline;
+    text-decoration-color: var(--lineStrong); text-underline-offset: 3px; cursor: pointer; }
+  .rows { padding: 14px 20px; color: var(--muted); font-size: 13px; }
+  .note { font-size: 13px; color: var(--muted); padding: 0 20px 14px; }
+  .saved { font-size: 13px; color: var(--muted); }
+  .option { margin-top: 20px; }
+  .option h3 { font-size: 15px; margin: 0 0 4px; }
+  .file { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px;
+    font: 13px/1.5 'Atkinson Hyperlegible Mono', ui-monospace, monospace; white-space: pre-wrap; overflow-x: auto;
+    margin-top: 10px; }
+  .file .sec { font-weight: 600; color: var(--ink); }
+  .file .dim { color: var(--muted); }
+  .settings { display: grid; grid-template-columns: 220px 1fr; min-height: 260px; }
+  .side { background: var(--surface); padding: 16px 12px; font-size: 14px; border-right: 1px solid var(--line); }
+  .side div { height: 40px; display: flex; align-items: center; padding: 0 10px; border-radius: 6px; }
+  .side .brand { font-size: 17px; font-weight: 700; height: 44px; }
+  .side .on { background: var(--panel); font-weight: 600; }
+  .pane { padding: 22px 28px; }
+  .pane-title { font-size: 26px; font-weight: 700; }
+  .group { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-top: 12px; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .row .t { font-weight: 600; }
+  .row .d { font-size: 13px; color: var(--muted); }
+  .rec { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 14px 16px; margin-top: 20px; }
+  code { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; font-size: 13px; }
+  ul { margin: 6px 0; padding-left: 20px; max-width: 70ch; }
+  li { margin: 4px 0; }
+  @media (max-width: 640px) { .settings { grid-template-columns: 1fr; } .side { display: none; } }
+</style>
+<style>
+  .lbl { font-size: 13px; color: var(--muted); font-weight: 600; margin-top: 16px; }
+  .what { font-size: 13px; color: var(--muted); margin-top: 8px; max-width: 64ch; }
+  .side div { gap: 10px; }
+  .side svg { flex: none; }
+  .side .on { font-weight: 700; }
+  .pane .group { margin-top: 22px; }
+  .statement { margin-top: 22px; display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 8px; background: var(--surface); }
+  .btn[disabled] { color: var(--muted); cursor: default; }
+  .notes { margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .side div { font-weight: 500; }
+  .status { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px;
+    border-radius: 6px; background: var(--surface); font-size: 13px; color: var(--ink); }
+  .status .say { font-weight: 600; }
+  .status .more { color: var(--muted); }
+  .status svg { flex: none; }
+  .dashes { animation: round .7s linear infinite; }
+  @keyframes round { to { stroke-dashoffset: -7; } }
+  @media (prefers-reduced-motion: reduce) { .dashes { animation: none; } }
+  :root { --danger: #B42318; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --danger: #F97066; } }
+  :root[data-theme="dark"] { --danger: #F97066; }
+  .lede { margin: 4px 0 0; color: var(--muted); }
+  .group .row + .row { border-top: 1px solid var(--line); margin: 14px -16px 0; padding: 14px 16px 0; }
+  .sw { flex: none; width: 46px; height: 26px; border-radius: 13px; padding: 3px; background: var(--accent); display: flex; justify-content: flex-end; }
+  .sw span { width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; }
+  .sel { flex: none; height: 38px; padding: 0 10px; border: 1px solid var(--lineStrong); border-radius: 6px; display: inline-flex; align-items: center; }
+  .quiet { color: var(--muted); background: transparent; }
+  .saved-in { font-size: 13px; color: var(--muted); margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; }
+</style>
+</head>
+<body>
+<main>
+  <h1>When the "Saved" line goes</h1>
+  <p class="muted">Proposal, 2026-10-19, following report-in-settings.html (built). After saving, Settings → Diagnostics says "Saved crake-report-….txt in Documents." with Open and Show in folder. Today the line stays until Settings closes, through other sections and back; the user: "not nice from a UX point of view". The line answers "did it work, and where is it?" right after the save. Once you've moved on, it's yesterday's news, and coming back to it reads as if something were still going on.</p>
+
+  <h2>A: It goes when you move on (recommended)</h2>
+  <p>The line is about the save you just made, so it lasts as long as you stay with it: choosing another section, or closing Settings, takes it away, and coming back shows the row as it was before saving. Staying with it means everything else: Open (reading the file first, as the row asks) and Show in folder, switching to the mail or chat app to attach it, the window losing focus, a click elsewhere in Diagnostics. A second "Save a report…" keeps the old line while its dialog is open (cancelled, nothing changed), and "Saving the report…" takes its place once a file is chosen. The line also says whether names were left out, as the file it names has them: today's file and the one saved after switching hiding on share a name.</p>
+  <div class="lbl">Saved, still in Diagnostics</div>
+  <div class="group"><div class="row" style="align-items:flex-start"><div class="grow"><div class="t">Save a report for someone helping you</div><div class="d">A text file showing how this computer connects to networks…</div></div><button class="btn" type="button">Save a report…</button></div><div class="status" role="status"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM14 3v4h4"/></svg><span class="say">Saved crake-report-2026-10-19.txt in Documents, names and addresses left out.</span><button class="link" type="button">Open</button><button class="link" type="button">Show in folder</button></div></div>
+  <div class="lbl">After looking at Privacy &amp; log, back in Diagnostics</div>
+  <div class="group"><div class="row" style="align-items:flex-start"><div class="grow"><div class="t">Save a report for someone helping you</div><div class="d">A text file showing how this computer connects to networks…</div></div><button class="btn" type="button">Save a report…</button></div></div>
+  <p class="what">One rule covers a save still under way: leaving takes away a result, never a save in progress. Leave while it saves, and back in Diagnostics it's still saving, or its result is there; leaving after that takes the result away as above. A failure follows the same rule as a success, not a timer: its reason may decide what you do next (another folder). Close Settings while it saves and the file is still written; a quiet notification then says how it went ("Saved crake-report-2026-10-19.txt in Documents."), as the Notifications setting allows.</p>
+  <div class="group"><div class="row" style="align-items:flex-start"><div class="grow"><div class="t">Save a report for someone helping you</div><div class="d">A text file showing how this computer connects to networks…</div></div><button class="btn" type="button" disabled>Save a report…</button></div><div class="status" role="status"><svg  width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3.2 2.9"/></svg><span class="say">Saving the report… 6 s</span><span class="more">Crake is looking at this computer and trying the internet.</span></div></div>
+
+  <h2>B: It fades after a while</h2>
+  <p>Gone ten seconds after saving, wherever you are. Not chosen: Open and Show in folder would vanish under the pointer of someone who reads slowly or was looking for the file; a line that disappears on a timer says nothing to someone who looked away; and reduce motion leaves it to jump out instead.</p>
+
+  <h2>Also not chosen</h2>
+  <p>Keeping the line through Privacy &amp; log, the natural detour: back from switching hiding on, "Saved …" would describe a file that still names your hosts. Taking it away once the file is opened: Show in folder comes after reading.</p>
+
+  <h2>C: A ✕ on the line</h2>
+  <p>It stays until you close it. Not chosen: a chore that adds nothing (nobody needs to keep it), and a second small control beside Open and Show in folder.</p>
+
+  <h2>Today: it stays until Settings closes</h2>
+  <p>What the user saw: back in Diagnostics after looking elsewhere, the line is still there, as if the save had just happened.</p>
+
+  <div class="rec">
+    <h2 style="margin-top:0">Recommendation: A</h2>
+    <p>The line belongs to the moment of saving and to the place you saved from. It goes when you leave that place, never under your pointer, and a save you didn't wait for still gets to tell you how it went.</p>
+  </div>
+</main>
+</body>
+</html>

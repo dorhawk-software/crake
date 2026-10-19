@@ -52,11 +52,11 @@ ago. Neither knows what you actually open.**
     <td align="center"><sub>Fortinet<br/>SSL VPN<br/><em>beta</em></sub></td>
     <td align="center"><sub>F5<br/>BIG-IP<br/><em>beta</em></sub></td>
     <td align="center"><sub>Array<br/>Networks<br/><em>beta</em></sub></td>
-    <td align="center"><sub>OpenVPN 3<br/>profiles</sub></td>
+    <td align="center"><sub>OpenVPN<br/>.ovpn profiles</sub></td>
   </tr>
 </table>
 
-<em>Every protocol openconnect speaks, plus the OpenVPN 3 profiles already on your computer.
+<em>Every protocol openconnect speaks, plus OpenVPN, which Crake runs itself from your .ovpn file.
 Beta: openconnect speaks it, but Crake hasn't been used against a real gateway of that kind yet.</em>
 
 </div>

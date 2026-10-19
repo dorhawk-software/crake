@@ -226,13 +226,9 @@ impl NewTunnel {
                             .text_size(px(13.))
                             .line_height(px(19.))
                             .text_color(t.muted)
-                            .child(if self.protocol == "openvpn" {
-                                "Beta: Crake hasn\u{2019}t run OpenVPN against a real gateway yet. If it doesn\u{2019}t connect, the sign-in window says what openvpn said, with Copy for helpdesk.".to_owned()
-                            } else {
-                                format!(
-                                    "Beta: Crake hasn\u{2019}t been tried against a real {name} gateway yet. openconnect speaks it, so it should work. If it doesn\u{2019}t, Copy for helpdesk in the sign-in window says what happened."
-                                )
-                            }),
+                            .child(format!(
+                                "Beta: Crake hasn\u{2019}t been tried against a real {name} gateway yet. openconnect speaks it, so it should work. If it doesn\u{2019}t, Copy for helpdesk in the sign-in window says what happened."
+                            )),
                     )
                 },
             )

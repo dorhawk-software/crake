@@ -11,6 +11,29 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **OpenVPN is no longer Beta.** Crake's own OpenVPN has signed in to a real company gateway
+  through the browser and reached its internal network, so New tunnel shows it beside AnyConnect,
+  without the Beta tag.
+
+- **"Hide names and addresses when sharing" hides them all.** A report could still name a host
+  whose company domain ends in a digit, or one written with its port, after "host=", in a list, in a
+  range of addresses, as a Mac shortens a network, or as one word where your DNS settings list
+  domains; and OpenVPN's gateway address in Crake's service log. Now they're "a host" too, and your
+  tunnels' names stay, so a report still says whose each line is. Whatever the setting, e-mail
+  addresses, more sign-in cookies and file paths wherever they stand (a Windows path with a space
+  in it gave away a surname) are left out.
+
+- **"Saved …" goes when you move on.** The line under "Save a report…" stays while you're in
+  Diagnostics, to open the file or show it in its folder, and goes when you choose another section;
+  a save still under way waits for you to see how it went. It also says when names and addresses
+  were left out. Close Settings while a report is saving and a notification says how it went.
+
+- **The libraries Crake is built on are up to date.** tokio 1.53.3 marked the way Crake's service
+  watched its own kernel connections as unsafe; it now uses tokio's safe replacement. Also
+  serde_json 1.0.154, base64 0.23, resvg 0.48 and, on a Mac, system-configuration 0.8, with which a
+  busy Mac refusing Crake a look at its network settings is asked again rather than caught as a
+  crash.
+
 ## 0.11.0 (2026-10-19)
 
 - **Crake runs OpenVPN profiles itself.** Import the .ovpn file your IT team gave you (New

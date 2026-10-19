@@ -2,7 +2,10 @@
 //! out of everyday view, where someone helping you would send you
 //! ("Settings, Diagnostics, Save a report"). Saving keeps the button as it
 //! is (nothing in the row moves); what's happening, then how it went, is
-//! said in a box under the row until the window closes.
+//! said in a box under the row while you stay in Diagnostics
+//! (design/proposals/report-saved-line.html, A): another section or closing
+//! Settings takes a result away, never a save still under way, and a save
+//! that ends with Settings closed is said in a notification.
 
 use super::*;
 
@@ -19,8 +22,9 @@ pub(super) enum Report {
     /// craked is being asked, since then (a few seconds; longer when the
     /// internet is what's broken).
     Saving(std::time::Instant),
-    /// Written: the file.
-    Saved(std::path::PathBuf),
+    /// Written: the file, and whether names and addresses were left out
+    /// (today's file and one saved after switching hiding on share a name).
+    Saved(std::path::PathBuf, bool),
     /// Not written: the system's reason.
     Failed(String),
 }
@@ -31,12 +35,44 @@ impl Report {
         match std::env::var("CRAKE_SHOW").as_deref() {
             Ok("settings:diagnostics:saved") => Self::Saved(
                 crate::report::default_folder().join(crate::report::file_name(&jiff::Zoned::now())),
+                false,
             ),
             Ok("settings:diagnostics:saving") => Self::Saving(std::time::Instant::now()),
             _ => Self::None,
         }
     }
+
+    /// Diagnostics left for another section: a result has been said and
+    /// goes; a save still under way stays, to say how it went.
+    pub(super) fn left(&mut self) {
+        if matches!(self, Self::Saved(..) | Self::Failed(_)) {
+            *self = Self::None;
+        }
+    }
 }
+
+/// "Saved crake-report-2026-10-19.txt in Documents, names and addresses
+/// left out."
+pub(super) fn saved_said(path: &std::path::Path, hidden: bool) -> String {
+    let file = path.file_name().map(|f| f.to_string_lossy().into_owned());
+    let folder = path
+        .parent()
+        .and_then(|p| p.file_name())
+        .map(|f| f.to_string_lossy().into_owned());
+    let left_out = if hidden {
+        ", names and addresses left out"
+    } else {
+        ""
+    };
+    match (file, folder) {
+        (Some(f), Some(d)) => format!("Saved {f} in {d}{left_out}."),
+        (Some(f), None) => format!("Saved {f}{left_out}."),
+        _ => format!("Saved{left_out}."),
+    }
+}
+
+/// A report not saved, under the row or in a notification.
+const FAILED: &str = "Couldn\u{2019}t save the report.";
 
 /// How to make the same file from a terminal, on this system (neither
 /// Windows nor macOS puts `crake` on the PATH).
@@ -135,27 +171,15 @@ impl Settings {
                 Some("Crake is looking at this computer and trying the internet.".to_owned()),
                 None,
             ),
-            Report::Saved(path) => {
-                let file = path.file_name().map(|f| f.to_string_lossy().into_owned());
-                let folder = path
-                    .parent()
-                    .and_then(|p| p.file_name())
-                    .map(|f| f.to_string_lossy().into_owned());
-                let said = match (file, folder) {
-                    (Some(f), Some(d)) => format!("Saved {f} in {d}."),
-                    (Some(f), None) => format!("Saved {f}."),
-                    _ => "Saved.".to_owned(),
-                };
-                (
-                    icon("crake/file.svg", t.ink).into_any_element(),
-                    said,
-                    None,
-                    Some(path.clone()),
-                )
-            }
+            Report::Saved(path, hidden) => (
+                icon("crake/file.svg", t.ink).into_any_element(),
+                saved_said(path, *hidden),
+                None,
+                Some(path.clone()),
+            ),
             Report::Failed(why) => (
                 icon("crake/cross.svg", t.danger).into_any_element(),
-                "Couldn\u{2019}t save the report.".to_owned(),
+                FAILED.to_owned(),
                 Some(why.clone()),
                 None,
             ),
@@ -248,14 +272,27 @@ impl Settings {
                 Report::Failed("Crake couldn\u{2019}t ask its service.".into())
             } else {
                 match crate::report::save(&path, &text) {
-                    Ok(()) => Report::Saved(path),
+                    Ok(()) => Report::Saved(path, hide),
                     Err(why) => Report::Failed(why),
                 }
             };
-            let _ = this.update(cx, |this, cx| {
+            let told = done.clone();
+            let shown = this.update(cx, |this, cx| {
                 this.report = done;
                 cx.notify();
             });
+            // Settings closed while it saved: nobody to say it under a row.
+            // The Notifications setting as it is now, not as it was.
+            let notify = cx.update(|cx| cx.global::<Prefs>().notify.clone());
+            if shown.is_err() && notify != "none" {
+                match told {
+                    Report::Saved(path, hidden) => {
+                        crate::notify::said(&saved_said(&path, hidden), "");
+                    }
+                    Report::Failed(why) => crate::notify::said(FAILED, &why),
+                    Report::None | Report::Saving(_) => {}
+                }
+            }
         })
         .detach();
     }

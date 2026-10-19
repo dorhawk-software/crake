@@ -59,8 +59,10 @@ impl Part {
     }
 }
 
-/// Words that mark a line as carrying sign-in material.
-const SIGN_IN: [&str; 9] = [
+/// Words that mark a line as carrying sign-in material: openconnect's
+/// and OpenVPN's, F5's (MRHSession) and Pulse's (DSID) session cookies,
+/// OpenVPN's challenge (CRV1, which carries the username).
+const SIGN_IN: [&str; 12] = [
     "cookie",
     "token",
     "password",
@@ -70,6 +72,9 @@ const SIGN_IN: [&str; 9] = [
     "authorization",
     "web_auth",
     "open_url",
+    "mrhsession",
+    "dsid=",
+    "crv1",
 ];
 
 /// The groups in a hardware (MAC) address.
@@ -80,10 +85,11 @@ const A_DEVICE: &str = "<a device>";
 /// A line as it may go in a report: None when it carries sign-in material
 /// (a session cookie, an OpenVPN token, a password, a sign-in page);
 /// otherwise with web addresses as "<a web address>", file paths as
-/// "<a file>" (a profile's keys and certificates are named by their paths)
-/// and hardware addresses as "<a device>" (a Mac's routes name the
-/// router's and the other devices' on the network, Windows' each
-/// adapter's).
+/// "<a file>" wherever they start ("path=/home/…", "C:\Users\Jane Doe\…":
+/// a profile's keys and certificates are named by their paths, and a home
+/// folder by its user), e-mail addresses as "<an e-mail address>", and
+/// hardware addresses as "<a device>" (a Mac's routes name the router's
+/// and the other devices' on the network, Windows' each adapter's).
 pub fn private(line: &str) -> Option<String> {
     let lower = line.to_lowercase();
     if SIGN_IN.iter().any(|w| lower.contains(w)) {
@@ -94,7 +100,19 @@ pub fn private(line: &str) -> Option<String> {
         .map(|word| {
             if word.contains("://") {
                 "<a web address>".to_owned()
-            } else if is_path(word) {
+            } else if is_email(word) {
+                "<an e-mail address>".to_owned()
+            } else if let Some(at) = path_at(word) {
+                // "path=" stays; a quote or bracket alone goes with it.
+                let before = &word[..at];
+                let before = if before.chars().all(|c| "\"'([{<".contains(c)) {
+                    ""
+                } else {
+                    before
+                };
+                format!("{before}<a file>")
+            } else if word.matches('\\').count() >= 2 {
+                // The rest of a Windows path with a space in it.
                 "<a file>".to_owned()
             } else if is_mac(word) {
                 A_DEVICE.to_owned()
@@ -138,16 +156,34 @@ fn spaced_macs(mut words: Vec<String>) -> Vec<String> {
     words
 }
 
+/// Where a path starts in a word: at its start, or after "=", a quote, a
+/// bracket, a colon or a tab ("path=/home/…", "Some(\"/home/…").
+fn path_at(word: &str) -> Option<usize> {
+    word.char_indices()
+        .filter(|&(i, _)| {
+            i == 0 || word[..i].ends_with(['=', '"', '\'', '(', '[', '{', ':', ',', '\t', '<'])
+        })
+        .map(|(i, _)| i)
+        .find(|&i| is_path(&word[i..]))
+}
+
 /// "/var/lib/crake/profiles/initech.ovpn", "~/certs/me.p12",
-/// "C:\ProgramData\Crake\x": a path, not "/32" or "10.40.0.0/16".
-fn is_path(word: &str) -> bool {
-    let w = word.trim_start_matches(['"', '\'', '(', '[', '=']);
+/// "C:\ProgramData\Crake\x", "\\?\C:\Users\…": a path, not "/32" or
+/// "10.40.0.0/16".
+fn is_path(w: &str) -> bool {
     let unix = (w.starts_with('/') || w.starts_with("~/")) && w.matches('/').count() >= 2;
     let windows = matches!(
         w.as_bytes(),
         [drive, b':', b'\\' | b'/', _, ..] if drive.is_ascii_alphabetic()
-    );
+    ) || w.starts_with("\\\\?\\");
     unix || windows
+}
+
+/// "alice@acme.example", "user=alice@acme.example": someone's address.
+fn is_email(word: &str) -> bool {
+    word.split_once('@').is_some_and(|(who, domain)| {
+        !who.is_empty() && domain.contains('.') && !domain.starts_with('.')
+    })
 }
 
 #[cfg(test)]
@@ -222,6 +258,44 @@ mod tests {
             "  0.0.0.0          0.0.0.0     203.0.113.1    203.0.113.20     35",
         ] {
             assert_eq!(private(kept).as_deref(), Some(kept));
+        }
+    }
+
+    #[test]
+    fn paths_and_people_go_wherever_they_stand() {
+        for (line, want) in [
+            (
+                "loading path=/home/jane/certs/me.p12 now",
+                "loading path=<a file> now",
+            ),
+            ("Some(\"/Users/jane/x.ovpn\") read", "Some(\"<a file> read"),
+            ("found\t/Users/jane/Library/x", "found\t<a file>"),
+            (
+                r"C:\Users\Jane Doe\AppData\Local\Crake\log",
+                "<a file> <a file>",
+            ),
+            (r"\\?\C:\Users\jane\x", "<a file>"),
+            (
+                "signed in as alice@acme.example.",
+                "signed in as <an e-mail address>",
+            ),
+        ] {
+            assert_eq!(private(line).as_deref(), Some(want), "{line}");
+        }
+        for gone in [
+            "AUTH_FAILED,CRV1:R,E:Om01u7Fh4LrGBS7uh0SWmzwabUiGiW6l:YWxpY2U=:Enter code",
+            "Set-Cookie: MRHSession=abc123",
+            "DSID=5f2a; path=/",
+        ] {
+            assert_eq!(private(gone), None, "{gone}");
+        }
+        // Not paths: networks, a ratio, a route's flags.
+        for kept in [
+            "10.40.0.0/16 via crake-acme",
+            "DNSSEC=no/unsupported",
+            "UGSc utun4",
+        ] {
+            assert_eq!(private(kept).as_deref(), Some(kept), "{kept}");
         }
     }
 

@@ -60,11 +60,11 @@ impl Manager {
         let mut labels = HashMap::new();
         let mut keep: Vec<String> = OWN_DNS.iter().map(|s| (*s).to_owned()).collect();
         for (_, addr, prefix) in crate::sys::interfaces() {
+            let prefix = u8::try_from(prefix).unwrap_or(u8::MAX);
             keep.push(addr.to_string());
-            keep.push(network(
-                IpAddr::V4(addr),
-                u8::try_from(prefix).unwrap_or(u8::MAX),
-            ));
+            keep.push(network(IpAddr::V4(addr), prefix));
+            // Windows' routes name the network and its broadcast alone.
+            keep.extend(network_ends(addr, prefix).map(|a| a.to_string()));
         }
         for (_, addr, prefix) in crate::sys::interfaces6() {
             keep.push(addr.to_string());
@@ -244,15 +244,21 @@ fn network(addr: IpAddr, prefix: u8) -> String {
     format!("{net}/{prefix}")
 }
 
-/// A line's first word, when it's an address (a route's destination):
-/// "10.40.0.2", "10.40.0.2/32", "fd40::2".
+/// A network's own address and its broadcast: 192.168.1.0 and
+/// 192.168.1.255 for 192.168.1.20/24.
+fn network_ends(addr: std::net::Ipv4Addr, prefix: u8) -> [std::net::Ipv4Addr; 2] {
+    let mask = u32::MAX
+        .checked_shl(V4_BITS - u32::from(prefix).min(V4_BITS))
+        .unwrap_or(0);
+    let bits = u32::from(addr);
+    [(bits & mask).into(), (bits | !mask).into()]
+}
+
+/// A line's first word, when it's an address or a network (a route's
+/// destination): "10.40.0.2", "10.40.0.2/32", "fd40::2", "10.40.0.0/16".
 fn first_address(line: &str) -> Option<IpAddr> {
     let word = line.split_whitespace().next()?;
-    let word = word
-        .strip_suffix("/32")
-        .or_else(|| word.strip_suffix("/128"))
-        .unwrap_or(word);
-    word.parse().ok()
+    word.split('/').next()?.parse().ok()
 }
 
 /// The routers in the routes: "default via 192.0.2.1 …" (Linux),
@@ -322,5 +328,16 @@ mod tests {
             "192.168.1.0/24"
         );
         assert_eq!(network("fd40:ff::5".parse().unwrap(), 64), "fd40:ff::/64");
+        assert_eq!(
+            first_address("10.40.0.0/16  utun4"),
+            Some("10.40.0.0".parse().unwrap())
+        );
+        assert_eq!(
+            network_ends("192.168.1.20".parse().unwrap(), 24),
+            [
+                "192.168.1.0".parse::<std::net::Ipv4Addr>().unwrap(),
+                "192.168.1.255".parse().unwrap()
+            ]
+        );
     }
 }

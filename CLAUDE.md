@@ -545,7 +545,9 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    gateway are shown plain; every other one carries a "Beta" tag (New
    tunnel's list, the Tunnels rows) and New tunnel says what that means
    when one is chosen. The list is `new_tunnel::TRIED` (today: anyconnect,
-   openvpn3). A protocol leaves Beta only after the user (or someone they
+   openvpn, openvpn3; openvpn since 2026-10-19: the user connected
+   0.11.0's own OpenVPN to their company's real gateway, browser sign-in,
+   and reached its internal network). A protocol leaves Beta only after the user (or someone they
    trust) has signed in, connected and had hosts routed through a real
    gateway of that kind; the README's "Speaks" table follows it.
    **Built (requested; design/proposals/what-crake-did-help.html):** a "?"
@@ -594,10 +596,17 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    where; the button keeps its words while craked is asked, and a box
    under the row says "Saving the report…" with the dashed head,
    `head::under_way`, seconds after 2 s; then "Saved <file> in <folder>."
-   with Open and Show in folder, or "Couldn't save the report." with the
-   system's reason, until Settings closes), and the terminal command for
+   with Open and Show in folder, ", names and addresses left out" when
+   they were, or "Couldn't save the report." with the system's reason),
+   and the terminal command for
    that system (crake isn't on the PATH on Windows or macOS). The log's
-   Export is gone for good. `crake report [file]
+   Export is gone for good. The line goes when you move on
+   (design/proposals/report-saved-line.html, A, chosen by the user
+   2026-10-19): choosing another section clears a result
+   (`Report::left`), never a save under way, which keeps its result for
+   when you come back; Open, Show in folder, other apps and clicks keep
+   it; a save that ends with Settings closed is said in a notification
+   (`notify::said`, the Notifications setting read then). `crake report [file]
    [--hide-hosts|--show-hosts]` writes the same file without a window
    (`report.rs`; Windows attaches to the console it was run from). Always
    the same parts: craked's tunnels, "This computer" (D-Bus `Report`,
@@ -612,7 +621,10 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    through ACME", the last 24 hours of decisions, and craked's own log
    (the last hour, at most 200 lines, kept in memory by a tracing layer,
    `own_log`). Never in it: lines with sign-in material, web addresses,
-   file paths, hardware (MAC) addresses (a Mac's netstat -rn names the
+   file paths wherever they start (after "=", a quote, a tab; a Windows
+   path's rest after a space), e-mail addresses, F5's and Pulse's
+   cookies, OpenVPN's CRV1 challenge, hardware (MAC) addresses (a Mac's
+   netstat -rn names the
    router's and other devices', Windows' route print each adapter's)
    (`crake_proto::report::private`, which every line of the file goes
    through, Crake's own decisions and tunnel lines too: a stopped tunnel's
@@ -621,7 +633,18 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    removes names and IPv4/IPv6 addresses but the computer's plumbing
    (craked's `keep`: its addresses and networks, the tunnels' addresses
    and DNS servers, the routers, 127.53.0.1) and what's never a host
-   (loopback, link-local, multicast, netmasks); the setting is now "Hide
+   (loopback, link-local, multicast, netmasks), and the tunnels' names
+   (`Keep::keeping_words`). Hidden as a whole after it's put together:
+   names and addresses found anywhere in a line (with a port, after
+   "host=", in lists and nft ranges, IPv4-mapped IPv6), a company domain
+   ending in a digit (found 2026-10-19 on the user's real gateway, its
+   host kept whole with hiding on), one-word domains where DNS settings
+   list domains (`DOMAIN_KEYS`, "~routing"), a host's first label alone
+   once its name is in the file (5 letters or more, not a tunnel's name);
+   files and reverse-DNS identifiers aren't names. The Mac's netstat runs
+   with -W and its short networks ("10.40/16") are written out. An
+   adversarial audit (2026-10-19) found each of these; the tests in
+   `model/scrub.rs` hold its lines. The setting is now "Hide
    names and addresses when sharing". Without craked the file says why
    and holds the rest. Not decided: "Hide names and addresses when
    sharing" is off by default, so a report names the hosts reached unless
@@ -1517,6 +1540,9 @@ daily.
 
 **Everywhere:**
 - [ ] Importing a real .ovpn file (New tunnel's Import .ovpn…).
+- [x] OpenVPN run by Crake itself against a real gateway (2026-10-19,
+  the user, on 0.11.0: browser sign-in, the company's internal network
+  reached).
 - [ ] Each Beta protocol against a real gateway (only AnyConnect and
   OpenVPN 3 have met one; the Beta tag comes off as each is ticked).
 
@@ -1778,7 +1804,11 @@ The user doesn't want development builds installed on their machine.
 `CHANGELOG.md`, written by hand for the people using Crake, in its copy
 voice (not generated from commits, which are written for developers):
 **every user-facing change adds a line under "Unreleased" in the same
-commit.** To release, `scripts/release.sh <version>` (asked for by the
+commit.** Dependency updates too (asked by the user, 2026-10-19): a
+merged Dependabot update, or one fixed by hand, gets a line saying what
+was updated and what it means for the people using Crake, since a
+security fix in a dependency warrants at least a hotfix release, and
+release.sh refuses an "Unreleased" with nothing in it. To release, `scripts/release.sh <version>` (asked for by the
 user, 2026-10-13; `--dry-run` first shows the changes and pushes
 nothing): it refuses an empty "Unreleased", dates it
 (`## <version> (<YYYY-MM-DD>)`), puts the version into Cargo.toml (and

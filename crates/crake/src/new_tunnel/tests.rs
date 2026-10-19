@@ -291,7 +291,7 @@ fn on_a_small_screen_continue_stays_in_view(cx: &mut TestAppContext) {
         .unwrap()
     };
     assert!(visible(cx, "next".into()), "Continue in view");
-    // The last card shown: Array Networks, the last Beta one (OpenVPN 3
+    // The last card shown: Array Networks, the last Beta one (OpenVPN
     // sits near the top, with those used with real gateways).
     let last: gpui_kit::ElementId = ("protocol", 7usize).into();
     assert!(!visible(cx, last.clone()), "the list runs past the window");

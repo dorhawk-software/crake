@@ -410,15 +410,68 @@ fn save_a_report_says_where_it_went(cx: &mut TestAppContext) {
     assert!(text.contains("\nThis computer\n  The internet: one.one.one.one"));
     assert_eq!(
         w.view.read_with(cx, |s, _| s.report.clone()),
-        diagnostics::Report::Saved(file.clone())
+        diagnostics::Report::Saved(file.clone(), false)
     );
     assert!(w.shown("report-said", cx), "said under the row");
     assert!(w.shown("report-open", cx), "with Open, to read it first");
     assert!(w.shown("report-show", cx), "and Show in folder");
-    // Still said after looking at another section.
+    // A click elsewhere in Diagnostics keeps it (Open and Show in folder
+    // too: the test platform can't open files).
+    w.click("report-said", cx);
+    assert!(w.shown("report-said", cx), "kept while you stay");
+    // Another section: it has been said, and goes.
     w.click(("section", 0usize), cx);
     w.click(("section", Section::Diagnostics.position()), cx);
-    assert!(w.shown("report-said", cx), "kept until the window closes");
+    assert!(!w.shown("report-status", cx), "gone once you moved on");
+}
+
+/// A save under way when Diagnostics is left still says how it went, once.
+#[gpui_kit::test]
+fn a_save_left_halfway_still_says_how_it_went(cx: &mut TestAppContext) {
+    let w = open(cx, Section::Diagnostics);
+    let craked = stand_in(cx);
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("crake-report-2026-10-19.txt");
+    w.click("report", cx);
+    let chosen = file.clone();
+    cx.simulate_new_path_selection(move |_| Some(chosen));
+    cx.run_until_parked();
+    let diagnostics = ("section", Section::Diagnostics.position());
+    w.click(("section", 0usize), cx);
+    w.click(diagnostics, cx);
+    assert!(w.shown("report-status", cx), "still saving when back");
+    w.click(("section", 0usize), cx);
+    craked.send_blocking(gathered()).unwrap();
+    cx.run_until_parked();
+    // Between two other sections, it keeps waiting.
+    w.click(("section", 1usize), cx);
+    w.click(diagnostics, cx);
+    assert!(w.shown("report-open", cx), "the result, waiting");
+    w.click(("section", 0usize), cx);
+    w.click(diagnostics, cx);
+    assert!(!w.shown("report-status", cx), "said once, then gone");
+}
+
+/// A second save keeps the first one's line while its dialog is open.
+#[gpui_kit::test]
+fn a_second_save_cancelled_keeps_the_first_line(cx: &mut TestAppContext) {
+    let w = open(cx, Section::Diagnostics);
+    let craked = stand_in(cx);
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("crake-report.txt");
+    w.click("report", cx);
+    let chosen = file.clone();
+    cx.simulate_new_path_selection(move |_| Some(chosen));
+    craked.send_blocking(gathered()).unwrap();
+    cx.run_until_parked();
+    w.click("report", cx);
+    assert!(
+        w.shown("report-open", cx),
+        "the first line, while asked where"
+    );
+    cx.simulate_new_path_selection(|_| None);
+    cx.run_until_parked();
+    assert!(w.shown("report-open", cx), "and after cancelling");
 }
 
 #[gpui_kit::test]
@@ -449,5 +502,35 @@ fn a_report_not_saved_after_all_changes_nothing(cx: &mut TestAppContext) {
     assert_eq!(
         w.view.read_with(cx, |s, _| s.report.clone()),
         diagnostics::Report::None
+    );
+}
+
+/// Saved with hiding on, the line says so: the file it names has none.
+#[gpui_kit::test]
+fn the_line_says_names_were_left_out(cx: &mut TestAppContext) {
+    let w = open(cx, Section::Diagnostics);
+    cx.update(|cx| cx.global_mut::<Prefs>().hide_hosts = true);
+    let craked = stand_in(cx);
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("crake-report.txt");
+    w.click("report", cx);
+    let chosen = file.clone();
+    cx.simulate_new_path_selection(move |_| Some(chosen));
+    craked.send_blocking(gathered()).unwrap();
+    cx.run_until_parked();
+    assert_eq!(
+        w.view.read_with(cx, |s, _| s.report.clone()),
+        diagnostics::Report::Saved(file, true)
+    );
+    let said = cx
+        .update_window(w.window, |_, window, cx| {
+            window.render_frame(cx);
+            window.try_find("report-said").is_some()
+        })
+        .unwrap();
+    assert!(said);
+    assert!(
+        diagnostics::saved_said(std::path::Path::new("/x/Documents/r.txt"), true)
+            .ends_with(", names and addresses left out.")
     );
 }

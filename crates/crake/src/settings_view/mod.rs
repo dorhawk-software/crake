@@ -175,8 +175,8 @@ pub struct Settings {
     removing: Option<String>,
     /// The setting whose plain-words explanation is showing (its label).
     hint: Option<&'static str>,
-    /// Diagnostics' report: where it stands, said under its row until the
-    /// window closes (moving between sections keeps it).
+    /// Diagnostics' report: where it stands, said under its row while
+    /// Diagnostics is shown (`Report::left`).
     report: diagnostics::Report,
     focus: FocusHandle,
     _subscriptions: Vec<Subscription>,
@@ -582,6 +582,9 @@ impl Settings {
                     .child(label)
                     .keys()
                     .on_click(cx.listener(move |this, _, _, cx| {
+                        if this.section == Section::Diagnostics && section != Section::Diagnostics {
+                            this.report.left();
+                        }
                         this.section = section;
                         this.open_select = None;
                         this.adding_never = false;

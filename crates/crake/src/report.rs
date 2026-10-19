@@ -164,14 +164,6 @@ pub fn default_folder() -> PathBuf {
 const LEFT_OUT: &str = "(a line left out: it named a sign-in)";
 
 pub fn text(g: &Gathered, hide: bool, now: &jiff::Zoned) -> String {
-    let keep = Keep::new(g.computer.as_ref().map_or(&[][..], |c| &c.keep));
-    let say = |t: &str| {
-        if hide {
-            scrub_keeping(t, &keep)
-        } else {
-            t.to_owned()
-        }
-    };
     let mut s = format!(
         "Crake report, {}\n{}\nHost names and addresses: {} (Settings \u{2192} Privacy & log).\n",
         now.strftime("%-d %B %Y %H:%M"),
@@ -190,7 +182,7 @@ pub fn text(g: &Gathered, hide: bool, now: &jiff::Zoned) -> String {
                 let indent = l.len() - l.trim_start().len();
                 format!("{}{LEFT_OUT}", &l[..indent])
             });
-            s += &format!("  {}\n", say(&l));
+            s += &format!("  {l}\n");
         }
         if !any {
             s += &format!("  {empty}\n");
@@ -239,7 +231,21 @@ pub fn text(g: &Gathered, hide: bool, now: &jiff::Zoned) -> String {
         &mut own.into_iter(),
         missing.map_or("(nothing)", |_| "(craked couldn't be asked)"),
     );
-    s
+    if !hide {
+        return s;
+    }
+    // Hidden as a whole: a name found anywhere hides its short form
+    // everywhere (`Keep::with_names_in`).
+    // The tunnels' names stay: they say whose each line is.
+    let tunnels = g
+        .tunnels
+        .iter()
+        .filter_map(|t| t.split(':').next().map(str::to_owned))
+        .chain(g.decisions.iter().filter_map(|e| e.tunnel.clone()));
+    let keep = Keep::new(g.computer.as_ref().map_or(&[][..], |c| &c.keep))
+        .keeping_words(tunnels)
+        .with_names_in(&s);
+    scrub_keeping(&s, &keep)
 }
 
 /// "Crake 0.10.4 on Ubuntu 26.04 LTS." (and craked's version when it's
