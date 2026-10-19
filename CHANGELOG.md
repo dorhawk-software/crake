@@ -55,8 +55,6 @@ What's new in each Crake release, for the people using it. The newest is at the 
   says so; OpenVPN 3 keeps its own profile. One whose profile OpenVPN 3 keeps locked stays where it
   is, and the panel asks for its .ovpn file.
 
-## 0.10.4 (2026-10-17)
-
 - **Save a report when something's wrong.** In the log, "Save a report…" (where Export was) saves
   one text file with what someone helping you needs to see: this computer's DNS and routes, what
   Crake added to them, whether the internet and each tunnel's names answer right then, the last day
@@ -71,6 +69,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
   tunnel off, or quitting Crake, could leave the filter on, with Crake's rule for that tunnel
   still in it. Now both go. If Crake's service ever stops without tidying up, it does so the next
   time it starts.
+
+## 0.10.4 (2026-10-17)
 
 - **No more large pointer for a moment.** Coming onto a Crake window, the pointer could blink
   large for an instant: GNOME had given XWayland's background a pointer at an older scale's size,
