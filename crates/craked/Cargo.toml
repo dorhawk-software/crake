@@ -34,7 +34,7 @@ libc = "0.2"
 time = { version = "0.3", features = ["formatting"] }
 clap = { version = "4", features = ["derive"] }
 hickory-proto = { version = "0.26", default-features = false, features = ["std"] }
-base64 = "0.22"
+base64 = "0.23"
 
 # Linux only: answers held in NFQUEUE until their addresses are routed.
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -47,7 +47,7 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_
 
 # macOS: the system's DNS settings (the dynamic store), for every name.
 [target.'cfg(target_os = "macos")'.dependencies]
-system-configuration = "0.6"
+system-configuration = "0.8"
 
 [dev-dependencies]
 tempfile = "3"
