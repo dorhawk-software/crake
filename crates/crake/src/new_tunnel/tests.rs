@@ -113,6 +113,7 @@ impl Opened {
 
 const OPENVPN: usize = 8;
 const ANYCONNECT: usize = 1;
+#[cfg(target_os = "linux")]
 const IPSEC: usize = 9;
 
 /// OpenVPN 3's profiles are taken over (design/proposals/openvpn-tunnel.html,
@@ -565,6 +566,8 @@ fn the_protocols_fold_once_the_gateway_answered(cx: &mut TestAppContext) {
 /// the list folds and Import .ovpn… goes; the gateway's key is asked
 /// before Continue, the username before step 3; the key, the gateway's
 /// identity and the domains go to craked with the rest.
+// IPsec is Linux's for now: elsewhere its card says "Not available".
+#[cfg(target_os = "linux")]
 #[gpui_kit::test]
 fn an_ipsec_gateway_with_its_key(cx: &mut TestAppContext) {
     let w = open(cx);

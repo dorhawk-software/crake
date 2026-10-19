@@ -158,6 +158,7 @@ pub(crate) fn index(cx: &mut TestAppContext, tunnel: &str) -> usize {
 /// The sign-in window of that tunnel (another's may still be open: a
 /// window that's done closes on a timer, which the test platform runs only
 /// when its clock is moved).
+#[cfg(any(target_os = "linux", windows))]
 pub(crate) fn sign_in_of(
     cx: &mut TestAppContext,
     tunnel: &str,
@@ -181,6 +182,7 @@ pub(crate) fn sign_in_of(
 
 /// Not signed in after all: "Don't connect" to the gateway's certificate,
 /// then the window closed, as a person would.
+#[cfg(any(target_os = "linux", windows))]
 pub(crate) fn decline(
     cx: &mut TestAppContext,
     w: AnyWindowHandle,
@@ -216,6 +218,7 @@ pub(crate) fn decline(
 }
 
 /// A failed sign-in's window, grown to its card (more than any question's).
+#[cfg(any(target_os = "linux", windows))]
 const FAILED_HEIGHT: f32 = 700.;
 
 /// Sign in as the window asks: trust the gateway, give the password.
