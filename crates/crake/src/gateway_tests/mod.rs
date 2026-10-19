@@ -21,7 +21,10 @@ use std::time::Duration;
 use crate::client::Command;
 use crate::test_app::{App, connected, enabled, gateway, get, off, sign_in};
 
+mod names;
 mod sso;
+
+use names::{kept_private, names_hold, names_work};
 
 /// How long a tunnel, and a host through it, get.
 const WAIT: Duration = Duration::from_secs(60);
@@ -227,32 +230,6 @@ fn route_device(ip: &str) -> String {
     .to_owned()
 }
 
-/// A public name looked up as an app looks it up, and its address
-/// answering: the internet works by name.
-fn public_name_answers() -> bool {
-    PUBLIC_NAME
-        .to_socket_addrs()
-        .ok()
-        .and_then(|mut a| a.find(SocketAddr::is_ipv4))
-        .is_some_and(|a| TcpStream::connect_timeout(&a, Duration::from_secs(5)).is_ok())
-}
-
-/// The internet works by name within `wait`.
-async fn names_work(what: &str, wait: Duration) {
-    let end = std::time::Instant::now() + wait;
-    while !tokio::task::spawn_blocking(public_name_answers)
-        .await
-        .unwrap()
-    {
-        assert!(
-            std::time::Instant::now() < end,
-            "{}: {what}",
-            "public names don't resolve"
-        );
-        tokio::time::sleep(Duration::from_secs(1)).await;
-    }
-}
-
 /// What the system makes of ACME's host and the tunnel's device, and
 /// what craked decided: for a failure's message.
 fn diagnose(device: &str) -> String {
@@ -334,7 +311,10 @@ async fn the_split_holds(crake: &Crake, tunnel: &str) {
     );
     // 4. And by name: craked's DNS answers public names too.
     names_work("while a tunnel is up", WAIT).await;
-    // 5. A report (Settings → Diagnostics → "Save a report…") says so, part by part.
+    // 5. A name public DNS doesn't know, answered by ACME's (the rescue),
+    //    routed before its first packet; and a name asked over TCP.
+    names_hold(&device).await;
+    // 6. A report (Settings → Diagnostics → "Save a report…") says so, part by part.
     report_holds(crake, tunnel).await;
 }
 
@@ -392,6 +372,7 @@ async fn anyconnect_through_cloudflare() {
     crake.app.within(WAIT, "ACME off", off).await;
     assert!(get("10.40.1.10", Duration::from_secs(2)).is_err());
     names_work("switched off", WAIT).await;
+    kept_private("wiki.acme.internal").await;
     no_nat_left("switched off");
     crake.stop().await;
 }

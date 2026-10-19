@@ -1216,7 +1216,14 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    craked killed mid-connection (macOS: a craked process of its own,
    SIGKILL, started again as launchd would; Windows: the service's
    process, restarted by Windows), then within 45 s names work and macOS'
-   DNS no longer points at 127.53.0.1.
+   DNS no longer points at 127.53.0.1. And (2026-10-19, the testing-gaps
+   review; `gateway_tests/names.rs`) a name public DNS doesn't know
+   answered by ACME's (portal.acme.example, the rescue) and reached at
+   once, a name asked over TCP, and with ACME off its names refused at
+   once (kept private). Not through Cloudflare, so only in the local
+   Windows VM test: a full tunnel (it would send cloudflared's own
+   connection to Cloudflare into the tunnel it carries) and IPv6 (no
+   IPv6 path).
    **The other protocols' sign-in (Linux e2e, 2026-10-18):**
    `e2e_protocols.rs` against openconnect's own fake servers for Fortinet,
    GlobalProtect, F5 and Juniper/Pulse (openconnect 9.12's tests/, LGPL,
@@ -1458,7 +1465,17 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    the gateway's traffic); `scripts/vm-test.sh 26.04` passes it with both
    profiles enforced. Locally the containers fail it: the kernel attaches
    this computer's Ubuntu charon (and swanctl) profiles by path in
-   containers too. **Not yet:** SELinux (Fedora): charon runs as
+   containers too. The IPsec journey (`journey_ipsec.rs`) runs in every
+   distribution's package test too (check.sh `journey`; its craked runs
+   charon itself, at the distribution's path, `Config::default`), said
+   skipped where SELinux enforces or the distribution's AppArmor profile
+   for charon is loaded (the VMs: it confines a charon craked runs
+   itself, as with craked by hand; the IPsec phase runs the unit). The
+   gateway's charon has a /run of its own (`unshare --mount`), and the
+   IPsec phase stands in for a system strongSwan with a pid file and a
+   live process in /run and /run/strongswan (Fedora's charon keeps its
+   pid file there; the unit makes the folder in its own /run).
+   **Not yet:** SELinux (Fedora): charon runs as
    strongSwan's own `ipsec_t` whatever starts it (unconfined_service_t
    may not use its file as an entry point; through /bin/sh it moves to
    ipsec_t at charon's exec), and ipsec_t may read neither
@@ -1928,8 +1945,12 @@ The user doesn't want development builds installed on their machine.
   detection, so the first probe through a fresh tunnel failed (addresses
   are now created Preferred, as WireGuard does), and a domain kept private
   for a tunnel that's off beat a tunnel that's up with the same domain
-  (`dns_links::owner` now prefers the tunnel). Still to do: macOS
-  (GitHub's runners; no gateway there).
+  (`dns_links::owner` now prefers the tunnel). In CI too:
+  `ci-through-cloudflare.sh` runs `windows_journey` against the installed
+  service and the CI gateways through Cloudflare (the `windows-gateways`
+  job), and `macos_journey` (craked as a process of its own, as root)
+  in the `macos` job; both pass in every run (checked 2026-10-19, after
+  this line had said macOS was still to do).
 - `scripts/netns-test.sh`: real nftables and policy routing inside a
   disposable container with no network (host filesystem read-only, with a
   `/run` of its own: until 2026-10-15 the container saw this computer's
@@ -2231,8 +2252,12 @@ it doesn't, bundle, and own the updates.**
   (the kernel attaches it by path, /usr/sbin/craked; found 2026-10-18 when
   the containers' openvpn was refused by 0.10.4's profile): a new rule is
   proven by vm-test.sh only, and a container's AppArmor denial may be the
-  host's older profile. Not in CI (needs KVM). Still
-  to do, with the user: the signed apt repository (their key) and its
+  host's older profile. **In CI since 2026-10-19** (the testing-gaps
+  review: CI's Linux runners have KVM, as the nixos job's VMs use it):
+  the `vm-test` job, after `packages`, runs it on 22.04, 24.04, 26.04
+  (AppArmor enforced) and fedora:44 (SELinux enforcing), the journey
+  phase included (vm-test.sh copies target/deb/journey into the VM).
+  Still to do, with the user: the signed apt repository (their key) and its
   publishing.
 - **Upgrades keep tunnels up (requested).** postinst, upgrading a running
   craked, leaves `/run/crake/handover` and restarts it; craked, stopping,

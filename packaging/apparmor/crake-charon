@@ -45,8 +45,11 @@ profile crake-charon flags=(attach_disconnected) {
   # craked's settings for it and its vici socket.
   /run/crake/ipsec/ r,
   /run/crake/ipsec/** rw,
-  # Its pid file, in the unit's own /run.
+  # Its pid file, in the unit's own /run (Fedora builds it in
+  # /run/strongswan: craked's /run/crake/ipsec/run, bound there).
   /run/charon.* rw,
+  /run/strongswan/ rw,
+  /run/strongswan/** rw,
 
   /proc/sys/net/core/xfrm_acq_expires w,
   @{PROC}/@{pid}/fd/ r,

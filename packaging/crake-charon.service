@@ -22,6 +22,11 @@ Environment=LC_ALL=C
 # socket and the hook's socket.
 TemporaryFileSystem=/run
 BindPaths=/run/crake
+# Fedora's charon keeps its pid file in /run/strongswan: a folder craked
+# makes beside the settings (an ExecStartPre's mkdir made it in a /run of
+# its own, and Ubuntu 26.04's mkdir is a path AppArmor's profile doesn't
+# name).
+BindPaths=-/run/crake/ipsec/run:/run/strongswan
 # Its own AppArmor profile (packaging/apparmor/crake-charon), not the one
 # a distribution attaches to charon's path, which allows /etc/strongswan*
 # and /run/charon.* only. Ignored where AppArmor isn't on.

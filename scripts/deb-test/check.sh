@@ -222,27 +222,38 @@ openvpn_tunnel() {
 
 # An IPsec (IKEv2) tunnel through the installed service (CLAUDE.md, 7k):
 # craked starts its charon as crake-charon.service (a /run of its own,
-# its own AppArmor profile), beside the gateway's charon, which holds
-# this container's /run/charon.pid as a system strongSwan would. On a
+# its own AppArmor profile), beside a system strongSwan: a pid file of
+# charon's in this system's /run, its process running, as charon itself
+# checks (and refuses to start beside). On a
 # computer with strongSwan installed, its AppArmor profile for charon's
 # path attaches in containers too and refuses Crake's settings (Crake's
 # profile, which the unit asks for, isn't loaded there): proven by
 # scripts/vm-test.sh, as AppArmor rules are.
 ipsec_tunnel() {
+    # SELinux runs charon as strongSwan's own (ipsec_t), which may read
+    # neither Crake's settings nor reach craked: not yet (CLAUDE.md, 7k).
+    if [ "$(getenforce 2>/dev/null)" = Enforcing ]; then
+        echo "  skip  IPsec: not yet with SELinux enforcing (a policy module of Crake's own, CLAUDE.md 7k)"
+        return
+    fi
     if [ -e /tmp/ipsec-gw-load.log ]; then
         check "ACME's IPsec gateway is up" sh -c 'grep -q "loaded connection .acme." /tmp/ipsec-gw-load.log || { cat /tmp/ipsec-gw-load.log /tmp/ipsec-gw.log; pgrep -a gw-charon; false; }'
     fi
     check "Nordbank (IPsec) added" call AddTunnel 'a{ss}' 8 display_name Nordbank protocol ipsec gateway 198.51.100.10 \
         gateway_key hunter2hunter2 gateway_id vpn.acme.example user alice domains acme.internal sign_in password
     check "its key is root's alone" sh -c 'test "$(stat -c %a /var/lib/crake/profiles/nordbank.ipsec)" = 600'
+    # A system strongSwan, as charon sees one: its pid file, its process
+    # (Debian's and Arch's charon look in /run, Fedora's in /run/strongswan).
+    sleep 600 & system=$!
+    mkdir -p /run/strongswan
+    echo "$system" > /run/charon.pid
+    echo "$system" > /run/strongswan/charon.pid
     check "switched on" call Connect s nordbank
     check "asked for the password" answer nordbank password hunter2
     for _ in $(seq 1 40); do call GetTunnel s nordbank | grep -q '"connected"' && break; sleep 0.5; done
     check "Nordbank connected" sh -c "busctl --system call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 GetTunnel s nordbank | grep -q '\"connected\"' || { systemctl status crake-charon --no-pager; journalctl -b -u crake-charon --no-pager -o cat | tail -40; false; }"
     check "its charon runs as Crake's unit" systemctl is-active crake-charon
-    if [ -e /tmp/ipsec-gw-load.log ]; then
-        check "beside the system's strongSwan" pgrep -x gw-charon
-    fi
+    check "beside a system strongSwan" sh -c "kill -0 \"\$(cat /run/charon.pid)\""
     if aa-enabled --quiet 2>/dev/null; then
         check "charon runs confined by Crake's profile" sh -c 'grep -Eq "^crake-charon \((enforce|complain)\)" /proc/$(systemctl show -p MainPID --value crake-charon)/attr/current'
     fi
@@ -253,6 +264,8 @@ ipsec_tunnel() {
     check "its interface went" sh -c '! ip link show crake-nordbank 2>/dev/null'
     check "Nordbank removed" call RemoveTunnel s nordbank
     check "its key went with it" test ! -e /var/lib/crake/profiles/nordbank.ipsec
+    kill "$system"
+    rm -f /run/charon.pid /run/strongswan/charon.pid
 }
 
 # The journey (crates/crake/src/journey_tests.rs): the real app and its own
@@ -267,6 +280,20 @@ journey() {
     mkdir -p /tmp/journey
     check "a day with Crake (the journey)" env CRAKE_E2E=1 CRAKE_E2E_HOOK="$hook" TMPDIR=/tmp/journey \
         /pkg/journey journey_tests --test-threads=1
+    # IPsec through the app (journey_ipsec.rs), its craked running this
+    # system's charon itself. Not with SELinux enforcing yet (7k).
+    if [ "$(getenforce 2>/dev/null)" = Enforcing ]; then
+        echo "  skip  the IPsec journey: not yet with SELinux enforcing (CLAUDE.md 7k)"
+    elif grep -q "ipsec/charon (enforce)" /sys/kernel/security/apparmor/profiles 2>/dev/null; then
+        # The journey's craked runs charon itself, as craked by hand does,
+        # and the distribution's profile for charon's path refuses its
+        # settings: only the package's unit (the IPsec phase) runs under
+        # Crake's own profile.
+        echo "  skip  the IPsec journey: this system's AppArmor profile for charon confines the journey's own"
+    else
+        check "an IPsec tunnel through the app (the journey)" env CRAKE_E2E=1 CRAKE_E2E_IPSEC=1 CRAKE_E2E_HOOK="$hook" \
+            TMPDIR=/tmp/journey /pkg/journey journey_ipsec --test-threads=1
+    fi
     systemctl start craked
 }
 

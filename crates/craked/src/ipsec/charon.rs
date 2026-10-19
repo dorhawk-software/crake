@@ -28,6 +28,8 @@ const POLL: Duration = Duration::from_millis(100);
 const SETTLE: Duration = Duration::from_millis(300);
 /// How long it gets to stop once told to, before it's killed.
 const STOP_WAIT: Duration = Duration::from_secs(5);
+/// The folder the unit binds as /run/strongswan.
+const PID_DIR: &str = "run";
 /// What charon says when another one runs.
 const ALREADY: &str = "already running";
 
@@ -111,6 +113,10 @@ impl Charon {
     /// settings: craked.service names it, crake-charon.service says where).
     pub async fn start(program: &Path, dir: &Path, unit: Option<&str>) -> Result<Self> {
         crate::sys::create_private_dir(dir).with_context(|| format!("making {}", dir.display()))?;
+        // Where the unit puts Fedora's charon's pid file (its
+        // /run/strongswan; crake-charon.service).
+        crate::sys::create_private_dir(&dir.join(PID_DIR))
+            .with_context(|| format!("making {}", dir.display()))?;
         let socket = dir.join("charon.vici");
         let settings = dir.join("strongswan.conf");
         {

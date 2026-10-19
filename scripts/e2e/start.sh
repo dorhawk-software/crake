@@ -9,7 +9,7 @@ set -e
 ip link set lo up
 ip link add acme type dummy
 ip link set acme up
-for a in 10.40.0.2 10.40.1.10 10.40.1.11 10.40.1.12 10.40.1.13; do ip addr add "$a/32" dev acme; done
+for a in 10.40.0.2 10.40.1.10 10.40.1.11 10.40.1.12 10.40.1.13 10.40.1.14; do ip addr add "$a/32" dev acme; done
 ip link add inet type dummy
 ip link set inet up
 ip addr add 203.0.113.80/32 dev inet
@@ -29,7 +29,8 @@ table ip lan {
 }
 NFT
 dnsmasq --no-resolv --no-hosts --listen-address=10.40.0.2 --bind-interfaces \
-  --address=/git.acme.internal/10.40.1.10 --address=/wiki.acme.internal/10.40.1.11
+  --address=/git.acme.internal/10.40.1.10 --address=/wiki.acme.internal/10.40.1.11 \
+  --address=/portal.acme.example/10.40.1.14
 busybox httpd -p 80 -h /srv/www
 cp /etc/openvpn/e2e/ca.crt /link/openvpn-ca.crt
 openvpn --config /etc/openvpn/e2e/server.conf > /link/openvpn-server.log 2>&1 &

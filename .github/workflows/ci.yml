@@ -482,6 +482,34 @@ jobs:
       - name: Install it, a tunnel through the service, the journey, an upgrade, removal
         run: scripts/deb-test.sh ${{ matrix.system }}
 
+  # The same package test in throwaway VMs, each with a kernel of its own
+  # (scripts/vm-test.sh): craked's AppArmor profiles enforced on Ubuntu
+  # (a container would run under this runner's kernel and its profiles),
+  # SELinux enforcing on Fedora. The runners have KVM, as the nixos job's
+  # VMs use it.
+  vm-test:
+    needs: packages
+    runs-on: ubuntu-24.04
+    name: vm-test (${{ matrix.system }})
+    strategy:
+      fail-fast: false
+      matrix:
+        system: ["22.04", "24.04", "26.04", "fedora:44"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: crake-packages
+          path: target
+      - name: Let the VM use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: qemu and the tools for the VM's discs
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends qemu-system-x86 qemu-utils xorriso
+      - name: The package test in a VM, AppArmor or SELinux enforcing
+        run: scripts/vm-test.sh ${{ matrix.system }}
+
   # Once main's jobs have saved their caches: the ones a newer cache of the
   # same kind replaced (an older Cargo.lock's) are deleted, or they push
   # out caches still in use (scripts/prune-caches.sh).

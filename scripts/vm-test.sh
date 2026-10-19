@@ -51,6 +51,8 @@ runcmd:
 CLOUD
 xorriso -as mkisofs -quiet -output "$WORK/seed.iso" -volid cidata -joliet -rock "$WORK/seed"
 cp "$PKG" "$WORK/test/$AS"
+# The journey's test binary (scripts/build-deb.sh), for the journey phase.
+[ ! -f target/deb/journey ] || cp target/deb/journey "$WORK/test/journey"
 cp -r scripts/deb-test scripts/e2e "$WORK/test/"
 cp scripts/vm-test/run.sh "$WORK/test/"
 [ -z "$COMPLAIN" ] || touch "$WORK/test/complain"

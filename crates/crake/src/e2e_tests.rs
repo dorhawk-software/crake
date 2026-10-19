@@ -31,7 +31,8 @@ pub(crate) fn config(dir: &std::path::Path) -> Config {
         hook_socket: dir.join("hook.sock"),
         openconnect: "openconnect".into(),
         openvpn: "openvpn".into(),
-        charon: "/usr/lib/ipsec/charon".into(),
+        // Where this system keeps it (Debian's, Fedora's, Arch's).
+        charon: Config::default().charon,
         charon_unit: None,
         log_path: dir.join("log"),
         state_path: dir.join("hosts.json"),
