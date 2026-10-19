@@ -1339,9 +1339,12 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
      journey, the package test; the FortiGate (`fortigate-vm.sh`) stays
      a hand check, as the user's real gateways are (its licence is the
      user's).
-   - **Packages:** strongswan-charon with the two plugin packages a
-     Recommended engine (as openvpn), AppArmor rules for charon under
-     craked's profile.
+   - **Packages:** strongswan-charon, strongswan-swanctl (its vici
+     plugin), libstrongswan-standard-plugins (openssl's crypto: without
+     it Ubuntu 24.04's charon refused to start, "unmet dependency:
+     HASHER:HASH_SHA1", CI 2026-10-19) and the two EAP plugin packages
+     as a Recommended engine (as openvpn), AppArmor rules for charon
+     under craked's profile; never strongswan-starter's running service.
    - **Other systems, to find out once Linux works:** macOS (Homebrew's
      strongSwan uses PF_KEY policies, no tunnel device, so a host would
      be an IPsec policy rather than a route; or Apple's IKEv2, which

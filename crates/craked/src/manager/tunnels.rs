@@ -59,7 +59,10 @@ impl Manager {
         }
         if config.protocol == crate::config::Protocol::Ipsec {
             #[cfg(target_os = "linux")]
-            tokio::spawn(async move { this.supervise_ipsec(config, stop_rx).await });
+            {
+                tokio::spawn(async move { this.supervise_ipsec(config, stop_rx).await });
+                return Ok(());
+            }
             #[cfg(not(target_os = "linux"))]
             {
                 drop(stop_rx);
@@ -70,7 +73,6 @@ impl Manager {
                 }
                 bail!("IPsec tunnels aren\u{2019}t built for this system yet.");
             }
-            return Ok(());
         }
         tokio::spawn(async move { this.supervise(config, session, stop_rx).await });
         Ok(())

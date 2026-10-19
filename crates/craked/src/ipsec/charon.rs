@@ -22,16 +22,24 @@ use tokio::process::{Child, Command};
 /// How long charon gets to open its vici socket.
 const START_WAIT: Duration = Duration::from_secs(10);
 const POLL: Duration = Duration::from_millis(100);
+/// How long it must keep running after making its socket.
+const SETTLE: Duration = Duration::from_millis(300);
 /// How long it gets to stop once told to, before it's killed.
 const STOP_WAIT: Duration = Duration::from_secs(5);
 /// What charon says when another one runs.
 const ALREADY: &str = "already running";
 
 /// The plugins craked's charon loads: no resolve (resolv.conf is
-/// resolved's), no stroke or starter (vici only).
-const PLUGINS: &str = "random nonce openssl pem pkcs1 pkcs8 x509 revocation constraints \
-                       pubkey drbg kernel-netlink socket-default vici updown \
-                       eap-identity eap-mschapv2 eap-md5 eap-gtc eap-dynamic";
+/// resolved's), no stroke or starter (vici only). Its crypto is openssl's
+/// (libstrongswan-standard-plugins on Debian and Ubuntu: ECP groups, GCM);
+/// strongSwan's own (aes, sha1, sha2, hmac, gmp, kdf) stand in where it's
+/// missing, as on Ubuntu 24.04 without the recommended packages, where
+/// charon refused to start (2026-10-19, CI). One that isn't installed is
+/// skipped.
+const PLUGINS: &str = "random nonce openssl aes sha1 sha2 hmac gmp kdf curve25519 pem pkcs1 \
+                       pkcs8 x509 revocation constraints pubkey drbg kernel-netlink \
+                       socket-default vici updown eap-identity eap-mschapv2 eap-md5 eap-gtc \
+                       eap-dynamic";
 
 /// craked's charon settings.
 pub fn conf(socket: &Path) -> String {
@@ -63,6 +71,20 @@ pub fn conf(socket: &Path) -> String {
          }}\n",
         socket.display()
     )
+}
+
+/// What charon said that tells why it didn't start: its failures, else
+/// everything it said.
+fn last_words(said: &str) -> String {
+    let telling: Vec<&str> = said
+        .lines()
+        .filter(|l| l.contains("failed") || l.contains("unmet") || l.contains("abort"))
+        .collect();
+    if telling.is_empty() {
+        said.to_owned()
+    } else {
+        telling.join("\n")
+    }
 }
 
 pub struct Charon {
@@ -118,7 +140,15 @@ impl Charon {
             heard,
         };
         let deadline = tokio::time::Instant::now() + START_WAIT;
-        while !charon.socket.exists() {
+        // Up once its socket is there and it still runs a moment later: it
+        // makes the socket before its plugins can fail it.
+        loop {
+            if charon.socket.exists() {
+                tokio::time::sleep(SETTLE).await;
+                if charon.running() {
+                    break;
+                }
+            }
             if !charon.running() || tokio::time::Instant::now() > deadline {
                 // Its last words arrive a moment after it ends.
                 tokio::time::sleep(POLL).await;
@@ -130,7 +160,7 @@ impl Charon {
                     );
                 }
                 charon.stop().await;
-                bail!("strongSwan's charon didn't start: {said}");
+                bail!("strongSwan's charon didn't start: {}", last_words(&said));
             }
             tokio::time::sleep(POLL).await;
         }
@@ -159,6 +189,21 @@ impl Charon {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn why_charon_didnt_start_is_its_failures() {
+        let said = "00[DMN] Starting IKE charon daemon\n\
+                    00[LIB] feature CUSTOM:libcharon has unmet dependency: HASHER:HASH_SHA1\n\
+                    00[JOB] spawning 16 worker threads\n\
+                    00[DMN] initialization failed - aborting charon";
+        let why = last_words(said);
+        assert!(
+            why.contains("unmet dependency") && why.contains("aborting"),
+            "{why}"
+        );
+        assert!(!why.contains("worker threads"));
+        assert_eq!(last_words("one\ntwo"), "one\ntwo");
+    }
 
     #[test]
     fn craked_s_charon_leaves_the_system_alone() {
