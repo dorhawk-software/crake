@@ -253,7 +253,10 @@ fn watch() {
                     tracing::warn!("couldn't watch the system's DNS settings");
                     return;
                 }
-                let source = store.create_run_loop_source();
+                let Some(source) = store.create_run_loop_source() else {
+                    tracing::warn!("couldn't watch the system's DNS settings");
+                    return;
+                };
                 // SAFETY: CoreFoundation's constant, only read.
                 CFRunLoop::get_current().add_source(&source, unsafe { kCFRunLoopCommonModes });
                 CFRunLoop::run_current();
@@ -269,17 +272,21 @@ fn changed(_store: SCDynamicStore, _keys: CFArray<CFString>, _info: &mut ()) {
 }
 
 /// A session with macOS's dynamic store. macOS may refuse one (configd
-/// busy, the Mac waking up), and system-configuration then panics
-/// ("Attempted to create a NULL object") instead of saying so: craked died
-/// of it on a colleague's Mac. Asked again a few times, then given up.
-fn open_store(make: impl Fn() -> SCDynamicStore) -> Option<SCDynamicStore> {
-    without_panic(make, STORE_TRIES, STORE_WAIT)
+/// busy, the Mac waking up): system-configuration 0.6 panicked then
+/// ("Attempted to create a NULL object"), and craked died of it on a
+/// colleague's Mac; 0.8 says None. Asked again a few times, then given up.
+fn open_store(make: impl Fn() -> Option<SCDynamicStore>) -> Option<SCDynamicStore> {
+    asked_again(make, STORE_TRIES, STORE_WAIT)
 }
 
-/// `make`'s result, asked up to `tries` times `wait` apart while it panics.
-fn without_panic<T>(make: impl Fn() -> T, tries: u32, wait: std::time::Duration) -> Option<T> {
+/// `make`'s answer, asked up to `tries` times `wait` apart while it's None.
+fn asked_again<T>(
+    make: impl Fn() -> Option<T>,
+    tries: u32,
+    wait: std::time::Duration,
+) -> Option<T> {
     for _ in 0..tries {
-        if let Ok(made) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(&make)) {
+        if let Some(made) = make() {
             return Some(made);
         }
         std::thread::sleep(wait);
@@ -400,23 +407,18 @@ fn with_servers(base: Option<&CFDictionary>, servers: Option<&[String]>) -> CFDi
 mod tests {
     use super::*;
 
-    /// system-configuration panics when macOS refuses a session: that
+    /// macOS refusing a session is asked again, then given up on: that
     /// mustn't end craked.
     #[test]
     fn a_session_macos_refuses_is_given_up_on() {
         let wait = std::time::Duration::from_millis(1);
-        let refused = without_panic(
-            || -> u32 { panic!("Attempted to create a NULL object.") },
-            3,
-            wait,
-        );
+        let refused = asked_again(|| -> Option<u32> { None }, 3, wait);
         assert_eq!(refused, None);
         let tries = std::cell::Cell::new(0);
-        let second = without_panic(
+        let second = asked_again(
             || {
                 tries.set(tries.get() + 1);
-                assert!(tries.get() > 1, "refused once");
-                tries.get()
+                (tries.get() > 1).then(|| tries.get())
             },
             3,
             wait,

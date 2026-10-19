@@ -105,8 +105,11 @@ impl Events {
                 std::mem::size_of::<libc::c_int>() as u32,
             );
         }
+        // SAFETY: the netlink socket is an OwnedFd the AsyncFd owns: open,
+        // the same descriptor for as long as the AsyncFd holds it.
+        let fd = unsafe { AsyncFd::register(fd) }.map_err(std::io::Error::from)?;
         Ok(Self {
-            fd: AsyncFd::new(fd)?,
+            fd,
             buf: vec![0; EVENT_BUFFER],
         })
     }

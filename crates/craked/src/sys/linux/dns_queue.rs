@@ -31,7 +31,11 @@ pub fn spawn(mgr: Arc<Manager>) -> Result<()> {
     // If craked falls behind, let answers through rather than drop them.
     q.set_fail_open(QUEUE_NUM, true).ok();
     q.set_nonblocking(true);
-    let mut fd = AsyncFd::new(q).context("watching NFQUEUE")?;
+    // SAFETY: the queue owns its netlink socket and the AsyncFd owns the
+    // queue: open, the same descriptor, for as long as the AsyncFd holds it.
+    let mut fd = unsafe { AsyncFd::register(q) }
+        .map_err(std::io::Error::from)
+        .context("watching NFQUEUE")?;
     let (done_tx, mut done) = mpsc::unbounded_channel::<Message>();
 
     tokio::spawn(async move {
