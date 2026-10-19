@@ -91,7 +91,8 @@ pub(super) fn steps(
         } else if i < at {
             ("crake/mark-routed.svg", done, false, t.accent)
         } else if i == at {
-            ("crake/dots.svg", doing, true, t.accent)
+            // Under way: ink (DESIGN.md, Colour: teal is for decisions).
+            ("crake/dots.svg", doing, true, t.ink)
         } else {
             ("crake/circle.svg", done, false, t.line_strong)
         };
@@ -163,22 +164,14 @@ pub(super) fn button(
         .on_mouse_down(gpui_kit::MouseButton::Left, keep_press)
 }
 
-/// A small accent link that acts (sign-in.html's "Copy for helpdesk",
-/// beside the words it copies).
+/// A small action (sign-in.html's "Copy for helpdesk", beside the words it
+/// copies), as every small action looks (`controls::action`).
 pub(super) fn link(
     id: impl Into<gpui_kit::ElementId>,
     label: &'static str,
     t: &Theme,
 ) -> Stateful<Div> {
-    div()
-        .id(id)
-        .text_size(px(13.))
-        .font_weight(FontWeight::SEMIBOLD)
-        .text_color(t.accent)
-        .cursor_pointer()
-        .hover(|s| s.underline())
-        .child(label)
-        .on_mouse_down(gpui_kit::MouseButton::Left, keep_press)
+    crate::controls::action(id, label, t).on_mouse_down(gpui_kit::MouseButton::Left, keep_press)
 }
 
 /// A press on a control is its own: the card's window drag doesn't take it.

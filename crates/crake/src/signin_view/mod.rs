@@ -4,6 +4,9 @@
 
 use std::time::Duration;
 
+/// How long "Copied" shows after Copy for helpdesk.
+const COPIED_FOR: Duration = Duration::from_secs(3);
+
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::*;
 use gpui_kit::{
@@ -79,6 +82,8 @@ pub struct SignIn {
     model: Entity<Model>,
     /// The session went to the app or craked: closing ends nothing.
     handed_over: bool,
+    /// Copy for helpdesk was used, and when ("Copied" shows for a while).
+    copied: Option<std::time::Instant>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -163,12 +168,21 @@ impl Render for SignIn {
                     // Beside the words it copies: the buttons' row has room
                     // for two (design/proposals/signin-error-buttons.html, A).
                     .child(
-                        div().mt(px(6.)).flex().child(
-                            link("helpdesk", "Copy for helpdesk", &t)
-                                .keys()
-                                .on_click(cx.listener(|this, _, _, cx| this.copy_for_helpdesk(cx)))
-                                .test_support(),
-                        ),
+                        div()
+                            .mt(px(6.))
+                            .flex()
+                            .items_center()
+                            .child(
+                                link("helpdesk", "Copy for helpdesk", &t)
+                                    .keys()
+                                    .on_click(
+                                        cx.listener(|this, _, _, cx| this.copy_for_helpdesk(cx)),
+                                    )
+                                    .test_support(),
+                            )
+                            .when(self.copied.is_some_and(|c| c.elapsed() < COPIED_FOR), |d| {
+                                d.child(crate::controls::copied(&t))
+                            }),
                     )
                     .child(
                         buttons()
@@ -395,6 +409,7 @@ impl SignIn {
             spec,
             model,
             handed_over: false,
+            copied: None,
             requests,
             replies,
             stage: Stage::Reaching,
@@ -520,6 +535,14 @@ impl SignIn {
             self.spec.display, self.spec.gateway, self.spec.protocol
         );
         cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(text));
+        // Said, then gone: it copied (it used to copy and say nothing).
+        self.copied = Some(std::time::Instant::now());
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(COPIED_FOR).await;
+            let _ = this.update(cx, |_, cx| cx.notify());
+        })
+        .detach();
     }
 
     fn cancel(&mut self, cx: &mut Context<Self>) {

@@ -52,13 +52,7 @@ impl NewTunnel {
                     .justify_between()
                     .child(label("Profile"))
                     .child(
-                        div()
-                            .id("import-ovpn")
-                            .text_size(px(13.))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(t.accent)
-                            .cursor_pointer()
-                            .child("Import .ovpn\u{2026}")
+                        crate::controls::action("import-ovpn", "Import .ovpn\u{2026}", t)
                             .on_click(cx.listener(|this, _, _, cx| this.choose_ovpn(cx)))
                             .test_support(),
                     ),
@@ -424,13 +418,7 @@ impl NewTunnel {
             .justify_between()
             .child(label(name))
             .child(
-                div()
-                    .id("import-ovpn")
-                    .text_size(px(13.))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(t.accent)
-                    .cursor_pointer()
-                    .child("Import .ovpn\u{2026}")
+                crate::controls::action("import-ovpn", "Import .ovpn\u{2026}", t)
                     .on_click(cx.listener(|this, _, _, cx| this.choose_ovpn(cx)))
                     .test_support(),
             )

@@ -23,7 +23,8 @@ pub(super) fn about(t: &Theme, cx: &mut Context<Settings>) -> impl IntoElement {
     let link = |id: &'static str, label: &'static str, url: &'static str| {
         div()
             .id(id)
-            .text_color(t.accent)
+            // A link to the web looks as every small action does (DESIGN.md).
+            .text_color(t.ink)
             .font_weight(FontWeight::SEMIBOLD)
             .underline()
             .cursor_pointer()
@@ -166,7 +167,7 @@ fn coffee(t: &Theme) -> impl IntoElement {
                 .text_color(t.ink)
                 .font_weight(FontWeight::SEMIBOLD)
                 .cursor_pointer()
-                .hover(|s| s.border_color(t.accent))
+                .hover(|s| s.border_color(t.muted))
                 .child("Buy me a coffee")
                 .keys()
                 .on_click(|_, _, cx| cx.open_url(COFFEE))

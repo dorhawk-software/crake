@@ -296,7 +296,7 @@ impl Render for Settings {
                                             .id("crex")
                                             .italic()
                                             .underline()
-                                            .text_color(t.accent)
+                                            .text_color(t.ink)
                                             .cursor_pointer()
                                             .child("Crex crex")
                                             .keys()

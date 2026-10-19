@@ -44,15 +44,24 @@ impl Panel {
             .text_size(px(13.))
             .child(div().flex_1().min_w_0().child(text));
         for (label, request) in actions {
+            // A notice's shape (DESIGN.md): a bordered action, and a muted
+            // "Not now" (they were teal text, against the colour rule).
+            let dismiss = label == "Not now";
             note = note.child(
                 div()
                     .id(label)
                     .flex_none()
-                    .text_color(if label == "Not now" {
-                        t.muted
-                    } else {
-                        t.accent
+                    .when(!dismiss, |d| {
+                        d.px(px(12.))
+                            .py(px(6.))
+                            .rounded(px(6.))
+                            .bg(t.panel)
+                            .border_1()
+                            .border_color(t.line)
+                            .text_color(t.ink)
+                            .hover(|s| s.border_color(t.muted))
                     })
+                    .when(dismiss, |d| d.text_color(t.muted))
                     .font_weight(FontWeight::SEMIBOLD)
                     .cursor_pointer()
                     .child(label)

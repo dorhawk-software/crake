@@ -95,16 +95,7 @@ pub fn host_name(
         .items_baseline()
         .max_w_full()
         .child(name_box.flex_1().min_w_0())
-        .when(copied, |d| {
-            d.child(
-                div()
-                    .flex_none()
-                    .ml(px(8.))
-                    .text_size(px(12.))
-                    .text_color(t.accent)
-                    .child("Copied"),
-            )
-        });
+        .when(copied, |d| d.child(crate::controls::copied(t)));
     div().flex().flex_col().items_start().min_w_0().child(row)
 }
 

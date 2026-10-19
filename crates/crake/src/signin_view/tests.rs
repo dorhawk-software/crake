@@ -270,6 +270,11 @@ fn a_wrong_password_can_be_tried_again(cx: &mut TestAppContext) {
         .unwrap_or_default();
     assert!(copied.contains("Couldn\u{2019}t sign in to"), "{copied}");
     assert!(copied.contains(&reason), "{copied}");
+    // And it says so, as every Copy does (it used to say nothing).
+    assert!(
+        w.view.read_with(cx, |s, _| s.copied.is_some()),
+        "Copied is shown after Copy for helpdesk"
+    );
 
     w.click("retry", cx);
     assert!(w.signing_in(cx));

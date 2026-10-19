@@ -11,7 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
 <style>
 body{margin:0}
-a{color:#0F766E}a:hover{text-decoration:underline}
+a{color:inherit;font-weight:600;text-decoration:underline}
 button,input,select{font:inherit}
 .mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}
 </style>
@@ -36,7 +36,7 @@ button,input,select{font:inherit}
 <div style="max-width: 640px; padding-right: 20px">
 <h1 style="margin: 0; font-size: 26px; font-weight: 700">{{title}}</h1>
 <sc-if value="{{is.notAbout}}" hint-placeholder-val="{{true}}"><p style="margin: 4px 0 0; color: {{c.muted}}">{{lede}}</p></sc-if>
-<sc-if value="{{is.about}}" hint-placeholder-val="{{false}}"><p style="margin: 4px 0 0; color: {{c.muted}}">Named after the corncrake, <a href="https://en.wikipedia.org/wiki/Corn_crake" style="font-style: italic; color: {{c.accent}}">Crex crex</a>.</p></sc-if>
+<sc-if value="{{is.about}}" hint-placeholder-val="{{false}}"><p style="margin: 4px 0 0; color: {{c.muted}}">Named after the corncrake, <a href="https://en.wikipedia.org/wiki/Corn_crake" style="font-style: italic; font-weight: 400">Crex crex</a>.</p></sc-if>
 
 <sc-if value="{{is.general}}" hint-placeholder-val="{{true}}">
 <div style="margin-top: 22px; border: 1px solid {{c.line}}; border-radius: 8px">

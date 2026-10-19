@@ -11,6 +11,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Teal means one thing again.** Small actions and links (Import .ovpn…, Edit…, Copy for helpdesk,
+  About's links) are ink and underlined, as Diagnostics' Open already was; the update notice's
+  Restart and Download are buttons, as other notices' are. Teal is left to what Crake decided, what's
+  chosen or on, and the one main button. Copy for helpdesk now says "Copied".
+
 - **Everything stays on a small screen.** On a 1366×768 laptop, Settings ran off the bottom of the
   screen, the panel's footer went missing once there were four tunnels, and a gateway's long list
   of groups pushed Cancel out of the sign-in window. Each now fits its screen and scrolls what

@@ -1,7 +1,7 @@
 //! Small controls shared by the windows.
 
 use gpui_kit::prelude::*;
-use gpui_kit::{Div, ElementId, Pixels, Stateful, div, px};
+use gpui_kit::{Div, ElementId, FontWeight, Pixels, SharedString, Stateful, div, px};
 
 use crate::theme::Theme;
 
@@ -37,4 +37,43 @@ pub fn segment(
         .bg(if on { t.accent } else { t.panel })
         .text_color(if on { t.accent_ink } else { t.ink })
         .cursor_pointer()
+}
+
+/// A small action or link (DESIGN.md, "Small actions and links";
+/// design/proposals/text-actions.html, A): ink, 13 px, semibold, with an ink
+/// underline, the hand when pointed at. Never teal: the only teal you click
+/// is the one primary action.
+pub fn action(
+    id: impl Into<ElementId>,
+    label: impl Into<SharedString>,
+    t: &Theme,
+) -> Stateful<Div> {
+    div()
+        .id(id)
+        .text_size(px(13.))
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(t.ink)
+        .underline()
+        .cursor_pointer()
+        .child(label.into())
+}
+
+/// "Copied", after what was copied: an acknowledgement, so muted, with the
+/// app's check (DESIGN.md: never teal).
+pub fn copied(t: &Theme) -> Div {
+    div()
+        .flex()
+        .flex_none()
+        .items_center()
+        .gap(px(4.))
+        .ml(px(8.))
+        .text_size(px(12.))
+        .text_color(t.muted)
+        .child(
+            gpui_kit::svg()
+                .path("crake/check.svg")
+                .size(px(12.))
+                .text_color(t.muted),
+        )
+        .child("Copied")
 }

@@ -153,14 +153,8 @@ pub(super) fn facts(
                         .when(openvpn3 && profile_locked != Some(true), |row| {
                             let name = tunnel.name.clone();
                             row.child(
-                                div()
-                                    .id("edit-profile")
-                                    .text_size(px(12.))
+                                crate::controls::action("edit-profile", "Edit\u{2026}", t)
                                     .line_height(px(17.))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(t.accent)
-                                    .cursor_pointer()
-                                    .child("Edit\u{2026}")
                                     .keys()
                                     .on_click(cx.listener(move |this, _, _, _| {
                                         this.ask(Request::EditProfile(name.clone()));
