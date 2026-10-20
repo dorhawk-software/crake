@@ -1,0 +1,96 @@
+//! macOS: CI's Mac, the gateways through Cloudflare
+//! (scripts/ci-through-cloudflare.sh), craked in the test as root.
+
+use std::path::Path;
+
+use craked::config::Config;
+
+use super::sh;
+
+/// A public address that answers anywhere, and a public name.
+pub(crate) const PUBLIC: &str = "1.1.1.1:443";
+pub(crate) const PUBLIC_NAME: (&str, u16) = ("one.one.one.one", 443);
+/// craked's DNS server stands in for the system's while a tunnel is up.
+pub(crate) const REPORT_DNS: &str = "127.53.0.1";
+
+pub(crate) fn config(dir: &Path) -> Config {
+    let hook = std::env::var("CRAKE_E2E_HOOK").expect("CRAKE_E2E_HOOK: craked's crake-hook");
+    Config {
+        hook_path: hook.into(),
+        hook_socket: dir.join("hook.sock"),
+        log_path: dir.join("log"),
+        state_path: dir.join("hosts.json"),
+        probe_wait_secs: 1,
+        race_first_syn: false,
+        managed_dir: dir.join("managed.d"),
+        ..Config::default()
+    }
+}
+
+/// The OpenVPN gateway through Cloudflare ("host port"), over TCP.
+pub(crate) fn openvpn_gateway() -> (String, &'static str, String) {
+    (
+        std::env::var("CRAKE_GATEWAY_OPENVPN").expect("CRAKE_GATEWAY_OPENVPN"),
+        "tcp-client",
+        std::env::var("CRAKE_GATEWAY_CA").expect("CRAKE_GATEWAY_CA"),
+    )
+}
+
+/// The device the system sends `ip` out of.
+pub(crate) fn way(ip: &str) -> String {
+    sh(&format!("route -n get {ip}"))
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("interface: ").map(str::to_owned))
+        .unwrap_or_default()
+}
+
+/// `name` asked over TCP of craked's DNS server, where macOS sends the
+/// tunnel's domains (/etc/resolver).
+pub(crate) fn tcp_lookup(name: &str) -> String {
+    super::dns_over_tcp("127.53.0.1", name)
+}
+
+/// The system's DNS servers are the network's own: the test can't see
+/// what they were asked.
+pub(crate) fn public_questions() -> Option<String> {
+    None
+}
+
+pub(crate) fn diagnose(device: &str) -> String {
+    sh(&format!(
+        "route -n get 10.40.1.10; ifconfig {device}; netstat -rn -f inet | head -40; \
+         scutil --dns | head -60; cat /etc/resolver/* 2>/dev/null"
+    ))
+}
+
+/// Crake's NAT rule left in pf (the Doctor saw one stay with the tunnel
+/// off and craked gone, and pf on, 2026-10-18).
+fn nat_left() -> String {
+    let nat = sh("pfctl -a com.apple/250.Crake -s nat 2>/dev/null");
+    if nat.contains("nat on") {
+        nat
+    } else {
+        String::new()
+    }
+}
+
+pub(crate) fn left_behind(device: &str) -> String {
+    let mut left = nat_left();
+    let dev = sh(&format!("ifconfig {device} 2>&1"));
+    if dev.contains("flags=") {
+        left += &dev;
+    }
+    left
+}
+
+pub(crate) fn left_after_stop() -> String {
+    let mut left = nat_left();
+    left += &sh("grep -l 'Written by Crake' /etc/resolver/* 2>/dev/null");
+    // The system's own resolver (#1, every name), not the ones per domain.
+    let dns = sh("scutil --dns");
+    let primary = dns.split("resolver #2").next().unwrap_or_default();
+    if primary.contains("127.53.0.1") {
+        left += primary;
+    }
+    left
+}

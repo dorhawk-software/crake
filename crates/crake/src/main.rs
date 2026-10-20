@@ -102,6 +102,8 @@ mod e2e_tests;
 mod gateway_tests;
 #[cfg(test)]
 mod journey_kit;
+#[cfg(test)]
+mod scenarios;
 // What the macOS package installs, read from packaging/macos: any system.
 #[cfg(all(test, target_os = "linux"))]
 mod journey_tests;

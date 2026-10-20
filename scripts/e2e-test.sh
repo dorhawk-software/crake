@@ -7,6 +7,7 @@
 # (scripts/e2e/relay.py). The client runs the host's own openconnect, nft and
 # ip from the host's filesystem, read-only, as scripts/netns-test.sh does.
 # Nothing on the host's network is touched; nothing is installed.
+# CRAKE_E2E_FILTER picks the tests (e.g. "scenarios::anyconnect").
 set -eu
 cd "$(dirname "$0")/.."
 # These tests run the app headless (frames drawn by hand), so they don't need
@@ -35,4 +36,4 @@ docker run -d --rm --name "$GW" --network none --cap-add NET_ADMIN --device /dev
 docker run --rm --network none --cap-add NET_ADMIN --device /dev/net/tun \
   -v /:/host:ro -v "$WORK/tmp:/host/mnt" -v "$WORK/link:/link" -v "$WORK/link:/host/mnt/link:ro" --tmpfs /host/run \
   crake-e2e-gateway sh /client.sh env CRAKE_E2E_HOOK="$HOOK" CRAKE_E2E_IPSEC=1 LLVM_PROFILE_FILE=/dev/null \
-  env ${CRAKE_JOURNEY_DEBUG:+CRAKE_JOURNEY_DEBUG=$CRAKE_JOURNEY_DEBUG} ${CRAKE_DEBUG:+CRAKE_DEBUG=$CRAKE_DEBUG} "$BIN" e2e_tests e2e_openvpn e2e_ipsec e2e_protocols journey_tests journey_ipsec --test-threads=1 --nocapture "$@"
+  env ${CRAKE_JOURNEY_DEBUG:+CRAKE_JOURNEY_DEBUG=$CRAKE_JOURNEY_DEBUG} ${CRAKE_DEBUG:+CRAKE_DEBUG=$CRAKE_DEBUG} "$BIN" ${CRAKE_E2E_FILTER:-e2e_tests e2e_openvpn e2e_ipsec e2e_protocols scenarios journey_tests journey_ipsec} --test-threads=1 --nocapture "$@"

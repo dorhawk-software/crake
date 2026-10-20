@@ -1146,8 +1146,9 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    and it stays until the `macos` and `windows-gateways` jobs have
    finished. The Mac job's last test step and the Windows job
    (`scripts/ci-through-cloudflare.sh macos|windows`) carry each to 127.0.0.1
-   with `cloudflared access tcp` and the service token and runs
-   `crates/crake/src/gateway_tests.rs`: on the Mac as root, craked in the
+   with `cloudflared access tcp` and the service token and runs the
+   scenario suite (`crates/crake/src/scenarios/`, since 2026-10-20; see
+   "Testing without installing anything") and `gateway_tests/`: on the Mac as root, craked in the
    test as the e2e tests run it; on Windows against the installed service
    (`windows-installer` builds the installer from the run's executables,
    openconnect and OpenVPN cached by their scripts' hash; the job installs
@@ -1217,7 +1218,7 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    SIGKILL, started again as launchd would; Windows: the service's
    process, restarted by Windows), then within 45 s names work and macOS'
    DNS no longer points at 127.53.0.1. And (2026-10-19, the testing-gaps
-   review; `gateway_tests/names.rs`) a name public DNS doesn't know
+   review; scenarios since 2026-10-20) a name public DNS doesn't know
    answered by ACME's (portal.acme.example, the rescue) and reached at
    once, a name asked over TCP, and with ACME off its names refused at
    once (kept private). Not through Cloudflare, so only in the local
@@ -1979,6 +1980,35 @@ The user doesn't want development builds installed on their machine.
   and stopping leaving nothing; and a network that blocks UDP (7b: noticed,
   over TCP on the same session, remembered). Keep both containers without a
   network: a gateway on a Docker network would be a service on this machine.
+  `CRAKE_E2E_FILTER` picks tests (e.g. `scenarios::ipsec`).
+- **The scenario suite (`crates/crake/src/scenarios/`; asked for by the
+  user, 2026-10-19: one scenario per test, the same tests on every
+  system).** Each scenario is one `#[test]`, written once in `checks.rs`
+  and run against every kind of gateway (`every_scenario!`: AnyConnect,
+  OpenVPN, and IPsec on Linux) on Linux (the e2e containers), macOS and
+  Windows (the CI gateways through Cloudflare). Each starts from nothing,
+  like a Spring test's context: craked fresh (Linux, macOS: in the test;
+  Windows: the installed service, its test tunnels removed), the tunnel
+  added, signed in, connected; then one scenario; then all removed. What
+  differs per system is `platform/` (where an address goes: Linux by
+  Crake's nft sets, macOS `route get`, Windows `Find-NetRoute`; the
+  tunnel's device; a name over TCP; what's left behind). A scenario a
+  system can't run says so in the output (`not_here`), never passes
+  quietly. The Linux client container runs the system's own
+  systemd-resolved on a D-Bus of its own (scripts/e2e/client.sh), with the
+  gateway's public DNS stand-in (203.0.113.53, dnsmasq, which logs every
+  question) as the network's DNS: names are asked as an app asks them,
+  so the public-name rescue and "keep names private" run on Linux too
+  (proven by the stand-in's log: the name never left). The testcontainers
+  crate was weighed and not used: the test runs as root inside a
+  no-network container, and starting containers from there would need
+  Docker's socket in it (root on this machine); the gateway's container
+  stays one per run, started by the script. Its first run found craked
+  leaving an IPsec tunnel's XFRM interface behind when it ended without
+  stopping it (unlike a tun device, it outlives its process); craked now
+  removes Crake's leftover ones when it starts (`Net::remove_left_xfrm`).
+  The older chained tests (`e2e_tests.rs` and the rest) still run; their
+  checks move into scenarios as the testing-gaps catalogue is worked down.
 - CI (`.github/workflows/ci.yml`, on every push; a new push cancels the
   branch's run still going): the lint gate, `cargo test`, the coverage
   floors, Crake for Windows (checked, then built and tested on a Windows

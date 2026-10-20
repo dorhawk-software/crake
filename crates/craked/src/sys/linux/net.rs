@@ -83,6 +83,25 @@ impl Net {
         ip(&["link", "set", "dev", dev, "mtu", &mtu.to_string(), "up"]).await
     }
 
+    /// The XFRM interfaces of Crake's IPsec tunnels a craked left behind
+    /// when it ended without stopping them (killed, crashed): unlike a
+    /// tunnel's tun device, which goes with its process, one stays in the
+    /// kernel until it's removed (found by the scenario suite, 2026-10-20).
+    pub async fn remove_left_xfrm(&self) {
+        let Self::Ip = self else { return };
+        let Ok(out) = Command::new("ip")
+            .args(["-o", "link", "show", "type", "xfrm"])
+            .output()
+            .await
+        else {
+            return;
+        };
+        for dev in left_xfrm(&String::from_utf8_lossy(&out.stdout)) {
+            tracing::info!("removing {dev}, left by a craked before");
+            let _ = ip(&["link", "del", &dev]).await;
+        }
+    }
+
     /// Remove a link; fine if it's gone.
     pub async fn remove(&self, dev: &str) {
         if let Self::Ip = self {
@@ -208,6 +227,17 @@ fn exchange(msg: &[u8], room: usize) -> Result<Vec<u8>> {
     Ok(buf)
 }
 
+/// Crake's links in `ip -o link show` lines ("50: crake-acme@NONE: <...").
+fn left_xfrm(listed: &str) -> Vec<String> {
+    listed
+        .lines()
+        .filter_map(|l| l.split(": ").nth(1))
+        .map(|name| name.split('@').next().unwrap_or(name))
+        .filter(|name| name.starts_with("crake-"))
+        .map(str::to_owned)
+        .collect()
+}
+
 async fn ip(args: &[&str]) -> Result<()> {
     let out = Command::new("ip")
         .args(args)
@@ -226,6 +256,14 @@ async fn ip(args: &[&str]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn only_crakes_xfrm_links_are_left_ones() {
+        let listed = "7: ipsec0@NONE: <NOARP,UP,LOWER_UP> mtu 1400 qdisc noqueue\\    link/none \n\
+                      50: crake-nordbank@NONE: <NOARP,UP,LOWER_UP> mtu 1400\\    link/none \n";
+        assert_eq!(super::left_xfrm(listed), ["crake-nordbank"]);
+        assert!(super::left_xfrm("").is_empty());
+    }
+
     #[test]
     fn only_a_tun_device_is_one() {
         assert_eq!(super::tun_index("lo"), None, "loopback");

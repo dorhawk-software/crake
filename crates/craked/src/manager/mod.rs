@@ -338,6 +338,8 @@ impl Manager {
     /// listening for DNS answers from tunnels.
     pub async fn init(self: &Arc<Self>) -> Result<()> {
         self.routing.reset_all().await?;
+        #[cfg(target_os = "linux")]
+        self.net.remove_left_xfrm().await;
         // Old log entries go as they pass the retention (Settings).
         let this = Arc::clone(self);
         tokio::spawn(async move {

@@ -2,7 +2,7 @@
 # CI's Mac or Windows reaches ACME's gateways in the run's `gateways` job
 # through Cloudflare Tunnel (CLAUDE.md, 7j): cloudflared carries each to a
 # port on 127.0.0.1 (with the repository's service token), and the tests in
-# crates/crake/src/gateway_tests.rs connect to them. macOS: craked in the
+# crates/crake/src/scenarios/ and gateway_tests/ connect to them. macOS: craked in the
 # test, as root, with Homebrew's openconnect and openvpn. Windows: the
 # installer (SETUP) puts Crake's service, openconnect and openvpn there,
 # and the tests (TESTS, the app's test binary) drive it.
@@ -102,7 +102,7 @@ SSO= FAKES=
 curl -s -o /dev/null --max-time 20 http://127.0.0.1:8080/ && SSO=127.0.0.1:8080
 curl -sk -o /dev/null --max-time 20 https://127.0.0.1:4431/ && FAKES=127.0.0.1
 echo "browser sign-in page: ${SSO:-not reached}; fake servers: ${FAKES:-not reached}"
-FILTER=${CRAKE_GATEWAY_FILTER:-gateway_tests ${SYSTEM}_journey e2e_protocols::each_protocols_sign_in}
+FILTER=${CRAKE_GATEWAY_FILTER:-scenarios gateway_tests ${SYSTEM}_journey e2e_protocols::each_protocols_sign_in}
 DOCTOR="CRAKE_DOCTOR_TUNNEL=${CRAKE_DOCTOR_TUNNEL:-} CRAKE_DOCTOR_MINUTES=${CRAKE_DOCTOR_MINUTES:-} CRAKE_DOCTOR_PHASE=${CRAKE_DOCTOR_PHASE:-}"
 [ -n "${CRAKE_DOCTOR_PHASE:-}" ] || DOCTOR=
 status=0
