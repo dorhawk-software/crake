@@ -262,7 +262,8 @@ openconnect and OpenVPN along. The installer is signed and notarized. Crake open
 service on once: in System Settings, under Login Items & Extensions, where it's listed as Crake.
 
 **Windows 11 (preview):** the installer from [Releases](https://github.com/dorhawk-software/crake/releases),
-openconnect and OpenVPN included. It isn't code-signed yet, so Windows asks before running it.
+openconnect and OpenVPN included: `crake-setup-<version>.exe` for Intel and AMD processors,
+`crake-setup-<version>-arm64.exe` for Windows on ARM. It isn't code-signed yet, so Windows asks before running it.
 
 **Arch Linux:** the PKGBUILD in `packaging/arch` (the AUR is coming).
 
@@ -305,6 +306,8 @@ On NixOS, from the flake:
 # and in the system's modules:
 crake.nixosModules.default
 { services.crake.enable = true; }
+# IPsec (IKEv2) tunnels too, with strongSwan:
+{ services.crake.ipsec = true; }
 ```
 
 Tests and checks:

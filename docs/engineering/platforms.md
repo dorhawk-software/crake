@@ -161,6 +161,34 @@ leaving no adapters or NRPT rules; it reports on the serial port. The
 test binary and craked are cross-built with MinGW in
 `crake-windows-build`. Not in GitHub's CI (KVM).
 
+**Windows on ARM64 (planned with the user 2026-10-20, for Windows 11 for
+ARM in a VM on an Apple Silicon Mac).** Windows on ARM runs x64 programs
+emulated but never x64 drivers, and Crake needs drivers (Wintun,
+ovpn-dco, tap-windows6), so it gets a build of its own:
+- crake, craked and the hook built natively on GitHub's `windows-11-arm`
+  runner (`aarch64-pc-windows-msvc`, the CRT linked in as on x64), their
+  portable tests run there (CI's `windows-arm64-build`).
+- openconnect built natively there too, in MSYS2's CLANGARM64
+  environment (`scripts/build-openconnect-windows-arm64.sh`: Fedora's
+  MinGW, which builds the x64 one, has no ARM64), the same version and
+  one change, Wintun's ARM64 DLL beside it, MSYS2's DLLs it needs
+  collected with llvm-objdump; cached while its script doesn't change.
+- OpenVPN from the same release's ARM64 MSI, tap-windows6's ARM64 build
+  (`scripts/fetch-openvpn-windows.sh arm64`, pinned by checksum).
+- One installer per architecture (`CRAKE_WINDOWS_ARCH=arm64
+  scripts/build-windows-installer.sh` → `crake-setup-<version>-arm64.exe`);
+  each refuses the other's Windows and names the right file
+  (`${IsNativeARM64}`). The NSIS stub itself is x86 (emulated on ARM64,
+  `Sysnative` reaches the native pnputil).
+- `scripts/windows-arm64-install-test.ps1` (CI's `windows-arm64-install`,
+  and the release's `windows-arm64` before publishing): installed
+  silently, every program ARM64, the service running and serving the
+  app, openconnect and openvpn starting, OpenVPN's drivers in the driver
+  store, removed leaving nothing.
+- Not yet: the gateway tests and the journey on ARM64 (the x64 jobs
+  carry them; the code is the same, the engines and drivers aren't), and
+  anyone using it on a real Windows on ARM (the checklist).
+
 **macOS (started 2026-10-11, after Windows' phase 4, as the user
 suggested).** Same layout as Windows. craked's `sys/macos/`: the
 tunnel's address and routes with `ifconfig` and `route` (`cmd.rs`;

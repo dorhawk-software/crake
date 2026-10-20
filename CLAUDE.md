@@ -456,10 +456,11 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   choosing at install), and CI building and testing it (GitHub has
   Windows ARM64 runners). Detail in docs/engineering/platforms.md when
   started.
-  **Started 2026-10-20:** stage 1, Crake's programs built and tested on
-  `windows-11-arm` (CI job windows-arm64-build); next, openconnect for
-  ARM64 (MSYS2's CLANGARM64 has the toolchain and gnutls), Wintun's and
-  OpenVPN's ARM64 drivers, the installer per architecture.
+  **Built 2026-10-20** (docs/engineering/platforms.md, "Windows on
+  ARM64"): the programs, openconnect (MSYS2 CLANGARM64), OpenVPN's and
+  Wintun's ARM64 files, `crake-setup-<version>-arm64.exe`, installed and
+  removed on CI's `windows-11-arm` and in each release. Not yet: the
+  gateway tests on ARM64, and a real Windows on ARM (the user's Mac).
 - **Browser sign-in on Windows.** The openconnect Crake builds for
   Windows has no `--external-browser`; New tunnel and sign-in say so
   (2026-10-20). Building it in (and an opener there: `BROWSER` is
@@ -564,6 +565,8 @@ daily.
 - [ ] A day of real use: sign-in, hosts learned, Undo; whether the first
   connection to a new host failing (no WFP driver) is noticed.
 - [ ] Display scale changes with Crake running (also in Not now).
+- [ ] Windows 11 for ARM (the ARM64 installer; the user's coming Mac,
+  in a VM): installing, the drivers, a tunnel up.
 - [ ] The Traffic window: connections listed with their ways and rates
   (extended TCP statistics switched on by the service).
 

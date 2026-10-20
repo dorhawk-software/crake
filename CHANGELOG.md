@@ -11,6 +11,14 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **IPsec on NixOS.** `services.crake.ipsec = true;` brings strongSwan and runs Crake's own charon
+  for IPsec tunnels, as the other distributions' packages do. New tunnel says that line on NixOS
+  instead of an apt command.
+
+- **Crake for Windows on ARM (preview).** Windows on ARM can't load the drivers made for Intel and
+  AMD processors, so it gets its own installer, `crake-setup-<version>-arm64.exe`, with openconnect,
+  OpenVPN and their drivers built for ARM. Each installer tells you if you picked the other one.
+
 - **Your IT team can set up IPsec tunnels.** A file in Crake's managed folder can now describe an
   IPsec (IKEv2) tunnel: the gateway, its identity, the pre-shared key in a file of its own (kept
   root's alone; a key anyone on the computer can read is refused), the company's domains and what

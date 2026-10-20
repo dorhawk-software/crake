@@ -171,7 +171,16 @@ it doesn't, bundle, and own the updates.**
   restarts it, as the packages' upgrade scripts do. The VM test also
   checks polkit's refusal, the upgrade (a specialisation with craked's
   unit changed, switched to with ACME up), and runs the journey (Nix
-  builds its test binary: the flake's `packages.journey`). Locally the
+  builds its test binary: the flake's `packages.journey`). IPsec
+  (2026-10-20): `services.crake.ipsec = true` puts strongSwan in the
+  system's profile (where the app finds it,
+  /run/current-system/sw/libexec/ipsec/charon), names its charon in
+  craked.toml and runs it as `crake-charon.service` (the package's unit,
+  without AppArmor); New tunnel says that line on NixOS. The VM test's
+  gateway also runs openvpn (sso.py signing alice in) and strongSwan
+  (scripts/e2e's settings), and the client connects an OpenVPN and an
+  IPsec tunnel through craked over D-Bus, each asked its password with
+  Asking/Answer, a host learned through each. Locally the
   container makes its own /dev/kvm open to all (Nix's build users lose
   their groups; without it the VMs ran emulated).
 - **macOS and Windows (someday):** no package manager to pull engines in,

@@ -8,7 +8,11 @@
 ; in ProgramData\Crake (as apt's remove, not purge).
 ; Unsigned: signing is decided before a release (CLAUDE.md).
 ;
-;   makensis -DVERSION=0.1.0 -DSRC=<staged files> -DOUT=<setup.exe> crake.nsi
+;   makensis -DVERSION=0.1.0 -DARCH=amd64|arm64 -DSRC=<staged files> -DOUT=<setup.exe> crake.nsi
+;
+; One installer per architecture: x64 drivers never load on Windows on
+; ARM64 (which runs x64 programs emulated, not drivers), so each refuses
+; the other's Windows.
 
 Unicode true
 !include "MUI2.nsh"
@@ -51,11 +55,26 @@ VIAddVersionKey "LegalCopyright" "GPL-3.0-or-later"
 
 !insertmacro MUI_LANGUAGE "English"
 
+!ifndef ARCH
+  !define ARCH amd64
+!endif
+
 Function .onInit
-  ${IfNot} ${RunningX64}
-    MessageBox MB_OK|MB_ICONSTOP "Crake needs 64-bit Windows."
-    Abort
-  ${EndIf}
+  !if "${ARCH}" == "arm64"
+    ${IfNot} ${IsNativeARM64}
+      MessageBox MB_OK|MB_ICONSTOP "This is Crake for Windows on ARM. This computer needs Crake for Intel and AMD processors: crake-setup-${VERSION}.exe."
+      Abort
+    ${EndIf}
+  !else
+    ${IfNot} ${RunningX64}
+      MessageBox MB_OK|MB_ICONSTOP "Crake needs 64-bit Windows."
+      Abort
+    ${EndIf}
+    ${If} ${IsNativeARM64}
+      MessageBox MB_OK|MB_ICONSTOP "This computer runs Windows on ARM, which needs Crake for ARM: crake-setup-${VERSION}-arm64.exe. (This one's drivers are for Intel and AMD processors.)"
+      Abort
+    ${EndIf}
+  !endif
   SetRegView 64
 FunctionEnd
 

@@ -1,8 +1,10 @@
-# The NixOS module, end to end: a gateway (ocserv, ACME's network behind it:
-# DNS 10.40.0.2, web servers 10.40.1.10 and .11) and a client with
-# services.crake.enable, on the test's own network. The client signs in with
-# openconnect, connects through craked over D-Bus, and its traffic and DNS
-# go where Crake says. As scripts/deb-test/check.sh does for the packages.
+# The NixOS module, end to end: a gateway (ocserv, openvpn and strongSwan,
+# ACME's network behind them: DNS 10.40.0.2, web servers 10.40.1.10 to .13)
+# and a client with services.crake.enable, on the test's own network. The
+# client signs in with openconnect, connects through craked over D-Bus, and
+# its traffic and DNS go where Crake says; then an OpenVPN tunnel and an
+# IPsec one (crake-charon.service) through the same craked. As
+# scripts/deb-test/check.sh does for the packages.
 self:
 { pkgs, lib, ... }:
 let
@@ -15,6 +17,33 @@ let
     # ocserv's passwd file: user:group:crypt hash (ocpasswd's crypt fails
     # in the build sandbox).
     echo "alice:*:$(openssl passwd -6 -salt crakecrake hunter2)" > $out/passwd
+    # OpenVPN's: a CA and the server's certificate (clients sign in instead).
+    openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout ca.key -out $out/ca.crt -days 3650 -subj /CN=ACME-CA
+    openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout $out/server.key -out server.csr -subj /CN=vpn.acme.example
+    printf 'extendedKeyUsage=serverAuth\nkeyUsage=digitalSignature,keyAgreement\n' > server.ext
+    openssl x509 -req -in server.csr -CA $out/ca.crt -CAkey ca.key -CAcreateserial -out $out/server.crt -days 3650 -extfile server.ext
+  '';
+  # The e2e gateway's OpenVPN and IPsec settings (scripts/e2e/), listening
+  # on every address of this VM rather than the e2e's, with this VM's files.
+  openvpnConf = pkgs.runCommand "acme-openvpn.conf" { } ''
+    sed -e '/^local /d' -e 's|/etc/openvpn/e2e/|${secrets}/|' ${../../scripts/e2e/openvpn.conf} > $out
+  '';
+  ipsecConf = pkgs.runCommand "acme-ipsec.conf" { } ''
+    sed -e '/local_addrs/d' ${../../scripts/e2e/ipsec.conf} > $out
+  '';
+  # The gateway's charon: its vici socket named, its plugins listed (all of
+  # them would take kernel-libipsec, as scripts/deb-test/gateway.sh says).
+  gatewayCharon = pkgs.writeText "acme-strongswan.conf" ''
+    charon {
+      install_routes = no
+      install_virtual_ip = no
+      load = random nonce openssl pem pkcs1 pkcs8 x509 revocation constraints pubkey drbg kdf gmp kernel-netlink socket-default vici eap-identity eap-mschapv2
+      plugins {
+        vici {
+          socket = unix:///run/acme-ipsec.vici
+        }
+      }
+    }
   '';
   www = pkgs.writeTextDir "index.html" "crex";
 in {
@@ -48,7 +77,12 @@ in {
       script = ''
         ip link add acme type dummy
         ip link set acme up
-        for a in 10.40.0.2 10.40.1.10 10.40.1.11; do ip addr add "$a/32" dev acme; done
+        for a in 10.40.0.2 10.40.1.10 10.40.1.11 10.40.1.12 10.40.1.13; do ip addr add "$a/32" dev acme; done
+        # IPsec's tunnel ends here (if_id 7, as in ipsec.conf); its pool's
+        # replies go back through it.
+        ip link add ipsec0 type xfrm if_id 7
+        ip link set ipsec0 up
+        ip route add 10.40.9.0/24 dev ipsec0
       '';
     };
     services.dnsmasq = {
@@ -66,6 +100,30 @@ in {
       wantedBy = [ "multi-user.target" ];
       after = [ "acme-net.service" ];
       serviceConfig.ExecStart = "${pkgs.busybox}/bin/busybox httpd -f -p 80 -h ${www}";
+    };
+    # ACME's OpenVPN gateway, its sign-in answered by sso.py over the
+    # management interface (alice, hunter2).
+    systemd.services.acme-openvpn = {
+      wantedBy = [ "multi-user.target" ];
+      after = [ "acme-net.service" ];
+      serviceConfig.ExecStart = "${pkgs.openvpn}/bin/openvpn --config ${openvpnConf}";
+    };
+    systemd.services.acme-openvpn-sign-in = {
+      wantedBy = [ "multi-user.target" ];
+      after = [ "acme-openvpn.service" ];
+      serviceConfig.ExecStart = "${pkgs.python3}/bin/python3 ${../../scripts/e2e/sso.py} /run/openvpn-mgmt.sock 127.0.0.1 8080 /run/openvpn-seen";
+    };
+    # ACME's IPsec (IKEv2) gateway: strongSwan, the key, alice's password
+    # over EAP-MSCHAPv2.
+    systemd.services.acme-ipsec = {
+      wantedBy = [ "multi-user.target" ];
+      after = [ "acme-net.service" ];
+      environment.STRONGSWAN_CONF = "${gatewayCharon}";
+      serviceConfig.ExecStart = "${pkgs.strongswan}/libexec/ipsec/charon";
+      postStart = ''
+        for _ in $(seq 1 50); do [ -S /run/acme-ipsec.vici ] && break; sleep 0.1; done
+        ${pkgs.strongswan}/bin/swanctl --load-all --uri unix:///run/acme-ipsec.vici --file ${ipsecConf}
+      '';
     };
     services.ocserv = {
       enable = true;
@@ -99,6 +157,7 @@ in {
   nodes.client = { nodes, pkgs, ... }: {
     imports = [ self.nixosModules.default ];
     services.crake.enable = true;
+    services.crake.ipsec = true;
     # The client runs craked, openconnect and the whole GPUI journey
     # (software-rendered): the test VM's 1 vCPU / 1 GB default is cramped.
     virtualisation.cores = 2;
@@ -167,6 +226,49 @@ in {
         client.wait_until_succeeds("ip link show crake-hush")
         # (resolvectl fails on a refusal; the driver's shell has pipefail)
         client.wait_until_succeeds("(resolvectl query wiki.acme.internal 2>&1 || true) | grep -q REFUSED", timeout=10)
+
+    def answer(tunnel, kind, text):
+        """craked's question about a tunnel's sign-in, answered as the
+        app's sign-in window does (D-Bus Asking and Answer)."""
+        out = client.wait_until_succeeds(call + f"Asking s {tunnel} | grep '\"kind\" \"{kind}\"'", timeout=30)
+        asked = re.search(r'"id" "(\d+)"', out).group(1)
+        client.succeed(call + f"Answer sus {tunnel} {asked} {text}")
+
+    with subtest("an OpenVPN tunnel, its password asked over D-Bus"):
+        gateway.wait_for_unit("acme-openvpn-sign-in.service")
+        client.succeed("printf 'client\\ndev tun\\nproto udp\\nremote ${gw} 1194\\nnobind\\nauth-user-pass\\n"
+                       + "remote-cert-tls server\\n<ca>\\n%s\\n</ca>\\n' \"$(cat ${secrets}/ca.crt)\" > /tmp/initech.ovpn")
+        client.succeed(call + "AddTunnel 'a{ss}' 3 display_name Initech protocol openvpn profile \"$(cat /tmp/initech.ovpn)\"")
+        client.succeed("test \"$(stat -c %a /var/lib/crake/profiles/initech.ovpn)\" = 600")
+        client.succeed(call + "Connect s initech")
+        answer("initech", "user", "alice")
+        answer("initech", "password", "hunter2")
+        client.wait_until_succeeds(call + "GetTunnel s initech | grep -q '\"connected\"'", timeout=30)
+        client.succeed("ip -4 -o addr show crake-initech | grep -q 'inet 10.40.254.'")
+        client.succeed("curl -s -m 15 http://10.40.1.12/ | grep -q crex")
+        client.succeed(call + "Disconnect s initech")
+        client.wait_until_fails("pgrep -f '[o]penvpn-initech'", timeout=10)
+        client.succeed(call + "RemoveTunnel s initech")
+        client.fail("test -e /var/lib/crake/profiles/initech.ovpn")
+
+    with subtest("an IPsec tunnel, its charon Crake's own unit"):
+        # Where the app looks for strongSwan here (New tunnel's IPsec card).
+        client.succeed("test -x /run/current-system/sw/libexec/ipsec/charon")
+        client.succeed("test -f /run/current-system/sw/lib/ipsec/plugins/libstrongswan-vici.so")
+        gateway.wait_for_unit("acme-ipsec.service")
+        client.succeed(call + "AddTunnel 'a{ss}' 8 display_name Nordbank protocol ipsec gateway ${gw} "
+                       + "gateway_key hunter2hunter2 gateway_id vpn.acme.example user alice domains acme.internal sign_in password")
+        client.succeed("test \"$(stat -c %a /var/lib/crake/profiles/nordbank.ipsec)\" = 600")
+        client.succeed(call + "Connect s nordbank")
+        answer("nordbank", "password", "hunter2")
+        client.wait_until_succeeds(call + "GetTunnel s nordbank | grep -q '\"connected\"'", timeout=30)
+        client.succeed("systemctl is-active crake-charon")
+        client.succeed("ip -4 -o addr show crake-nordbank | grep -q 'inet 10.40.9.'")
+        client.succeed("curl -s -m 15 http://10.40.1.13/ | grep -q crex")
+        client.succeed(call + "Disconnect s nordbank")
+        client.wait_until_fails("ip link show crake-nordbank", timeout=10)
+        client.succeed(call + "RemoveTunnel s nordbank")
+        client.fail("test -e /var/lib/crake/profiles/nordbank.ipsec")
 
     with subtest("nothing went wrong in craked's journal"):
         client.fail("journalctl -u craked -o cat | grep -E 'ERROR|panicked'")

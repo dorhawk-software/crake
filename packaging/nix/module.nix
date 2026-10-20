@@ -11,6 +11,15 @@ in {
       default = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
       description = "The Crake package.";
     };
+    ipsec = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        IPsec (IKEv2) tunnels: strongSwan's charon, which craked starts as
+        crake-charon.service for the first IPsec tunnel switched on (as the
+        distributions' packages suggest strongSwan rather than require it).
+      '';
+    };
     extraConfig = lib.mkOption {
       type = lib.types.lines;
       default = "";
@@ -19,8 +28,10 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    # The app signs in with openconnect as the user.
-    environment.systemPackages = [ cfg.package pkgs.openconnect pkgs.openvpn ];
+    # The app signs in with openconnect as the user; with IPsec, it finds
+    # strongSwan in the system's profile (New tunnel's IPsec card).
+    environment.systemPackages = [ cfg.package pkgs.openconnect pkgs.openvpn ]
+      ++ lib.optional cfg.ipsec pkgs.strongswan;
     services.dbus.packages = [ cfg.package ];
     security.polkit.enable = true;
     # Tunnel DNS goes through systemd-resolved.
@@ -32,7 +43,31 @@ in {
 
     environment.etc."crake/craked.toml".text = ''
       hook_path = "${cfg.package}/libexec/crake/hook"
+    '' + lib.optionalString cfg.ipsec ''
+      charon = "${pkgs.strongswan}/libexec/ipsec/charon"
     '' + cfg.extraConfig;
+
+    # As packaging/crake-charon.service: a /run of its own (charon's pid
+    # file's path is built in, so it never meets a system strongSwan's),
+    # craked's folder bound back in for its settings and sockets.
+    systemd.services.crake-charon = lib.mkIf cfg.ipsec {
+      description = "Crake's IPsec engine (strongSwan's charon)";
+      bindsTo = [ "craked.service" ];
+      after = [ "craked.service" ];
+      environment = {
+        STRONGSWAN_CONF = "/run/crake/ipsec/strongswan.conf";
+        LC_ALL = "C";
+      };
+      serviceConfig = {
+        Type = "simple";
+        ExecStart = "${pkgs.strongswan}/libexec/ipsec/charon";
+        TemporaryFileSystem = "/run";
+        BindPaths = [ "/run/crake" "-/run/crake/ipsec/run:/run/strongswan" ];
+        CapabilityBoundingSet = [ "CAP_NET_ADMIN" "CAP_NET_RAW" "CAP_IPC_LOCK" ];
+        ProtectHome = true;
+        PrivateTmp = true;
+      };
+    };
 
     # As packaging/craked.service, with the tools craked runs on its path.
     systemd.services.craked = {
@@ -41,6 +76,7 @@ in {
       after = [ "network-online.target" "dbus.service" ];
       wants = [ "network-online.target" ];
       path = [ pkgs.nftables pkgs.iproute2 pkgs.openconnect pkgs.openvpn ];
+      environment = lib.mkIf cfg.ipsec { CRAKE_CHARON_UNIT = "crake-charon.service"; };
       # An upgrade (nixos-rebuild switch) reloads craked rather than
       # restarting it: the reload leaves the handover flag and restarts it,
       # so its tunnels stay signed in, as the packages' upgrade scripts do

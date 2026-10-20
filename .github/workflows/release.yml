@@ -121,6 +121,83 @@ jobs:
           name: windows
           path: target/windows/crake-setup-*.exe
 
+  # Windows on ARM64: its own programs, openconnect built in MSYS2 there,
+  # OpenVPN's ARM64 MSI, its own installer, installed and removed on an
+  # ARM64 runner before it's published (CLAUDE.md, Windows on ARM64).
+  windows-arm64-exe:
+    needs: notes
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: crake.exe, craked.exe and crake-hook.exe for ARM64
+        run: cargo build --release --locked -p crake -p craked
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-arm64-exe
+          path: |
+            target/release/crake.exe
+            target/release/craked.exe
+            target/release/crake-hook.exe
+
+  windows-arm64-openconnect:
+    needs: notes
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANGARM64
+          update: false
+          install: make curl unzip tar
+          pacboy: clang:p gnutls:p libxml2:p zlib:p pkgconf:p
+      - name: openconnect for ARM64
+        shell: msys2 {0}
+        run: sh scripts/build-openconnect-windows-arm64.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-arm64-openconnect
+          path: target/windows-arm64/openconnect
+
+  windows-arm64-setup:
+    needs: [windows-arm64-exe, windows-arm64-openconnect]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-arm64-exe
+          path: target/windows-arm64/app
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-arm64-openconnect
+          path: target/windows-arm64/openconnect
+      - name: The ARM64 installer, with openconnect and OpenVPN (unsigned)
+        env:
+          CRAKE_WINDOWS_ARCH: arm64
+        run: scripts/build-windows-installer.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-arm64-setup
+          path: target/windows-arm64/crake-setup-*-arm64.exe
+
+  windows-arm64:
+    needs: windows-arm64-setup
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-arm64-setup
+          path: setup
+      - name: It installs, runs craked and uninstalls
+        shell: pwsh
+        run: scripts/windows-arm64-install-test.ps1 (Get-ChildItem setup/crake-setup-*-arm64.exe).FullName
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-arm64
+          path: setup/crake-setup-*-arm64.exe
+
   # For Apple Silicon and Intel Macs: each built in a job of its own, at
   # once (one after the other they took 22 of the job's 24 minutes,
   # uncached, 0.12.0), then joined (lipo), signed and notarized below.
@@ -187,7 +264,7 @@ jobs:
           path: target/macos/Crake-*.pkg
 
   publish:
-    needs: [linux, windows, macos]
+    needs: [linux, windows, windows-arm64, macos]
     # A rehearsal stops here (and so the cask, the repository and the AUR).
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
@@ -203,7 +280,7 @@ jobs:
       - name: Checksums
         run: |
           mkdir release
-          find dist -type f ! -path 'dist/windows-exe/*' ! -path 'dist/notes/*' ! -path 'dist/macos-bin-*/*' -exec cp {} release/ \;
+          find dist -type f ! -path 'dist/windows-exe/*' ! -path 'dist/windows-arm64-*/*' ! -path 'dist/notes/*' ! -path 'dist/macos-bin-*/*' -exec cp {} release/ \;
           cp dist/notes/notes.md notes.md
           cd release && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
       - name: The GitHub release

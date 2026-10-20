@@ -139,8 +139,9 @@ impl Engines {
 pub const IPSEC_LINUX_ONLY: &str = "Crake runs IPsec on Linux only for now.";
 
 /// Where each distribution puts strongSwan's charon (Debian and Ubuntu,
-/// Fedora, Arch), and its plugins.
-const CHARONS: [(&str, &str); 4] = [
+/// Fedora, Arch, and NixOS's system profile with `services.crake.ipsec`),
+/// and its plugins.
+const CHARONS: [(&str, &str); 5] = [
     ("/usr/lib/ipsec/charon", "/usr/lib/ipsec/plugins"),
     (
         "/usr/libexec/strongswan/charon",
@@ -151,6 +152,10 @@ const CHARONS: [(&str, &str); 4] = [
         "/usr/lib/strongswan/plugins",
     ),
     ("/usr/lib/strongswan/charon", "/usr/lib/strongswan/plugins"),
+    (
+        "/run/current-system/sw/libexec/ipsec/charon",
+        "/run/current-system/sw/lib/ipsec/plugins",
+    ),
 ];
 
 /// charon and its vici plugin (Debian has the plugin in another package,
@@ -176,7 +181,10 @@ pub fn strongswan_install(os_release: &str) -> String {
     };
     let (id, like) = (field("ID"), field("ID_LIKE"));
     let is = |name: &str| id == name || like.split_whitespace().any(|l| l == name);
-    if is("fedora") || is("rhel") {
+    if is("nixos") {
+        // A line for configuration.nix: the module brings strongSwan.
+        "services.crake.ipsec = true;".into()
+    } else if is("fedora") || is("rhel") {
         "sudo dnf install strongswan".into()
     } else if is("arch") {
         "sudo pacman -S strongswan".into()
@@ -319,6 +327,27 @@ pub fn spawn(cmd: &mut std::process::Command) -> std::io::Result<std::process::C
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn strongswans_install_is_said_for_each_distribution() {
+        let said = |release: &str| strongswan_install(release);
+        assert!(
+            said("ID=ubuntu\nID_LIKE=debian\n")
+                .starts_with("sudo apt install --no-install-recommends")
+        );
+        assert_eq!(said("ID=fedora\n"), "sudo dnf install strongswan");
+        assert_eq!(
+            said("ID=\"rocky\"\nID_LIKE=\"rhel centos fedora\"\n"),
+            "sudo dnf install strongswan"
+        );
+        assert_eq!(said("ID=arch\n"), "sudo pacman -S strongswan");
+        assert_eq!(
+            said("ID=opensuse-tumbleweed\n"),
+            "sudo zypper install strongswan"
+        );
+        // NixOS installs nothing by hand: the module's option brings it.
+        assert_eq!(said("ID=nixos\n"), "services.crake.ipsec = true;");
+    }
 
     #[test]
     fn says_what_a_protocol_is_missing() {

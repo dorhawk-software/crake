@@ -1321,9 +1321,10 @@
    hook) reach craked's socket. `vm-test.sh fedora:44` passes the IPsec
    phase enforced with no denials. The IPsec journey still skips under
    SELinux: its craked runs charon by hand from a temporary folder.
-   NixOS: the module
-   has no charon unit, and the app looks for charon at the
-   distributions' paths.
+   NixOS (2026-10-20): `services.crake.ipsec = true` gives the module
+   the charon unit and strongSwan in the system's profile, where the app
+   looks too; its VM test connects an IPsec tunnel
+   (docs/engineering/packaging.md).
    **IT's files and craked.toml (2026-10-20):** `protocol = "ipsec"`
    with `gateway`, `gateway_id` and `gateway_key_file` (one line, beside
    IT's file or a whole path; root's alone: a key others can read is
