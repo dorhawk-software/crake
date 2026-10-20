@@ -1345,11 +1345,12 @@
    the sign-in window's failure with Change the key… in Try again's
    place, opening the tunnel's Edit (as ipsec-tunnel.html drew it; window
    test `a_refused_key_offers_to_change_it`).
-   Not yet: a gateway with several networks shows only the first as a
-   hint (charon runs updown once per pair of selectors, and craked takes
-   the first call's; seen 2026-10-20 when the e2e gateway got
-   10.42.0.0/16 too), certificates (the gateway's or the user's), the
-   FortiGate by hand.
+   A gateway with several networks: charon runs updown once per pair of
+   selectors, and each later call's network is added to the tunnel's
+   hints (`add_hints`; until 2026-10-20 only the first call's showed;
+   `nothing_is_routed_up_front` checks both of the e2e gateway's).
+   Not yet: certificates (the gateway's or the user's), the FortiGate by
+   hand.
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or
    Windows problem without a colleague's machine):** `.github/workflows/
    doctor.yml`, started by hand (system, tunnel anyconnect/openvpn/none,

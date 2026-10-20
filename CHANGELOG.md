@@ -11,6 +11,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Every network an IPsec gateway offers shows in tunnel detail.** A gateway offering two networks
+  showed only the first under "From the gateway", and only that one was raced on the first
+  connection. Both are now.
+
 ## 0.13.0 (2026-10-20)
 
 - **A certificate check fixed in a library Crake carries.** rustls-webpki, part of the window

@@ -4,6 +4,22 @@
 use super::*;
 
 impl Manager {
+    /// More of a connected tunnel's networks as hints; whether any was new.
+    fn add_hints(&self, name: &str, nets: &[String]) -> bool {
+        let mut map = self.tunnels.lock().unwrap();
+        let Some(info) = map.get_mut(name).and_then(|e| e.info.as_mut()) else {
+            return false;
+        };
+        let mut added = false;
+        for net in nets {
+            if !info.split_include.contains(net) {
+                info.split_include.push(net.clone());
+                added = true;
+            }
+        }
+        added
+    }
+
     /// Apply one call from the hook. An error makes the hook fail, which makes
     /// openconnect give up on that step.
     pub async fn handle_hook(&self, msg: HookMessage) -> Result<()> {
@@ -48,8 +64,15 @@ impl Manager {
                     crate::config::Protocol::Ipsec => {
                         // charon calls updown once per pair of traffic
                         // selectors, and again when it signs in anew: one
-                        // tunnel coming up once.
+                        // tunnel coming up once, each call's network a
+                        // hint (a gateway with two networks showed only
+                        // the first, 2026-10-20).
                         if state == TunnelState::Connected {
+                            let more = crate::ipsec::env::info(&msg.env, &interface_name(name))?;
+                            if self.add_hints(name, &more.split_include) {
+                                self.sync_syn_race().await;
+                                let _ = self.changes.send(name.to_owned());
+                            }
                             return Ok(());
                         }
                         crate::ipsec::env::info(&msg.env, &interface_name(name))?

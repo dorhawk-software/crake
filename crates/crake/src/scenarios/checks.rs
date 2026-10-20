@@ -79,6 +79,28 @@ pub(crate) async fn nothing_is_routed_up_front(up: &mut Up) {
         .map(|t| t.address.clone())
         .unwrap_or_default();
     assert!(address.starts_with("10.40."), "its address: {address:?}");
+    // What the gateway pushed is shown as hints (tunnel detail's "From the
+    // gateway"): ACME's network; the IPsec gateway also hands out
+    // 10.42.0.0/16, in a second pair of selectors charon reports apart.
+    let mut hints = vec!["10.40.0.0/16"];
+    #[cfg(target_os = "linux")]
+    if up.gateway == super::Gateway::Ipsec {
+        hints.push("10.42.0.0/16");
+    }
+    let name = up.name;
+    let shown = |m: &crate::model::Model| {
+        m.tunnels
+            .iter()
+            .find(|t| t.name == name)
+            .map(|t| t.split_include.clone())
+            .unwrap_or_default()
+    };
+    up.app
+        .within(WAIT, "the gateway's networks as hints", |m| {
+            let s = shown(m);
+            hints.iter().all(|h| s.iter().any(|n| n == h))
+        })
+        .await;
 }
 
 /// A host that doesn't answer directly but does through the tunnel:
