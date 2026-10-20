@@ -169,6 +169,17 @@ The user doesn't want development builds installed on their machine.
   macOS failing: openconnect starts the browser with posix_spawn, which
   doesn't search PATH, and Crake named it bare (now found on PATH,
   `signin::browser_on_path`).
+  The engine's other paths, Linux (2026-10-20, each on every gateway
+  kind): a router's ICMP "host unreachable" starting the probe at once
+  (the e2e gateway rejects 10.40.1.17 from the wire), a UDP host learned
+  (an echo on 10.40.1.18:7007), a full tunnel and back (the public web
+  server drops what comes through a tunnel), another VPN client's domain
+  left to it (a resolved link `othervpn0` with the public DNS stand-in;
+  a mutant craked that sees no other client's domains fails it), and the
+  first-SYN race (`racing!`: craked started with `race_first_syn`, which
+  the other scenarios leave off; one connection with 2 s to connect,
+  which times out with the race off). Each says `not_here` on macOS and
+  Windows, with why.
   Not yet in the suite (2026-10-20): a certificate kept in the keyring
   or on a smart card (the tests keep no keyring; SoftHSM could stand in
   for a card, but the e2e client runs from this computer's read-only
