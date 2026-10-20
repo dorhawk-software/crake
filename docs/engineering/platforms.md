@@ -185,9 +185,12 @@ ovpn-dco, tap-windows6), so it gets a build of its own:
   silently, every program ARM64, the service running and serving the
   app, openconnect and openvpn starting, OpenVPN's drivers in the driver
   store, removed leaving nothing.
-- Not yet: the gateway tests and the journey on ARM64 (the x64 jobs
-  carry them; the code is the same, the engines and drivers aren't), and
-  anyone using it on a real Windows on ARM (the checklist).
+- The gateway tests on ARM64: by hand, through the Doctor (doctor.yml,
+  system `windows-arm64`: main's ARM64 installer and test binary, the
+  `crake-windows-arm64-tests` artifact, on windows-11-arm). Not in every
+  CI run: uncached, the ARM64 builds take ~25 minutes, and the shared
+  Cloudflare gateways would be held that much longer. Not yet: anyone
+  using it on a real Windows on ARM (the checklist).
 
 **macOS (started 2026-10-11, after Windows' phase 4, as the user
 suggested).** Same layout as Windows. craked's `sys/macos/`: the

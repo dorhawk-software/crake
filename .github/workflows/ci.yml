@@ -331,6 +331,24 @@ jobs:
             target/debug/crake.exe
             target/debug/craked.exe
             target/debug/crake-hook.exe
+      # The app's tests for ARM64, built above: the Doctor runs the real
+      # gateways' tests with them on windows-11-arm, when asked
+      # (doctor.yml, system windows-arm64). PowerShell's JSON: the ARM64
+      # image may have no jq.
+      - name: The app's test binary
+        shell: pwsh
+        run: |
+          $bin = cargo test --workspace --locked --no-run --message-format=json |
+            ForEach-Object { $_ | ConvertFrom-Json } |
+            Where-Object { $_.executable -and $_.target.name -eq 'crake' -and $_.profile.test } |
+            Select-Object -First 1 -ExpandProperty executable
+          if (-not $bin) { throw "no test binary for crake" }
+          New-Item -ItemType Directory -Force target/ci | Out-Null
+          Copy-Item $bin target/ci/crake-tests.exe
+      - uses: actions/upload-artifact@v7
+        with:
+          name: crake-windows-arm64-tests
+          path: target/ci/crake-tests.exe
 
   # openconnect for ARM64, built natively in MSYS2 (Fedora's MinGW, which
   # builds the x64 one, has no ARM64); cached while its script doesn't change.

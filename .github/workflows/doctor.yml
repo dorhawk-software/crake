@@ -7,8 +7,8 @@
 # all comes back as the artifact "doctor-<system>". With "shell", an SSH
 # session onto that machine while the tunnel is up, for the keys on the
 # starter's GitHub profile only (tmate; the address is in the step's log).
-# The Mac builds the branch; Windows takes the installer and the tests
-# from main's latest green CI run. CLAUDE.md, 7j.
+# The Mac builds the branch; Windows (x64 or ARM64, windows-11-arm) takes
+# the installer and the tests from main's latest green CI run. CLAUDE.md, 7j.
 name: Doctor
 
 on:
@@ -17,7 +17,7 @@ on:
       system:
         description: Which machine
         type: choice
-        options: [macos, windows]
+        options: [macos, windows, windows-arm64]
         default: macos
       tunnel:
         description: Which tunnel to hold up
@@ -85,12 +85,14 @@ jobs:
         run: scripts/ci-gateways.sh down "$RUNNER_TEMP/gateways"
 
   doctor:
-    runs-on: ${{ inputs.system == 'windows' && 'windows-latest' || 'macos-latest' }}
+    runs-on: ${{ inputs.system == 'windows' && 'windows-latest' || inputs.system == 'windows-arm64' && 'windows-11-arm' || 'macos-latest' }}
     permissions:
       contents: read
       actions: read
     env:
-      SYSTEM: ${{ inputs.system }}
+      # The scripts know Windows; which build of it is the artifacts'.
+      SYSTEM: ${{ inputs.system == 'windows-arm64' && 'windows' || inputs.system }}
+      ARTIFACTS: ${{ inputs.system == 'windows-arm64' && 'crake-windows-arm64' || 'crake-windows' }}
       CRAKE_DOCTOR_TUNNEL: ${{ inputs.tunnel }}
       CRAKE_DOCTOR_MINUTES: ${{ inputs.minutes }}
       CRAKE_GATEWAY_FILTER: gateway_tests::doctor
@@ -104,14 +106,14 @@ jobs:
         with:
           save-if: false
       - name: Main's latest installer and tests (Windows)
-        if: inputs.system == 'windows'
+        if: env.SYSTEM == 'windows'
         shell: bash
         run: |
           RUN=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --status success \
             --limit 1 --json databaseId --jq '.[0].databaseId')
           echo "From CI run $RUN"
-          gh run download "$RUN" -R "$GITHUB_REPOSITORY" -n crake-windows-setup -D setup
-          gh run download "$RUN" -R "$GITHUB_REPOSITORY" -n crake-windows-tests -D tests
+          gh run download "$RUN" -R "$GITHUB_REPOSITORY" -n "$ARTIFACTS-setup" -D setup
+          gh run download "$RUN" -R "$GITHUB_REPOSITORY" -n "$ARTIFACTS-tests" -D tests
       - name: Before Crake
         shell: bash
         run: |
