@@ -23,6 +23,21 @@
 //! learn = ["*.initech.internal"]
 //! ```
 //!
+//! An IPsec (IKEv2) tunnel names the gateway's pre-shared key in a file of
+//! its own (one line, root's alone: a key others can read is refused), and
+//! signs in with the user's password; its domains are `dns_domains`, since
+//! an IPsec gateway hands over none:
+//!
+//! ```toml
+//! display_name = "Nordbank"
+//! protocol = "ipsec"
+//! gateway = "vpn.nordbank.example"
+//! gateway_id = "vpn.nordbank.example"   # its IKE identity; any, when unset
+//! gateway_key_file = "nordbank.key"
+//! dns_domains = ["nordbank.internal"]
+//! learn = ["*.nordbank.internal"]
+//! ```
+//!
 //! The user can switch a managed tunnel on and off, but can't edit it or
 //! widen its scope: hosts outside `learn` are never sent through it, by
 //! learning or by hand.
@@ -147,6 +162,11 @@ struct ManagedFile {
     protocol: Protocol,
     /// OpenVPN's profile: beside this file, or a whole path.
     profile: Option<PathBuf>,
+    /// IPsec's pre-shared key: a file of one line beside this one (or a
+    /// whole path), root's alone.
+    gateway_key_file: Option<PathBuf>,
+    /// IPsec: the gateway's IKE identity.
+    gateway_id: Option<String>,
     group: Option<String>,
     user: Option<String>,
     sign_in: Option<String>,
@@ -217,6 +237,7 @@ pub fn load_file(path: &Path) -> Result<TunnelConfig> {
     }
     let display = f.display_name.clone().unwrap_or_else(|| name.clone());
     let (gateway, profile) = gateway_of(path, &f, &display)?;
+    let gateway_key_file = ipsec_key_of(path, &f)?;
     let mut auth_args = Vec::new();
     if let Some(g) = &f.group {
         auth_args.push(format!("--authgroup={g}"));
@@ -238,6 +259,8 @@ pub fn load_file(path: &Path) -> Result<TunnelConfig> {
         auth_args,
         extra_args: f.extra_args,
         profile,
+        gateway_key_file,
+        gateway_id: f.gateway_id,
         managed: Some(Managed {
             file: path.to_owned(),
             organisation: f.organisation.unwrap_or_else(|| format!("{display} IT")),
@@ -246,6 +269,43 @@ pub fn load_file(path: &Path) -> Result<TunnelConfig> {
         }),
         own: None,
     })
+}
+
+/// An IPsec tunnel's key file, beside the managed file or a whole path:
+/// read and checked now (one Crake can't use is refused here, with the
+/// file), and again at each start. Nothing of IPsec's for the others.
+fn ipsec_key_of(path: &Path, f: &ManagedFile) -> Result<Option<PathBuf>> {
+    if f.protocol != Protocol::Ipsec {
+        if f.gateway_key_file.is_some() || f.gateway_id.is_some() {
+            bail!(
+                "{}: gateway_key_file and gateway_id are for IPsec tunnels",
+                path.display()
+            );
+        }
+        return Ok(None);
+    }
+    if f.sign_in.as_deref().is_some_and(|s| s != "password") {
+        bail!(
+            "{}: an IPsec tunnel signs in with a username and password (sign_in = \"password\")",
+            path.display()
+        );
+    }
+    if f.certificate.is_some() || f.group.is_some() || !f.extra_args.is_empty() {
+        bail!(
+            "{}: certificate, group and extra_args aren't for IPsec tunnels",
+            path.display()
+        );
+    }
+    let Some(file) = &f.gateway_key_file else {
+        bail!(
+            "{}: an IPsec tunnel names the gateway's key (gateway_key_file = \"{}.key\")",
+            path.display(),
+            path.file_stem().and_then(|s| s.to_str()).unwrap_or("its")
+        );
+    };
+    let file = path.parent().unwrap_or(Path::new(".")).join(file);
+    crate::ipsec::key_from_file(&file, f.gateway_id.as_deref())?;
+    Ok(Some(file))
 }
 
 /// A managed tunnel's gateway, and an OpenVPN tunnel's profile (read and
@@ -298,6 +358,83 @@ mod tests {
         let p = dir.join(name);
         std::fs::write(&p, text).unwrap();
         p
+    }
+
+    #[cfg(unix)]
+    /// IT's key file, root's alone.
+    fn key(dir: &Path, name: &str, mode: u32) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt as _;
+        let p = write(dir, name, "hunter2hunter2\n");
+        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(mode)).unwrap();
+        p
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_ipsec_tunnel_names_its_key_beside_it() {
+        let dir = tempfile::tempdir().unwrap();
+        key(dir.path(), "nordbank.key", 0o600);
+        let file = write(
+            dir.path(),
+            "nordbank.toml",
+            "display_name = \"Nordbank\"\nprotocol = \"ipsec\"\ngateway = \"vpn.nordbank.example\"\n\
+             gateway_id = \"vpn.nordbank.example\"\ngateway_key_file = \"nordbank.key\"\n\
+             user = \"alice\"\ndns_domains = [\"nordbank.internal\"]\nlearn = [\"*.nordbank.internal\"]\n",
+        );
+        let t = load_file(&file).unwrap();
+        assert_eq!(t.protocol, Protocol::Ipsec);
+        assert_eq!(t.gateway_key_file, Some(dir.path().join("nordbank.key")));
+        assert_eq!(t.gateway_id.as_deref(), Some("vpn.nordbank.example"));
+        assert_eq!(t.dns_domains, ["nordbank.internal"]);
+        let secret = crate::ipsec::key_from_file(
+            t.gateway_key_file.as_ref().unwrap(),
+            t.gateway_id.as_deref(),
+        )
+        .unwrap();
+        assert_eq!(secret.key, "hunter2hunter2");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_ipsec_key_others_can_read_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        key(dir.path(), "nordbank.key", 0o644);
+        let file = write(
+            dir.path(),
+            "nordbank.toml",
+            "protocol = \"ipsec\"\ngateway = \"vpn.nordbank.example\"\ngateway_key_file = \"nordbank.key\"\n",
+        );
+        let e = format!("{:#}", load_file(&file).unwrap_err());
+        assert!(e.contains("can be read by others"), "{e}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_ipsec_tunnel_needs_a_key_and_a_password_sign_in() {
+        let dir = tempfile::tempdir().unwrap();
+        key(dir.path(), "k.key", 0o600);
+        for (text, said) in [
+            (
+                "protocol = \"ipsec\"\ngateway = \"vpn.nordbank.example\"\n",
+                "names the gateway's key",
+            ),
+            (
+                "protocol = \"ipsec\"\ngateway = \"g\"\ngateway_key_file = \"k.key\"\nsign_in = \"browser\"\n",
+                "username and password",
+            ),
+            (
+                "protocol = \"ipsec\"\ngateway = \"g\"\ngateway_key_file = \"k.key\"\ngroup = \"Staff\"\n",
+                "aren't for IPsec",
+            ),
+            (
+                "gateway = \"g\"\ngateway_key_file = \"k.key\"\n",
+                "are for IPsec tunnels",
+            ),
+        ] {
+            let file = write(dir.path(), "t.toml", text);
+            let e = format!("{:#}", load_file(&file).unwrap_err());
+            assert!(e.contains(said), "{text}: {e}");
+        }
     }
 
     #[test]

@@ -305,3 +305,39 @@ fn a_gateways_field_is_asked_for_in_words() {
     assert_eq!(asks_for("PIN"), Some("your PIN"));
     assert_eq!(asks_for("Realm"), None);
 }
+
+/// IPsec (design/proposals/ipsec-tunnel.html): a key the gateway turns
+/// down ends in the failure shape with Change the key…, not Try again,
+/// and that opens the tunnel's Edit and closes the window.
+#[gpui_kit::test]
+fn a_refused_key_offers_to_change_it(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open_with(cx, fake(dir.path()), "ipsec");
+    w.model.update(cx, |m, cx| {
+        if let Some(t) = m.tunnels.iter_mut().find(|t| t.name == "acme") {
+            t.state = "trouble".into();
+            t.why = format!(
+                "{} ACME\u{2019}s gateway. Your IT team can tell you the right one; change it in ACME\u{2019}s Edit.",
+                crake_proto::trouble::KEY_MISMATCH
+            );
+        }
+        cx.notify();
+    });
+    w.until("the failure", cx, |s| matches!(s, Stage::Failed { .. }));
+    w.click("change-key", cx);
+    let end = Instant::now() + Duration::from_secs(5);
+    loop {
+        match w.requests.try_recv() {
+            Ok(Request::NewTunnel(Some(tunnel))) => {
+                assert_eq!(tunnel, "acme");
+                break;
+            }
+            Ok(_) => {}
+            Err(_) => {
+                assert!(Instant::now() < end, "Edit was never asked for");
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        }
+    }
+    assert!(w.closed.get(), "the window closes");
+}

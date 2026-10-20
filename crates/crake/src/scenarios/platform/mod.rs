@@ -98,7 +98,14 @@ impl Craked {
         cfg.managed_dir = dir.path().join("managed.d");
         std::fs::create_dir_all(&cfg.managed_dir).unwrap();
         for (file, text) in managed {
-            std::fs::write(cfg.managed_dir.join(file), text).unwrap();
+            let path = cfg.managed_dir.join(file);
+            std::fs::write(&path, text).unwrap();
+            // An IPsec key, root's alone as IT keeps it (craked refuses
+            // one others can read).
+            if file.ends_with(".key") {
+                use std::os::unix::fs::PermissionsExt as _;
+                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            }
         }
         cfg.add_managed();
         let (mgr, app) = Self::launch(&cfg, dir.path()).await;

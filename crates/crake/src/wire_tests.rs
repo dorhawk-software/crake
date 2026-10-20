@@ -46,6 +46,8 @@ fn config(dir: &std::path::Path) -> Config {
             auth_args: vec![],
             extra_args: vec![],
             profile: None,
+            gateway_key_file: None,
+            gateway_id: None,
             managed: None,
             own: None,
         }],

@@ -123,7 +123,18 @@ impl Gateway {
                 ),
             ],
             #[cfg(target_os = "linux")]
-            Self::Ipsec => panic!("IPsec in IT's files isn't built yet (CLAUDE.md, 7k)"),
+            Self::Ipsec => vec![
+                ("nordbank.key", "hunter2hunter2\n".to_owned()),
+                (
+                    "nordbank.toml",
+                    format!(
+                        "display_name = \"Nordbank\"\nprotocol = \"ipsec\"\ngateway = \"{}\"\n\
+                         gateway_id = \"vpn.acme.example\"\ngateway_key_file = \"nordbank.key\"\n\
+                         user = \"alice\"\ndns_domains = [\"acme.internal\"]\n{learn}\n",
+                        platform::IPSEC_GATEWAY
+                    ),
+                ),
+            ],
             Self::AnyConnectCertificate | Self::OpenVpnCode | Self::Globex => {
                 panic!("{self:?} is never IT's in these tests")
             }

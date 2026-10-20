@@ -11,6 +11,15 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Your IT team can set up IPsec tunnels.** A file in Crake's managed folder can now describe an
+  IPsec (IKEv2) tunnel: the gateway, its identity, the pre-shared key in a file of its own (kept
+  root's alone; a key anyone on the computer can read is refused), the company's domains and what
+  may go through. You switch it on and sign in with your password, as with your own. craked.toml
+  takes the same.
+
+- **"Change the key…" when the gateway turns the key down.** An IPsec sign-in refused for its key
+  now ends with a button that opens the tunnel's Edit, instead of Try again, which couldn't help.
+
 - **Names kept private once another VPN client lets them go.** When another VPN program had been
   serving a company's names and stopped, Crake took them back to keep them private, but if the
   system's resolver wasn't ready that moment, it never tried again, and those names could go to

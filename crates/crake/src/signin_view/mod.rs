@@ -193,14 +193,22 @@ impl Render for SignIn {
                                     .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
                                     .test_support(),
                             )
-                            .child(
+                            .child(if reason.starts_with(crake_proto::trouble::KEY_MISMATCH) {
+                                // A key the gateway turns down only IT can fix:
+                                // trying again can't help, changing it can
+                                // (design/proposals/ipsec-tunnel.html).
+                                button("change-key", "Change the key\u{2026}", Look::Primary, &t)
+                                    .keys()
+                                    .on_click(cx.listener(|this, _, _, cx| this.change_key(cx)))
+                                    .test_support()
+                            } else {
                                 button("retry", "Try again", Look::Primary, &t)
                                     .keys()
                                     .on_click(
                                         cx.listener(|this, _, window, cx| this.retry(window, cx)),
                                     )
-                                    .test_support(),
-                            ),
+                                    .test_support()
+                            }),
                     )
             }
             // design/screens/sign-in.html, "Single sign-on".
@@ -563,5 +571,13 @@ impl SignIn {
     fn cancel(&mut self, cx: &mut Context<Self>) {
         let _ = self.replies.send_blocking(Reply::Cancel);
         cx.emit(Close);
+    }
+
+    /// The tunnel's Edit, where its key is changed; this window goes.
+    fn change_key(&mut self, cx: &mut Context<Self>) {
+        let _ = self
+            .requests
+            .send_blocking(Request::NewTunnel(Some(self.spec.tunnel.clone())));
+        self.cancel(cx);
     }
 }

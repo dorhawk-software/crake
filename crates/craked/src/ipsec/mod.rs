@@ -65,6 +65,31 @@ impl Secret {
     }
 }
 
+/// The secret from a key file IT (or craked.toml) names: one line, root's
+/// alone (a group key others on the computer can read would let them pose
+/// as the gateway's clients), and the gateway's identity beside it.
+pub fn key_from_file(path: &Path, gateway_id: Option<&str>) -> Result<Secret> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        /// Readable or writable by the group or others.
+        const SHARED: u32 = 0o077;
+        let mode = std::fs::metadata(path)
+            .with_context(|| format!("reading {}", path.display()))?
+            .permissions()
+            .mode();
+        if mode & SHARED != 0 {
+            bail!(
+                "{} can be read by others: the gateway's key must be root's alone (chmod 600)",
+                path.display()
+            );
+        }
+    }
+    let text =
+        std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+    Secret::from_fields(text.trim(), gateway_id).with_context(|| path.display().to_string())
+}
+
 /// Where craked keeps a tunnel's secret: root's only, beside the OpenVPN
 /// profiles.
 pub fn secret_path(state_path: &Path, tunnel: &str) -> PathBuf {

@@ -106,9 +106,14 @@ pub(crate) async fn it_s_tunnel_cant_be_changed_or_removed(up: &mut Up) {
     );
     assert_eq!(state(&up.app.model, name), "connected", "{label} stays up");
     up.off().await;
-    up.app.send(Command::Connect(name.into()));
-    up.app
-        .within(WAIT, "on again", |m| state(m, name) == "connected")
-        .await;
+    if up.gateway.keeps_sign_in() {
+        up.app.send(Command::Connect(name.into()));
+        up.app
+            .within(WAIT, "on again", |m| state(m, name) == "connected")
+            .await;
+    } else {
+        // IPsec's password is the app's to keep (the keyring): asked again.
+        super::sign_in_and_connect(&mut up.app, up.gateway, &["hunter2"]).await;
+    }
     up.device = up.crake.device(name);
 }

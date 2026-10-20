@@ -1324,13 +1324,26 @@
    NixOS: the module
    has no charon unit, and the app looks for charon at the
    distributions' paths.
-   Not yet: "Change the key…" in the sign-in window's failure (the
-   failure says to use Edit); a gateway with several networks shows only
-   the first as a hint (charon runs updown once per pair of selectors,
-   and craked takes the first call's; seen 2026-10-20 when the e2e
-   gateway got 10.42.0.0/16 too), IPsec in craked.toml and IT's managed
-   files, certificates (the gateway's or the user's), the FortiGate by
-   hand.
+   **IT's files and craked.toml (2026-10-20):** `protocol = "ipsec"`
+   with `gateway`, `gateway_id` and `gateway_key_file` (one line, beside
+   IT's file or a whole path; root's alone: a key others can read is
+   refused, `ipsec::key_from_file`, and the tunnel skipped with the reason
+   in craked's log), `dns_domains`, `user` and the usual `learn`; sign-in
+   is the user's password (`sign_in` other than password, `group`,
+   `certificate` and `extra_args` refused for IPsec). The key is read at
+   each start (`TunnelConfig::gateway_key_file`; an app-added tunnel's is
+   craked's copy in `profiles/`). Tested: policy and config units, the
+   `it_ipsec` scenarios (scope held, can't be changed or removed).
+   **"Change the key…" (2026-10-20):** a key the gateway turns down ends
+   the sign-in window's failure with Change the key… in Try again's
+   place, opening the tunnel's Edit (as ipsec-tunnel.html drew it; window
+   test `a_refused_key_offers_to_change_it`).
+   Not yet: a gateway with several networks shows only the first as a
+   hint (charon runs updown once per pair of selectors, and craked takes
+   the first call's; seen 2026-10-20 when the e2e gateway got
+   10.42.0.0/16 too), handing an IPsec tunnel over across an upgrade
+   (CLAUDE.md, Not now), certificates (the gateway's or the user's), the
+   FortiGate by hand.
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or
    Windows problem without a colleague's machine):** `.github/workflows/
    doctor.yml`, started by hand (system, tunnel anyconnect/openvpn/none,

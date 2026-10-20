@@ -49,7 +49,12 @@ impl Manager {
         stop_rx: &mut oneshot::Receiver<Stop>,
     ) -> Result<Ended> {
         let name = &config.name;
-        let secret = Secret::read(&ipsec::secret_path(&self.cfg.state_path, name))?;
+        // IT's key (or craked.toml's), read at each start; else craked's own
+        // copy of the one given in the app.
+        let secret = match &config.gateway_key_file {
+            Some(file) => ipsec::key_from_file(file, config.gateway_id.as_deref())?,
+            None => Secret::read(&ipsec::secret_path(&self.cfg.state_path, name))?,
+        };
         let socket = self.charon_socket().await?;
         let index = self
             .tunnels

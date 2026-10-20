@@ -484,7 +484,7 @@ every_scenario!(openvpn, super::Gateway::OpenVpn);
 every_scenario!(ipsec, super::Gateway::Ipsec);
 
 /// The scenarios of IT's tunnels (managed.d), each a test of its own,
-/// against the kinds of gateway IT's files can name (not IPsec yet).
+/// against every kind of gateway (IPsec on Linux).
 macro_rules! it_scenarios {
     ($kind:ident, $gateway:expr) => {
         mod $kind {
@@ -513,3 +513,5 @@ macro_rules! it_scenarios {
 
 it_scenarios!(it_anyconnect, super::Gateway::AnyConnect);
 it_scenarios!(it_openvpn, super::Gateway::OpenVpn);
+#[cfg(target_os = "linux")]
+it_scenarios!(it_ipsec, super::Gateway::Ipsec);

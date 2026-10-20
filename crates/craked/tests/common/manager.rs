@@ -56,6 +56,8 @@ pub fn setup(dir: &std::path::Path, script: &str) -> Config {
             auth_args: vec![],
             extra_args: vec![],
             profile: None,
+            gateway_key_file: None,
+            gateway_id: None,
             managed: None,
             own: None,
         }],

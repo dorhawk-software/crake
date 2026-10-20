@@ -168,6 +168,15 @@ pub struct TunnelConfig {
     /// file, or one craked.toml names. Read and checked at each start.
     #[serde(default)]
     pub profile: Option<PathBuf>,
+    /// An IPsec tunnel's pre-shared key, where it isn't craked's own copy
+    /// (one added in the app is kept in `profiles/`): a file of one line,
+    /// root's alone, beside IT's managed file or where craked.toml says.
+    /// Read at each start.
+    #[serde(default)]
+    pub gateway_key_file: Option<PathBuf>,
+    /// The IPsec gateway's IKE identity, with `gateway_key_file` (any, when unset).
+    #[serde(default)]
+    pub gateway_id: Option<String>,
     /// Set for tunnels from `managed_dir`: who decides, and what may go through.
     #[serde(skip)]
     pub managed: Option<crate::policy::Managed>,
@@ -190,6 +199,8 @@ impl TunnelConfig {
             auth_args: Vec::new(),
             extra_args: Vec::new(),
             profile: None,
+            gateway_key_file: None,
+            gateway_id: None,
             managed: None,
             own: None,
         }
@@ -289,6 +300,13 @@ impl Config {
             }
             if t.gateway.is_empty() || t.gateway.starts_with('-') {
                 bail!("tunnel {:?} has an invalid gateway", t.name);
+            }
+            // Its key: a file craked.toml names (the app's are kept apart).
+            if t.protocol == Protocol::Ipsec && t.own.is_none() && t.gateway_key_file.is_none() {
+                bail!(
+                    "tunnel {:?}: an IPsec tunnel names the gateway's key (gateway_key_file)",
+                    t.name
+                );
             }
         }
         Ok(())
@@ -449,6 +467,26 @@ mod tests {
         cfg.validate().unwrap();
         assert_eq!(cfg.tunnels[0].protocol, Protocol::Anyconnect);
         assert_eq!(cfg.tunnels[0].display(), "ACME");
+    }
+
+    #[test]
+    fn an_ipsec_tunnel_in_craked_toml_names_its_key() {
+        let without: Config = toml::from_str(
+            "[[tunnel]]\nname = \"nordbank\"\nprotocol = \"ipsec\"\ngateway = \"vpn.nordbank.example\"",
+        )
+        .unwrap();
+        let e = without.validate().unwrap_err().to_string();
+        assert!(e.contains("gateway_key_file"), "{e}");
+        let with: Config = toml::from_str(
+            "[[tunnel]]\nname = \"nordbank\"\nprotocol = \"ipsec\"\ngateway = \"vpn.nordbank.example\"\n\
+             gateway_key_file = \"/etc/crake/nordbank.key\"\ngateway_id = \"vpn.nordbank.example\"",
+        )
+        .unwrap();
+        with.validate().unwrap();
+        assert_eq!(
+            with.tunnels[0].gateway_id.as_deref(),
+            Some("vpn.nordbank.example")
+        );
     }
 
     #[test]

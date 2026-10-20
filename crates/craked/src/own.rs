@@ -283,6 +283,8 @@ impl OwnTunnel {
             auth_args,
             extra_args,
             profile: None,
+            gateway_key_file: None,
+            gateway_id: None,
             managed: None,
             own: Some(self.clone()),
         }
