@@ -167,6 +167,19 @@ The user doesn't want development builds installed on their machine.
   must work) and the next test starts it again; IPv6 inside the tunnel
   (ocserv hands it out, ACME's fd40:1::10 and v6.acme.internal) runs on
   every system.
+  Split-horizon runs everywhere since 2026-10-20: through Cloudflare the
+  gateway is named crake-ci-acme.dorhawk.software (the runner's hosts
+  file points it at cloudflared's local end, ci-through-cloudflare.sh),
+  and ACME's DNS gives packages.dorhawk.software a private address. The
+  DNS-rewrite scenario does each system's version: openvpn3's rewrite of
+  the link (Linux), Crake's /etc/resolver file removed (macOS), its NRPT
+  rule removed (Windows); the last two found craked never checked them
+  (`link_as_set` was always true there).
+  Seen once (CI's Windows, 2026-10-20): Globex's name asked right after
+  it came up beside Initech had no answer; asked again it had. The
+  scenario asks for up to 5 s and prints each miss. If it shows up again,
+  craked's DNS server needs a debug line per question to say why (the
+  new adapter not taking traffic yet is the guess).
   The older chained tests (`e2e_tests.rs` and the rest) still run; their
   checks move into scenarios as the testing-gaps catalogue is worked down.
 - CI (`.github/workflows/ci.yml`, on every push; a new push cancels the

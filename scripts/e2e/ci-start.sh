@@ -29,4 +29,6 @@ for gw in fortinet:4431 gp:4432 f5:4433 juniper:4434; do
   python3 "$server" 0.0.0.0 "${gw##*:}" /etc/ocserv/cert.pem /etc/ocserv/key.pem \
     > "/link/fake-${gw%%:*}.log" 2>&1 &
 done
+# The gateway with groups (8445) and the AnyConnect-only front (8444).
+sh /extras.sh 0.0.0.0
 exec ocserv --foreground --config /etc/ocserv/ocserv.conf

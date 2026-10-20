@@ -99,8 +99,19 @@ impl Resolved {
     /// What another program registered for the device (OpenVPN 3 on Linux).
     /// Its own DNS server holds the tunnels' domains here: nothing else
     /// rewrites them.
-    pub async fn link_as_set(&self, _device: &str, _domains: &[String], _everything: bool) -> bool {
-        true
+    /// Each of the tunnel's domains still has its /etc/resolver file: one
+    /// another program removed (a VPN client clearing the folder) sent
+    /// those names to the network's DNS until the tunnel reconnected
+    /// (found 2026-10-20). Another program's file for a domain is left as
+    /// it is (`set_link`), so it counts as set.
+    pub async fn link_as_set(&self, _device: &str, domains: &[String], _everything: bool) -> bool {
+        if let Self::Noop = self {
+            return true;
+        }
+        domains
+            .iter()
+            .filter(|d| file_name(d))
+            .all(|d| Path::new(DIR).join(d).exists())
     }
 
     /// The domains other programs serve: every network service's DNS in

@@ -85,11 +85,23 @@ impl Resolved {
         write_rule(device, domains, everything)
     }
 
-    /// What another program registered for the device (OpenVPN 3 on Linux).
-    /// Its own DNS server holds the tunnels' domains here: nothing else
-    /// rewrites them.
-    pub async fn link_as_set(&self, _device: &str, _domains: &[String], _everything: bool) -> bool {
-        true
+    /// The link's NRPT rule still names what craked wrote: one another
+    /// program removed or changed (a VPN client cleaning NRPT up, a tool)
+    /// sent the tunnel's names to the usual DNS until it reconnected
+    /// (found 2026-10-20).
+    pub async fn link_as_set(&self, device: &str, domains: &[String], everything: bool) -> bool {
+        if let Self::Noop = self {
+            return true;
+        }
+        let mut want = rule_names(domains, everything);
+        let mut have: Vec<String> = multi_sz(&format!("{POLICY}\\{PREFIX}{device}"), "Name")
+            .split(|&c| c == 0)
+            .map(String::from_utf16_lossy)
+            .filter(|n| !n.is_empty())
+            .collect();
+        want.sort();
+        have.sort();
+        want == have
     }
 
     /// The domains other programs serve: the NRPT rules that aren't
@@ -140,12 +152,7 @@ impl Resolved {
 /// itself and everything under it) to craked's server; with `everything`,
 /// the root (".", every name) too.
 fn write_rule(device: &str, domains: &[String], everything: bool) -> Result<()> {
-    let root = everything.then(|| ".".to_owned());
-    let names: Vec<String> = domains
-        .iter()
-        .flat_map(|d| [d.clone(), format!(".{d}")])
-        .chain(root)
-        .collect();
+    let names = rule_names(domains, everything);
     let server = super::dns_queue::ADDR.to_string();
     let written = (|| {
         let key = Key::create_volatile(Root::LocalMachine, &format!("{POLICY}\\{PREFIX}{device}"))?;
@@ -160,6 +167,17 @@ fn write_rule(device: &str, domains: &[String], everything: bool) -> Result<()> 
         bail!("writing the DNS rule for {device}: {e}");
     }
     Ok(())
+}
+
+/// A rule's namespaces: each domain with and without a leading dot, and
+/// the root with `everything`.
+fn rule_names(domains: &[String], everything: bool) -> Vec<String> {
+    let root = everything.then(|| ".".to_owned());
+    domains
+        .iter()
+        .flat_map(|d| [d.clone(), format!(".{d}")])
+        .chain(root)
+        .collect()
 }
 
 fn delete(path: &str) {

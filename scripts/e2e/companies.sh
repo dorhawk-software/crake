@@ -40,10 +40,14 @@ table ip6 companies6 {
   }
 }
 NFT
+# shop.acme.example and (for CI, whose gateway is named under
+# dorhawk.software) packages.dorhawk.software have public addresses too and
+# private ones here: split-horizon.
 dnsmasq --no-resolv --no-hosts --listen-address=10.40.0.2 --bind-interfaces --pid-file=/run/dnsmasq-acme.pid \
   --address=/git.acme.internal/10.40.1.10 --address=/wiki.acme.internal/10.40.1.11 \
   --address=/portal.acme.example/10.40.1.14 --address=/files.acme.example/10.40.1.15 \
-  --address=/shop.acme.example/10.40.1.16 --address=/v6.acme.internal/fd40:1::10
+  --address=/shop.acme.example/10.40.1.16 --address=/v6.acme.internal/fd40:1::10 \
+  --address=/packages.dorhawk.software/10.40.1.16
 # dup.globex.internal shares an address with ACME's git: one address, two
 # companies, which routing by address can't serve both ways at once.
 dnsmasq --no-resolv --no-hosts --listen-address=10.41.0.2 --bind-interfaces --pid-file=/run/dnsmasq-globex.pid \

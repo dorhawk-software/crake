@@ -133,3 +133,32 @@ pub(crate) fn left_after_stop() -> String {
 /// The system asks for a name's IPv6 addresses only where the network
 /// has IPv6 of its own (macOS' resolver).
 pub(crate) const NAMES_NEED_NETWORK_IPV6: bool = false;
+
+/// Split-horizon's names: one with a public address and a private one in
+/// ACME's DNS, and one with only a public one (the internet's (the gateway is named under dorhawk.software here, scripts/ci-through-cloudflare.sh)).
+pub(crate) const SPLIT: (&str, &str) = ("packages.dorhawk.software", "10.40.1.16");
+pub(crate) const PUBLIC_UNDER_ORG: &str = "dorhawk.software";
+/// The tunnel's NRPT rule, where craked writes it.
+fn nrpt_rule(dev: &str) -> String {
+    format!(
+        r"HKLM:\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters\DnsPolicyConfig\Crake {dev}"
+    )
+}
+
+/// What another program does to the tunnel's DNS: a VPN client cleaning
+/// NRPT up takes Crake's rule for the tunnel.
+pub(crate) fn rewrite_tunnel_dns(dev: &str) -> String {
+    sh(&format!(
+        "Remove-Item -Path '{}' -Recurse -ErrorAction Stop",
+        nrpt_rule(dev)
+    ))
+}
+
+/// Whether the rule is Crake's again, and what it names.
+pub(crate) fn tunnel_dns_is_crakes(dev: &str) -> (bool, String) {
+    let names = sh(&format!(
+        "(Get-ItemProperty -Path '{}' -Name Name -ErrorAction SilentlyContinue).Name",
+        nrpt_rule(dev)
+    ));
+    (names.lines().any(|l| l.trim() == "acme.internal"), names)
+}

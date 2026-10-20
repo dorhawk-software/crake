@@ -62,13 +62,11 @@ pub(crate) enum Gateway {
     /// file with a password) instead of a password.
     AnyConnectCertificate,
     /// AnyConnect behind a front that admits only clients calling
-    /// themselves AnyConnect (7d; scripts/e2e/picky.py, Linux only: it
-    /// would need a Cloudflare hostname of its own).
-    #[cfg(target_os = "linux")]
+    /// themselves AnyConnect (7d; scripts/e2e/picky.py; through Cloudflare
+    /// where its hostname is, crake-ci-picky).
     AnyConnectOnly,
     /// AnyConnect where signing in chooses a group (erin's, Engineering;
-    /// Linux only, as AnyConnectOnly).
-    #[cfg(target_os = "linux")]
+    /// through Cloudflare where its hostname is, crake-ci-groups).
     AnyConnectGroups,
     /// OpenVPN again, signed in as dave: his password, then a code from his
     /// app, asked as a challenge (CR_TEXT; scripts/e2e/sso.py).
@@ -84,7 +82,6 @@ impl Gateway {
     fn names(self) -> (&'static str, &'static str) {
         match self {
             Self::AnyConnect | Self::AnyConnectCertificate => ("acme", "ACME"),
-            #[cfg(target_os = "linux")]
             Self::AnyConnectOnly | Self::AnyConnectGroups => ("acme", "ACME"),
             Self::OpenVpn | Self::OpenVpnCode => ("initech", "Initech"),
             #[cfg(target_os = "linux")]
@@ -102,10 +99,24 @@ impl Gateway {
             | Self::OpenVpn
             | Self::OpenVpnCode
             | Self::Globex => true,
-            #[cfg(target_os = "linux")]
             Self::AnyConnectOnly | Self::AnyConnectGroups => true,
             #[cfg(target_os = "linux")]
             Self::Ipsec => false,
+        }
+    }
+
+    /// Why this system can't reach this kind of gateway, if it can't.
+    fn missing(self) -> Option<&'static str> {
+        match self {
+            Self::AnyConnectOnly if platform::anyconnect_only_gateway().is_none() => Some(
+                "the AnyConnect-only front isn't reachable here (a Cloudflare route for \
+                 crake-ci-picky.dorhawk.software)",
+            ),
+            Self::AnyConnectGroups if platform::anyconnect_groups_gateway().is_none() => Some(
+                "the gateway with groups isn't reachable here (a Cloudflare route for \
+                 crake-ci-groups.dorhawk.software)",
+            ),
+            _ => None,
         }
     }
 
@@ -114,9 +125,7 @@ impl Gateway {
         match self {
             Self::AnyConnect => Some("alice"),
             Self::AnyConnectCertificate => Some(""),
-            #[cfg(target_os = "linux")]
             Self::AnyConnectOnly => Some("alice"),
-            #[cfg(target_os = "linux")]
             Self::AnyConnectGroups => Some("erin"),
             Self::Globex => Some("bob"),
             _ => None,
@@ -127,7 +136,6 @@ impl Gateway {
     fn other(self) -> Self {
         match self {
             Self::AnyConnect | Self::AnyConnectCertificate => Self::OpenVpn,
-            #[cfg(target_os = "linux")]
             Self::AnyConnectOnly | Self::AnyConnectGroups => Self::OpenVpn,
             Self::OpenVpn | Self::OpenVpnCode => Self::AnyConnect,
             #[cfg(target_os = "linux")]
@@ -162,7 +170,6 @@ impl Gateway {
             Self::AnyConnectCertificate | Self::OpenVpnCode | Self::Globex => {
                 panic!("{self:?} is never IT's in these tests")
             }
-            #[cfg(target_os = "linux")]
             Self::AnyConnectOnly | Self::AnyConnectGroups => {
                 panic!("{self:?} is never IT's in these tests")
             }
@@ -186,16 +193,20 @@ impl Gateway {
                 ("sign_in", "certificate".into()),
                 ("certificate", platform::user_certificate()),
             ]),
-            #[cfg(target_os = "linux")]
             Self::AnyConnectGroups => fields.extend([
-                ("gateway", platform::ANYCONNECT_GROUPS.into()),
+                (
+                    "gateway",
+                    platform::anyconnect_groups_gateway().unwrap_or_default(),
+                ),
                 ("protocol", "anyconnect".into()),
                 ("sign_in", "password".into()),
                 ("user", "erin".into()),
             ]),
-            #[cfg(target_os = "linux")]
             Self::AnyConnectOnly => fields.extend([
-                ("gateway", platform::ANYCONNECT_ONLY.into()),
+                (
+                    "gateway",
+                    platform::anyconnect_only_gateway().unwrap_or_default(),
+                ),
                 ("protocol", "anyconnect".into()),
                 ("sign_in", "password".into()),
                 ("user", "alice".into()),
@@ -409,13 +420,11 @@ pub(crate) async fn sign_in(app: &mut App, gateway: Gateway, passwords: &[&str])
                     // The test gateways' certificates are their own: the
                     // window asks whether to trust each.
                     assert!(asked.contains(&"trust"), "{label} asked {asked:?}");
-                    #[cfg(target_os = "linux")]
                     if gateway == Gateway::AnyConnectGroups {
                         assert!(asked.contains(&"group"), "{label} asked {asked:?}");
                     }
                     // Turned away as openconnect, it signed in as AnyConnect,
                     // and craked connects the same way with the session.
-                    #[cfg(target_os = "linux")]
                     if gateway == Gateway::AnyConnectOnly {
                         assert_eq!(s.user_agent.as_deref(), Some("AnyConnect"), "{label}");
                     }
@@ -492,6 +501,10 @@ async fn remove_tunnels(app: &mut App) {
 /// One scenario against a tunnel that's up through `gateway`.
 async fn run(gateway: Gateway, scenario: impl AsyncFnOnce(&mut Up)) {
     if !enabled() {
+        return;
+    }
+    if let Some(why) = gateway.missing() {
+        not_here(why);
         return;
     }
     let mut up = Up::start(gateway).await;
@@ -592,7 +605,6 @@ scenarios!(
     [sign_in::new_tunnel_finds_the_gateway_and_its_certificate]
 );
 // A gateway that admits only AnyConnect: signed in again as AnyConnect.
-#[cfg(target_os = "linux")]
 scenarios!(
     anyconnect_only,
     super::Gateway::AnyConnectOnly,
@@ -603,7 +615,6 @@ scenarios!(
     ]
 );
 // A gateway whose sign-in asks the group.
-#[cfg(target_os = "linux")]
 scenarios!(
     anyconnect_groups,
     super::Gateway::AnyConnectGroups,
@@ -612,22 +623,6 @@ scenarios!(
         sign_in::switching_on_again_uses_what_was_kept,
     ]
 );
-#[cfg(not(target_os = "linux"))]
-#[test]
-fn anyconnect_groups() {
-    not_here(
-        "a gateway with groups is a second ocserv on the e2e gateway; through Cloudflare it \
-         would need a hostname of its own",
-    );
-}
-#[cfg(not(target_os = "linux"))]
-#[test]
-fn anyconnect_only() {
-    not_here(
-        "a gateway that admits only AnyConnect is a front on the e2e gateway; through \
-         Cloudflare it would need a hostname of its own",
-    );
-}
 // OpenVPN with a code after the password (a challenge).
 scenarios!(
     openvpn_code,

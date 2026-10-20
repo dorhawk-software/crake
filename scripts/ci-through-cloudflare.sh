@@ -22,6 +22,9 @@ OPENVPN_HOST=crake-ci-openvpn.dorhawk.software
 # port the gateways job publishes it on.
 SSO_HOST=crake-ci-sso.dorhawk.software
 FAKE_HOSTS="crake-ci-fortinet:4431 crake-ci-gp:4432 crake-ci-f5:4433 crake-ci-pulse:4434"
+# ACME behind a front that admits only AnyConnect, and with groups.
+PICKY_HOST=crake-ci-picky.dorhawk.software
+GROUPS_HOST=crake-ci-groups.dorhawk.software
 # How long the tunnel gets to carry the gateways once they're up (5 s a
 # try), and the gateways job, queued behind other runs', to be up at all
 # (10 s a try: an hour).
@@ -51,6 +54,8 @@ access() {
 access "$ANYCONNECT_HOST" 8443
 access "$OPENVPN_HOST" 1194
 access "$SSO_HOST" 8080
+access "$PICKY_HOST" 8444
+access "$GROUPS_HOST" 8445
 for fake in $FAKE_HOSTS; do
   access "${fake%%:*}.dorhawk.software" "${fake##*:}"
 done
@@ -101,10 +106,24 @@ done
 SSO= FAKES=
 curl -s -o /dev/null --max-time 20 http://127.0.0.1:8080/ && SSO=127.0.0.1:8080
 curl -sk -o /dev/null --max-time 20 https://127.0.0.1:4431/ && FAKES=127.0.0.1
-echo "browser sign-in page: ${SSO:-not reached}; fake servers: ${FAKES:-not reached}"
 FILTER=${CRAKE_GATEWAY_FILTER:-scenarios gateway_tests ${SYSTEM}_journey e2e_protocols::each_protocols_sign_in}
 DOCTOR="CRAKE_DOCTOR_TUNNEL=${CRAKE_DOCTOR_TUNNEL:-} CRAKE_DOCTOR_MINUTES=${CRAKE_DOCTOR_MINUTES:-} CRAKE_DOCTOR_PHASE=${CRAKE_DOCTOR_PHASE:-}"
 [ -n "${CRAKE_DOCTOR_PHASE:-}" ] || DOCTOR=
+# The gateways by a name under dorhawk.software (this runner's hosts file
+# points it at cloudflared's local end), as a company's gateway is named:
+# ACME's organisation domain is then dorhawk.software, and split-horizon
+# asks ACME's DNS about public names under it (the scenario suite).
+GW_NAME=crake-ci-acme.dorhawk.software
+if [ "$SYSTEM" = macos ]; then
+  echo "127.0.0.1 $GW_NAME" | sudo tee -a /etc/hosts >/dev/null
+else
+  powershell -NoProfile -Command "Add-Content -Path \"\$env:SystemRoot\\System32\\drivers\\etc\\hosts\" -Value '127.0.0.1 $GW_NAME'"
+fi
+PICKY_GW= GROUPS_GW=
+curl -sk -o /dev/null --max-time 20 https://127.0.0.1:8444/ && PICKY_GW="https://$GW_NAME:8444"
+curl -sk -o /dev/null --max-time 20 https://127.0.0.1:8445/ && GROUPS_GW="https://$GW_NAME:8445"
+echo "browser sign-in page: ${SSO:-not reached}; fake servers: ${FAKES:-not reached}"
+echo "AnyConnect-only front: ${PICKY_GW:-not reached}; groups: ${GROUPS_GW:-not reached}"
 status=0
 if [ "$SYSTEM" = macos ]; then
   cargo build -q --workspace --locked --bin crake-hook --bin craked
@@ -112,16 +131,18 @@ if [ "$SYSTEM" = macos ]; then
   BIN=$(cargo test --workspace --locked --no-run --message-format=json 2>/dev/null |
     jq -r 'select(.executable != null and .target.name == "crake" and .profile.test) | .executable' | head -n1)
   [ -n "$BIN" ] || { echo "could not build the tests" >&2; exit 1; }
-  sudo env CRAKE_E2E=1 CRAKE_E2E_GATEWAY=https://127.0.0.1:8443 \
+  sudo env CRAKE_E2E=1 CRAKE_E2E_GATEWAY="https://$GW_NAME:8443" \
     CRAKE_GATEWAY_SSO="$SSO" CRAKE_FAKE_GATEWAY="$FAKES" \
-    CRAKE_GATEWAY_OPENVPN="127.0.0.1 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
+    CRAKE_GATEWAY_OPENVPN="$GW_NAME 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
     CRAKE_GATEWAY_USER_CERT="$WORK/ready/acme-user.p12" \
+    ${PICKY_GW:+CRAKE_GATEWAY_PICKY=$PICKY_GW} ${GROUPS_GW:+CRAKE_GATEWAY_GROUPS=$GROUPS_GW} \
     CRAKE_E2E_HOOK="$HOOK" CRAKE_E2E_CRAKED="$PWD/target/debug/craked" $DOCTOR \
     "$BIN" $FILTER --test-threads=1 --nocapture || status=$?
 else
-  CRAKE_E2E=1 CRAKE_E2E_GATEWAY=https://127.0.0.1:8443 \
+  env ${PICKY_GW:+CRAKE_GATEWAY_PICKY=$PICKY_GW} ${GROUPS_GW:+CRAKE_GATEWAY_GROUPS=$GROUPS_GW} \
+  CRAKE_E2E=1 CRAKE_E2E_GATEWAY="https://$GW_NAME:8443" \
     CRAKE_GATEWAY_SSO="$SSO" CRAKE_FAKE_GATEWAY="$FAKES" \
-    CRAKE_GATEWAY_OPENVPN="127.0.0.1 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
+    CRAKE_GATEWAY_OPENVPN="$GW_NAME 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
     CRAKE_GATEWAY_USER_CERT="$WORK/ready/acme-user.p12" \
     CRAKE_OPENCONNECT="C:/Program Files/Crake/openconnect/openconnect.exe" \
     CRAKE_INSTALLER="$2" \

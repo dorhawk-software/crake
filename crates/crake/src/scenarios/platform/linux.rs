@@ -25,9 +25,14 @@ const PUBLIC_DNS_LOG: &str = "/mnt/link/public-dns.log";
 const GATEWAY_NAME: &str = "vpn.acme.example";
 /// ACME's AnyConnect gateway behind a front that admits only clients
 /// calling themselves AnyConnect (scripts/e2e/picky.py).
-pub(crate) const ANYCONNECT_ONLY: &str = "https://vpn.acme.example:8444";
+pub(crate) fn anyconnect_only_gateway() -> Option<String> {
+    Some(format!("https://{GATEWAY_NAME}:8444"))
+}
+
 /// ACME's AnyConnect gateway with groups to choose from (its own ocserv).
-pub(crate) const ANYCONNECT_GROUPS: &str = "https://vpn.acme.example:8445";
+pub(crate) fn anyconnect_groups_gateway() -> Option<String> {
+    Some(format!("https://{GATEWAY_NAME}:8445"))
+}
 /// IPsec's gateway.
 pub(crate) const IPSEC_GATEWAY: &str = GATEWAY_NAME;
 
@@ -171,3 +176,27 @@ pub(crate) fn network_has_ipv6() -> bool {
 /// The system asks for a name's IPv6 addresses only where the network
 /// has IPv6 of its own (macOS' resolver).
 pub(crate) const NAMES_NEED_NETWORK_IPV6: bool = false;
+
+/// Split-horizon's names: one with a public address and a private one in
+/// ACME's DNS, and one with only a public one (the public DNS stand-in's).
+pub(crate) const SPLIT: (&str, &str) = ("shop.acme.example", "10.40.1.16");
+pub(crate) const PUBLIC_UNDER_ORG: &str = "www.acme.example";
+/// What another program does to the tunnel's DNS: openvpn3's reconnect
+/// makes its link every name's DNS ("~." and the default route).
+pub(crate) fn rewrite_tunnel_dns(dev: &str) -> String {
+    sh(&format!(
+        "resolvectl domain {dev} '~.' acme.internal && resolvectl default-route {dev} yes"
+    ))
+}
+
+/// Whether the tunnel's link is Crake's again (routing-only, its domain),
+/// and what resolved says.
+pub(crate) fn tunnel_dns_is_crakes(dev: &str) -> (bool, String) {
+    let link = sh(&format!("resolvectl status {dev}"));
+    // "Default Route: no", or (older resolvectl) "-DefaultRoute".
+    let back = !link.contains("Default Route: yes")
+        && !link.contains("+DefaultRoute")
+        && link.contains("~acme.internal")
+        && !link.contains("~.");
+    (back, link)
+}

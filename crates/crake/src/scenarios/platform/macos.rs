@@ -137,3 +137,19 @@ pub(crate) fn network_has_ipv6() -> bool {
 /// The system asks for a name's IPv6 addresses only where the network
 /// has IPv6 of its own (macOS' resolver).
 pub(crate) const NAMES_NEED_NETWORK_IPV6: bool = true;
+
+/// Split-horizon's names: one with a public address and a private one in
+/// ACME's DNS, and one with only a public one (the internet's (the gateway is named under dorhawk.software here, scripts/ci-through-cloudflare.sh)).
+pub(crate) const SPLIT: (&str, &str) = ("packages.dorhawk.software", "10.40.1.16");
+pub(crate) const PUBLIC_UNDER_ORG: &str = "dorhawk.software";
+/// What another program does to the tunnel's DNS: a VPN client clearing
+/// /etc/resolver takes Crake's file for ACME's domain.
+pub(crate) fn rewrite_tunnel_dns(_dev: &str) -> String {
+    sh("rm /etc/resolver/acme.internal")
+}
+
+/// Whether the file is Crake's again, and what's there.
+pub(crate) fn tunnel_dns_is_crakes(dev: &str) -> (bool, String) {
+    let file = sh("cat /etc/resolver/acme.internal 2>&1");
+    (file.contains(&format!("Written by Crake for {dev}")), file)
+}

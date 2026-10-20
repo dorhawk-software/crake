@@ -57,5 +57,5 @@ RUN sed -i '/^default-domain/d' /etc/ocserv/ocserv.conf \
 COPY openvpn.conf /etc/openvpn/e2e/server.conf
 COPY ipsec.conf /etc/swanctl/conf.d/acme.conf
 COPY strongswan.conf /etc/strongswan.d/crake-e2e.conf
-COPY start.sh ci-start.sh companies.sh client.sh relay.py sso.py picky.py /
+COPY start.sh ci-start.sh companies.sh extras.sh client.sh relay.py sso.py picky.py /
 CMD ["/bin/sh", "/start.sh"]

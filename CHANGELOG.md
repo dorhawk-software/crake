@@ -29,6 +29,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
   service hands the tunnels to the new one, as the Linux and macOS packages do: they come back on
   their own, with what they had learned.
 
+- **Crake's DNS rules come back on Windows and macOS.** If another program removed the rule that
+  sends a company's names to its tunnel (Windows' name resolution policy, or macOS' /etc/resolver
+  file), those names went to the network's DNS until the tunnel reconnected. Crake now notices
+  within moments and puts its rule back, as it already did on Linux.
+
 - **Moving a tunnel to TCP is tried twice.** On a network that blocks UDP, Crake moves the tunnel
   over to TCP on the same sign-in. If the gateway wasn't done with the old connection yet, the move
   failed and the tunnel said it stopped unexpectedly. Crake now tries it once more, a moment later.

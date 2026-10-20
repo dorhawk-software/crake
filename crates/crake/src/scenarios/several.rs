@@ -99,7 +99,15 @@ pub(crate) async fn two_companies_each_through_their_own(up: &mut Up) {
     );
     assert_eq!(way(at), up.device, "{wiki} through {}", up.label);
     let (git, git_at) = ("git.globex.internal", GLOBEX_GIT);
-    let found = look_up(git).await;
+    let mut found = look_up(git).await;
+    // Asked within a second of Globex coming up, Windows once had no
+    // answer (CI, 2026-10-20; docs/engineering/testing.md): said, not hidden.
+    let end = Instant::now() + Duration::from_secs(5);
+    while !found.iter().any(|a| a.to_string() == git_at) && Instant::now() < end {
+        println!("{git}: no answer yet ({found:?}), asking again");
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        found = look_up(git).await;
+    }
     assert!(
         found.iter().any(|a| a.to_string() == git_at),
         "{git}: {found:?}\n{}",

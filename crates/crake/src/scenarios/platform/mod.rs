@@ -42,6 +42,18 @@ pub(crate) fn user_certificate() -> String {
     }
 }
 
+/// ACME's AnyConnect-only front and its gateway with groups, through
+/// Cloudflare where CI reaches them (scripts/ci-through-cloudflare.sh).
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn anyconnect_only_gateway() -> Option<String> {
+    std::env::var("CRAKE_GATEWAY_PICKY").ok()
+}
+
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn anyconnect_groups_gateway() -> Option<String> {
+    std::env::var("CRAKE_GATEWAY_GROUPS").ok()
+}
+
 /// Whether ACME's DNS answers `name` with `at` when asked directly (over
 /// TCP), as a check that a block on it took.
 #[cfg(unix)]

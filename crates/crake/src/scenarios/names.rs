@@ -14,45 +14,35 @@ const NEVER_ASKED: &str = "new.acme.internal";
 /// asks every 30 s and calls two silences in a row an outage.
 const NOTICED: Duration = Duration::from_secs(150);
 
-/// A name under ACME's own domain (the gateway's, acme.example) that
-/// public DNS gives a public address and ACME's DNS a private one: the
-/// private one goes through the tunnel and is the answer the app gets
-/// (a company's portal that resets everyone outside it). A public name
-/// ACME's DNS has nothing else for keeps its public answer.
-#[cfg(target_os = "linux")]
+/// A name under ACME's own domain (its gateway's: acme.example on Linux,
+/// dorhawk.software through Cloudflare) that public DNS gives a public
+/// address and ACME's DNS a private one: the private one goes through the
+/// tunnel and is the answer the app gets (a company's portal that resets
+/// everyone outside it). A public name ACME's DNS has nothing else for
+/// keeps its public answer.
 pub(crate) async fn a_public_name_with_a_private_address_goes_through(up: &mut Up) {
-    let (name, at) = ("shop.acme.example", "10.40.1.16");
+    let (name, at) = platform::SPLIT;
     let found = look_up(name).await;
-    assert!(
-        found.iter().map(ToString::to_string).eq([at.to_owned()]),
-        "{name}: {found:?}\n{}",
-        platform::diagnose(&up.device)
-    );
+    if !found.iter().map(ToString::to_string).eq([at.to_owned()]) {
+        up.app.settle(Duration::from_secs(1)).await;
+        panic!(
+            "{name}: {found:?}\n{}\n{}\ncraked said:\n{}",
+            platform::name_diagnosis(name),
+            platform::diagnose(&up.device),
+            up.said()
+        );
+    }
     assert_eq!(
         platform::way(at),
         up.device,
         "{at}'s way, before any connection"
     );
     assert!(platform::answers(at).await, "{name} at {at}");
-    let (public, public_at) = (
-        "www.acme.example",
-        platform::PUBLIC.split(':').next().unwrap(),
-    );
+    let public = platform::PUBLIC_UNDER_ORG;
     let found = look_up(public).await;
     assert!(
-        found
-            .iter()
-            .map(ToString::to_string)
-            .eq([public_at.to_owned()]),
+        !found.is_empty() && found.iter().all(|a| !a.is_private()),
         "{public}: {found:?}"
-    );
-}
-
-#[cfg(not(target_os = "linux"))]
-pub(crate) async fn a_public_name_with_a_private_address_goes_through(_up: &mut Up) {
-    super::not_here(
-        "split-horizon needs the gateway reached by its name and a public DNS the test \
-         controls; through Cloudflare the gateway is 127.0.0.1 and public DNS is the internet's",
     );
 }
 
@@ -121,36 +111,33 @@ pub(crate) async fn a_tunnel_dns_that_stops_answering_is_stood_in_for(up: &mut U
         .await;
 }
 
-/// Another program makes the tunnel's link every name's DNS (openvpn3
-/// does on a reconnect: "~." and the default route, so every name went to
-/// the company): craked puts its routing-only setup back within moments.
-#[cfg(target_os = "linux")]
+/// Another program rewrites the tunnel's DNS setup (openvpn3 on Linux makes
+/// its link every name's DNS on a reconnect; a VPN client clears macOS'
+/// /etc/resolver or Windows' NRPT rules): craked puts its own back within
+/// moments, and the tunnel's names work.
 pub(crate) async fn another_programs_dns_change_is_put_back(up: &mut Up) {
     let dev = up.device.clone();
-    let out = platform::sh(&format!(
-        "resolvectl domain {dev} '~.' acme.internal && resolvectl default-route {dev} yes"
-    ));
-    assert!(out.trim().is_empty(), "rewriting {dev}: {out}");
+    let out = platform::rewrite_tunnel_dns(&dev);
+    assert!(out.trim().is_empty(), "rewriting {dev}'s DNS: {out}");
     let end = std::time::Instant::now() + Duration::from_secs(5);
     loop {
-        let link = platform::sh(&format!("resolvectl status {dev}"));
-        // resolvectl says "Default Route: no", or (older) "-DefaultRoute".
-        let back = !link.contains("Default Route: yes")
-            && !link.contains("+DefaultRoute")
-            && link.contains("~acme.internal")
-            && !link.contains("~.");
+        let (back, how) = platform::tunnel_dns_is_crakes(&dev);
         if back {
             break;
         }
         assert!(
             std::time::Instant::now() < end,
-            "{dev} not put back:\n{link}"
+            "{dev}'s DNS not put back:\n{how}"
         );
         tokio::time::sleep(Duration::from_millis(200)).await;
     }
-}
-
-#[cfg(not(target_os = "linux"))]
-pub(crate) async fn another_programs_dns_change_is_put_back(_up: &mut Up) {
-    super::not_here("only Linux's systemd-resolved has per-link DNS another program rewrites");
+    let (name, at) = WIKI;
+    let end = std::time::Instant::now() + WAIT;
+    while !look_up(name).await.iter().any(|a| a.to_string() == at) {
+        assert!(
+            std::time::Instant::now() < end,
+            "{name} after its DNS was put back"
+        );
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 }
