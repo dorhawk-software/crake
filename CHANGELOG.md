@@ -13,6 +13,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## 0.13.0 (2026-10-20)
 
+- **A certificate check fixed in a library Crake carries.** rustls-webpki, part of the window
+  toolkit's web client, could accept a certificate chain through intermediates that are no longer
+  trusted (RUSTSEC-2026-0382); updated to 0.103.16. Crake itself doesn't fetch anything through it
+  (its update check uses your system's curl), and your tunnels' TLS is openconnect's and OpenVPN's.
+
 - **Signing in through the browser works for AnyConnect and other openconnect gateways.** Crake
   handed openconnect the browser's name without its folder, and openconnect doesn't look for it, so
   the browser never opened on Linux or macOS and the sign-in waited forever. It's found where your
