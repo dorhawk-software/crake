@@ -135,6 +135,24 @@ pub(crate) async fn sign_in() -> crake_proto::Session {
 
 /// The same at another gateway (the Windows test's second, on 8443).
 pub(crate) async fn sign_in_to(gateway: &str) -> crake_proto::Session {
+    let (session, asked) = sign_in_answering(gateway, &["hunter2"])
+        .await
+        .unwrap_or_else(|(asked, said)| panic!("refused after {asked:?}: {said:?}"));
+    assert_eq!(asked, ["trust", "password"], "what the window asked");
+    session
+}
+
+/// What the window asked ("trust", "user", "password"), in order.
+pub(crate) type Asked = Vec<&'static str>;
+
+/// The sign-in window's part at `gateway`, giving `passwords` in turn.
+/// The session and what the window asked; or, asked for a password once
+/// more than there are (refused), the sign-in cancelled, with what was
+/// asked and the gateway's words with the last question.
+pub(crate) async fn sign_in_answering(
+    gateway: &str,
+    passwords: &[&str],
+) -> Result<(crake_proto::Session, Asked), (Asked, Option<String>)> {
     let spec = Spec {
         tunnel: "acme".into(),
         display: "ACME".into(),
@@ -150,6 +168,7 @@ pub(crate) async fn sign_in_to(gateway: &str) -> crake_proto::Session {
     let (tx, events) = async_channel::unbounded();
     let replies = signin::start(spec, tx);
     let mut asked = Vec::new();
+    let mut passwords = passwords.iter();
     loop {
         let event = tokio::time::timeout(Duration::from_secs(20), events.recv())
             .await
@@ -157,11 +176,8 @@ pub(crate) async fn sign_in_to(gateway: &str) -> crake_proto::Session {
             .expect("sign-in ended");
         let answer = match event {
             Event::Reached | Event::Attached(..) | Event::Browser(_) => continue,
-            Event::Done(session) => {
-                assert_eq!(asked, ["trust", "password"], "what the window asked");
-                return session;
-            }
-            Event::Failed(why) => panic!("sign-in failed: {why}"),
+            Event::Done(session) => return Ok((session, asked)),
+            Event::Failed(why) => panic!("sign-in failed: {why} (asked {asked:?})"),
             Event::Prompt(p) => match p.ask {
                 Ask::TrustServer { fingerprint } => {
                     assert!(fingerprint.is_some(), "the window shows the fingerprint");
@@ -170,7 +186,16 @@ pub(crate) async fn sign_in_to(gateway: &str) -> crake_proto::Session {
                 }
                 Ask::Secret => {
                     asked.push("password");
-                    "hunter2"
+                    let Some(password) = passwords.next() else {
+                        replies.send(Reply::Cancel).await.unwrap();
+                        return Err((asked, p.words));
+                    };
+                    password
+                }
+                // Asked again, openconnect may ask the username too.
+                Ask::Text if p.label.to_lowercase().contains("user") => {
+                    asked.push("user");
+                    "alice"
                 }
                 other => panic!("unexpected question {other:?} ({})", p.label),
             },
