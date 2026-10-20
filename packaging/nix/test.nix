@@ -231,8 +231,9 @@ in {
         """craked's question about a tunnel's sign-in, answered as the
         app's sign-in window does (D-Bus Asking and Answer)."""
         out = client.wait_until_succeeds(call + f"Asking s {tunnel} | grep '\"kind\" \"{kind}\"'", timeout=30)
-        asked = re.search(r'"id" "(\d+)"', out).group(1)
-        client.succeed(call + f"Answer sus {tunnel} {asked} {text}")
+        asked = re.search(r'"id" "(\d+)"', out)
+        assert asked, f"no question's id in {out}"
+        client.succeed(call + f"Answer sus {tunnel} {asked.group(1)} {text}")
 
     with subtest("an OpenVPN tunnel, its password asked over D-Bus"):
         gateway.wait_for_unit("acme-openvpn-sign-in.service")
