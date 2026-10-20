@@ -81,7 +81,13 @@ pub(crate) async fn asking_first_sends_a_host_only_when_told(up: &mut Up) {
     up.app
         .send(Command::AddHosts(up.name.into(), vec![GIT.into()]));
     until_through(up, GIT).await;
-    assert!(answers(GIT).await, "{GIT} once sent");
+    // Right after the unanswered tries, Windows' first one through the new
+    // route once got no answer (CI, 2026-10-20): said, and asked again.
+    let end = Instant::now() + Duration::from_secs(10);
+    while !answers(GIT).await {
+        assert!(Instant::now() < end, "{GIT} once sent");
+        println!("{GIT}: no answer yet through {}, trying again", up.label);
+    }
 }
 
 /// "Only what I list": a listed host and a listed name go through, by
