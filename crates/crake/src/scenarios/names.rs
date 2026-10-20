@@ -73,11 +73,10 @@ pub(crate) async fn a_tunnel_dns_that_stops_answering_is_stood_in_for(up: &mut U
             m.log.iter().any(|e| e.message == said)
         })
         .await;
-    up.app
-        .until("the panel says it", |m| {
-            m.tunnels.iter().any(|t| t.name == tunnel && t.dns_down)
-        })
-        .await;
+    up.wait_for("the panel say its DNS doesn't answer", |m| {
+        m.tunnels.iter().any(|t| t.name == tunnel && t.dns_down)
+    })
+    .await;
     // Asked afresh, as after the system's cache let it go: noticed within
     // seconds, the system could still answer from its own cache (CI's Mac).
     platform::flush_dns_cache();

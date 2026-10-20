@@ -115,7 +115,9 @@ pub(crate) async fn two_companies_each_through_their_own(up: &mut Up) {
     );
     assert_eq!(way(git_at), globex, "{git} through Globex");
     assert!(platform::answers(git_at).await, "{git} at {git_at}");
-    assert!(reached(ACME_GIT).await, "{ACME_GIT} probed");
+    if !reached(ACME_GIT).await {
+        up.fail(&format!("{ACME_GIT} probed")).await;
+    }
     assert_eq!(way(ACME_GIT), up.device, "{ACME_GIT} through {}", up.label);
     let public = platform::PUBLIC.split(':').next().unwrap();
     let out = way(public);
@@ -126,7 +128,9 @@ pub(crate) async fn two_companies_each_through_their_own(up: &mut Up) {
 /// the log says the other answers for it too, and "Use Globex" moves it.
 pub(crate) async fn a_host_both_answer_for_can_be_moved(up: &mut Up) {
     let globex = globex_beside(up).await;
-    assert!(reached(SHARED).await, "{SHARED} probed");
+    if !reached(SHARED).await {
+        up.fail(&format!("{SHARED} probed")).await;
+    }
     assert_eq!(way(SHARED), up.device, "{SHARED}: the first in order");
     let too = format!("Globex answers for {SHARED} too.");
     up.app
@@ -158,7 +162,9 @@ pub(crate) async fn a_host_both_answer_for_can_be_moved(up: &mut Up) {
 /// it stays there, and craked says the name can't go through Globex.
 pub(crate) async fn one_address_goes_through_one_tunnel(up: &mut Up) {
     let _globex = globex_beside(up).await;
-    assert!(reached(ACME_GIT).await, "{ACME_GIT} probed");
+    if !reached(ACME_GIT).await {
+        up.fail(&format!("{ACME_GIT} probed")).await;
+    }
     assert_eq!(way(ACME_GIT), up.device, "{ACME_GIT} through {}", up.label);
     let dup = "dup.globex.internal";
     let _ = look_up(dup).await;
@@ -182,7 +188,9 @@ pub(crate) async fn one_address_goes_through_one_tunnel(up: &mut Up) {
 /// that reaches it takes it (what an off tunnel learned routes nothing).
 pub(crate) async fn a_host_learned_by_a_tunnel_thats_off_goes_through_another(up: &mut Up) {
     let globex = globex_beside(up).await;
-    assert!(reached(SHARED).await, "{SHARED} probed");
+    if !reached(SHARED).await {
+        up.fail(&format!("{SHARED} probed")).await;
+    }
     assert_eq!(way(SHARED), up.device, "{SHARED}: the first in order");
     up.off().await;
     assert!(
