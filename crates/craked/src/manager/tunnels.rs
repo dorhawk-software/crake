@@ -140,6 +140,8 @@ impl Manager {
 
     /// Stop every running tunnel and wait for them to finish (daemon shutdown).
     pub async fn shutdown(&self) {
+        self.stopping
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         self.traffic
             .save(&self.cfg.state_path.with_file_name("traffic.json"));
         crate::conntrack::connections_idle(true);

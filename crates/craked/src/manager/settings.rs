@@ -120,6 +120,10 @@ impl Manager {
     }
 
     async fn apply_hush(&self, domains: Vec<String>) {
+        // Stopping: what's here goes with craked (`shutdown`), nothing new.
+        if self.stopping.load(std::sync::atomic::Ordering::SeqCst) {
+            return;
+        }
         let _hush = self.hush.lock().await;
         if domains.is_empty() {
             self.resolved.revert(crate::hush::DEVICE).await;
@@ -172,11 +176,19 @@ impl Manager {
         {
             // Tried again at the next look: until 2026-10-20 it counted as
             // done, and the names stayed unhidden (Ubuntu 22.04's resolved,
-            // CI's VM, not yet knowing a link just made).
-            tracing::error!("keeping internal names private: {e:#}");
+            // CI's VM, not yet knowing a link just made). Said once.
+            if !self
+                .hush_link_failing
+                .swap(true, std::sync::atomic::Ordering::SeqCst)
+            {
+                tracing::error!("keeping internal names private: {e:#}");
+            }
             *self.hush_last.lock().unwrap() = None;
+            self.hush_trouble(None);
             return;
         }
+        self.hush_link_failing
+            .store(false, std::sync::atomic::Ordering::SeqCst);
         self.resolved.flush().await;
         *self.hush_last.lock().unwrap() = Some(domains);
         self.hush_trouble(None);

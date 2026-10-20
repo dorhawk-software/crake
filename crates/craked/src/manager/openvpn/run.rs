@@ -348,8 +348,16 @@ impl Manager {
     }
 
     fn keep_token(&self, name: &str, token: Option<openvpn::Token>) {
-        if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
+        let changed = self.tunnels.lock().unwrap().get_mut(name).is_some_and(|e| {
+            let had = e.token.is_some();
             e.token = token;
+            had != e.token.is_some()
+        });
+        // The app shows whether a sign-in is kept (ListTunnels signed_in):
+        // until 2026-10-20 it learned of the token only at the next change
+        // of state (CI's Windows).
+        if changed {
+            let _ = self.changes.send(name.to_owned());
         }
     }
 }

@@ -118,6 +118,11 @@ pub struct Manager {
     hush: tokio::sync::Mutex<()>,
     /// The answerer has its socket (it clears this if the socket fails).
     hush_serving: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// resolved refused the hush link's domains last time (said once,
+    /// tried again at each look).
+    hush_link_failing: std::sync::atomic::AtomicBool,
+    /// craked is stopping: nothing of its is set up again meanwhile.
+    stopping: std::sync::atomic::AtomicBool,
     /// Why names aren't kept private now (Settings shows it); None if they are.
     hush_trouble: Mutex<Option<String>>,
     /// The domains kept private last (`refresh_hush` changes them only
@@ -302,6 +307,8 @@ impl Manager {
             settings: Mutex::new(settings),
             hush: tokio::sync::Mutex::new(()),
             hush_serving: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            hush_link_failing: std::sync::atomic::AtomicBool::new(false),
+            stopping: std::sync::atomic::AtomicBool::new(false),
             hush_trouble: Mutex::new(None),
             hush_last: Mutex::new(None),
             dns_down: Mutex::new(HashMap::new()),
