@@ -438,9 +438,13 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   an IPv6-only name came back empty); Windows' tunnel default route
   (metric 9000) is taken by all IPv6 there instead. Fixing it on Linux means a main-table route of
   Crake's (e.g. IPv6 default via the tunnel, unmarked packets refused),
-  which goes against "no routes but the DNS's": the user's decision. The
-  e2e network has IPv6 (as most do); the probe scenario says `not_here`
-  where the runner's network has none.
+  which goes against "no routes but the DNS's". **Decided with the user
+  (2026-10-20): left as it is** (IPv6-only internal hosts are rare;
+  dual-stack names work). If a real gateway shows one: a lowest-priority
+  IPv6 default route into the tunnel only while the network has no IPv6
+  of its own, with anything unmarked refused at once. The e2e network has
+  IPv6 (as most do); the probe scenario says `not_here` where the
+  runner's network has none.
 - **Windows on ARM64 (planned with the user, 2026-10-20).** The user's
   coming Apple Silicon Mac runs Windows 11 for ARM in a VM, which runs
   x64 programs emulated but never x64 drivers, and Crake for Windows is

@@ -77,7 +77,10 @@ impl Manager {
                 // as some company DNS servers do): "no such record", never
                 // the public "no such name", which made Windows drop the
                 // name's A answer too (CI's Windows, 2026-10-20).
-                if let Some(other) = other_family(failure.qtype)
+                // Not for "no such name": the name isn't there either, and
+                // unknown names are the common case.
+                if reply.metadata.response_code != ResponseCode::NXDomain
+                    && let Some(other) = other_family(failure.qtype)
                     && ask(&device, &servers, &failure.name, other)
                         .await
                         .is_some_and(|r| !dns::records(&r).is_empty())
