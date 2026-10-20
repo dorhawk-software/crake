@@ -34,8 +34,9 @@ mkdir -p shim/sec_api
 echo '#include <stdlib.h>' > shim/sec_api/stdlib_s.h
 # openconnect's config.guess predates MSYS2's ARM64 environments: named.
 ./configure --build=aarch64-w64-mingw32 --host=aarch64-w64-mingw32 CC=clang CPPFLAGS="-I$PWD/shim $LENIENT" --disable-nls --without-libpskc --without-stoken --without-libproxy --without-lz4 \
-  --with-vpnc-script=crake-hook.js >/dev/null
-make -j"$(nproc)" >/dev/null
+  --with-vpnc-script=crake-hook.js > configure.out 2>&1 || { tail -40 configure.out; exit 1; }
+# Its output kept, and its end said when it fails (CI's only view of it).
+make -j"$(nproc)" > make.out 2>&1 || { grep -E "error|Error|undefined" make.out | head -40; tail -40 make.out; exit 1; }
 # libtool leaves a shared build in .libs and a static one beside the
 # sources (natively in MSYS2 it linked statically; cross-built, shared).
 if [ -f .libs/openconnect.exe ]; then
