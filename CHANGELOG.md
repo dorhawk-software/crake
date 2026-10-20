@@ -24,10 +24,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
   folder (ProgramData\Crake\managed.d on Windows) were read only when a craked.toml was there too,
   which Windows' and macOS' installers don't make, so they never showed up. They do now.
 
-- **Updating Crake on Windows keeps your tunnels signed in.** Installing a newer Crake stopped its
-  service the plain way, which signed every tunnel out; you had to sign in again. Now the old
-  service hands the tunnels to the new one, as the Linux and macOS packages do: they come back on
-  their own, with what they had learned.
+- **Updating Crake on Windows keeps your tunnels signed in, from this version on.** Installing a
+  newer Crake stopped its service the plain way, which signed every tunnel out; you had to sign in
+  again. From now on the old service hands the tunnels to the new one, as the Linux and macOS
+  packages do: they come back on their own, with what they had learned. The update to this
+  version still signs you out once, since it's the older service that stops.
 
 - **Names only your company knows work on Windows with IPv6 about.** When a company's DNS
   answered a name's IPv4 address but refused its IPv6 one, Crake passed on the internet's "no such
