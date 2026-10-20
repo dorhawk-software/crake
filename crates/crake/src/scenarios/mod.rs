@@ -31,6 +31,7 @@ use crate::test_app::{App, enabled, sign_in_with};
 mod checks;
 mod hosts;
 mod managed;
+mod modes;
 mod names;
 mod platform;
 mod settings;
@@ -510,6 +511,7 @@ macro_rules! every_scenario {
                 checks::stopping_craked_leaves_nothing,
                 names::a_public_name_with_a_private_address_goes_through,
                 names::a_tunnel_dns_that_stops_answering_is_stood_in_for,
+                names::another_programs_dns_change_is_put_back,
                 hosts::undo_sends_a_host_direct_and_redo_brings_it_back,
                 hosts::a_host_added_by_hand_goes_through,
                 hosts::a_name_added_by_hand_goes_through,
@@ -518,6 +520,8 @@ macro_rules! every_scenario {
                 hosts::forget_all_keeps_the_pins,
                 hosts::the_never_list_keeps_a_host_direct,
                 hosts::tunnel_detail_lists_what_was_learned,
+                modes::asking_first_sends_a_host_only_when_told,
+                modes::only_what_is_listed_goes_through,
                 settings::with_the_rescue_off_an_unknown_name_stays_unknown,
                 settings::names_not_kept_private_go_to_public_dns,
                 sign_in::a_wrong_password_is_asked_again,

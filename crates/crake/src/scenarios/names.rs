@@ -120,3 +120,35 @@ pub(crate) async fn a_tunnel_dns_that_stops_answering_is_stood_in_for(up: &mut U
         })
         .await;
 }
+
+/// Another program makes the tunnel's link every name's DNS (openvpn3
+/// does on a reconnect: "~." and the default route, so every name went to
+/// the company): craked puts its routing-only setup back within moments.
+#[cfg(target_os = "linux")]
+pub(crate) async fn another_programs_dns_change_is_put_back(up: &mut Up) {
+    let dev = up.device.clone();
+    let out = platform::sh(&format!(
+        "resolvectl domain {dev} '~.' acme.internal && resolvectl default-route {dev} yes"
+    ));
+    assert!(out.trim().is_empty(), "rewriting {dev}: {out}");
+    let end = std::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let link = platform::sh(&format!("resolvectl status {dev}"));
+        let back = link.contains("Default Route: no")
+            && link.contains("~acme.internal")
+            && !link.contains("~.");
+        if back {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < end,
+            "{dev} not put back:\n{link}"
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+pub(crate) async fn another_programs_dns_change_is_put_back(_up: &mut Up) {
+    super::not_here("only Linux's systemd-resolved has per-link DNS another program rewrites");
+}

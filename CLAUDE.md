@@ -2057,6 +2057,11 @@ The user doesn't want development builds installed on their machine.
   (7h) took over a tunnel's names in the wrong order and was left behind
   by a craked that ended during an outage; and IT's tunnel edited with
   partial fields was refused for its fields, not for being IT's.
+  The routing modes "Ask me first" and "Only what I list" (set as Edit
+  sets them, UpdateTunnel with the tunnel's own fields; a host added by
+  hand to one's own list tunnel goes through: only IT's scope refuses
+  that) and another program rewriting a tunnel's DNS link (Linux; a
+  mutation that stops `keep_dns_links` fails it) are scenarios too.
   A gateway that admits only AnyConnect (7d) is `scripts/e2e/picky.py`, a
   front on 8444 that answers 404 to any other user agent and passes TLS
   records through one for one (re-chunked, ocserv ends the session:

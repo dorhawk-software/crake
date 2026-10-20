@@ -36,6 +36,7 @@ busybox httpd -p 80 -h /srv/www
 cp /etc/openvpn/e2e/ca.crt /link/openvpn-ca.crt
 # carol's certificate, for the client's certificate sign-in.
 cp /etc/ocserv/carol.p12 /link/acme-user.p12
+chmod a+r /link/acme-user.p12
 openvpn --config /etc/openvpn/e2e/server.conf > /link/openvpn-server.log 2>&1 &
 python3 /sso.py /run/openvpn-mgmt.sock 198.51.100.10 8080 &
 # IPsec (IKEv2): charon, its tunnel ending on ipsec0 (if_id 7), where the

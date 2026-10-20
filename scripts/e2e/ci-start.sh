@@ -9,8 +9,10 @@ set -e
 sh /companies.sh eth0
 busybox httpd -p 80 -h /srv/www
 cp /etc/openvpn/e2e/ca.crt /link/openvpn-ca.crt
-# carol's certificate, for the client's certificate sign-in.
+# carol's certificate, for the client's certificate sign-in (a test's: the
+# runner's own user uploads it for the Mac and Windows jobs).
 cp /etc/ocserv/carol.p12 /link/acme-user.p12
+chmod a+r /link/acme-user.p12
 sed -e 's/^proto udp$/proto tcp-server/' -e '/^local /d' /etc/openvpn/e2e/server.conf > /run/server.conf
 openvpn --config /run/server.conf > /link/openvpn-server.log 2>&1 &
 python3 /sso.py /run/openvpn-mgmt.sock 0.0.0.0 8080 /link/openvpn-seen &
