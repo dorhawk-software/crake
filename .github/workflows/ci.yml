@@ -348,8 +348,8 @@ jobs:
         with:
           msystem: CLANGARM64
           update: false
-          install: make curl unzip tar
-          pacboy: clang:p gnutls:p libxml2:p zlib:p pkgconf:p
+          install: make curl unzip tar diffutils
+          pacboy: clang:p llvm:p gnutls:p libxml2:p zlib:p pkgconf:p
       - name: openconnect for ARM64
         if: steps.openconnect.outputs.cache-hit != 'true'
         shell: msys2 {0}

@@ -28,8 +28,12 @@ cat "$REPO/scripts/windows/openconnect-unbuffered.c" >> main.c
 # openconnect 9.12 predates today's compilers, which made these errors
 # (in CPPFLAGS, so configure keeps its own CFLAGS).
 LENIENT="-Wno-error=incompatible-pointer-types -Wno-error=int-conversion -Wno-error=implicit-function-declaration"
+# compat.c includes sec_api/stdlib_s.h, which today's mingw-w64 dropped
+# (its declarations are in stdlib.h now): a stand-in that includes that.
+mkdir -p shim/sec_api
+echo '#include <stdlib.h>' > shim/sec_api/stdlib_s.h
 # openconnect's config.guess predates MSYS2's ARM64 environments: named.
-./configure --build=aarch64-w64-mingw32 --host=aarch64-w64-mingw32 CC=clang CPPFLAGS="$LENIENT" --disable-nls --without-libpskc --without-stoken --without-libproxy --without-lz4 \
+./configure --build=aarch64-w64-mingw32 --host=aarch64-w64-mingw32 CC=clang CPPFLAGS="-I$PWD/shim $LENIENT" --disable-nls --without-libpskc --without-stoken --without-libproxy --without-lz4 \
   --with-vpnc-script=crake-hook.js >/dev/null
 make -j"$(nproc)" >/dev/null
 cp .libs/openconnect.exe .libs/libopenconnect-5.dll ../wintun/bin/arm64/wintun.dll "$OUT/"
