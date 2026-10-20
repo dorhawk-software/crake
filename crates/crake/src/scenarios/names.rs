@@ -78,6 +78,9 @@ pub(crate) async fn a_tunnel_dns_that_stops_answering_is_stood_in_for(up: &mut U
             m.tunnels.iter().any(|t| t.name == tunnel && t.dns_down)
         })
         .await;
+    // Asked afresh, as after the system's cache let it go: noticed within
+    // seconds, the system could still answer from its own cache (CI's Mac).
+    platform::flush_dns_cache();
     let found = look_up(name).await;
     assert!(
         found.iter().any(|a| a.to_string() == at),

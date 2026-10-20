@@ -11,6 +11,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Names kept private once another VPN client lets them go.** When another VPN program had been
+  serving a company's names and stopped, Crake took them back to keep them private, but if the
+  system's resolver wasn't ready that moment, it never tried again, and those names could go to
+  the internet's DNS. It tries again two seconds later now.
+
 ## 0.12.0 (2026-10-20)
 
 - **IPsec (IKEv2) tunnels, on Linux (Beta).** New tunnel has an IPsec card for FortiGate's "IPsec

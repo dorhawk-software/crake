@@ -202,3 +202,8 @@ pub(crate) fn tunnel_dns_is_crakes(dev: &str) -> (bool, String) {
         && !link.contains("~.");
     (back, link)
 }
+
+/// The system's DNS cache emptied (resolved's).
+pub(crate) fn flush_dns_cache() {
+    sh("resolvectl flush-caches");
+}

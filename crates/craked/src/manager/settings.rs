@@ -170,7 +170,12 @@ impl Manager {
             )
             .await
         {
+            // Tried again at the next look: until 2026-10-20 it counted as
+            // done, and the names stayed unhidden (Ubuntu 22.04's resolved,
+            // CI's VM, not yet knowing a link just made).
             tracing::error!("keeping internal names private: {e:#}");
+            *self.hush_last.lock().unwrap() = None;
+            return;
         }
         self.resolved.flush().await;
         *self.hush_last.lock().unwrap() = Some(domains);

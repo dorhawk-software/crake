@@ -20,10 +20,15 @@ RECORD = 16384
 
 
 def anyconnect(head):
+    """Cisco's client, not openconnect: newer openconnect calls itself
+    "AnyConnect-compatible OpenConnect VPN Agent" (Homebrew's, CI's Mac,
+    2026-10-20), older "Open AnyConnect VPN Agent"; such gateways turn both
+    away."""
     for line in head.decode("latin-1").split("\r\n")[1:]:
         name, _, value = line.partition(":")
         if name.strip().lower() == "user-agent":
-            return value.strip().lower().startswith("anyconnect")
+            agent = value.strip().lower()
+            return agent.startswith("anyconnect") and "openconnect" not in agent
     return False
 
 

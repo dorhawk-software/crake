@@ -162,3 +162,8 @@ pub(crate) fn tunnel_dns_is_crakes(dev: &str) -> (bool, String) {
     ));
     (names.lines().any(|l| l.trim() == "acme.internal"), names)
 }
+
+/// The system's DNS cache emptied (the DNS client's).
+pub(crate) fn flush_dns_cache() {
+    sh("Clear-DnsClientCache");
+}

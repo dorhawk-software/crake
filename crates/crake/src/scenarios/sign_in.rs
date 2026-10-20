@@ -18,6 +18,16 @@ pub(crate) async fn a_wrong_password_is_asked_again(up: &mut Up) {
 /// nothing; IPsec asks the password again (the app answers it from the
 /// keyring, which these tests don't use).
 pub(crate) async fn switching_on_again_uses_what_was_kept(up: &mut Up) {
+    // OpenVPN's token can come a moment after "connected" (CI's Mac):
+    // switched off before it, there's nothing to keep.
+    if up.gateway.keeps_sign_in() {
+        let name = up.name;
+        up.app
+            .within(WAIT, "a sign-in to keep", |m| {
+                m.tunnels.iter().any(|t| t.name == name && t.signed_in)
+            })
+            .await;
+    }
     up.off().await;
     let name = up.name;
     if !up.gateway.keeps_sign_in() {

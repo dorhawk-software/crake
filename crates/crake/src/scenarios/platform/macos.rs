@@ -155,3 +155,8 @@ pub(crate) fn tunnel_dns_is_crakes(dev: &str) -> (bool, String) {
     let file = sh("cat /etc/resolver/acme.internal 2>&1");
     (file.contains(&format!("Written by Crake for {dev}")), file)
 }
+
+/// The system's DNS cache emptied (mDNSResponder's).
+pub(crate) fn flush_dns_cache() {
+    sh("dscacheutil -flushcache; killall -HUP mDNSResponder");
+}
