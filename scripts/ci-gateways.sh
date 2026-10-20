@@ -36,8 +36,13 @@ case "${1:-}" in
     shift
     end=$(( $(date +%s) + WAIT_MINUTES * 60 ))
     while [ "$(date +%s)" -lt "$end" ]; do
-      jobs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --paginate \
-        --jq '.jobs[] | "\(.name) \(.status)"')
+      # GitHub's API fails now and then (a 502, 2026-10-20): asked again
+      # at the next look, not taken for the jobs' end.
+      if ! jobs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --paginate \
+        --jq '.jobs[] | "\(.name) \(.status)"'); then
+        sleep 20
+        continue
+      fi
       left=
       for job in "$@"; do
         echo "$jobs" | grep -qx "$job completed" || left="$left $job"
