@@ -20,6 +20,10 @@ pub(super) struct Entry {
     pub(super) routed: bool,
     /// Restarted over TCP (UDP blocked): its next "connect" is a return.
     pub(super) resumed: bool,
+    /// The openconnect that found UDP blocked is being stopped for one over
+    /// TCP: a "connect" it still sends (its script was already running) is
+    /// for a device about to go, not the tunnel coming up.
+    pub(super) replacing: bool,
     /// When it last came up (seconds since the epoch); kept across a
     /// reconnect, cleared when it goes off.
     pub(super) up_since: Option<u64>,
@@ -58,6 +62,7 @@ impl Entry {
             running: false,
             routed: false,
             resumed: false,
+            replacing: false,
             up_since: None,
             ups: 0,
             refused: false,

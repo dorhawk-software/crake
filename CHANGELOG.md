@@ -20,6 +20,12 @@ What's new in each Crake release, for the people using it. The newest is at the 
   such: "The key doesn't match". On Fedora, a small SELinux module of Crake's lets strongSwan
   read Crake's settings.
 
+- **On a network that blocks UDP, a tunnel isn't called connected too soon.** When AnyConnect's UDP
+  channel can't get through, Crake moves the tunnel over to TCP on the same sign-in. For about three
+  seconds of that, the panel said Connected while the tunnel was still being moved, and internal
+  names looked up then failed. It now says Connecting until the tunnel over TCP is up, and the log
+  says the tunnel is up rather than "back".
+
 - **You choose whether a password is kept.** Every password the sign-in window asks for has
   "Remember the password in your keyring", ticked to start with; before, a gateway's password was
   kept without a word, and only a certificate's had the box. One-time codes are never kept.

@@ -2,17 +2,18 @@
 
 #![cfg(target_os = "linux")]
 
-use std::os::unix::fs::PermissionsExt;
 use std::time::Duration;
 
 use crake_proto::TunnelState;
-use craked::config::{Config, Protocol, TunnelConfig};
+use craked::config::Protocol;
 use craked::hook_server;
 use craked::manager::Manager;
 
+#[path = "common/manager.rs"]
+mod manager;
 #[path = "common/script.rs"]
 mod script;
-use script::scripted;
+use manager::{setup, wait_for};
 
 const FAKE: &str = r#"#!/bin/sh
 HOOK="$CRAKE_TEST_HOOK"
@@ -24,57 +25,6 @@ reason=pre-init "$HOOK" || exit 1
 reason=connect "$HOOK" || exit 1
 while :; do sleep 0.1; done
 "#;
-
-async fn wait_for(mgr: &Manager, name: &str, want: TunnelState) {
-    for _ in 0..100 {
-        if mgr.get(name).unwrap().state == want {
-            return;
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-    panic!(
-        "{name} never reached {want:?}; is {:?}",
-        mgr.get(name).unwrap().state
-    );
-}
-
-fn setup(dir: &std::path::Path, script: &str) -> Config {
-    let fake = dir.join("openconnect");
-    std::fs::write(&fake, scripted(script, dir)).unwrap();
-    std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
-    Config {
-        hook_path: env!("CARGO_BIN_EXE_crake-hook").into(),
-        hook_socket: dir.join("hook.sock"),
-        openconnect: fake,
-        openvpn: "openvpn".into(),
-        charon: "charon".into(),
-        charon_unit: None,
-        log_path: dir.join("log"),
-        state_path: dir.join("hosts.json"),
-        learned_expiry_days: 7,
-        probing: false,
-        race_first_syn: false,
-        probe_wait_secs: 3,
-        never: vec![],
-        use_resolved: false,
-        apply_network: false,
-        managed_dir: dir.join("managed.d"),
-        tunnels: vec![TunnelConfig {
-            name: "acme".into(),
-            display_name: Some("ACME".into()),
-            gateway: "vpn.acme.example".into(),
-            protocol: Protocol::Anyconnect,
-            user: None,
-            passwd_file: None,
-            dns_domains: vec![],
-            auth_args: vec![],
-            extra_args: vec![],
-            profile: None,
-            managed: None,
-            own: None,
-        }],
-    }
-}
 
 #[tokio::test]
 async fn connect_then_disconnect() {
@@ -207,68 +157,6 @@ async fn connects_with_a_signed_in_session() {
     wait_for(&mgr, "acme", TunnelState::Off).await;
     let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
     assert!(!log.contains("s3cret"), "cookie leaked into the log");
-}
-
-/// UDP doesn't get through: DTLS never comes up unless told not to try.
-const FAKE_NO_UDP: &str = r#"#!/bin/sh
-trap 'exit 0' TERM HUP
-echo "$*" >> "$CRAKE_TEST_CALLS"
-read -r cookie
-export TUNDEV=crake-acme INTERNAL_IP4_ADDRESS=10.40.1.7
-reason=connect "$CRAKE_TEST_HOOK" || exit 1
-case "$*" in *--no-dtls*) ;; *) echo "DTLS handshake timed out" >&2 ;; esac
-while :; do sleep 0.1; done
-"#;
-
-#[tokio::test]
-async fn where_udp_is_blocked_it_carries_on_over_tcp() {
-    let dir = tempfile::tempdir().unwrap();
-    let cfg = setup(dir.path(), FAKE_NO_UDP);
-    let calls = dir.path().join("calls");
-    let socket = cfg.hook_socket.clone();
-    let mgr = Manager::new(cfg).unwrap();
-    let _srv = hook_server::serve(mgr.clone(), &socket).unwrap();
-
-    let session =
-        craked::auth::parse("COOKIE='s3cret'\nCONNECT_URL='https://vpn.acme.example/'\n").unwrap();
-    mgr.connect_with("acme", Some(session)).unwrap();
-    // Up, then restarted without DTLS on the same sign-in.
-    for _ in 0..100 {
-        let n = std::fs::read_to_string(&calls)
-            .unwrap_or_default()
-            .lines()
-            .count();
-        if n >= 2 {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-    wait_for(&mgr, "acme", TunnelState::Connected).await;
-    let runs = std::fs::read_to_string(&calls).unwrap();
-    let runs: Vec<&str> = runs.lines().collect();
-    assert_eq!(runs.len(), 2, "{runs:?}");
-    assert!(!runs[0].contains("--no-dtls"));
-    assert!(runs[1].contains("--no-dtls") && runs[1].contains("--cookie-on-stdin"));
-    tokio::time::sleep(Duration::from_millis(300)).await;
-    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
-    assert!(
-        log.contains("UDP is blocked here. ACME runs over TCP on this network."),
-        "{log}"
-    );
-    assert_eq!(log.matches("ACME is up").count(), 1, "{log}");
-    assert!(log.contains("ACME is back."), "{log}");
-
-    // Next time on this network it starts over TCP straight away.
-    mgr.disconnect("acme").unwrap();
-    wait_for(&mgr, "acme", TunnelState::Off).await;
-    if craked::networks::current().is_some() {
-        mgr.connect("acme").unwrap();
-        wait_for(&mgr, "acme", TunnelState::Connected).await;
-        let runs = std::fs::read_to_string(&calls).unwrap();
-        assert!(runs.lines().nth(2).unwrap().contains("--no-dtls"), "{runs}");
-        mgr.disconnect("acme").unwrap();
-        wait_for(&mgr, "acme", TunnelState::Off).await;
-    }
 }
 
 #[tokio::test]

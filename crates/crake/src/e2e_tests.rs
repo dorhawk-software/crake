@@ -288,11 +288,28 @@ async fn a_network_that_blocks_udp() {
             .any(|e| e.message == "UDP is blocked here. ACME runs over TCP on this network.")
     })
     .await;
-    app.within(Duration::from_secs(20), "back, over TCP", |m| {
-        connected(m) && m.log.iter().any(|e| e.message == "ACME is back.")
+    app.within(Duration::from_secs(20), "connected, over TCP", |m| {
+        connected(m) && transport(m) == "TLS"
     })
     .await;
-    assert_eq!(transport(&app.model), "TLS");
+    app.settle(Duration::from_secs(1)).await;
+    let said: Vec<&str> = app
+        .model
+        .log
+        .iter()
+        .map(|e| e.message.as_str())
+        .filter(|m| m.starts_with("ACME is") || m.starts_with("UDP is"))
+        .collect();
+    // DTLS fails before the first openconnect is up, so the one over TCP
+    // is the tunnel coming up, not back (until 2026-10-20 the first one's
+    // late "connect" made it connected while its device was going).
+    assert_eq!(
+        said,
+        [
+            "UDP is blocked here. ACME runs over TCP on this network.",
+            "ACME is up. Routing nothing yet."
+        ]
+    );
     let works = tokio::task::spawn_blocking(|| get("10.40.1.10", Duration::from_secs(12)))
         .await
         .unwrap();

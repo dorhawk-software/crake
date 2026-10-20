@@ -203,6 +203,8 @@ pub(crate) fn connected(m: &Model) -> bool {
         .any(|t| t.name == "acme" && t.state == "connected")
 }
 
+/// ACME off (Linux's e2e test and Windows' VM test).
+#[cfg(any(target_os = "linux", windows))]
 pub(crate) fn off(m: &Model) -> bool {
     m.tunnels
         .iter()

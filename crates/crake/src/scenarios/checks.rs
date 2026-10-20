@@ -63,7 +63,7 @@ async fn names_work(what: &str, wait: Duration) {
 
 /// Switched on, the gateway's whole network is a hint, not a route: a
 /// host nobody asked for still goes the way it went.
-pub(super) async fn nothing_is_routed_up_front(up: &mut Up) {
+pub(crate) async fn nothing_is_routed_up_front(up: &mut Up) {
     let way = way(UNTOUCHED);
     assert_ne!(
         way,
@@ -84,7 +84,7 @@ pub(super) async fn nothing_is_routed_up_front(up: &mut Up) {
 
 /// A host that doesn't answer directly but does through the tunnel:
 /// probed, learned, said in the log, and the app's own retry gets through.
-pub(super) async fn a_host_is_learned_by_probing(up: &mut Up) {
+pub(crate) async fn a_host_is_learned_by_probing(up: &mut Up) {
     let probed = page_within(GIT).await;
     assert!(
         probed.is_some_and(|b| b.contains("crex")),
@@ -103,7 +103,7 @@ pub(super) async fn a_host_is_learned_by_probing(up: &mut Up) {
 
 /// A name only the tunnel's DNS knows, asked as an app asks: its address
 /// goes through the tunnel before the app's first packet.
-pub(super) async fn a_tunnel_name_is_routed_before_its_first_packet(up: &mut Up) {
+pub(crate) async fn a_tunnel_name_is_routed_before_its_first_packet(up: &mut Up) {
     let (name, at) = WIKI;
     let found = look_up(name).await;
     assert!(
@@ -117,7 +117,7 @@ pub(super) async fn a_tunnel_name_is_routed_before_its_first_packet(up: &mut Up)
 
 /// The internet answers, and not through the tunnel (OpenVPN's gateway
 /// pushes redirect-gateway; Crake leaves it).
-pub(super) async fn the_internet_stays_direct(up: &mut Up) {
+pub(crate) async fn the_internet_stays_direct(up: &mut Up) {
     let public = tokio::task::spawn_blocking(|| {
         TcpStream::connect_timeout(&PUBLIC.parse().unwrap(), Duration::from_secs(10))
     })
@@ -136,13 +136,13 @@ pub(super) async fn the_internet_stays_direct(up: &mut Up) {
 /// Public names still resolve while a tunnel is up ("my internet
 /// stopped" is almost always names: craked stands in for the system's
 /// DNS on Windows and macOS).
-pub(super) async fn public_names_resolve(_up: &mut Up) {
+pub(crate) async fn public_names_resolve(_up: &mut Up) {
     names_work("while a tunnel is up", WAIT).await;
 }
 
 /// A name public DNS doesn't know but the tunnel's does: craked asks the
 /// tunnels, and its address is routed before the first packet.
-pub(super) async fn a_name_public_dns_doesnt_know_is_rescued(up: &mut Up) {
+pub(crate) async fn a_name_public_dns_doesnt_know_is_rescued(up: &mut Up) {
     let (name, at) = RESCUED;
     let found = look_up(name).await;
     assert!(
@@ -156,7 +156,7 @@ pub(super) async fn a_name_public_dns_doesnt_know_is_rescued(up: &mut Up) {
 
 /// A name asked over TCP: held like one over UDP until its address is
 /// routed.
-pub(super) async fn a_name_asked_over_tcp_is_routed(up: &mut Up) {
+pub(crate) async fn a_name_asked_over_tcp_is_routed(up: &mut Up) {
     let answer = tokio::task::spawn_blocking(|| platform::tcp_lookup("git.acme.internal"))
         .await
         .unwrap();
@@ -167,7 +167,7 @@ pub(super) async fn a_name_asked_over_tcp_is_routed(up: &mut Up) {
 /// Settings → Diagnostics → "Save a report…" while the tunnel is up: the
 /// internet direct, the tunnel's names through it, the system's DNS, its
 /// routes with Crake's marked, Crake's rules. Printed whole for the log.
-pub(super) async fn a_report_says_where_things_go(up: &mut Up) {
+pub(crate) async fn a_report_says_where_things_go(up: &mut Up) {
     let label = up.label;
     // A host by name through the tunnel first: the report tries the
     // tunnel's last-used one.
@@ -205,7 +205,7 @@ pub(super) async fn a_report_says_where_things_go(up: &mut Up) {
 
 /// Switched off: the tunnel's network is gone again, and so is what Crake
 /// put in place for it.
-pub(super) async fn switching_off_leaves_nothing(up: &mut Up) {
+pub(crate) async fn switching_off_leaves_nothing(up: &mut Up) {
     let _ = page_within(GIT).await;
     up.off().await;
     assert!(!answers(GIT).await, "{GIT} answered with the tunnel off");
@@ -214,14 +214,14 @@ pub(super) async fn switching_off_leaves_nothing(up: &mut Up) {
 }
 
 /// Switched off, the internet still works by name.
-pub(super) async fn names_resolve_after_switching_off(up: &mut Up) {
+pub(crate) async fn names_resolve_after_switching_off(up: &mut Up) {
     up.off().await;
     names_work("after switching off", WAIT).await;
 }
 
 /// With its tunnel off, a name only it knows is refused at once (Keep
 /// internal names private), never sent to public DNS.
-pub(super) async fn names_are_kept_private_while_off(up: &mut Up) {
+pub(crate) async fn names_are_kept_private_while_off(up: &mut Up) {
     up.off().await;
     let before = platform::public_questions();
     let name = WIKI.0;
@@ -255,7 +255,7 @@ pub(super) async fn names_are_kept_private_while_off(up: &mut Up) {
 /// craked stopping with the tunnel up (the service stopped, a reboot):
 /// the system is as it was.
 #[cfg(unix)]
-pub(super) async fn stopping_craked_leaves_nothing(up: &mut Up) {
+pub(crate) async fn stopping_craked_leaves_nothing(up: &mut Up) {
     let _ = page_within(GIT).await;
     up.crake.stop().await;
     let end = Instant::now() + BACK;
@@ -272,6 +272,6 @@ pub(super) async fn stopping_craked_leaves_nothing(up: &mut Up) {
 }
 
 #[cfg(windows)]
-pub(super) async fn stopping_craked_leaves_nothing(_up: &mut Up) {
+pub(crate) async fn stopping_craked_leaves_nothing(_up: &mut Up) {
     super::not_here("the service stays for the next test; scripts/windows-vm-test.sh stops it");
 }

@@ -29,6 +29,7 @@ use crate::client::Command;
 use crate::test_app::{App, enabled, gateway, sign_in};
 
 mod checks;
+mod hosts;
 mod platform;
 
 pub(crate) use platform::Craked;
@@ -113,6 +114,12 @@ impl Up {
         })
         .await;
         remove_tunnels(&mut app).await;
+        // Windows' service keeps its settings from test to test.
+        app.send(Command::SetSetting("never".into(), String::new()));
+        app.until("no never list", |m| {
+            m.settings.get("never").is_some_and(String::is_empty)
+        })
+        .await;
         let before = platform::answers("10.40.1.10").await;
         assert!(!before, "10.40.1.10 answered without a tunnel");
 
@@ -215,12 +222,12 @@ pub(crate) fn not_here(why: &str) {
 
 /// Every scenario, as a test of its own, against one kind of gateway.
 macro_rules! scenarios {
-    ($kind:ident, $gateway:expr, [$($scenario:ident),* $(,)?]) => {
+    ($kind:ident, $gateway:expr, [$($module:ident::$scenario:ident),* $(,)?]) => {
         mod $kind {
             $(
                 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
                 async fn $scenario() {
-                    super::run($gateway, super::checks::$scenario).await;
+                    super::run($gateway, super::$module::$scenario).await;
                 }
             )*
         }
@@ -233,18 +240,26 @@ macro_rules! every_scenario {
             $kind,
             $gateway,
             [
-                nothing_is_routed_up_front,
-                a_host_is_learned_by_probing,
-                a_tunnel_name_is_routed_before_its_first_packet,
-                the_internet_stays_direct,
-                public_names_resolve,
-                a_name_public_dns_doesnt_know_is_rescued,
-                a_name_asked_over_tcp_is_routed,
-                a_report_says_where_things_go,
-                switching_off_leaves_nothing,
-                names_resolve_after_switching_off,
-                names_are_kept_private_while_off,
-                stopping_craked_leaves_nothing,
+                checks::nothing_is_routed_up_front,
+                checks::a_host_is_learned_by_probing,
+                checks::a_tunnel_name_is_routed_before_its_first_packet,
+                checks::the_internet_stays_direct,
+                checks::public_names_resolve,
+                checks::a_name_public_dns_doesnt_know_is_rescued,
+                checks::a_name_asked_over_tcp_is_routed,
+                checks::a_report_says_where_things_go,
+                checks::switching_off_leaves_nothing,
+                checks::names_resolve_after_switching_off,
+                checks::names_are_kept_private_while_off,
+                checks::stopping_craked_leaves_nothing,
+                hosts::undo_sends_a_host_direct_and_redo_brings_it_back,
+                hosts::a_host_added_by_hand_goes_through,
+                hosts::a_name_added_by_hand_goes_through,
+                hosts::a_pinned_network_goes_through_until_unpinned,
+                hosts::forgetting_a_host_sends_it_direct,
+                hosts::forget_all_keeps_the_pins,
+                hosts::the_never_list_keeps_a_host_direct,
+                hosts::tunnel_detail_lists_what_was_learned,
             ]
         );
     };

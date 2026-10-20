@@ -273,12 +273,17 @@ impl Manager {
     /// Apply one call from the hook. An error makes the hook fail, which makes
     /// openconnect give up on that step.
     pub async fn handle_hook(&self, msg: HookMessage) -> Result<()> {
-        let (display, state, protocol) = {
+        let (display, state, protocol, replacing) = {
             let map = self.tunnels.lock().unwrap();
             let e = map
                 .get(&msg.tunnel)
                 .ok_or_else(|| anyhow!("unknown tunnel {}", msg.tunnel))?;
-            (e.config.display().to_owned(), e.state, e.config.protocol)
+            (
+                e.config.display().to_owned(),
+                e.state,
+                e.config.protocol,
+                e.replacing,
+            )
         };
         // Only a tunnel Crake started may report in.
         if state == TunnelState::Off || state == TunnelState::Trouble {
@@ -288,6 +293,13 @@ impl Manager {
 
         match msg.reason.as_str() {
             "pre-init" => Ok(()),
+            "connect" | "reconnect" if replacing => {
+                tracing::debug!(
+                    tunnel = name,
+                    "a connect from the openconnect being replaced"
+                );
+                Ok(())
+            }
             "connect" | "reconnect" => {
                 let info = match protocol {
                     crate::config::Protocol::Openvpn => {
@@ -454,10 +466,20 @@ impl Manager {
                         Some(format!("{why} Crake reconnected without it, keeping the sign-in.")),
                     );
                     if let Some(e) = self.tunnels.lock().unwrap().get_mut(&name) {
-                        e.resumed = true;
+                        // Back only if it had come up: openconnect may say
+                        // DTLS failed before its script's "connect" (seen on
+                        // CI's Windows through Cloudflare, 2026-10-20).
+                        e.resumed = e.state == TunnelState::Connected;
+                        e.replacing = true;
                         e.ups += 1;
                     }
+                    // Not connected while its device is replaced: names
+                    // asked meanwhile failed while the app said connected.
+                    self.set_state(&name, TunnelState::Connecting, false);
                     crate::sys::stop(&mut child, true).await;
+                    if let Some(e) = self.tunnels.lock().unwrap().get_mut(&name) {
+                        e.replacing = false;
+                    }
                     no_dtls = true;
                 }
             }

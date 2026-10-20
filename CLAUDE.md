@@ -662,7 +662,13 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    state file), SIGHUPs openconnect and starts it again with `--no-dtls` on
    the same session; next time on that network it starts with `--no-dtls`.
    Logged: "UDP is blocked here. ACME runs over TCP on this network.", then
-   "ACME is back." Without a reusable session it only remembers. Tested on
+   "ACME is back." (or "ACME is up." when DTLS failed before the first
+   openconnect was up: the usual order, on Linux too). While the first
+   is being replaced the tunnel is Connecting, and a "connect" that one's
+   script still sends is ignored (`Entry::replacing`; found by the scenario
+   suite on CI's Windows, 2026-10-20: the app said connected for ~3 s
+   while the device was being replaced, and names asked then failed).
+   Without a reusable session it only remembers. Tested on
    a real network that blocks UDP and it works; SSID isn't used. Original request: On
    some networks (e.g. a company's own office Wi-Fi) DTLS can't come up and
    openconnect is slow until it falls back; the user's NetworkManager
