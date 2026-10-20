@@ -413,6 +413,7 @@ macro_rules! every_scenario {
                 hosts::tunnel_detail_lists_what_was_learned,
                 modes::asking_first_sends_a_host_only_when_told,
                 modes::only_what_is_listed_goes_through,
+                modes::everything_goes_through_a_full_tunnel,
                 settings::with_the_rescue_off_an_unknown_name_stays_unknown,
                 settings::names_not_kept_private_go_to_public_dns,
                 sign_in::a_wrong_password_is_asked_again,

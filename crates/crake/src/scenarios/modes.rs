@@ -1,5 +1,5 @@
 //! A tunnel's routing mode, as New tunnel or Edit sets it: "Ask me
-//! first" and "Only what I list".
+//! first", "Only what I list" and "Everything" (a full tunnel).
 
 use std::time::{Duration, Instant};
 
@@ -11,6 +11,8 @@ use crate::test_app::get;
 const GIT: &str = "10.40.1.10";
 const WIKI: (&str, &str) = ("wiki.acme.internal", "10.40.1.11");
 const UNTOUCHED: &str = "10.40.1.12";
+/// The test network's public web server: it answers direct only.
+const PUBLIC_WEB: &str = "203.0.113.80";
 
 /// The tunnel's mode changed as Edit changes it (its own fields, sent
 /// back with the new mode and list), applied at once.
@@ -88,6 +90,42 @@ pub(crate) async fn asking_first_sends_a_host_only_when_told(up: &mut Up) {
         assert!(Instant::now() < end, "{GIT} once sent");
         println!("{GIT}: no answer yet through {}, trying again", up.label);
     }
+}
+
+/// "Everything" (a full tunnel): ACME's host answers at once, nothing to
+/// probe, and the internet goes through the tunnel too, where the test
+/// network's public web server doesn't answer (it drops whatever comes
+/// through a tunnel, start.sh); back to learning, it answers direct
+/// again, and the tunnel stayed up throughout (its gateway direct).
+/// Linux only: through Cloudflare a full tunnel would take cloudflared's
+/// own connection in too.
+pub(crate) async fn everything_goes_through_a_full_tunnel(up: &mut Up) {
+    if !cfg!(target_os = "linux") {
+        super::not_here("a full tunnel would carry cloudflared's own connection to CI's gateways");
+        return;
+    }
+    let public = PUBLIC_WEB;
+    assert!(answers(public).await, "{public} answers direct before");
+    set_mode(up, "full", "").await;
+    let end = Instant::now() + Duration::from_secs(10);
+    while !answers(GIT).await {
+        assert!(Instant::now() < end, "{GIT} through the full tunnel");
+    }
+    stays_unanswered(public, "the internet went around the full tunnel").await;
+    set_mode(up, "learn", "").await;
+    let end = Instant::now() + Duration::from_secs(10);
+    while !answers(public).await {
+        assert!(
+            Instant::now() < end,
+            "{public} direct again after the full tunnel"
+        );
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    assert_eq!(
+        super::state(&up.app.model, up.name),
+        "connected",
+        "the tunnel stayed up"
+    );
 }
 
 /// "Only what I list": a listed host and a listed name go through, by
