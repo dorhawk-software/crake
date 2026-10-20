@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.12.0 (2026-10-20)
+
 - **IPsec (IKEv2) tunnels, on Linux (Beta).** New tunnel has an IPsec card for FortiGate's "IPsec
   VPN" and other IKEv2 gateways: the gateway, the key your IT team gave you and, if they named them,
   the company's domains; then your username. Crake runs strongSwan's charon itself and asks your
