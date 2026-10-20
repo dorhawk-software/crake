@@ -30,6 +30,7 @@ mod clash;
 mod diagnostics;
 mod entry;
 mod handover;
+mod hook;
 mod host_ops;
 #[cfg(target_os = "linux")]
 mod ipsec;

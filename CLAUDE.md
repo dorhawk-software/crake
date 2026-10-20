@@ -279,7 +279,11 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    order with the tunnel's fwmark; the first that answers gets it, and the
    stuck conntrack entry is deleted so the app's next SYN retry is routed and
    NATed afresh. Never probed: own LAN/bridges (on-link), loopback etc., the
-   gateway, already-routed hosts, the `never` list, hosts probed in the last
+   gateway, hosts a tunnel that's up routes (until 2026-10-20 any
+   tunnel's, so a host learned by one that was off, or by an IT tunnel
+   whose file was gone, could be learned by no other: found by the
+   scenario suite on CI's Windows; a tunnel going down now also forgets
+   its hosts' probes, so another tunnel tries them at once), the `never` list, hosts probed in the last
    10 min (forgotten whenever a tunnel comes up, again or new: what found
    no answer may answer through it now; and a probe whose tunnels were
    restarting or changed while it ran doesn't count; both found on CI's
@@ -1911,7 +1915,9 @@ Any lint stops the build; fix it and build again, never silence it.
   every `cargo build` / `cargo test` from Claude Code and blocks on failure.
 - Coverage (`scripts/check-coverage.sh`, cargo-llvm-cov, about a minute):
   each crate's share of lines run by the tests stays at or above its floor
-  (crake 66%, craked 63%, crake-proto 98%, lint-literals 82% as of Oct 2026). The pre-commit
+  (crake 73%, craked 63%, crake-proto 98%, lint-literals 82% as of Oct 2026; crake's
+  without the tests that need a real gateway, the scenario suite, e2e tests,
+  journeys and their helpers: test code measured by running it, 2026-10-20). The pre-commit
   hook runs it when Rust files are committed. Raise a floor as tests grow;
   never lower one to let a change through.
 
@@ -2038,13 +2044,31 @@ The user doesn't want development builds installed on their machine.
   reach, 10.42.0.10), "Use Globex" moving a host, one address for two
   companies, and IT's tunnels (`it_scenarios!`, AnyConnect and OpenVPN:
   managed.d in craked's test folder, or the installed service's with a
-  restart on Windows). ACME's domain now comes from alice's per-user
-  `split-dns` (a global default-domain would reach bob too). Found then:
+  restart on Windows). In the e2e image ACME's domain comes from
+  `ocserv-users/default`'s `split-dns` (`ocserv-companies.conf`, added to
+  ocserv.conf in the image, takes the global default-domain out, which
+  would reach bob too; the package and Windows VM tests use ocserv.conf
+  alone: CI's package tests failed the one run it was changed). carol
+  signs in with a certificate (a PKCS#12 file from ACME's users' CA, in
+  the image; the gateways-ready artifact carries it to the Mac and
+  Windows jobs): the `anyconnect_certificate` scenarios. Found then:
   IT's files were read only with a craked.toml, which Windows' and macOS'
   installers don't ship (`Config::without_file`); the memory answerer
   (7h) took over a tunnel's names in the wrong order and was left behind
   by a craked that ended during an outage; and IT's tunnel edited with
   partial fields was refused for its fields, not for being IT's.
+  A gateway that admits only AnyConnect (7d) is `scripts/e2e/picky.py`, a
+  front on 8444 that answers 404 to any other user agent and passes TLS
+  records through one for one (re-chunked, ocserv ends the session:
+  "unexpected CSTP length"); Linux only (a Cloudflare hostname of its own
+  would be needed). `CRAKE_E2E_KEEP=<folder>` keeps the gateway's logs
+  (ocserv logs to /link/ocserv.log).
+  Not yet in the suite (2026-10-20): AnyConnect's browser sign-in (ocserv
+  speaks no SAML; a stand-in would have to play Cisco's sso-v2 for
+  openconnect's `--external-browser`), a certificate kept in the keyring
+  or on a smart card (the tests keep no keyring; SoftHSM could stand in
+  for a card), OpenVPN's and IPsec's certificates, and a full tunnel and
+  IPv6 off Linux (Cloudflare carries neither).
   The older chained tests (`e2e_tests.rs` and the rest) still run; their
   checks move into scenarios as the testing-gaps catalogue is worked down.
 - CI (`.github/workflows/ci.yml`, on every push; a new push cancels the

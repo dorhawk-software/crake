@@ -228,7 +228,9 @@ jobs:
         if: env.HAVE_TUNNEL == 'true'
         with:
           name: gateways-ready
-          path: ${{ runner.temp }}/gateways/openvpn-ca.crt
+          path: |
+            ${{ runner.temp }}/gateways/openvpn-ca.crt
+            ${{ runner.temp }}/gateways/acme-user.p12
       - name: Up until the Mac's and Windows' jobs are done with them
         if: env.HAVE_TUNNEL == 'true'
         env:

@@ -1,0 +1,3 @@
+# ACME's users (every user without a file of their own): ocserv.conf's
+# network, with ACME's domain (per user: ocserv-companies.conf).
+split-dns = acme.internal

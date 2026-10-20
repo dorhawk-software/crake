@@ -26,7 +26,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::client::Command;
-use crate::test_app::{App, enabled, sign_in_as};
+use crate::test_app::{App, enabled, sign_in_with};
 
 mod checks;
 mod hosts;
@@ -56,6 +56,14 @@ pub(crate) enum Gateway {
     /// doesn't carry).
     #[cfg(target_os = "linux")]
     Ipsec,
+    /// AnyConnect again, signed in with a certificate (carol's, a PKCS#12
+    /// file with a password) instead of a password.
+    AnyConnectCertificate,
+    /// AnyConnect behind a front that admits only clients calling
+    /// themselves AnyConnect (7d; scripts/e2e/picky.py, Linux only: it
+    /// would need a Cloudflare hostname of its own).
+    #[cfg(target_os = "linux")]
+    AnyConnectOnly,
     /// A second company on the AnyConnect gateway (its user bob): its own
     /// network, DNS and domain (scripts/e2e/companies.sh). Not a kind the
     /// scenarios run against: the tunnel beside theirs.
@@ -66,7 +74,9 @@ impl Gateway {
     /// The tunnel's name and how the app shows it.
     fn names(self) -> (&'static str, &'static str) {
         match self {
-            Self::AnyConnect => ("acme", "ACME"),
+            Self::AnyConnect | Self::AnyConnectCertificate => ("acme", "ACME"),
+            #[cfg(target_os = "linux")]
+            Self::AnyConnectOnly => ("acme", "ACME"),
             Self::OpenVpn => ("initech", "Initech"),
             #[cfg(target_os = "linux")]
             Self::Ipsec => ("nordbank", "Nordbank"),
@@ -78,7 +88,9 @@ impl Gateway {
     /// password is the app's to keep, in the keyring.
     fn keeps_sign_in(self) -> bool {
         match self {
-            Self::AnyConnect | Self::OpenVpn | Self::Globex => true,
+            Self::AnyConnect | Self::AnyConnectCertificate | Self::OpenVpn | Self::Globex => true,
+            #[cfg(target_os = "linux")]
+            Self::AnyConnectOnly => true,
             #[cfg(target_os = "linux")]
             Self::Ipsec => false,
         }
@@ -88,6 +100,9 @@ impl Gateway {
     fn anyconnect_user(self) -> Option<&'static str> {
         match self {
             Self::AnyConnect => Some("alice"),
+            Self::AnyConnectCertificate => Some(""),
+            #[cfg(target_os = "linux")]
+            Self::AnyConnectOnly => Some("alice"),
             Self::Globex => Some("bob"),
             _ => None,
         }
@@ -96,7 +111,9 @@ impl Gateway {
     /// Another kind, for a second tunnel beside this one.
     fn other(self) -> Self {
         match self {
-            Self::AnyConnect => Self::OpenVpn,
+            Self::AnyConnect | Self::AnyConnectCertificate => Self::OpenVpn,
+            #[cfg(target_os = "linux")]
+            Self::AnyConnectOnly => Self::OpenVpn,
             Self::OpenVpn => Self::AnyConnect,
             #[cfg(target_os = "linux")]
             Self::Ipsec => Self::AnyConnect,
@@ -127,7 +144,11 @@ impl Gateway {
             ],
             #[cfg(target_os = "linux")]
             Self::Ipsec => panic!("IPsec in IT's files isn't built yet (CLAUDE.md, 7k)"),
-            Self::Globex => panic!("Globex is never IT's in these tests"),
+            Self::AnyConnectCertificate | Self::Globex => {
+                panic!("{self:?} is never IT's in these tests")
+            }
+            #[cfg(target_os = "linux")]
+            Self::AnyConnectOnly => panic!("{self:?} is never IT's in these tests"),
         }
     }
 
@@ -138,6 +159,18 @@ impl Gateway {
         match self {
             Self::AnyConnect => fields.extend([
                 ("gateway", platform::anyconnect_gateway()),
+                ("protocol", "anyconnect".into()),
+                ("user", "alice".into()),
+            ]),
+            Self::AnyConnectCertificate => fields.extend([
+                ("gateway", platform::anyconnect_gateway()),
+                ("protocol", "anyconnect".into()),
+                ("sign_in", "certificate".into()),
+                ("certificate", platform::user_certificate()),
+            ]),
+            #[cfg(target_os = "linux")]
+            Self::AnyConnectOnly => fields.extend([
+                ("gateway", platform::ANYCONNECT_ONLY.into()),
                 ("protocol", "anyconnect".into()),
                 ("user", "alice".into()),
             ]),
@@ -225,6 +258,21 @@ impl Up {
         }
     }
 
+    /// What craked has said so far (the log's lines, with their reasons),
+    /// for a failure's message.
+    pub fn said(&self) -> String {
+        self.app
+            .model
+            .log
+            .iter()
+            .map(|e| match &e.reason {
+                Some(r) => format!("{}  ({r})", e.message),
+                None => e.message.clone(),
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
     /// Removed and added again, off and with no sign-in kept.
     pub async fn add_again(&mut self) {
         let name = self.name;
@@ -303,11 +351,40 @@ pub(crate) async fn sign_in(app: &mut App, gateway: Gateway, passwords: &[&str])
         // ocserv refuses every password after a wrong one in the same
         // sign-in (Cisco's gateways let you try again): the window says it
         // was refused and asks again; cancelled, a new sign-in works.
-        let gw = platform::anyconnect_gateway();
+        // As the app opens sign-in for the tunnel craked lists.
+        let tunnel = app
+            .model
+            .tunnels
+            .iter()
+            .find(|t| t.name == name)
+            .expect("the tunnel, listed")
+            .clone();
+        let spec = |user: &str| crate::signin::Spec {
+            tunnel: tunnel.name.clone(),
+            display: tunnel.display.clone(),
+            gateway: tunnel.gateway.clone(),
+            protocol: tunnel.protocol.clone(),
+            user: if tunnel.user.is_empty() {
+                user.into()
+            } else {
+                tunnel.user.clone()
+            },
+            auth_args: tunnel.auth_args.clone(),
+            extra_args: tunnel.extra_args.clone(),
+            user_agent: None,
+            keyring: false,
+            openconnect: None,
+        };
         let mut session = None;
         for (n, password) in passwords.iter().enumerate() {
-            match sign_in_as(&gw, user, &[password]).await {
+            match sign_in_with(spec(user), &[password]).await {
                 Ok((s, _)) => {
+                    // Turned away as openconnect, it signed in as AnyConnect,
+                    // and craked connects the same way with the session.
+                    #[cfg(target_os = "linux")]
+                    if gateway == Gateway::AnyConnectOnly {
+                        assert_eq!(s.user_agent.as_deref(), Some("AnyConnect"), "{label}");
+                    }
                     session = Some(s);
                     break;
                 }
@@ -449,12 +526,51 @@ macro_rules! every_scenario {
                 several::two_companies_each_through_their_own,
                 several::a_host_both_answer_for_can_be_moved,
                 several::one_address_goes_through_one_tunnel,
+                several::a_host_learned_by_a_tunnel_thats_off_goes_through_another,
             ]
         );
     };
 }
 
 every_scenario!(anyconnect, super::Gateway::AnyConnect);
+// New tunnel's look at the AnyConnect gateway, once.
+scenarios!(
+    new_tunnel,
+    super::Gateway::AnyConnect,
+    [sign_in::new_tunnel_finds_the_gateway_and_its_certificate]
+);
+// A gateway that admits only AnyConnect: signed in again as AnyConnect.
+#[cfg(target_os = "linux")]
+scenarios!(
+    anyconnect_only,
+    super::Gateway::AnyConnectOnly,
+    [
+        checks::nothing_is_routed_up_front,
+        checks::a_host_is_learned_by_probing,
+        sign_in::switching_on_again_uses_what_was_kept,
+    ]
+);
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn anyconnect_only() {
+    not_here(
+        "a gateway that admits only AnyConnect is a front on the e2e gateway; through \
+         Cloudflare it would need a hostname of its own",
+    );
+}
+// Signed in with a certificate instead: the sign-in's own scenarios and
+// a tunnel that works once it's up.
+scenarios!(
+    anyconnect_certificate,
+    super::Gateway::AnyConnectCertificate,
+    [
+        checks::nothing_is_routed_up_front,
+        checks::a_host_is_learned_by_probing,
+        checks::a_tunnel_name_is_routed_before_its_first_packet,
+        checks::switching_off_leaves_nothing,
+        sign_in::switching_on_again_uses_what_was_kept,
+    ]
+);
 every_scenario!(openvpn, super::Gateway::OpenVpn);
 #[cfg(target_os = "linux")]
 every_scenario!(ipsec, super::Gateway::Ipsec);

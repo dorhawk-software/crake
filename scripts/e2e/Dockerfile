@@ -34,16 +34,27 @@ RUN mkdir -p /etc/ocserv /srv/www \
  && printf 'hunter2\nhunter2\n' | ocpasswd -c /etc/ocserv/passwd alice \
  && printf 'hunter2\nhunter2\n' | ocpasswd -c /etc/ocserv/passwd bob \
  && echo crex > /srv/www/index.html
+# ACME's users' CA and carol's certificate (a PKCS#12 file whose password
+# is hunter2), for signing in with a certificate.
+RUN cd /etc/ocserv \
+ && openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout users-ca.key -out users-ca.pem -days 3650 -subj "/CN=ACME users" \
+ && openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout carol.key -out carol.csr -subj /CN=carol \
+ && printf 'extendedKeyUsage=clientAuth\nkeyUsage=digitalSignature\n' > carol.ext \
+ && openssl x509 -req -in carol.csr -CA users-ca.pem -CAkey users-ca.key -CAcreateserial -out carol.pem -days 3650 -extfile carol.ext \
+ && openssl pkcs12 -export -inkey carol.key -in carol.pem -name carol -passout pass:hunter2 -out carol.p12 \
+ && rm carol.key carol.csr
 # OpenVPN's: a CA and the server's certificate (clients sign in instead).
 RUN mkdir -p /etc/openvpn/e2e && cd /etc/openvpn/e2e \
  && openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout ca.key -out ca.crt -days 3650 -subj /CN=ACME-CA \
  && openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout server.key -out server.csr -subj /CN=vpn.acme.example \
  && printf 'extendedKeyUsage=serverAuth\nkeyUsage=digitalSignature,keyAgreement\n' > server.ext \
  && openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 3650 -extfile server.ext
-COPY ocserv.conf /etc/ocserv/ocserv.conf
+COPY ocserv.conf ocserv-companies.conf /etc/ocserv/
 COPY ocserv-users /etc/ocserv/users
+RUN sed -i '/^default-domain/d' /etc/ocserv/ocserv.conf \
+ && cat /etc/ocserv/ocserv-companies.conf >> /etc/ocserv/ocserv.conf
 COPY openvpn.conf /etc/openvpn/e2e/server.conf
 COPY ipsec.conf /etc/swanctl/conf.d/acme.conf
 COPY strongswan.conf /etc/strongswan.d/crake-e2e.conf
-COPY start.sh ci-start.sh companies.sh client.sh relay.py sso.py /
+COPY start.sh ci-start.sh companies.sh client.sh relay.py sso.py picky.py /
 CMD ["/bin/sh", "/start.sh"]

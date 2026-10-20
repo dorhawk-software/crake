@@ -115,12 +115,14 @@ if [ "$SYSTEM" = macos ]; then
   sudo env CRAKE_E2E=1 CRAKE_E2E_GATEWAY=https://127.0.0.1:8443 \
     CRAKE_GATEWAY_SSO="$SSO" CRAKE_FAKE_GATEWAY="$FAKES" \
     CRAKE_GATEWAY_OPENVPN="127.0.0.1 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
+    CRAKE_GATEWAY_USER_CERT="$WORK/ready/acme-user.p12" \
     CRAKE_E2E_HOOK="$HOOK" CRAKE_E2E_CRAKED="$PWD/target/debug/craked" $DOCTOR \
     "$BIN" $FILTER --test-threads=1 --nocapture || status=$?
 else
   CRAKE_E2E=1 CRAKE_E2E_GATEWAY=https://127.0.0.1:8443 \
     CRAKE_GATEWAY_SSO="$SSO" CRAKE_FAKE_GATEWAY="$FAKES" \
     CRAKE_GATEWAY_OPENVPN="127.0.0.1 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
+    CRAKE_GATEWAY_USER_CERT="$WORK/ready/acme-user.p12" \
     CRAKE_OPENCONNECT="C:/Program Files/Crake/openconnect/openconnect.exe" \
     "$3" $FILTER --test-threads=1 --nocapture || status=$?
   [ "$status" = 0 ] || tail -n 60 "C:/ProgramData/Crake/craked.log"

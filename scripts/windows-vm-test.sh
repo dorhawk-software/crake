@@ -120,7 +120,6 @@ cp -r target/windows/openvpn "$WORK/test/crake/openvpn"
 cp "$OUT/crake-tests.exe" scripts/windows-vm-test/run.ps1 "$WORK/test/"
 [ -z "$SETUP" ] || cp "$SETUP" "$WORK/test/crake-setup.exe"
 cp scripts/e2e/ocserv.conf scripts/e2e/openvpn.conf scripts/e2e/sso.py "$WORK/test/e2e/"
-cp -r scripts/e2e/ocserv-users "$WORK/test/e2e/"
 cp scripts/windows-vm-test/gateway.sh "$WORK/test/"
 xorriso -as mkisofs -quiet -output "$WORK/test.iso" -volid CRAKETEST -joliet -rock "$WORK/test"
 

@@ -102,7 +102,7 @@ impl Manager {
 
     /// Whether `dst` (reached from `src`) may be probed, and through which
     /// tunnels: routable, not on the never list, this machine's own and not
-    /// the local network, not already routed, not probed in the last 10 min,
+    /// the local network, not routed by a tunnel that's up, not probed in the last 10 min,
     /// and in reach of at least one routed tunnel. Marks it probed.
     fn probe_candidacy(&self, dst: IpAddr, src: IpAddr) -> Option<Vec<(String, String, u32)>> {
         if Target::host(dst).check_routable().is_err()
@@ -115,14 +115,11 @@ impl Manager {
         if !local.is_own(src) || local.on_link(dst) {
             return None;
         }
-        if self
-            .hosts
-            .lock()
-            .unwrap()
-            .tunnels
-            .values()
-            .any(|t| t.covers(dst))
-        {
+        // Already routed: through a tunnel that's up. One that's off, or
+        // gone (IT took its file away), routes nothing: until 2026-10-20 its
+        // learned hosts kept every other tunnel from learning them (the
+        // scenario suite, on CI's Windows).
+        if self.owner_of(dst, "").is_some() {
             return None;
         }
         {

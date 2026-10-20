@@ -32,6 +32,16 @@ pub(crate) fn anyconnect_gateway() -> String {
     crate::test_app::gateway()
 }
 
+/// carol's certificate (a PKCS#12 file, its password hunter2): the
+/// gateway's copy, in the wire's folder on Linux, CI's artifact elsewhere.
+pub(crate) fn user_certificate() -> String {
+    if cfg!(target_os = "linux") {
+        "/mnt/link/acme-user.p12".into()
+    } else {
+        std::env::var("CRAKE_GATEWAY_USER_CERT").expect("CRAKE_GATEWAY_USER_CERT")
+    }
+}
+
 /// Whether ACME's DNS answers `name` with `at` when asked directly (over
 /// TCP), as a check that a block on it took.
 #[cfg(unix)]

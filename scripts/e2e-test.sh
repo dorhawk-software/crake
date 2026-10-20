@@ -8,6 +8,7 @@
 # ip from the host's filesystem, read-only, as scripts/netns-test.sh does.
 # Nothing on the host's network is touched; nothing is installed.
 # CRAKE_E2E_FILTER picks the tests (e.g. "scenarios::anyconnect").
+# CRAKE_E2E_KEEP=<folder> keeps the gateway's logs there.
 set -eu
 cd "$(dirname "$0")/.."
 # These tests run the app headless (frames drawn by hand), so they don't need
@@ -27,7 +28,7 @@ BIN=$(cargo test ${CRAKE_CARGO_SCOPE:--p crake} --no-run --message-format=json 2
 docker build -q -t crake-e2e-gateway scripts/e2e >/dev/null
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/crake-e2e.XXXXXX")
 GW=crake-e2e-gateway-$$
-trap 'docker rm -f "$GW" >/dev/null 2>&1 || true; rm -rf "$WORK"' EXIT
+trap 'docker rm -f "$GW" >/dev/null 2>&1 || true; [ -z "${CRAKE_E2E_KEEP:-}" ] || cp -r "$WORK/link/." "$CRAKE_E2E_KEEP/"; rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/link" "$WORK/tmp"
 docker run -d --rm --name "$GW" --network none --cap-add NET_ADMIN --device /dev/net/tun \
   -v "$WORK/link:/link" crake-e2e-gateway >/dev/null

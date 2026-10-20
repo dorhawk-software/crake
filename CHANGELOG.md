@@ -24,6 +24,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
   folder (ProgramData\Crake\managed.d on Windows) were read only when a craked.toml was there too,
   which Windows' and macOS' installers don't make, so they never showed up. They do now.
 
+- **A host another tunnel learned can go through this one.** Once a tunnel had learned a host, no
+  other tunnel could learn it, even with that tunnel switched off (or gone, when your IT team removed
+  theirs), so the host went nowhere. Now only a tunnel that's up keeps a host to itself, and switching
+  one off lets the others reach what it carried straight away.
+
 - **A tunnel whose DNS stops answering hands over cleanly.** When a company's DNS goes quiet, Crake
   answers the names it has seen with their last address. For a moment at the switch, a name asked
   could go to the internet's DNS instead (against "Keep internal names private"), or wait on an

@@ -1,3 +1,0 @@
-# ACME's own user: ocserv.conf's network, with ACME's domain (per user,
-# since a global default-domain would reach Globex's user too).
-split-dns = acme.internal

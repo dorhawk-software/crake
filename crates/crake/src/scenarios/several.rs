@@ -169,3 +169,20 @@ pub(crate) async fn one_address_goes_through_one_tunnel(up: &mut Up) {
         up.label
     );
 }
+
+/// A host the first tunnel learned, with that tunnel off: the other one
+/// that reaches it takes it (what an off tunnel learned routes nothing).
+pub(crate) async fn a_host_learned_by_a_tunnel_thats_off_goes_through_another(up: &mut Up) {
+    let globex = globex_beside(up).await;
+    assert!(reached(SHARED).await, "{SHARED} probed");
+    assert_eq!(way(SHARED), up.device, "{SHARED}: the first in order");
+    up.off().await;
+    assert!(
+        reached(SHARED).await,
+        "{SHARED} with {} off\n{}\ncraked said:\n{}",
+        up.label,
+        platform::diagnose(&globex),
+        up.said()
+    );
+    assert_eq!(way(SHARED), globex, "{SHARED} through Globex");
+}

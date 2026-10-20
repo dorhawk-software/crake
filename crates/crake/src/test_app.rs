@@ -159,7 +159,7 @@ pub(crate) async fn sign_in_answering(
 /// `sign_in_answering` as another of the gateway's users (Globex's bob).
 pub(crate) async fn sign_in_as(
     gateway: &str,
-    user: &'static str,
+    user: &str,
     passwords: &[&str],
 ) -> Result<(crake_proto::Session, Asked), (Asked, Option<String>)> {
     let spec = Spec {
@@ -174,6 +174,17 @@ pub(crate) async fn sign_in_as(
         keyring: false,
         openconnect: None,
     };
+    sign_in_with(spec, passwords).await
+}
+
+/// The sign-in window's part for `spec`, as the app opens it for a tunnel:
+/// trust the gateway, then `passwords` in turn for whatever secret is
+/// asked (the gateway's password, a certificate's).
+pub(crate) async fn sign_in_with(
+    spec: Spec,
+    passwords: &[&str],
+) -> Result<(crake_proto::Session, Asked), (Asked, Option<String>)> {
+    let user = spec.user.clone();
     let (tx, events) = async_channel::unbounded();
     let replies = signin::start(spec, tx);
     let mut asked = Vec::new();
@@ -193,6 +204,14 @@ pub(crate) async fn sign_in_as(
                     asked.push("trust");
                     "yes"
                 }
+                Ask::CertificatePassword { .. } => {
+                    asked.push("certificate password");
+                    let Some(password) = passwords.next() else {
+                        replies.send(Reply::Cancel).await.unwrap();
+                        return Err((asked, p.words));
+                    };
+                    password
+                }
                 Ask::Secret => {
                     asked.push("password");
                     let Some(password) = passwords.next() else {
@@ -204,7 +223,7 @@ pub(crate) async fn sign_in_as(
                 // Asked again, openconnect may ask the username too.
                 Ask::Text if p.label.to_lowercase().contains("user") => {
                     asked.push("user");
-                    user
+                    user.as_str()
                 }
                 other => panic!("unexpected question {other:?} ({})", p.label),
             },

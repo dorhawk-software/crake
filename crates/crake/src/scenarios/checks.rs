@@ -86,12 +86,16 @@ pub(crate) async fn nothing_is_routed_up_front(up: &mut Up) {
 /// probed, learned, said in the log, and the app's own retry gets through.
 pub(crate) async fn a_host_is_learned_by_probing(up: &mut Up) {
     let probed = page_within(GIT).await;
-    assert!(
-        probed.is_some_and(|b| b.contains("crex")),
-        "{GIT} through {}\n{}",
-        up.label,
-        platform::diagnose(&up.device)
-    );
+    if !probed.is_some_and(|b| b.contains("crex")) {
+        // What craked said meanwhile, applied.
+        up.app.settle(Duration::from_secs(1)).await;
+        panic!(
+            "{GIT} through {}\n{}\ncraked said:\n{}",
+            up.label,
+            platform::diagnose(&up.device),
+            up.said()
+        );
+    }
     assert_eq!(way(GIT), up.device, "{GIT}'s way");
     let said = format!("Sent {GIT} through {}.", up.label);
     up.app
@@ -201,6 +205,17 @@ pub(crate) async fn a_report_says_where_things_go(up: &mut Up) {
     assert!(part("DNS").contains(platform::REPORT_DNS), "{text}");
     assert!(part("Routes").contains("\u{2190} Crake: "), "{text}");
     assert!(!part("Crake's rules").is_empty(), "{text}");
+    // "Hide names and addresses when sharing": the hosts go, the
+    // computer's plumbing (the DNS Crake set up) stays.
+    let hidden = crate::report::text(&report, true, &jiff::Zoned::now());
+    assert!(
+        !hidden.contains(name) && !hidden.contains(at),
+        "{name} or {at} in a hidden report:\n{hidden}"
+    );
+    assert!(
+        hidden.contains(platform::REPORT_DNS),
+        "the DNS Crake set up, hidden:\n{hidden}"
+    );
 }
 
 /// Switched off: the tunnel's network is gone again, and so is what Crake

@@ -1,5 +1,5 @@
-//! Signing in again: a wrong password asked again, and switching on
-//! again with what each kind of gateway keeps.
+//! Signing in: New tunnel finding the gateway, a wrong password asked
+//! again, and switching on again with what each kind of gateway keeps.
 
 use super::{Up, WAIT, sign_in_and_connect, state};
 use crate::client::Command;
@@ -38,4 +38,28 @@ pub(crate) async fn switching_on_again_uses_what_was_kept(up: &mut Up) {
             .await;
     }
     up.device = up.crake.device(name);
+}
+
+/// New tunnel's Detect against the AnyConnect gateway: an AnyConnect
+/// gateway, and when its certificate runs out, read in a handshake (the
+/// test gateway's is valid for ten years).
+pub(crate) async fn new_tunnel_finds_the_gateway_and_its_certificate(_up: &mut Up) {
+    let gateway = super::platform::anyconnect_gateway();
+    let found = tokio::task::spawn_blocking(move || {
+        crate::detect::gateway(&gateway, std::time::Duration::from_secs(15))
+    })
+    .await
+    .unwrap();
+    let crate::detect::Found::AnyConnect {
+        expires: Some(expires),
+        ..
+    } = found
+    else {
+        panic!("not an AnyConnect gateway with a certificate: {found:?}");
+    };
+    let year = jiff::SignedDuration::from_hours(365 * 24);
+    assert!(
+        expires > jiff::Timestamp::now() + year,
+        "valid for years: {expires}"
+    );
 }

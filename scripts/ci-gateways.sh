@@ -23,7 +23,7 @@ case "${1:-}" in
       -p 127.0.0.1:4431-4434:4431-4434/tcp \
       -v "$OUT:/link" crake-e2e-gateway sh /ci-start.sh >/dev/null
     i=0
-    until [ -s "$OUT/openvpn-ca.crt" ] && curl -sk -o /dev/null https://127.0.0.1:8443; do
+    until [ -s "$OUT/openvpn-ca.crt" ] && [ -s "$OUT/acme-user.p12" ] && curl -sk -o /dev/null https://127.0.0.1:8443; do
       i=$((i + 1))
       [ "$i" -lt 60 ] || { docker logs "$NAME"; exit 1; }
       sleep 1

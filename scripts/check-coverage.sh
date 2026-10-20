@@ -13,12 +13,20 @@ cd "$(dirname "$0")/.."
 
 # Lines covered, in percent.
 declare -A floor=(
-    [crake]=66
+    [crake]=73
     [craked]=63
     [crake-os]=70
     [crake-proto]=98
     [lint-literals]=82
 )
+
+# The tests that need a real gateway (CRAKE_E2E: the scenario suite, the
+# e2e tests, the journeys, the gateway tests and their helpers) are test
+# code `cargo test` can't run, measured by running them: left out of the
+# share (2026-10-20, when the scenario suite's growth alone took crake
+# under its floor; the floor then rose from 66 to 73, what crake's own code
+# had without them).
+harness='^crake/src/(scenarios/|e2e_|journey_|gateway_tests/|windows_tests|windows_journey|macos_journey|test_app|journey_kit)'
 
 # Every test runs here, measured: cargo-llvm-cov's "show-env" way (cargo
 # test itself, instrumented), in a folder of its own, so the build stays
@@ -39,8 +47,8 @@ summary=$(cargo llvm-cov report --summary-only 2>&1)
 fail=0
 for crate in "${!floor[@]}"; do
     # Columns: file, regions (3), functions (3), lines (total, missed, cover), …
-    read -r total missed < <(printf '%s\n' "$summary" | awk -v c="$crate/" '
-        index($1, c) == 1 && $1 ~ /\.rs$/ { t += $8; m += $9 }
+    read -r total missed < <(printf '%s\n' "$summary" | awk -v c="$crate/" -v h="$harness" '
+        index($1, c) == 1 && $1 ~ /\.rs$/ && $1 !~ h { t += $8; m += $9 }
         END { print t + 0, m + 0 }')
     if [ "$total" -eq 0 ]; then
         echo "coverage: no lines found for $crate"
@@ -51,7 +59,8 @@ for crate in "${!floor[@]}"; do
     if [ "$pct" -lt "${floor[$crate]}" ]; then
         echo "coverage: $crate is at $pct% of lines, its floor is ${floor[$crate]}%."
         # Where: the lines no test ran, per file.
-        cargo llvm-cov report --show-missing-lines 2>/dev/null | grep "/$crate/src/" | sed 's/^/  /'
+        cargo llvm-cov report --show-missing-lines 2>/dev/null | grep "/$crate/src/" |
+            grep -Ev "/${harness#^}" | sed 's/^/  /'
         fail=1
     fi
 done

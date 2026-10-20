@@ -23,6 +23,9 @@ const PUBLIC_DNS_LOG: &str = "/mnt/link/public-dns.log";
 /// company's gateway names it (split-horizon asks its DNS about names
 /// under it).
 const GATEWAY_NAME: &str = "vpn.acme.example";
+/// ACME's AnyConnect gateway behind a front that admits only clients
+/// calling themselves AnyConnect (scripts/e2e/picky.py).
+pub(crate) const ANYCONNECT_ONLY: &str = "https://vpn.acme.example:8444";
 /// IPsec's gateway.
 pub(crate) const IPSEC_GATEWAY: &str = GATEWAY_NAME;
 

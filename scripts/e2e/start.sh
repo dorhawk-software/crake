@@ -34,6 +34,8 @@ dnsmasq --no-resolv --no-hosts --listen-address=203.0.113.53 --bind-interfaces \
   --address=/shop.acme.example/203.0.113.80 --address=/www.acme.example/203.0.113.80 --address=/#/
 busybox httpd -p 80 -h /srv/www
 cp /etc/openvpn/e2e/ca.crt /link/openvpn-ca.crt
+# carol's certificate, for the client's certificate sign-in.
+cp /etc/ocserv/carol.p12 /link/acme-user.p12
 openvpn --config /etc/openvpn/e2e/server.conf > /link/openvpn-server.log 2>&1 &
 python3 /sso.py /run/openvpn-mgmt.sock 198.51.100.10 8080 &
 # IPsec (IKEv2): charon, its tunnel ending on ipsec0 (if_id 7), where the
@@ -49,4 +51,8 @@ for gw in fortinet:4431 gp:4432 f5:4433 juniper:4434; do
   python3 "/fake/fake-${gw%%:*}-server.py" 198.51.100.10 "${gw##*:}" /etc/ocserv/cert.pem /etc/ocserv/key.pem \
     > "/link/fake-${gw%%:*}.log" 2>&1 &
 done
-exec ocserv --foreground --config /etc/ocserv/ocserv.conf
+# ACME's gateway again on 8444, behind a front that admits only clients
+# calling themselves AnyConnect (7d).
+python3 /picky.py 198.51.100.10 8444 /etc/ocserv/cert.pem /etc/ocserv/key.pem 443 \
+  > /link/picky.log 2>&1 &
+exec ocserv --foreground --log-stderr --config /etc/ocserv/ocserv.conf > /link/ocserv.log 2>&1
