@@ -11,6 +11,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **Signing in through the browser works for AnyConnect and other openconnect gateways.** Crake
+  handed openconnect the browser's name without its folder, and openconnect doesn't look for it, so
+  the browser never opened on Linux or macOS and the sign-in waited forever. It's found where your
+  system keeps it now. (Found by a new test that plays a Cisco gateway's browser sign-in.)
+
 - **IPsec on NixOS.** `services.crake.ipsec = true;` brings strongSwan and runs Crake's own charon
   for IPsec tunnels, as the other distributions' packages do. New tunnel says that line on NixOS
   instead of an apt command.

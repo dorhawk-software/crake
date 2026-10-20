@@ -32,6 +32,9 @@ in {
     # strongSwan in the system's profile (New tunnel's IPsec card).
     environment.systemPackages = [ cfg.package pkgs.openconnect pkgs.openvpn ]
       ++ lib.optional cfg.ipsec pkgs.strongswan;
+    # charon is in strongSwan's libexec, which the profile leaves out unless
+    # asked (/lib, with its plugins, is in).
+    environment.pathsToLink = lib.optional cfg.ipsec "/libexec";
     services.dbus.packages = [ cfg.package ];
     security.polkit.enable = true;
     # Tunnel DNS goes through systemd-resolved.

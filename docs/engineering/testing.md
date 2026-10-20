@@ -156,11 +156,26 @@ The user doesn't want development builds installed on their machine.
   "unexpected CSTP length"); Linux only (a Cloudflare hostname of its own
   would be needed). `CRAKE_E2E_KEEP=<folder>` keeps the gateway's logs
   (ocserv logs to /link/ocserv.log).
-  Not yet in the suite (2026-10-20): AnyConnect's browser sign-in (ocserv
-  speaks no SAML; a stand-in would have to play Cisco's sso-v2 for
-  openconnect's `--external-browser`), a certificate kept in the keyring
+  AnyConnect's browser sign-in (2026-10-20): ocserv speaks no SAML, so
+  `scripts/e2e/cisco_sso.py` (port 8446) plays Cisco's sso-v2 "external
+  browser" in front of it: the sign-in page, the token encrypted to the
+  key openconnect sent (its hpke.c: ECDH P-256, HKDF "AC_ECIES",
+  AES-256-GCM) handed to openconnect's port 29786, then it signs in to
+  ocserv itself and passes the tunnel through. The client's browser is a
+  `xdg-open` of client.sh's that follows the page with curl (on PATH,
+  in the client's /run, which e2e-test.sh mounts exec). The scenarios
+  `anyconnect_browser` (Linux only: elsewhere the browser would be a
+  real one). Its first run found every browser sign-in on Linux and
+  macOS failing: openconnect starts the browser with posix_spawn, which
+  doesn't search PATH, and Crake named it bare (now found on PATH,
+  `signin::browser_on_path`).
+  Not yet in the suite (2026-10-20): a certificate kept in the keyring
   or on a smart card (the tests keep no keyring; SoftHSM could stand in
-  for a card), OpenVPN's and IPsec's certificates, and a full tunnel and
+  for a card, but the e2e client runs from this computer's read-only
+  filesystem, so its softhsm2 module and tools would have to be
+  installed here: never. It needs a client image of its own, as the
+  gateway has, or the package tests' containers, which install what
+  they like), OpenVPN's and IPsec's certificates, and a full tunnel and
   IPv6 off Linux (Cloudflare carries neither).
   Windows' "stopping craked leaves nothing" stops the installed service
   (its adapters, NRPT rules, routes and firewall rules must be gone, names

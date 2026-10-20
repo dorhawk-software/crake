@@ -44,4 +44,11 @@ until chroot /host resolvectl dns lan 203.0.113.53 2>/dev/null; do
   [ "$i" -lt 50 ] || { cat /host/run/resolved.log; echo "systemd-resolved didn't start" >&2; exit 1; }
   sleep 0.1
 done
-exec chroot /host env CRAKE_E2E=1 TMPDIR=/mnt "$@"
+# The test's browser: it follows a sign-in page to its end, as a person
+# signing in would (Cisco's browser sign-in, scripts/e2e/cisco_sso.py).
+# openconnect is handed xdg-open, found on PATH.
+# (/run is a tmpfs of its own: e2e-test.sh mounts it exec for this.)
+mkdir -p /host/run/browser
+printf '#!/bin/sh\necho "$1" >> /mnt/browser.log\nexec curl -skS -L --max-time 20 -o /dev/null -w "%%{http_code} %%{url_effective}\\n" "$1" >> /mnt/browser.log 2>&1\n' > /host/run/browser/xdg-open
+chmod 755 /host/run/browser/xdg-open
+exec chroot /host env CRAKE_E2E=1 TMPDIR=/mnt PATH="/run/browser:$PATH" "$@"

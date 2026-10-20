@@ -60,6 +60,13 @@ pub(crate) fn anyconnect_groups_gateway() -> Option<String> {
     std::env::var("CRAKE_GATEWAY_GROUPS").ok()
 }
 
+/// The browser sign-in's stand-in: Linux's e2e only, where the test's own
+/// browser follows the page (a runner's would be a real one).
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn anyconnect_browser_gateway() -> Option<String> {
+    None
+}
+
 /// Whether ACME's DNS answers `name` with `at` when asked directly (over
 /// TCP), as a check that a block on it took.
 #[cfg(unix)]

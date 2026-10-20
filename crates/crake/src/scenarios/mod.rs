@@ -258,6 +258,10 @@ pub(crate) async fn sign_in(app: &mut App, gateway: Gateway, passwords: &[&str])
                     }
                     // Turned away as openconnect, it signed in as AnyConnect,
                     // and craked connects the same way with the session.
+                    // The page in the browser signed in: nothing asked here.
+                    if gateway == Gateway::AnyConnectBrowser {
+                        assert_eq!(asked, ["trust"], "{label} asked {asked:?}");
+                    }
                     if gateway == Gateway::AnyConnectOnly {
                         assert_eq!(s.user_agent.as_deref(), Some("AnyConnect"), "{label}");
                     }
@@ -441,6 +445,17 @@ scenarios!(
 scenarios!(
     anyconnect_only,
     super::Gateway::AnyConnectOnly,
+    [
+        checks::nothing_is_routed_up_front,
+        checks::a_host_is_learned_by_probing,
+        sign_in::switching_on_again_uses_what_was_kept,
+    ]
+);
+// A gateway that signs in through the browser (Cisco's SAML): no
+// password asked, the page in the browser does it.
+scenarios!(
+    anyconnect_browser,
+    super::Gateway::AnyConnectBrowser,
     [
         checks::nothing_is_routed_up_front,
         checks::a_host_is_learned_by_probing,

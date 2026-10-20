@@ -4,7 +4,7 @@
 # reaches (10.40.0.0/16, ACME's internal network in the tests).
 FROM ubuntu:26.04
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ocserv gnutls-bin dnsmasq-base busybox iproute2 nftables python3 python3-flask openvpn openssl curl ca-certificates \
+ && apt-get install -y --no-install-recommends ocserv gnutls-bin dnsmasq-base busybox iproute2 nftables python3 python3-flask python3-cryptography openvpn openssl curl ca-certificates \
     strongswan-charon strongswan-swanctl libcharon-extauth-plugins libcharon-extra-plugins \
  && rm -rf /var/lib/apt/lists/*
 # The other protocols' gateways, as openconnect's own tests play them
@@ -57,5 +57,5 @@ RUN sed -i '/^default-domain/d' /etc/ocserv/ocserv.conf \
 COPY openvpn.conf /etc/openvpn/e2e/server.conf
 COPY ipsec.conf /etc/swanctl/conf.d/acme.conf
 COPY strongswan.conf /etc/strongswan.d/crake-e2e.conf
-COPY start.sh ci-start.sh companies.sh extras.sh client.sh relay.py sso.py picky.py /
+COPY start.sh ci-start.sh companies.sh extras.sh client.sh relay.py sso.py picky.py cisco_sso.py /
 CMD ["/bin/sh", "/start.sh"]

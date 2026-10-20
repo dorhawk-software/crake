@@ -1,7 +1,8 @@
 #!/bin/sh
-# ACME's gateway twice more, for start.sh and ci-start.sh ($1: the address
-# the front listens on): with groups to choose from, and behind a front
-# that admits only clients calling themselves AnyConnect. Run before the
+# ACME's gateway three times more, for start.sh and ci-start.sh ($1: the
+# address the fronts listen on): with groups to choose from, behind a front
+# that admits only clients calling themselves AnyConnect, and behind one
+# that signs in through the browser. Run before the
 # main ocserv starts (the front reaches it at each connection).
 set -e
 # ACME's gateway with groups on 8445, its own ocserv: signing in, a user
@@ -19,3 +20,7 @@ ocserv --log-stderr --config /run/ocserv-groups.conf > /link/ocserv-groups.log 2
 # calling themselves AnyConnect (7d).
 python3 /picky.py "$1" 8444 /etc/ocserv/cert.pem /etc/ocserv/key.pem 443 \
   > /link/picky.log 2>&1 &
+# And on 8446 behind Cisco's browser sign-in (SAML's "external browser"),
+# which ocserv doesn't speak.
+python3 /cisco_sso.py "$1" 8446 /etc/ocserv/cert.pem /etc/ocserv/key.pem 443 \
+  > /link/cisco-sso.log 2>&1 &

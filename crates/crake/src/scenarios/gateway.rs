@@ -22,6 +22,11 @@ pub(crate) enum Gateway {
     /// themselves AnyConnect (7d; scripts/e2e/picky.py; through Cloudflare
     /// where its hostname is, crake-ci-picky).
     AnyConnectOnly,
+    /// AnyConnect signed in through the browser, as Cisco's gateways do
+    /// with SAML (scripts/e2e/cisco_sso.py in front of ocserv; the test's
+    /// browser follows the page). Linux's e2e only: the browser there is
+    /// the test's own.
+    AnyConnectBrowser,
     /// AnyConnect where signing in chooses a group (erin's, Engineering;
     /// through Cloudflare where its hostname is, crake-ci-groups).
     AnyConnectGroups,
@@ -40,6 +45,7 @@ impl Gateway {
         match self {
             Self::AnyConnect | Self::AnyConnectCertificate => ("acme", "ACME"),
             Self::AnyConnectOnly | Self::AnyConnectGroups => ("acme", "ACME"),
+            Self::AnyConnectBrowser => ("acme", "ACME"),
             Self::OpenVpn | Self::OpenVpnCode => ("initech", "Initech"),
             #[cfg(target_os = "linux")]
             Self::Ipsec => ("nordbank", "Nordbank"),
@@ -56,7 +62,7 @@ impl Gateway {
             | Self::OpenVpn
             | Self::OpenVpnCode
             | Self::Globex => true,
-            Self::AnyConnectOnly | Self::AnyConnectGroups => true,
+            Self::AnyConnectOnly | Self::AnyConnectGroups | Self::AnyConnectBrowser => true,
             #[cfg(target_os = "linux")]
             Self::Ipsec => false,
         }
@@ -73,6 +79,10 @@ impl Gateway {
                 "the gateway with groups isn't reachable here (a Cloudflare route for \
                  crake-ci-groups.dorhawk.software)",
             ),
+            Self::AnyConnectBrowser if platform::anyconnect_browser_gateway().is_none() => Some(
+                "the browser sign-in's stand-in runs in Linux's e2e only (its browser is the \
+                 test's own)",
+            ),
             _ => None,
         }
     }
@@ -84,6 +94,7 @@ impl Gateway {
             Self::AnyConnectCertificate => Some(""),
             Self::AnyConnectOnly => Some("alice"),
             Self::AnyConnectGroups => Some("erin"),
+            Self::AnyConnectBrowser => Some(""),
             Self::Globex => Some("bob"),
             _ => None,
         }
@@ -93,7 +104,9 @@ impl Gateway {
     pub(super) fn other(self) -> Self {
         match self {
             Self::AnyConnect | Self::AnyConnectCertificate => Self::OpenVpn,
-            Self::AnyConnectOnly | Self::AnyConnectGroups => Self::OpenVpn,
+            Self::AnyConnectOnly | Self::AnyConnectGroups | Self::AnyConnectBrowser => {
+                Self::OpenVpn
+            }
             Self::OpenVpn | Self::OpenVpnCode => Self::AnyConnect,
             #[cfg(target_os = "linux")]
             Self::Ipsec => Self::AnyConnect,
@@ -138,7 +151,7 @@ impl Gateway {
             Self::AnyConnectCertificate | Self::OpenVpnCode | Self::Globex => {
                 panic!("{self:?} is never IT's in these tests")
             }
-            Self::AnyConnectOnly | Self::AnyConnectGroups => {
+            Self::AnyConnectOnly | Self::AnyConnectGroups | Self::AnyConnectBrowser => {
                 panic!("{self:?} is never IT's in these tests")
             }
         }
@@ -178,6 +191,14 @@ impl Gateway {
                 ("protocol", "anyconnect".into()),
                 ("sign_in", "password".into()),
                 ("user", "alice".into()),
+            ]),
+            Self::AnyConnectBrowser => fields.extend([
+                (
+                    "gateway",
+                    platform::anyconnect_browser_gateway().unwrap_or_default(),
+                ),
+                ("protocol", "anyconnect".into()),
+                ("sign_in", "browser".into()),
             ]),
             Self::Globex => fields.extend([
                 ("gateway", platform::anyconnect_gateway()),

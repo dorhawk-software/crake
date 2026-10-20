@@ -170,6 +170,37 @@ fn certificate_arg(args: &[String]) -> Option<(usize, PathBuf)> {
     })
 }
 
+const EXTERNAL_BROWSER: &str = "--external-browser=";
+
+/// openconnect starts its browser with posix_spawn, which doesn't look on
+/// PATH: a bare "xdg-open" (or macOS' "open") failed every browser
+/// sign-in with "Spawn browser: No such file or directory" (found by the
+/// e2e stand-in for Cisco's sign-in page, 2026-10-20). The program found
+/// on PATH, as the user's shell would; left as it is where none is
+/// (openconnect then says so) and on Windows, whose openconnect asks the
+/// shell.
+fn browser_on_path(args: &mut [String], path: Option<&std::ffi::OsStr>) {
+    if cfg!(windows) {
+        return;
+    }
+    for a in args.iter_mut() {
+        let Some(name) = a.strip_prefix(EXTERNAL_BROWSER) else {
+            continue;
+        };
+        if name.contains('/') {
+            continue;
+        }
+        let found = path
+            .into_iter()
+            .flat_map(std::env::split_paths)
+            .map(|dir| dir.join(name))
+            .find(|p| crate::sys::executable(p));
+        if let Some(p) = found {
+            *a = format!("{EXTERNAL_BROWSER}{}", p.display());
+        }
+    }
+}
+
 fn run(
     spec: &Spec,
     events: &async_channel::Sender<Event>,
@@ -177,6 +208,7 @@ fn run(
     rt: &tokio::runtime::Runtime,
 ) -> Result<Session, String> {
     let mut auth_args = spec.auth_args.clone();
+    browser_on_path(&mut auth_args, std::env::var_os("PATH").as_deref());
     // A certificate kept in the keyring wins over the file the config names.
     let mut temp = None;
     let mut from_file = certificate_arg(&auth_args).map(|(_, p)| p);
@@ -384,6 +416,7 @@ fn attempt(
                         let _ = events.send_blocking(Event::Reached);
                     }
                     if !line.is_empty() {
+                        crate::debug(&format!("openconnect: {line}"));
                         lines.push(line);
                     }
                 }
@@ -604,6 +637,35 @@ fn failure(lines: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn the_browser_is_named_by_its_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let opener = dir.path().join("xdg-open");
+        std::fs::write(&opener, "#!/bin/sh\n").unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&opener, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let path =
+            std::env::join_paths([std::path::Path::new("/nonexistent"), dir.path()]).unwrap();
+        let mut args = vec![
+            "--external-browser=xdg-open".to_owned(),
+            "--user=alice".to_owned(),
+        ];
+        browser_on_path(&mut args, Some(&path));
+        assert_eq!(args[0], format!("--external-browser={}", opener.display()));
+        assert_eq!(args[1], "--user=alice");
+        // A path stays; a program found nowhere is left for openconnect to say.
+        let mut args = vec![
+            "--external-browser=/opt/b".to_owned(),
+            "--external-browser=nowhere".to_owned(),
+        ];
+        browser_on_path(&mut args, Some(&path));
+        assert_eq!(
+            args,
+            ["--external-browser=/opt/b", "--external-browser=nowhere"]
+        );
+    }
 
     fn lines(l: &[&str]) -> Vec<String> {
         l.iter().map(|s| s.to_string()).collect()

@@ -29,6 +29,12 @@ pub(crate) fn anyconnect_only_gateway() -> Option<String> {
     Some(format!("https://{GATEWAY_NAME}:8444"))
 }
 
+/// ACME's AnyConnect gateway behind Cisco's browser sign-in, played by
+/// scripts/e2e/cisco_sso.py; the test's browser is scripts/e2e/client.sh's.
+pub(crate) fn anyconnect_browser_gateway() -> Option<String> {
+    Some(format!("https://{GATEWAY_NAME}:8446"))
+}
+
 /// ACME's AnyConnect gateway with groups to choose from (its own ocserv).
 pub(crate) fn anyconnect_groups_gateway() -> Option<String> {
     Some(format!("https://{GATEWAY_NAME}:8445"))

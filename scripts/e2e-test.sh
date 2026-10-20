@@ -35,6 +35,6 @@ docker run -d --rm --name "$GW" --network none --cap-add NET_ADMIN --device /dev
 # /host/run is the container's own: this computer's /run holds its system
 # bus (openvpn3, resolved), which a test running as root must never reach.
 docker run --rm --network none --cap-add NET_ADMIN --device /dev/net/tun \
-  -v /:/host:ro -v "$WORK/tmp:/host/mnt" -v "$WORK/link:/link" -v "$WORK/link:/host/mnt/link:ro" --tmpfs /host/run \
+  -v /:/host:ro -v "$WORK/tmp:/host/mnt" -v "$WORK/link:/link" -v "$WORK/link:/host/mnt/link:ro" --tmpfs /host/run:exec \
   crake-e2e-gateway sh /client.sh env CRAKE_E2E_HOOK="$HOOK" CRAKE_E2E_IPSEC=1 LLVM_PROFILE_FILE=/dev/null \
   env ${CRAKE_JOURNEY_DEBUG:+CRAKE_JOURNEY_DEBUG=$CRAKE_JOURNEY_DEBUG} ${CRAKE_DEBUG:+CRAKE_DEBUG=$CRAKE_DEBUG} "$BIN" ${CRAKE_E2E_FILTER:-e2e_tests e2e_openvpn e2e_ipsec e2e_protocols scenarios journey_tests journey_ipsec} --test-threads=1 --nocapture "$@"
