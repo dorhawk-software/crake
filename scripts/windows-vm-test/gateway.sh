@@ -26,6 +26,9 @@ certtool --generate-self-signed --load-privkey /etc/ocserv/key.pem --template /t
     --outfile /etc/ocserv/cert.pem 2>/dev/null
 printf 'hunter2\nhunter2\n' | ocpasswd -c /etc/ocserv/passwd alice
 cp /test/e2e/ocserv.conf /etc/ocserv/ocserv.conf
+# Each user's settings (alice's: ACME's domain).
+mkdir -p /etc/ocserv/users
+cp /test/e2e/ocserv-users/* /etc/ocserv/users/
 # IPv6 too: an address for the client, and ACME's IPv6 network behind;
 # and a DNS server reached over IPv6, listed first (asked first).
 printf 'ipv6-network = fd40:ff::/64\nipv6-subnet-prefix = 128\nroute = fd40:1::/64\n' \

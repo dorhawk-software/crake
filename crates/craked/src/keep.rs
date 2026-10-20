@@ -49,13 +49,16 @@ pub fn answer(query: &[u8], addrs: &[IpAddr]) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// Answer on ADDR:53 until the socket fails. Windows: craked's DNS server
-/// answers for this link (`sys::windows::dns_queue`).
-pub async fn serve(mgr: Arc<crate::manager::Manager>) -> Result<()> {
-    if cfg!(windows) {
-        return Ok(());
-    }
-    let sock = Arc::new(UdpSocket::bind((ADDR, dns::PORT)).await?);
+/// The answerer's socket on ADDR:53 (its link's address must exist).
+/// Linux only: on Windows craked's DNS server answers for this link
+/// (`sys::windows::dns_queue`).
+pub async fn bind() -> Result<UdpSocket> {
+    Ok(UdpSocket::bind((ADDR, dns::PORT)).await?)
+}
+
+/// Answer on `sock` until it fails.
+pub async fn serve(mgr: Arc<crate::manager::Manager>, sock: UdpSocket) -> Result<()> {
+    let sock = Arc::new(sock);
     let mut buf = vec![0u8; dns::BUFFER];
     loop {
         let (n, from) = sock.recv_from(&mut buf).await?;

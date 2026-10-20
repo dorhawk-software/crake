@@ -69,6 +69,21 @@ impl Manager {
     /// Edit one of the user's own tunnels. Sign-in changes apply the next
     /// time it connects; what may go through it, at once.
     pub async fn update_tunnel(&self, name: &str, fields: &HashMap<String, String>) -> Result<()> {
+        // Whose it is first: IT's tunnel edited with fields that aren't
+        // whole was refused for its fields ("The gateway is a name or an
+        // address…"), not for being IT's (the scenario suite, 2026-10-20).
+        {
+            let map = self.tunnels.lock().unwrap();
+            let e = map
+                .get(name)
+                .ok_or_else(|| anyhow!("no tunnel named {name}"))?;
+            if e.config.own.is_none() {
+                bail!(
+                    "{} isn't one you added here, so it can't be changed here.",
+                    e.config.display()
+                );
+            }
+        }
         let mut fields = fields.clone();
         let profile = take_profile(&mut fields, false)?;
         let secret = take_secret(&mut fields, false)?;
@@ -78,12 +93,6 @@ impl Manager {
             let e = map
                 .get_mut(name)
                 .ok_or_else(|| anyhow!("no tunnel named {name}"))?;
-            if e.config.own.is_none() {
-                bail!(
-                    "{} isn't one you added here, so it can't be changed here.",
-                    e.config.display()
-                );
-            }
             // From OpenVPN 3 to Crake's own OpenVPN (7i): not under a
             // session that runs.
             let moved = e.config.protocol == crate::config::Protocol::Openvpn3

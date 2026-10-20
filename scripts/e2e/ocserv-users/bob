@@ -1,0 +1,6 @@
+# Globex's user, on the same gateway: its own network, DNS and domain
+# (companies.sh lets only these addresses into Globex's network).
+ipv4-network = 10.41.255.0/24
+dns = 10.41.0.2
+route = 10.41.0.0/16
+split-dns = globex.internal

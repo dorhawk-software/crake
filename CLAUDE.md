@@ -568,7 +568,10 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    sign_in = browser|password|certificate, certificate, dns_domains,
    extra_args, `learn = [names/networks]` or `full_tunnel = true`); IT's
    tunnels come first and shadow a user's one of the same name; a broken
-   file is skipped. The scope holds everywhere: DNS learning, the
+   file is skipped. Read with or without a craked.toml
+   (`Config::without_file`; until 2026-10-20 only with one, and Windows'
+   and macOS' installers ship none, so IT's files did nothing there).
+   The scope holds everywhere: DNS learning, the
    public-NXDOMAIN rescue, probing, and the user's own add/pin/redo ("ACME
    IT only allows *.acme.internal and 10.40.0.0/16 through ACME."). Full
    tunnel: everything not marked by another tunnel goes through except the
@@ -898,7 +901,13 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    known name gets an empty NOERROR; anything else SERVFAIL. The panel and
    tunnel detail say "Connected · its DNS doesn't answer". When it answers
    again: "Initech's DNS answers again.", its link is registered again and
-   crake-keep shrinks or goes.
+   crake-keep shrinks or goes. The order matters (found by the scenario
+   suite, 2026-10-20): the answerer's socket is bound, then crake-keep
+   takes the domains, and only then is the tunnel's link reverted (the
+   other way round, a name asked in between went to public DNS, or to a
+   link nobody answered on yet); and craked removes a crake-keep left by
+   one that ended during an outage when it starts (`apply_keep` in
+   `init`), or that company's names failed until the next outage.
    Original request: Found with an
    OpenVPN profile that set `dhcp-option DNS <address>` by hand; the DNS VM
    was restarted, got another address, and every name under the company's
@@ -1503,7 +1512,10 @@ gtk4 + relm4 or libadwaita (UI), oo7 (Secret Service keyring).
    has no charon unit, and the app looks for charon at the
    distributions' paths.
    Not yet: "Change the key…" in the sign-in window's failure (the
-   failure says to use Edit), IPsec in craked.toml and IT's managed
+   failure says to use Edit); a gateway with several networks shows only
+   the first as a hint (charon runs updown once per pair of selectors,
+   and craked takes the first call's; seen 2026-10-20 when the e2e
+   gateway got 10.42.0.0/16 too), IPsec in craked.toml and IT's managed
    files, certificates (the gateway's or the user's), the FortiGate by
    hand.
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or
@@ -2013,6 +2025,26 @@ The user doesn't want development builds installed on their machine.
   leaving an IPsec tunnel's XFRM interface behind when it ended without
   stopping it (unlike a tun device, it outlives its process); craked now
   removes Crake's leftover ones when it starts (`Net::remove_left_xfrm`).
+  Since 2026-10-20 it also covers split-horizon (Linux only: it needs the
+  gateway reached by name, vpn.acme.example from the public DNS stand-in,
+  and a public DNS the test controls; through Cloudflare the gateway is
+  127.0.0.1, so macOS and Windows say `not_here`), a tunnel's DNS that
+  stops answering (`platform::silence`: an nft rule, a pf anchor of the
+  test's own, a firewall rule), a second tunnel that clashes, two
+  companies at once (Globex: ocserv's second user, bob, with its own
+  network 10.41.0.0/16, DNS and domain from `ocserv-users/bob`, so it
+  rides the same Cloudflare route; `scripts/e2e/companies.sh` sets both
+  companies' networks up for start.sh and ci-start.sh, and a host both
+  reach, 10.42.0.10), "Use Globex" moving a host, one address for two
+  companies, and IT's tunnels (`it_scenarios!`, AnyConnect and OpenVPN:
+  managed.d in craked's test folder, or the installed service's with a
+  restart on Windows). ACME's domain now comes from alice's per-user
+  `split-dns` (a global default-domain would reach bob too). Found then:
+  IT's files were read only with a craked.toml, which Windows' and macOS'
+  installers don't ship (`Config::without_file`); the memory answerer
+  (7h) took over a tunnel's names in the wrong order and was left behind
+  by a craked that ended during an outage; and IT's tunnel edited with
+  partial fields was refused for its fields, not for being IT's.
   The older chained tests (`e2e_tests.rs` and the rest) still run; their
   checks move into scenarios as the testing-gaps catalogue is worked down.
 - CI (`.github/workflows/ci.yml`, on every push; a new push cancels the

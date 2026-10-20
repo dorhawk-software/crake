@@ -18,6 +18,17 @@ pub(crate) const PUBLIC_NAME: (&str, u16) = ("one.one.one.one", 80);
 pub(crate) const REPORT_DNS: &str = "10.40.0.2";
 /// What the gateway's public DNS stand-in was asked (dnsmasq's log).
 const PUBLIC_DNS_LOG: &str = "/mnt/link/public-dns.log";
+/// The gateways' public name (the public DNS stand-in gives it
+/// 198.51.100.10): ACME's organisation domain is acme.example, as a real
+/// company's gateway names it (split-horizon asks its DNS about names
+/// under it).
+const GATEWAY_NAME: &str = "vpn.acme.example";
+/// IPsec's gateway.
+pub(crate) const IPSEC_GATEWAY: &str = GATEWAY_NAME;
+
+pub(crate) fn anyconnect_gateway() -> String {
+    format!("https://{GATEWAY_NAME}")
+}
 
 pub(crate) fn config(dir: &Path) -> Config {
     Config {
@@ -30,7 +41,7 @@ pub(crate) fn config(dir: &Path) -> Config {
 /// The OpenVPN gateway ("host port"), its transport and its CA's file.
 pub(crate) fn openvpn_gateway() -> (String, &'static str, String) {
     (
-        "198.51.100.10 1194".into(),
+        format!("{GATEWAY_NAME} 1194"),
         "udp",
         "/mnt/link/openvpn-ca.crt".into(),
     )
@@ -110,4 +121,31 @@ pub(crate) fn left_after_stop() -> String {
     }
     left += &sh("ip -o link | grep crake-");
     left
+}
+
+/// Questions to `ip` dropped on their way out, until it's dropped (a
+/// tunnel's DNS that stopped answering).
+pub(crate) struct Silenced;
+
+pub(crate) fn silence(ip: &str) -> Silenced {
+    let out = sh(&format!(
+        "nft -f - <<'NFT'\ntable ip crake_test {{\n  chain out {{\n    \
+         type filter hook output priority 0;\n    ip daddr {ip} drop\n  }}\n}}\nNFT"
+    ));
+    assert!(out.trim().is_empty(), "silencing {ip}: {out}");
+    Silenced
+}
+
+impl Drop for Silenced {
+    fn drop(&mut self) {
+        sh("nft delete table ip crake_test");
+    }
+}
+
+/// How the system answers `name` now, and craked's memory answerer.
+pub(crate) fn name_diagnosis(name: &str) -> String {
+    sh(&format!(
+        "resolvectl query {name} 2>&1; dig +time=5 @169.254.53.54 {name} 2>&1; \
+         ss -ulpn 2>&1 | grep ':53 '; ip addr show crake-keep"
+    ))
 }

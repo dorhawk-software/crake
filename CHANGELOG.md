@@ -20,6 +20,17 @@ What's new in each Crake release, for the people using it. The newest is at the 
   such: "The key doesn't match". On Fedora, a small SELinux module of Crake's lets strongSwan
   read Crake's settings.
 
+- **Your IT team's tunnels on Windows and macOS.** Tunnels your IT team puts in Crake's managed
+  folder (ProgramData\Crake\managed.d on Windows) were read only when a craked.toml was there too,
+  which Windows' and macOS' installers don't make, so they never showed up. They do now.
+
+- **A tunnel whose DNS stops answering hands over cleanly.** When a company's DNS goes quiet, Crake
+  answers the names it has seen with their last address. For a moment at the switch, a name asked
+  could go to the internet's DNS instead (against "Keep internal names private"), or wait on an
+  answerer that wasn't listening yet. Crake's answerer is now listening before it takes the names
+  over. And if Crake's service ended during such an outage (a crash, a reboot), the company's names
+  kept failing once it was back, until the next outage; now they work again as soon as it starts.
+
 - **On a network that blocks UDP, a tunnel isn't called connected too soon.** When AnyConnect's UDP
   channel can't get through, Crake moves the tunnel over to TCP on the same sign-in. For about three
   seconds of that, the panel said Connected while the tunnel was still being moved, and internal

@@ -44,7 +44,7 @@ struct Crake {
 
 impl Crake {
     async fn craked() -> Self {
-        let (craked, app) = crate::scenarios::Craked::start().await;
+        let (craked, app) = crate::scenarios::Craked::start_with(&[]).await;
         Self { craked, app }
     }
 

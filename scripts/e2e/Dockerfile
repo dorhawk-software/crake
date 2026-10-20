@@ -32,6 +32,7 @@ RUN mkdir -p /etc/ocserv /srv/www \
  && printf 'cn = vpn.acme.example\nexpiration_days = 3650\ntls_www_server\nsigning_key\nencryption_key\n' > /tmp/cert.cfg \
  && certtool --generate-self-signed --load-privkey /etc/ocserv/key.pem --template /tmp/cert.cfg --outfile /etc/ocserv/cert.pem \
  && printf 'hunter2\nhunter2\n' | ocpasswd -c /etc/ocserv/passwd alice \
+ && printf 'hunter2\nhunter2\n' | ocpasswd -c /etc/ocserv/passwd bob \
  && echo crex > /srv/www/index.html
 # OpenVPN's: a CA and the server's certificate (clients sign in instead).
 RUN mkdir -p /etc/openvpn/e2e && cd /etc/openvpn/e2e \
@@ -40,8 +41,9 @@ RUN mkdir -p /etc/openvpn/e2e && cd /etc/openvpn/e2e \
  && printf 'extendedKeyUsage=serverAuth\nkeyUsage=digitalSignature,keyAgreement\n' > server.ext \
  && openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 3650 -extfile server.ext
 COPY ocserv.conf /etc/ocserv/ocserv.conf
+COPY ocserv-users /etc/ocserv/users
 COPY openvpn.conf /etc/openvpn/e2e/server.conf
 COPY ipsec.conf /etc/swanctl/conf.d/acme.conf
 COPY strongswan.conf /etc/strongswan.d/crake-e2e.conf
-COPY start.sh ci-start.sh client.sh relay.py sso.py /
+COPY start.sh ci-start.sh companies.sh client.sh relay.py sso.py /
 CMD ["/bin/sh", "/start.sh"]

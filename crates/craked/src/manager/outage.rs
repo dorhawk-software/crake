@@ -70,23 +70,15 @@ impl Manager {
                     domains.join(", ")
                 )),
             );
+            // The answerer listening first, then its link taking the
+            // domains, and only then the tunnel's link letting them go:
+            // until 2026-10-20 it was the other way round, so a name asked
+            // in between went to public DNS (kept private no longer), or
+            // to a link nobody answered on yet (the scenario suite).
+            self.serve_keep().await;
+            self.apply_keep().await;
             // Nobody waits for it meanwhile.
             self.resolved.revert(&info.device).await;
-            // The answerer's address exists once its link is up.
-            self.apply_keep().await;
-            if self.cfg.apply_network
-                && self.cfg.use_resolved
-                && !self
-                    .keep_serving
-                    .swap(true, std::sync::atomic::Ordering::SeqCst)
-            {
-                let this = Arc::clone(self);
-                tokio::spawn(async move {
-                    if let Err(e) = crate::keep::serve(this).await {
-                        tracing::error!("answering from memory: {e:#}");
-                    }
-                });
-            }
             let _ = self.changes.send(name.to_owned());
         } else if alive && was_down {
             self.dns_down.lock().unwrap().remove(name);
@@ -96,6 +88,40 @@ impl Manager {
             self.apply_keep().await;
             let _ = self.changes.send(name.to_owned());
         }
+    }
+
+    /// The memory answerer's socket, on its link's address, before the
+    /// link has any domain to send there.
+    async fn serve_keep(self: &Arc<Self>) {
+        if !(self.cfg.apply_network && self.cfg.use_resolved)
+            || self.keep_serving.load(std::sync::atomic::Ordering::SeqCst)
+        {
+            return;
+        }
+        let sock = {
+            let _keep = self.keep.lock().await;
+            if let Err(e) = self.net.dummy(crate::keep::DEVICE, crate::keep::ADDR).await {
+                tracing::error!("answering from memory: {e:#}");
+                return;
+            }
+            match crate::keep::bind().await {
+                Ok(sock) => sock,
+                Err(e) => {
+                    tracing::error!("answering from memory: {e:#}");
+                    return;
+                }
+            }
+        };
+        self.keep_serving
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let this = Arc::clone(self);
+        tokio::spawn(async move {
+            if let Err(e) = crate::keep::serve(this.clone(), sock).await {
+                tracing::error!("answering from memory: {e:#}");
+            }
+            this.keep_serving
+                .store(false, std::sync::atomic::Ordering::SeqCst);
+        });
     }
 
     /// The memory answerer's link takes the domains of every tunnel whose

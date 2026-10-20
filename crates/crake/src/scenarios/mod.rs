@@ -26,12 +26,15 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::client::Command;
-use crate::test_app::{App, enabled, gateway, sign_in_answering};
+use crate::test_app::{App, enabled, sign_in_as};
 
 mod checks;
 mod hosts;
+mod managed;
+mod names;
 mod platform;
 mod settings;
+mod several;
 mod sign_in;
 
 pub(crate) use platform::Craked;
@@ -39,7 +42,7 @@ pub(crate) use platform::Craked;
 /// How long a tunnel, and a host through it, get.
 const WAIT: Duration = Duration::from_secs(60);
 /// The test tunnels, gone before and after.
-const TUNNELS: [&str; 3] = ["acme", "initech", "nordbank"];
+const TUNNELS: [&str; 4] = ["acme", "initech", "nordbank", "globex"];
 
 /// The kinds of gateway every scenario runs against.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,6 +56,10 @@ pub(crate) enum Gateway {
     /// doesn't carry).
     #[cfg(target_os = "linux")]
     Ipsec,
+    /// A second company on the AnyConnect gateway (its user bob): its own
+    /// network, DNS and domain (scripts/e2e/companies.sh). Not a kind the
+    /// scenarios run against: the tunnel beside theirs.
+    Globex,
 }
 
 impl Gateway {
@@ -63,6 +70,7 @@ impl Gateway {
             Self::OpenVpn => ("initech", "Initech"),
             #[cfg(target_os = "linux")]
             Self::Ipsec => ("nordbank", "Nordbank"),
+            Self::Globex => ("globex", "Globex"),
         }
     }
 
@@ -70,9 +78,56 @@ impl Gateway {
     /// password is the app's to keep, in the keyring.
     fn keeps_sign_in(self) -> bool {
         match self {
-            Self::AnyConnect | Self::OpenVpn => true,
+            Self::AnyConnect | Self::OpenVpn | Self::Globex => true,
             #[cfg(target_os = "linux")]
             Self::Ipsec => false,
+        }
+    }
+
+    /// The user an AnyConnect gateway signs in with the app's own sign-in.
+    fn anyconnect_user(self) -> Option<&'static str> {
+        match self {
+            Self::AnyConnect => Some("alice"),
+            Self::Globex => Some("bob"),
+            _ => None,
+        }
+    }
+
+    /// Another kind, for a second tunnel beside this one.
+    fn other(self) -> Self {
+        match self {
+            Self::AnyConnect => Self::OpenVpn,
+            Self::OpenVpn => Self::AnyConnect,
+            #[cfg(target_os = "linux")]
+            Self::Ipsec => Self::AnyConnect,
+            Self::Globex => Self::AnyConnect,
+        }
+    }
+
+    /// IT's files for it (managed.d), with `learn` as its scope.
+    fn managed_files(self, learn: &str) -> Vec<(&'static str, String)> {
+        match self {
+            Self::AnyConnect => vec![(
+                "acme.toml",
+                format!(
+                    "display_name = \"ACME\"\nprotocol = \"anyconnect\"\ngateway = \"{}\"\n\
+                     sign_in = \"password\"\nuser = \"alice\"\n{learn}\n",
+                    platform::anyconnect_gateway()
+                ),
+            )],
+            Self::OpenVpn => vec![
+                ("initech.ovpn", platform::openvpn_profile()),
+                (
+                    "initech.toml",
+                    format!(
+                        "display_name = \"Initech\"\nprotocol = \"openvpn\"\n\
+                         profile = \"initech.ovpn\"\n{learn}\n"
+                    ),
+                ),
+            ],
+            #[cfg(target_os = "linux")]
+            Self::Ipsec => panic!("IPsec in IT's files isn't built yet (CLAUDE.md, 7k)"),
+            Self::Globex => panic!("Globex is never IT's in these tests"),
         }
     }
 
@@ -82,9 +137,14 @@ impl Gateway {
         let mut fields = vec![("display_name", label.to_owned())];
         match self {
             Self::AnyConnect => fields.extend([
-                ("gateway", gateway()),
+                ("gateway", platform::anyconnect_gateway()),
                 ("protocol", "anyconnect".into()),
                 ("user", "alice".into()),
+            ]),
+            Self::Globex => fields.extend([
+                ("gateway", platform::anyconnect_gateway()),
+                ("protocol", "anyconnect".into()),
+                ("user", "bob".into()),
             ]),
             Self::OpenVpn => fields.extend([
                 ("protocol", "openvpn".into()),
@@ -120,8 +180,20 @@ pub(crate) struct Up {
 
 impl Up {
     async fn start(gateway: Gateway) -> Self {
+        Self::start_from(gateway, None).await
+    }
+
+    /// The tunnel from IT's files (`learn` its scope), not added in the app.
+    async fn start_managed(gateway: Gateway, learn: &str) -> Self {
+        Self::start_from(gateway, Some(learn)).await
+    }
+
+    async fn start_from(gateway: Gateway, managed: Option<&str>) -> Self {
         let (name, label) = gateway.names();
-        let (crake, mut app) = Craked::start().await;
+        let files = managed
+            .map(|l| gateway.managed_files(l))
+            .unwrap_or_default();
+        let (crake, mut app) = Craked::start_with(&files).await;
         app.within(WAIT, "craked reached", |m| {
             m.reachable == Some(true) && !m.settings.is_empty()
         })
@@ -133,7 +205,14 @@ impl Up {
         }
         let before = platform::answers("10.40.1.10").await;
         assert!(!before, "10.40.1.10 answered without a tunnel");
-        add(&mut app, gateway).await;
+        if managed.is_some() {
+            app.until("IT's tunnel", |m| {
+                m.tunnels.iter().any(|t| t.name == name && t.managed)
+            })
+            .await;
+        } else {
+            add(&mut app, gateway).await;
+        }
         sign_in_and_connect(&mut app, gateway, &["hunter2"]).await;
         let device = crake.device(name);
         Self {
@@ -176,10 +255,13 @@ impl Up {
 
 /// Settings the scenarios start from: Settings' defaults where a
 /// scenario changes them.
-const DEFAULTS: [(&str, &str); 3] = [
+const DEFAULTS: [(&str, &str); 5] = [
     ("never", ""),
     ("ask_unknown", "true"),
     ("keep_private", "true"),
+    // Tunnels tried in the order they were added; when two answer, ask.
+    ("order", ""),
+    ("both", "ask"),
 ];
 
 /// A setting changed as Settings changes it, once craked has it.
@@ -192,7 +274,7 @@ pub(crate) async fn set(app: &mut App, key: &'static str, value: &'static str) {
 }
 
 /// The tunnel added as New tunnel adds it.
-async fn add(app: &mut App, gateway: Gateway) {
+pub(crate) async fn add(app: &mut App, gateway: Gateway) {
     let (name, _) = gateway.names();
     let fields: HashMap<String, String> = gateway
         .fields()
@@ -207,15 +289,24 @@ async fn add(app: &mut App, gateway: Gateway) {
 /// Switched on and signed in, giving `passwords` in turn (a wrong one,
 /// then the right one: it's asked again, saying so), until connected.
 pub(crate) async fn sign_in_and_connect(app: &mut App, gateway: Gateway, passwords: &[&str]) {
+    sign_in(app, gateway, passwords).await;
+    let (name, _) = gateway.names();
+    app.within(WAIT, "connected", |m| state(m, name) == "connected")
+        .await;
+}
+
+/// Switched on and signed in, as `sign_in_and_connect`, without waiting
+/// for what comes of it.
+pub(crate) async fn sign_in(app: &mut App, gateway: Gateway, passwords: &[&str]) {
     let (name, label) = gateway.names();
-    if gateway == Gateway::AnyConnect {
+    if let Some(user) = gateway.anyconnect_user() {
         // ocserv refuses every password after a wrong one in the same
         // sign-in (Cisco's gateways let you try again): the window says it
         // was refused and asks again; cancelled, a new sign-in works.
-        let gw = crate::test_app::gateway();
+        let gw = platform::anyconnect_gateway();
         let mut session = None;
         for (n, password) in passwords.iter().enumerate() {
-            match sign_in_answering(&gw, &[password]).await {
+            match sign_in_as(&gw, user, &[password]).await {
                 Ok((s, _)) => {
                     session = Some(s);
                     break;
@@ -253,8 +344,6 @@ pub(crate) async fn sign_in_and_connect(app: &mut App, gateway: Gateway, passwor
             }
         }
     }
-    app.within(WAIT, "connected", |m| state(m, name) == "connected")
-        .await;
 }
 
 fn state(m: &crate::model::Model, tunnel: &str) -> String {
@@ -268,7 +357,13 @@ fn state(m: &crate::model::Model, tunnel: &str) -> String {
 /// No test tunnel left (Windows' service keeps them from run to run).
 async fn remove_tunnels(app: &mut App) {
     for old in TUNNELS {
-        if app.model.tunnels.iter().any(|t| t.name == old) {
+        // IT's can't be removed: they go with their files.
+        if app
+            .model
+            .tunnels
+            .iter()
+            .any(|t| t.name == old && !t.managed)
+        {
             app.send(Command::RemoveTunnel(old.into()));
             app.until("an old one gone", |m| {
                 !m.tunnels.iter().any(|t| t.name == old)
@@ -288,9 +383,18 @@ async fn run(gateway: Gateway, scenario: impl AsyncFnOnce(&mut Up)) {
     up.stop().await;
 }
 
-/// A scenario this system can't run, said in the test's output (today
-/// only Windows has one).
-#[cfg(windows)]
+/// One scenario against IT's tunnel through `gateway`, its scope `learn`.
+async fn run_managed(gateway: Gateway, learn: &str, scenario: impl AsyncFnOnce(&mut Up)) {
+    if !enabled() {
+        return;
+    }
+    let mut up = Up::start_managed(gateway, learn).await;
+    scenario(&mut up).await;
+    up.stop().await;
+}
+
+/// A scenario this system can't run, said in the test's output.
+#[cfg(not(target_os = "linux"))]
 pub(crate) fn not_here(why: &str) {
     println!("not on {}: {why}", std::env::consts::OS);
 }
@@ -327,6 +431,8 @@ macro_rules! every_scenario {
                 checks::names_resolve_after_switching_off,
                 checks::names_are_kept_private_while_off,
                 checks::stopping_craked_leaves_nothing,
+                names::a_public_name_with_a_private_address_goes_through,
+                names::a_tunnel_dns_that_stops_answering_is_stood_in_for,
                 hosts::undo_sends_a_host_direct_and_redo_brings_it_back,
                 hosts::a_host_added_by_hand_goes_through,
                 hosts::a_name_added_by_hand_goes_through,
@@ -339,6 +445,10 @@ macro_rules! every_scenario {
                 settings::names_not_kept_private_go_to_public_dns,
                 sign_in::a_wrong_password_is_asked_again,
                 sign_in::switching_on_again_uses_what_was_kept,
+                several::a_second_tunnel_that_clashes_is_refused,
+                several::two_companies_each_through_their_own,
+                several::a_host_both_answer_for_can_be_moved,
+                several::one_address_goes_through_one_tunnel,
             ]
         );
     };
@@ -348,3 +458,34 @@ every_scenario!(anyconnect, super::Gateway::AnyConnect);
 every_scenario!(openvpn, super::Gateway::OpenVpn);
 #[cfg(target_os = "linux")]
 every_scenario!(ipsec, super::Gateway::Ipsec);
+
+/// The scenarios of IT's tunnels (managed.d), each a test of its own,
+/// against the kinds of gateway IT's files can name (not IPsec yet).
+macro_rules! it_scenarios {
+    ($kind:ident, $gateway:expr) => {
+        mod $kind {
+            use super::managed;
+            #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+            async fn it_s_tunnel_keeps_to_its_scope() {
+                super::run_managed(
+                    $gateway,
+                    managed::SCOPE,
+                    managed::it_s_tunnel_keeps_to_its_scope,
+                )
+                .await;
+            }
+            #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+            async fn it_s_tunnel_cant_be_changed_or_removed() {
+                super::run_managed(
+                    $gateway,
+                    managed::SCOPE,
+                    managed::it_s_tunnel_cant_be_changed_or_removed,
+                )
+                .await;
+            }
+        }
+    };
+}
+
+it_scenarios!(it_anyconnect, super::Gateway::AnyConnect);
+it_scenarios!(it_openvpn, super::Gateway::OpenVpn);

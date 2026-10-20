@@ -94,3 +94,33 @@ pub(crate) fn left_after_stop() -> String {
     }
     left
 }
+
+/// Where the test's own pf rules go (macOS' pf.conf takes every anchor
+/// under com.apple; craked's own is 250.Crake).
+const TEST_ANCHOR: &str = "com.apple/251.CrakeTest";
+
+/// Packets to `ip` dropped on their way out, until it's dropped (a
+/// tunnel's DNS that stopped answering). pf is on while a tunnel is up.
+pub(crate) struct Silenced;
+
+pub(crate) fn silence(ip: &str) -> Silenced {
+    let out = sh(&format!(
+        "echo 'block drop out quick proto {{ tcp udp }} from any to {ip}' | pfctl -a {TEST_ANCHOR} -f - 2>&1"
+    ));
+    let rules = sh(&format!("pfctl -a {TEST_ANCHOR} -s rules 2>/dev/null"));
+    assert!(rules.contains(ip), "silencing {ip}: {out}");
+    Silenced
+}
+
+impl Drop for Silenced {
+    fn drop(&mut self) {
+        sh(&format!("pfctl -a {TEST_ANCHOR} -F rules 2>/dev/null"));
+    }
+}
+
+/// How the system answers `name` now, and craked's DNS server.
+pub(crate) fn name_diagnosis(name: &str) -> String {
+    sh(&format!(
+        "dscacheutil -q host -a name {name}; dig +time=5 @127.53.0.1 {name} 2>&1"
+    ))
+}

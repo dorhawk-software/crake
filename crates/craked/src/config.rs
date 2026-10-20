@@ -221,6 +221,15 @@ impl Config {
         Ok(cfg)
     }
 
+    /// With no craked.toml (Windows' and macOS' installers ship none): the
+    /// defaults, and IT's tunnels all the same (until 2026-10-20 they
+    /// were read only with a craked.toml, so IT's files did nothing there).
+    pub fn without_file() -> Self {
+        let mut cfg = Self::default();
+        cfg.add_managed();
+        cfg
+    }
+
     /// IT's tunnels come first (their order is the try order); one of the
     /// user's own with the same name gives way.
     pub fn add_managed(&mut self) {

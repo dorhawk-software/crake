@@ -1,17 +1,15 @@
 #!/bin/sh
-# The gateway's container (no network): ACME's internal network, reachable
-# only through a tunnel: its DNS (10.40.0.2) and two web servers (git,
-# wiki); the wire to the client (relay.py) as the gateway's public side;
-# a public web server (203.0.113.80) that only answers direct, and the
-# network's public DNS (203.0.113.53), which knows one public name and
-# logs every question (so a test sees what left the client); ocserv,
-# openvpn and strongSwan (IPsec) as ACME's gateways; openconnect's fake servers for the other
+# The gateway's container (no network): ACME's internal network and
+# Globex's, reachable only through a tunnel (companies.sh); the wire to the
+# client (relay.py) as the gateway's public side; a public web server
+# (203.0.113.80) that only answers direct, and the network's public DNS
+# (203.0.113.53), which knows a few public names (the gateway's own,
+# vpn.acme.example, and two more of ACME's) and logs every question (so a
+# test sees what left the client); ocserv, openvpn and strongSwan (IPsec)
+# as the companies' gateways; openconnect's fake servers for the other
 # protocols' sign-in.
 set -e
 ip link set lo up
-ip link add acme type dummy
-ip link set acme up
-for a in 10.40.0.2 10.40.1.10 10.40.1.11 10.40.1.12 10.40.1.13 10.40.1.14 10.40.1.15; do ip addr add "$a/32" dev acme; done
 ip link add inet type dummy
 ip link set inet up
 ip addr add 203.0.113.80/32 dev inet
@@ -19,13 +17,12 @@ ip addr add 203.0.113.53/32 dev inet
 python3 /relay.py lan 198.51.100.10/24 /link/gateway.sock /link/client.sock &
 # openvpn and its sign-in page listen on the wire's address.
 until ip -4 addr show lan 2>/dev/null | grep -q 198.51.100.10; do sleep 0.1; done
-# From the client's side the internal network doesn't answer: only the
-# tunnel reaches it, as with a real company.
+# The companies' networks, which only a tunnel reaches.
+sh /companies.sh lan
 nft -f - <<'NFT'
 table ip lan {
   chain input {
     type filter hook input priority 0;
-    iifname "lan" ip daddr 10.40.0.0/16 drop
     # The internet answers direct: never through a tunnel.
     iifname != "lan" iifname != "lo" ip daddr { 203.0.113.53, 203.0.113.80 } drop
   }
@@ -33,10 +30,8 @@ table ip lan {
 NFT
 dnsmasq --no-resolv --no-hosts --listen-address=203.0.113.53 --bind-interfaces \
   --pid-file=/run/dnsmasq-public.pid --log-queries --log-facility=/link/public-dns.log \
-  --address=/one.one.one.one/203.0.113.80 --address=/#/
-dnsmasq --no-resolv --no-hosts --listen-address=10.40.0.2 --bind-interfaces --pid-file=/run/dnsmasq-acme.pid \
-  --address=/git.acme.internal/10.40.1.10 --address=/wiki.acme.internal/10.40.1.11 \
-  --address=/portal.acme.example/10.40.1.14 --address=/files.acme.example/10.40.1.15
+  --address=/one.one.one.one/203.0.113.80 --address=/vpn.acme.example/198.51.100.10 \
+  --address=/shop.acme.example/203.0.113.80 --address=/www.acme.example/203.0.113.80 --address=/#/
 busybox httpd -p 80 -h /srv/www
 cp /etc/openvpn/e2e/ca.crt /link/openvpn-ca.crt
 openvpn --config /etc/openvpn/e2e/server.conf > /link/openvpn-server.log 2>&1 &

@@ -137,6 +137,9 @@ async fn a_password_sign_in_over_ikev2() {
         info.dns,
         ["10.40.0.2".parse::<std::net::Ipv4Addr>().unwrap()]
     );
+    // Only the first of the gateway's networks (it has 10.42.0.0/16 too):
+    // charon runs updown once per pair of selectors and the hook hands
+    // craked the first; a hint only, so later (CLAUDE.md, 7k's "Not yet").
     assert_eq!(info.split_include, ["10.40.0.0/16"]);
 
     // The internet still answers direct: 203.0.113.80 drops what comes

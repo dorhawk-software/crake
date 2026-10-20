@@ -153,12 +153,21 @@ pub(crate) async fn sign_in_answering(
     gateway: &str,
     passwords: &[&str],
 ) -> Result<(crake_proto::Session, Asked), (Asked, Option<String>)> {
+    sign_in_as(gateway, "alice", passwords).await
+}
+
+/// `sign_in_answering` as another of the gateway's users (Globex's bob).
+pub(crate) async fn sign_in_as(
+    gateway: &str,
+    user: &'static str,
+    passwords: &[&str],
+) -> Result<(crake_proto::Session, Asked), (Asked, Option<String>)> {
     let spec = Spec {
         tunnel: "acme".into(),
         display: "ACME".into(),
         gateway: gateway.to_owned(),
         protocol: "anyconnect".into(),
-        user: "alice".into(),
+        user: user.into(),
         auth_args: vec![],
         extra_args: vec![],
         user_agent: None,
@@ -195,7 +204,7 @@ pub(crate) async fn sign_in_answering(
                 // Asked again, openconnect may ask the username too.
                 Ask::Text if p.label.to_lowercase().contains("user") => {
                     asked.push("user");
-                    "alice"
+                    user
                 }
                 other => panic!("unexpected question {other:?} ({})", p.label),
             },

@@ -6,20 +6,7 @@
 # listens over TCP (the tunnel carries nothing else) and the internal
 # network answers only through a tunnel.
 set -e
-ip link add acme type dummy
-ip link set acme up
-for a in 10.40.0.2 10.40.1.10 10.40.1.11 10.40.1.12 10.40.1.14 10.40.1.15; do ip addr add "$a/32" dev acme; done
-nft -f - <<'NFT'
-table ip lan {
-  chain input {
-    type filter hook input priority 0;
-    iifname "eth0" ip daddr 10.40.0.0/16 drop
-  }
-}
-NFT
-dnsmasq --no-resolv --no-hosts --listen-address=10.40.0.2 --bind-interfaces \
-  --address=/git.acme.internal/10.40.1.10 --address=/wiki.acme.internal/10.40.1.11 \
-  --address=/portal.acme.example/10.40.1.14 --address=/files.acme.example/10.40.1.15
+sh /companies.sh eth0
 busybox httpd -p 80 -h /srv/www
 cp /etc/openvpn/e2e/ca.crt /link/openvpn-ca.crt
 sed -e 's/^proto udp$/proto tcp-server/' -e '/^local /d' /etc/openvpn/e2e/server.conf > /run/server.conf

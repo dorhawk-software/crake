@@ -340,6 +340,12 @@ impl Manager {
         self.routing.reset_all().await?;
         #[cfg(target_os = "linux")]
         self.net.remove_left_xfrm().await;
+        // A craked that ended while a tunnel's DNS was down left the memory
+        // answerer's link with that company's domains, sent to an address
+        // nobody answers on any more: every name under them failed until
+        // the next outage came and went (the scenario suite, 2026-10-20).
+        // With no DNS down yet, this takes it away.
+        self.apply_keep().await;
         // Old log entries go as they pass the retention (Settings).
         let this = Arc::clone(self);
         tokio::spawn(async move {

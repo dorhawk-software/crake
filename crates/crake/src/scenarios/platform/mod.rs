@@ -22,9 +22,22 @@ pub(crate) use windows::*;
 
 use crate::test_app::{App, get};
 
-/// IPsec's gateway (Linux's containers only).
-#[cfg(target_os = "linux")]
-pub(crate) const IPSEC_GATEWAY: &str = "198.51.100.10";
+/// ACME's DNS server, which every test gateway pushes.
+pub(crate) const ACME_DNS: &str = "10.40.0.2";
+
+/// The AnyConnect gateway as New tunnel takes it: through Cloudflare, the
+/// local end of `cloudflared access`.
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn anyconnect_gateway() -> String {
+    crate::test_app::gateway()
+}
+
+/// Whether ACME's DNS answers `name` with `at` when asked directly (over
+/// TCP), as a check that a block on it took.
+#[cfg(unix)]
+pub(crate) fn acme_dns_answers(name: &str, at: &str) -> bool {
+    dns_over_tcp(ACME_DNS, name).contains(at)
+}
 
 /// craked started for one test, and where it serves the app.
 pub(crate) struct Craked {
@@ -34,14 +47,29 @@ pub(crate) struct Craked {
     dir: tempfile::TempDir,
     #[cfg(unix)]
     pub mgr: std::sync::Arc<craked::manager::Manager>,
+    /// IT's files this test put in the service's managed.d.
+    #[cfg(windows)]
+    managed: Vec<std::path::PathBuf>,
 }
+
+/// Where the installed service reads IT's files.
+#[cfg(windows)]
+const MANAGED_DIR: &str = r"C:\ProgramData\Crake\managed.d";
 
 #[cfg(unix)]
 impl Craked {
-    /// craked in this test, as root, with a folder of its own (`config`).
-    pub async fn start() -> (Self, App) {
+    /// craked in this test, as root, with a folder of its own (`config`)
+    /// and IT's files (name, text) in its managed.d, read as the service
+    /// reads them when it starts.
+    pub async fn start_with(managed: &[(&str, String)]) -> (Self, App) {
         let dir = tempfile::tempdir().unwrap();
-        let cfg = config(dir.path());
+        let mut cfg = config(dir.path());
+        cfg.managed_dir = dir.path().join("managed.d");
+        std::fs::create_dir_all(&cfg.managed_dir).unwrap();
+        for (file, text) in managed {
+            std::fs::write(cfg.managed_dir.join(file), text).unwrap();
+        }
+        cfg.add_managed();
         let hook_socket = cfg.hook_socket.clone();
         let mgr = craked::manager::Manager::new(cfg).unwrap();
         mgr.init().await.unwrap();
@@ -76,11 +104,31 @@ impl Craked {
 
 #[cfg(windows)]
 impl Craked {
-    /// The craked service the installer put there.
-    pub async fn start() -> (Self, App) {
+    /// The craked service the installer put there, with IT's files (name,
+    /// text) in its managed.d: the service restarted to read them, as it reads them when Windows
+    /// starts it (and again without them once the test is done).
+    pub async fn start_with(managed: &[(&str, String)]) -> (Self, App) {
+        let dir = std::path::Path::new(MANAGED_DIR);
+        std::fs::create_dir_all(dir).unwrap();
+        // A test that failed left its files (it never got to `stop`).
+        let mut restart = false;
+        for left in std::fs::read_dir(dir).unwrap().flatten() {
+            restart |= std::fs::remove_file(left.path()).is_ok();
+        }
+        let mut files = Vec::new();
+        for (file, text) in managed {
+            std::fs::write(dir.join(file), text).unwrap();
+            files.push(dir.join(file));
+        }
+        if restart || !files.is_empty() {
+            sh("Restart-Service craked");
+        }
         let (tx, updates) = async_channel::unbounded();
         (
-            Self { stopped: false },
+            Self {
+                stopped: false,
+                managed: files,
+            },
             App::new(crate::client::start(tx), updates),
         )
     }
@@ -93,8 +141,15 @@ impl Craked {
         format!("crake-{tunnel}")
     }
 
-    /// The service keeps running for the next test.
+    /// The service keeps running for the next test (without IT's files
+    /// this test gave it).
     pub async fn stop(&mut self) {
+        if !self.managed.is_empty() {
+            for file in self.managed.drain(..) {
+                let _ = std::fs::remove_file(file);
+            }
+            sh("Restart-Service craked");
+        }
         self.stopped = true;
     }
 }

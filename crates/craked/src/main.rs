@@ -100,7 +100,7 @@ async fn run(args: Args, external: Option<oneshot::Receiver<()>>) -> Result<()> 
             "{} not found; starting with no tunnels",
             args.config.display()
         );
-        Config::default()
+        Config::without_file()
     };
     let socket = cfg.hook_socket.clone();
     let mgr = Manager::new(cfg)?;

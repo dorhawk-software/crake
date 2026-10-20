@@ -61,3 +61,47 @@ pub(crate) fn left_behind(device: &str) -> String {
     .trim()
     .to_owned()
 }
+
+/// The test's firewall rule's name.
+const TEST_RULE: &str = "CrakeTestSilenced";
+
+/// Packets to `ip` dropped on their way out by a firewall rule, until
+/// it's dropped (a tunnel's DNS that stopped answering).
+pub(crate) struct Silenced;
+
+pub(crate) fn silence(ip: &str) -> Silenced {
+    let out = sh(&format!(
+        "Remove-NetFirewallRule -Name {TEST_RULE} -ErrorAction SilentlyContinue; \
+         New-NetFirewallRule -Name {TEST_RULE} -DisplayName 'Crake test: {ip} silent' \
+         -Direction Outbound -RemoteAddress {ip} -Action Block | Out-Null; \
+         Get-NetFirewallProfile | Format-Table Name,Enabled | Out-String"
+    ));
+    println!("silenced {ip}; the firewall's profiles:{out}");
+    Silenced
+}
+
+impl Drop for Silenced {
+    fn drop(&mut self) {
+        sh(&format!(
+            "Remove-NetFirewallRule -Name {TEST_RULE} -ErrorAction SilentlyContinue"
+        ));
+    }
+}
+
+/// Whether ACME's DNS answers `name` with `at` when asked directly, as a
+/// check that a block on it took.
+pub(crate) fn acme_dns_answers(name: &str, at: &str) -> bool {
+    sh(&format!(
+        "(Resolve-DnsName {name} -Server {} -Type A -DnsOnly -QuickTimeout -ErrorAction SilentlyContinue).IPAddress",
+        super::ACME_DNS
+    ))
+    .contains(at)
+}
+
+/// How the system answers `name` now, and craked's DNS server.
+pub(crate) fn name_diagnosis(name: &str) -> String {
+    sh(&format!(
+        "Resolve-DnsName {name} -ErrorAction Continue | Out-String; \
+         Resolve-DnsName {name} -Server 127.53.0.1 -DnsOnly -ErrorAction Continue | Out-String"
+    ))
+}
