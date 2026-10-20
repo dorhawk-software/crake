@@ -3,6 +3,8 @@
 # version and checksum (the release's own list), put at DEST.
 #   scripts/cloudflared.sh linux|macos|windows DEST
 set -eu
+# 2026.10.2 came out on 2026-10-20 (Cloudflare's dashboard suggests it):
+# moved to once it's two weeks old, about 2026-11-03.
 VERSION=2026.9.3
 case "$1" in
   linux) FILE=cloudflared-linux-amd64 SHA256=77e26d8d900e0b8469f416239d14b5f296525fdf79fee6f511ef55609e3fbac2 ;;
