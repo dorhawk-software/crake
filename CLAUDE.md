@@ -441,6 +441,17 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   which goes against "no routes but the DNS's": the user's decision. The
   e2e network has IPv6 (as most do); the probe scenario says `not_here`
   where the runner's network has none.
+- **Windows on ARM64 (planned with the user, 2026-10-20).** The user's
+  coming Apple Silicon Mac runs Windows 11 for ARM in a VM, which runs
+  x64 programs emulated but never x64 drivers, and Crake for Windows is
+  x64 throughout (its programs, openconnect, Wintun, ovpn-dco,
+  tap-windows6). An ARM64 build: `aarch64-pc-windows-*` for crake,
+  craked and the hook, openconnect built for ARM64
+  (scripts/build-openconnect-windows.sh), Wintun's and OpenVPN's ARM64
+  drivers (both ship them), an installer per architecture (or one
+  choosing at install), and CI building and testing it (GitHub has
+  Windows ARM64 runners). Detail in docs/engineering/platforms.md when
+  started.
 - **IPsec across an upgrade (2026-10-20).** The handover (resume.json)
   carries openconnect's sessions and OpenVPN's tokens, not IPsec's: its
   password is the app's (keyring) and charon's SA ends with craked, so an

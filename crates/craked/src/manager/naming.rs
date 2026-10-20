@@ -72,6 +72,21 @@ impl Manager {
                 continue;
             };
             if reply.metadata.response_code != ResponseCode::NoError {
+                // The tunnel's DNS knows the name, just not this record
+                // (it refused or failed an AAAA for a name it has an A for,
+                // as some company DNS servers do): "no such record", never
+                // the public "no such name", which made Windows drop the
+                // name's A answer too (CI's Windows, 2026-10-20).
+                if let Some(other) = other_family(failure.qtype)
+                    && ask(&device, &servers, &failure.name, other)
+                        .await
+                        .is_some_and(|r| !dns::records(&r).is_empty())
+                {
+                    let mut empty = reply;
+                    empty.metadata.response_code = ResponseCode::NoError;
+                    empty.answers.clear();
+                    return dns::rewrite(&failure, empty);
+                }
                 continue;
             }
             let addrs = dns::records(&reply);
@@ -385,6 +400,15 @@ fn keep_name(kept: Option<&(String, Instant)>, name: &str, now: Instant) -> (Str
             (n.clone(), *at)
         }
         _ => (name.to_owned(), now),
+    }
+}
+
+/// An address question's other family (A for AAAA, AAAA for A).
+fn other_family(qtype: RecordType) -> Option<RecordType> {
+    match qtype {
+        RecordType::A => Some(RecordType::AAAA),
+        RecordType::AAAA => Some(RecordType::A),
+        _ => None,
     }
 }
 

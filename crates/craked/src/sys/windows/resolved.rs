@@ -90,7 +90,9 @@ impl Resolved {
     /// sent the tunnel's names to the usual DNS until it reconnected
     /// (found 2026-10-20).
     pub async fn link_as_set(&self, device: &str, domains: &[String], everything: bool) -> bool {
-        if let Self::Noop = self {
+        // A tunnel going away: its rule goes, and stays gone (until
+        // 2026-10-20 this put a removed tunnel's rule back).
+        if matches!(self, Self::Noop) || !super::super::dns_links::registered(device) {
             return true;
         }
         let mut want = rule_names(domains, everything);

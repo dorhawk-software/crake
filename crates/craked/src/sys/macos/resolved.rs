@@ -104,8 +104,9 @@ impl Resolved {
     /// those names to the network's DNS until the tunnel reconnected
     /// (found 2026-10-20). Another program's file for a domain is left as
     /// it is (`set_link`), so it counts as set.
-    pub async fn link_as_set(&self, _device: &str, domains: &[String], _everything: bool) -> bool {
-        if let Self::Noop = self {
+    pub async fn link_as_set(&self, device: &str, domains: &[String], _everything: bool) -> bool {
+        // A tunnel going away: its files go, and stay gone.
+        if matches!(self, Self::Noop) || !super::super::dns_links::registered(device) {
             return true;
         }
         domains

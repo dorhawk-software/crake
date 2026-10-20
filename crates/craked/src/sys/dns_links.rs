@@ -39,6 +39,12 @@ pub fn remove(device: &str) {
     links().remove(device);
 }
 
+/// Whether craked serves this link now (a tunnel going away is taken out
+/// first: then nothing of its should be put back).
+pub fn registered(device: &str) -> bool {
+    links().contains_key(device)
+}
+
 /// Whether public names come to craked's server now: wanted, and not
 /// given back to the system for a while (`stand_in::Watch`).
 pub fn public() -> bool {
