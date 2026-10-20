@@ -105,3 +105,24 @@ pub(crate) fn name_diagnosis(name: &str) -> String {
          Resolve-DnsName {name} -Server 127.53.0.1 -DnsOnly -ErrorAction Continue | Out-String"
     ))
 }
+
+/// The network has IPv6 of its own: a default route that isn't Crake's.
+pub(crate) fn network_has_ipv6() -> bool {
+    !sh("Get-NetRoute -DestinationPrefix ::/0 -ErrorAction SilentlyContinue | \
+         Where-Object InterfaceAlias -notlike 'crake-*' | Select-Object -First 1 | Format-List | Out-String")
+    .trim()
+    .is_empty()
+}
+
+/// What the service left behind once it stopped: its adapters, its NRPT
+/// rules, routes into ACME's network, its firewall rules.
+pub(crate) fn left_after_stop() -> String {
+    sh("Get-NetAdapter -Name 'crake-*' -ErrorAction SilentlyContinue | Format-Table Name,Status | Out-String; \
+        Get-DnsClientNrptRule | Where-Object { $_.NameServers -contains '127.53.0.1' } | \
+        Format-Table Namespace,NameServers | Out-String; \
+        Get-NetRoute -AddressFamily IPv4 -ErrorAction SilentlyContinue | \
+        Where-Object DestinationPrefix -like '10.40.*' | Format-Table DestinationPrefix,InterfaceAlias | Out-String; \
+        Get-NetFirewallRule -Group Crake -ErrorAction SilentlyContinue | Format-Table DisplayName | Out-String")
+    .trim()
+    .to_owned()
+}

@@ -13,6 +13,8 @@ python3 /relay.py lan 198.51.100.20/24 /link/client.sock /link/gateway.sock /hos
 sleep 1
 # The local network's router: everything not on the LAN goes to it.
 ip route add default via 198.51.100.10
+ip -6 addr add 2001:db8:1::20/64 dev lan nodad
+ip -6 route add default via 2001:db8:1::10
 mkdir -p /host/run/dbus /host/run/systemd/resolve
 cat > /host/run/dbus/e2e.conf <<'CONF'
 <!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"

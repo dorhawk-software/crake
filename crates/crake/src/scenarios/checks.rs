@@ -19,7 +19,6 @@ const RESCUED: (&str, &str) = ("portal.acme.example", "10.40.1.14");
 /// public DNS server's timeout.
 const AT_ONCE: Duration = Duration::from_secs(2);
 /// How long the system gets to have its DNS back after craked's end.
-#[cfg(unix)]
 const BACK: Duration = Duration::from_secs(45);
 
 /// `ip`'s page, retried until it answers (the first try may wait for the
@@ -269,10 +268,9 @@ pub(crate) async fn names_are_kept_private_while_off(up: &mut Up) {
 
 /// craked stopping with the tunnel up (the service stopped, a reboot):
 /// the system is as it was.
-#[cfg(unix)]
 pub(crate) async fn stopping_craked_leaves_nothing(up: &mut Up) {
     let _ = page_within(GIT).await;
-    up.crake.stop().await;
+    up.crake.end().await;
     let end = Instant::now() + BACK;
     loop {
         let left = platform::left_after_stop();
@@ -284,9 +282,4 @@ pub(crate) async fn stopping_craked_leaves_nothing(up: &mut Up) {
     }
     assert!(!answers(GIT).await, "{GIT} answered with craked gone");
     names_work("after craked stopped", BACK).await;
-}
-
-#[cfg(windows)]
-pub(crate) async fn stopping_craked_leaves_nothing(_up: &mut Up) {
-    super::not_here("the service stays for the next test; scripts/windows-vm-test.sh stops it");
 }

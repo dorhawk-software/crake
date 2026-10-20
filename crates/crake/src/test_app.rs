@@ -225,6 +225,11 @@ pub(crate) async fn sign_in_with(
                     asked.push("user");
                     user.as_str()
                 }
+                // A gateway's groups (scripts/e2e/start.sh's on 8445).
+                Ask::Choice(options) if options.iter().any(|o| o == "Engineering") => {
+                    asked.push("group");
+                    "Engineering"
+                }
                 other => panic!("unexpected question {other:?} ({})", p.label),
             },
         };
@@ -241,7 +246,7 @@ pub(crate) async fn sign_in_with(
 
 /// An HTTP GET on a fresh connection, as an app would.
 pub(crate) fn get(ip: &str, within: Duration) -> std::io::Result<String> {
-    let addr: SocketAddr = format!("{ip}:80").parse().unwrap();
+    let addr = SocketAddr::new(ip.parse().unwrap(), 80);
     let mut s = TcpStream::connect_timeout(&addr, within)?;
     s.set_read_timeout(Some(Duration::from_secs(5)))?;
     s.write_all(b"GET / HTTP/1.0\r\n\r\n")?;

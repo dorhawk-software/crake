@@ -33,6 +33,7 @@ RUN mkdir -p /etc/ocserv /srv/www \
  && certtool --generate-self-signed --load-privkey /etc/ocserv/key.pem --template /tmp/cert.cfg --outfile /etc/ocserv/cert.pem \
  && printf 'hunter2\nhunter2\n' | ocpasswd -c /etc/ocserv/passwd alice \
  && printf 'hunter2\nhunter2\n' | ocpasswd -c /etc/ocserv/passwd bob \
+ && printf 'hunter2\nhunter2\n' | ocpasswd -c /etc/ocserv/passwd-groups -g Engineering,Sales erin \
  && echo crex > /srv/www/index.html
 # ACME's users' CA and carol's certificate (a PKCS#12 file whose password
 # is hunter2), for signing in with a certificate.

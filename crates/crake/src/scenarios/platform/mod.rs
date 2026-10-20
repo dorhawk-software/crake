@@ -110,6 +110,11 @@ impl Craked {
         self.mgr.shutdown().await;
         self.stopped = true;
     }
+
+    /// craked ending with its tunnels up, as the service stops.
+    pub async fn end(&mut self) {
+        self.stop().await;
+    }
 }
 
 #[cfg(windows)]
@@ -118,6 +123,9 @@ impl Craked {
     /// text) in its managed.d: the service restarted to read them, as it reads them when Windows
     /// starts it (and again without them once the test is done).
     pub async fn start_with(managed: &[(&str, String)]) -> (Self, App) {
+        // A test that stopped the service ("stopping craked leaves
+        // nothing") left it for this one to start.
+        sh("if ((Get-Service craked).Status -ne 'Running') { Start-Service craked }");
         let dir = std::path::Path::new(MANAGED_DIR);
         std::fs::create_dir_all(dir).unwrap();
         // A test that failed left its files (it never got to `stop`).
@@ -160,6 +168,14 @@ impl Craked {
             }
             sh("Restart-Service craked");
         }
+        self.stopped = true;
+    }
+
+    /// The service stopped with its tunnels up, as Windows stops it (the
+    /// next test starts it again).
+    pub async fn end(&mut self) {
+        let out = sh("Stop-Service craked; (Get-Service craked).Status");
+        assert!(out.contains("Stopped"), "the service didn't stop: {out}");
         self.stopped = true;
     }
 }
@@ -206,6 +222,24 @@ pub(crate) async fn look_up(name: &'static str) -> Vec<Ipv4Addr> {
                 a.filter_map(|a| match a {
                     SocketAddr::V4(v4) => Some(*v4.ip()),
                     SocketAddr::V6(_) => None,
+                })
+                .collect()
+            })
+            .unwrap_or_default()
+    })
+    .await
+    .unwrap()
+}
+
+/// `name`'s IPv6 addresses, asked as an app asks the system.
+pub(crate) async fn look_up6(name: &'static str) -> Vec<std::net::Ipv6Addr> {
+    tokio::task::spawn_blocking(move || {
+        (name, 80)
+            .to_socket_addrs()
+            .map(|a| {
+                a.filter_map(|a| match a {
+                    SocketAddr::V6(v6) => Some(*v6.ip()),
+                    SocketAddr::V4(_) => None,
                 })
                 .collect()
             })

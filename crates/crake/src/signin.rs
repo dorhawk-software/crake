@@ -566,7 +566,16 @@ pub fn classify(question: &str, lines: &[String]) -> Prompt {
 
 /// The reason to show when sign-in failed: openconnect's last complaint.
 fn failure(lines: &[String]) -> String {
-    // openconnect 8 (Ubuntu 22.04) doesn't know --external-browser.
+    // openconnect 8 (Ubuntu 22.04) doesn't know --external-browser, nor
+    // does Windows' (its getopt says "unknown option --").
+    if lines
+        .iter()
+        .any(|l| l.contains("unknown option") && l.contains("external-browser"))
+    {
+        return "Signing in through your browser isn\u{2019}t built into the openconnect \
+                Crake uses here. A username and password or a certificate work with it."
+            .into();
+    }
     if lines
         .iter()
         .any(|l| l.contains("unrecognized option") && l.contains("external-browser"))
@@ -777,5 +786,12 @@ mod tests {
             "Usage:  openconnect [options] <server>".to_owned(),
         ];
         assert!(failure(&said).starts_with("Signing in through your browser needs openconnect 9"));
+        let windows = ["openconnect.exe: unknown option -- external-browser=xdg-open".to_owned()];
+        assert!(
+            failure(&windows)
+                .starts_with("Signing in through your browser isn\u{2019}t built into"),
+            "{}",
+            failure(&windows)
+        );
     }
 }

@@ -26,6 +26,8 @@ const GATEWAY_NAME: &str = "vpn.acme.example";
 /// ACME's AnyConnect gateway behind a front that admits only clients
 /// calling themselves AnyConnect (scripts/e2e/picky.py).
 pub(crate) const ANYCONNECT_ONLY: &str = "https://vpn.acme.example:8444";
+/// ACME's AnyConnect gateway with groups to choose from (its own ocserv).
+pub(crate) const ANYCONNECT_GROUPS: &str = "https://vpn.acme.example:8445";
 /// IPsec's gateway.
 pub(crate) const IPSEC_GATEWAY: &str = GATEWAY_NAME;
 
@@ -54,8 +56,14 @@ pub(crate) fn openvpn_gateway() -> (String, &'static str, String) {
 /// Crake's sets holds it (its rule marks it for the tunnel's table),
 /// else the main table's.
 pub(crate) fn way(ip: &str) -> String {
+    let v6 = ip.contains(':');
     for tunnel in super::super::TUNNELS {
-        for set in ["learned", "pinned"] {
+        let sets = if v6 {
+            ["learned6", "pinned6"]
+        } else {
+            ["learned", "pinned"]
+        };
+        for set in sets {
             let found = std::process::Command::new("nft")
                 .args([
                     "get",
@@ -72,7 +80,7 @@ pub(crate) fn way(ip: &str) -> String {
             }
         }
     }
-    let route = sh(&format!("ip -4 route get {ip}"));
+    let route = sh(&format!("ip -{} route get {ip}", if v6 { 6 } else { 4 }));
     route
         .split_whitespace()
         .skip_while(|w| *w != "dev")
@@ -151,4 +159,11 @@ pub(crate) fn name_diagnosis(name: &str) -> String {
         "resolvectl query {name} 2>&1; dig +time=5 @169.254.53.54 {name} 2>&1; \
          ss -ulpn 2>&1 | grep ':53 '; ip addr show crake-keep"
     ))
+}
+
+/// The network has IPv6 of its own: a default route that isn't Crake's.
+pub(crate) fn network_has_ipv6() -> bool {
+    sh("ip -6 route show default")
+        .lines()
+        .any(|l| !l.contains("crake-") && !l.contains("table"))
 }

@@ -38,7 +38,8 @@ pub(crate) fn openvpn_gateway() -> (String, &'static str, String) {
 
 /// The device the system sends `ip` out of.
 pub(crate) fn way(ip: &str) -> String {
-    sh(&format!("route -n get {ip}"))
+    let family = if ip.contains(':') { "-inet6 " } else { "" };
+    sh(&format!("route -n get {family}{ip}"))
         .lines()
         .find_map(|l| l.trim().strip_prefix("interface: ").map(str::to_owned))
         .unwrap_or_default()
@@ -123,4 +124,12 @@ pub(crate) fn name_diagnosis(name: &str) -> String {
     sh(&format!(
         "dscacheutil -q host -a name {name}; dig +time=5 @127.53.0.1 {name} 2>&1"
     ))
+}
+
+/// The network has IPv6 of its own: a default route that isn't a utun's.
+pub(crate) fn network_has_ipv6() -> bool {
+    sh("route -n get -inet6 default 2>/dev/null")
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("interface: ").map(str::to_owned))
+        .is_some_and(|i| !i.starts_with("utun"))
 }

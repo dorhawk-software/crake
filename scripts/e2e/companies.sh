@@ -19,6 +19,8 @@ dummy() {
 dummy acme 10.40.0.2 10.40.1.10 10.40.1.11 10.40.1.12 10.40.1.13 10.40.1.14 10.40.1.15 10.40.1.16
 dummy globex 10.41.0.2 10.41.1.10
 dummy shared 10.42.0.10
+# ACME's IPv6 host (v6.acme.internal), reached only through a tunnel too.
+ip -6 addr add fd40:1::10/128 dev acme nodad
 nft -f - <<NFT
 table ip companies {
   chain input {
@@ -30,10 +32,18 @@ table ip companies {
   }
 }
 NFT
+nft -f - <<NFT
+table ip6 companies6 {
+  chain input {
+    type filter hook input priority 0;
+    iifname "$lan" ip6 daddr fd40::/16 drop
+  }
+}
+NFT
 dnsmasq --no-resolv --no-hosts --listen-address=10.40.0.2 --bind-interfaces --pid-file=/run/dnsmasq-acme.pid \
   --address=/git.acme.internal/10.40.1.10 --address=/wiki.acme.internal/10.40.1.11 \
   --address=/portal.acme.example/10.40.1.14 --address=/files.acme.example/10.40.1.15 \
-  --address=/shop.acme.example/10.40.1.16
+  --address=/shop.acme.example/10.40.1.16 --address=/v6.acme.internal/fd40:1::10
 # dup.globex.internal shares an address with ACME's git: one address, two
 # companies, which routing by address can't serve both ways at once.
 dnsmasq --no-resolv --no-hosts --listen-address=10.41.0.2 --bind-interfaces --pid-file=/run/dnsmasq-globex.pid \

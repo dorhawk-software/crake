@@ -7,6 +7,9 @@
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
+/// The openconnect that brought `--external-browser`.
+const BROWSER_SINCE: u16 = 9;
+
 /// openvpn3's configuration service, which Crake talks to over D-Bus.
 const OPENVPN3_SERVICE: &str =
     "/usr/share/dbus-1/system-services/net.openvpn.v3.configuration.service";
@@ -76,6 +79,17 @@ impl Engines {
     pub fn no_browser(&self) -> Option<String> {
         if !self.openconnect || self.browser {
             return None;
+        }
+        // An openconnect 9 without it is built so (Windows' has none, seen
+        // on CI's Windows 2026-10-20): "needs 9; this computer has 9.12" said
+        // nothing true.
+        if let Some((major, minor)) = self.openconnect_version
+            && major >= BROWSER_SINCE
+        {
+            return Some(format!(
+                "Signing in through your browser isn\u{2019}t built into the openconnect \
+                 Crake uses here ({major}.{minor}). Use a username and password or a certificate."
+            ));
         }
         let has = self
             .openconnect_version
@@ -410,5 +424,15 @@ mod tests {
              this computer has 8.20. Use a username and password or a certificate."
         );
         assert_eq!(Engines::ALL.no_browser(), None);
+        let windows = Engines {
+            browser: false,
+            openconnect_version: Some((9, 12)),
+            ..Engines::ALL
+        };
+        assert_eq!(
+            windows.no_browser().unwrap(),
+            "Signing in through your browser isn\u{2019}t built into the openconnect Crake \
+             uses here (9.12). Use a username and password or a certificate."
+        );
     }
 }
