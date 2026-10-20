@@ -16,7 +16,7 @@ dummy() {
   ip link set "$name" up
   for a in "$@"; do ip addr add "$a/32" dev "$name"; done
 }
-dummy acme 10.40.0.2 10.40.1.10 10.40.1.11 10.40.1.12 10.40.1.13 10.40.1.14 10.40.1.15 10.40.1.16
+dummy acme 10.40.0.2 10.40.1.10 10.40.1.11 10.40.1.12 10.40.1.13 10.40.1.14 10.40.1.15 10.40.1.16 10.40.1.17
 dummy globex 10.41.0.2 10.41.1.10
 dummy shared 10.42.0.10
 # ACME's IPv6 host (v6.acme.internal), reached only through a tunnel too.
@@ -25,6 +25,9 @@ nft -f - <<NFT
 table ip companies {
   chain input {
     type filter hook input priority 0;
+    # 10.40.1.17 from the wire is turned away as a router does, "host
+    # unreachable" (the probe starts at once: scenarios' hosts.rs).
+    iifname "$lan" ip daddr 10.40.1.17 reject with icmp type host-unreachable
     iifname "$lan" ip daddr { 10.40.0.0/16, 10.41.0.0/16, 10.42.0.0/16 } drop
     iifname "lo" accept
     ip daddr 10.41.0.0/16 ip saddr != 10.41.255.0/24 drop

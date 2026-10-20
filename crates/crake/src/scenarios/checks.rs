@@ -11,6 +11,8 @@ use crate::test_app::get;
 /// ACME's hosts (scripts/e2e/start.sh, ci-start.sh).
 const GIT: &str = "10.40.1.10";
 const WIKI: (&str, &str) = ("wiki.acme.internal", "10.40.1.11");
+/// One the network's router turns away when asked direct.
+const TURNED_AWAY: &str = "10.40.1.17";
 /// One nobody asks for: it stays direct until someone does.
 const UNTOUCHED: &str = "10.40.1.12";
 /// A name public DNS doesn't know (.example) but ACME's DNS does.
@@ -82,11 +84,15 @@ pub(crate) async fn nothing_is_routed_up_front(up: &mut Up) {
     // What the gateway pushed is shown as hints (tunnel detail's "From the
     // gateway"): ACME's network; the IPsec gateway also hands out
     // 10.42.0.0/16, in a second pair of selectors charon reports apart.
-    let mut hints = vec!["10.40.0.0/16"];
     #[cfg(target_os = "linux")]
-    if up.gateway == super::Gateway::Ipsec {
-        hints.push("10.42.0.0/16");
-    }
+    let ipsec = up.gateway == super::Gateway::Ipsec;
+    #[cfg(not(target_os = "linux"))]
+    let ipsec = false;
+    let hints: &[&str] = if ipsec {
+        &["10.40.0.0/16", "10.42.0.0/16"]
+    } else {
+        &["10.40.0.0/16"]
+    };
     let name = up.name;
     let shown = |m: &crate::model::Model| {
         m.tunnels
@@ -123,6 +129,41 @@ pub(crate) async fn a_host_is_learned_by_probing(up: &mut Up) {
         .within(WAIT, "the probe's decision", |m| {
             m.log.iter().any(|e| e.message == said)
         })
+        .await;
+}
+
+/// A host the network's router turns away ("host unreachable", as the
+/// e2e gateway does for 10.40.1.17 from the wire): the probe starts at
+/// once, not after the wait, and says why (Linux: craked reads routers'
+/// ICMP in its queue; macOS and Windows probe on the timeout alone, and
+/// their path to ACME's network isn't the test gateway's).
+pub(crate) async fn a_routers_unreachable_starts_the_probe(up: &mut Up) {
+    if !cfg!(target_os = "linux") {
+        super::not_here("routers' ICMP is read on Linux only, and only its gateway sends one");
+        return;
+    }
+    let probed = page_within(TURNED_AWAY).await;
+    assert!(
+        probed.is_some_and(|b| b.contains("crex")),
+        "{TURNED_AWAY} through {}\ncraked said:\n{}",
+        up.label,
+        up.said()
+    );
+    assert_eq!(way(TURNED_AWAY), up.device, "{TURNED_AWAY}'s way");
+    let said = format!("Sent {TURNED_AWAY} through {}.", up.label);
+    up.app
+        .within(
+            WAIT,
+            "the decision, saying the router turned it away",
+            |m| {
+                m.log.iter().any(|e| {
+                    e.message == said
+                        && e.reason
+                            .as_deref()
+                            .is_some_and(|r| r.starts_with("Unreachable directly."))
+                })
+            },
+        )
         .await;
 }
 
