@@ -11,6 +11,8 @@ use crate::test_app::get;
 /// ACME's hosts (scripts/e2e/start.sh, ci-start.sh).
 const GIT: &str = "10.40.1.10";
 const WIKI: (&str, &str) = ("wiki.acme.internal", "10.40.1.11");
+/// How long the first connection gets with the first-SYN race on.
+const FIRST_TRY: Duration = Duration::from_secs(2);
 /// A UDP service of ACME's (an echo), only through a tunnel.
 const UDP_HOST: (&str, u16) = ("10.40.1.18", 7007);
 /// One the network's router turns away when asked direct.
@@ -132,6 +134,26 @@ pub(crate) async fn a_host_is_learned_by_probing(up: &mut Up) {
             m.log.iter().any(|e| e.message == said)
         })
         .await;
+}
+
+/// With the first-SYN race on, the very first connection to a host only
+/// the tunnel reaches gets through: craked holds its SYN, races direct
+/// against the tunnel, learns the host and lets the SYN go through it.
+/// One attempt, 2 s to connect: without the race it waits for the probe
+/// and the kernel's retry (~3 s).
+pub(crate) async fn the_first_connection_gets_through(up: &mut Up) {
+    let started = Instant::now();
+    let got = tokio::task::spawn_blocking(|| get(GIT, FIRST_TRY))
+        .await
+        .unwrap();
+    assert!(
+        got.as_deref().is_ok_and(|b| b.contains("crex")),
+        "{GIT}'s first connection through {}: {got:?} after {:?}\ncraked said:\n{}",
+        up.label,
+        started.elapsed(),
+        up.said()
+    );
+    assert_eq!(way(GIT), up.device, "{GIT}'s way");
 }
 
 /// A UDP service only the tunnel reaches (10.40.1.18:7007, an echo):

@@ -62,20 +62,20 @@ pub(crate) struct Up {
 
 impl Up {
     async fn start(gateway: Gateway) -> Self {
-        Self::start_from(gateway, None).await
+        Self::start_from(gateway, None, false).await
     }
 
     /// The tunnel from IT's files (`learn` its scope), not added in the app.
     async fn start_managed(gateway: Gateway, learn: &str) -> Self {
-        Self::start_from(gateway, Some(learn)).await
+        Self::start_from(gateway, Some(learn), false).await
     }
 
-    async fn start_from(gateway: Gateway, managed: Option<&str>) -> Self {
+    async fn start_from(gateway: Gateway, managed: Option<&str>, race: bool) -> Self {
         let (name, label) = gateway.names();
         let files = managed
             .map(|l| gateway.managed_files(l))
             .unwrap_or_default();
-        let (crake, mut app) = Craked::start_with(&files).await;
+        let (crake, mut app) = Craked::start_with(&files, race).await;
         app.within(WAIT, "craked reached", |m| {
             m.reachable == Some(true) && !m.settings.is_empty()
         })
@@ -349,6 +349,21 @@ async fn run(gateway: Gateway, scenario: impl AsyncFnOnce(&mut Up)) {
     up.stop().await;
 }
 
+/// One scenario with craked's first-SYN race on (Linux; the others run
+/// with it off, so passive probing is what they prove).
+async fn run_racing(gateway: Gateway, scenario: impl AsyncFnOnce(&mut Up)) {
+    if !enabled() {
+        return;
+    }
+    if !cfg!(target_os = "linux") {
+        not_here("the first-SYN race is built on Linux only (Windows would need a WFP driver)");
+        return;
+    }
+    let mut up = Up::start_from(gateway, None, true).await;
+    scenario(&mut up).await;
+    up.stop().await;
+}
+
 /// One scenario against IT's tunnel through `gateway`, its scope `learn`.
 async fn run_managed(gateway: Gateway, learn: &str, scenario: impl AsyncFnOnce(&mut Up)) {
     if !enabled() {
@@ -534,3 +549,20 @@ it_scenarios!(it_anyconnect, super::Gateway::AnyConnect);
 it_scenarios!(it_openvpn, super::Gateway::OpenVpn);
 #[cfg(target_os = "linux")]
 it_scenarios!(it_ipsec, super::Gateway::Ipsec);
+
+// The first-SYN race on: the first connection to a host only the tunnel
+// reaches gets through, no retry.
+macro_rules! racing {
+    ($kind:ident, $gateway:expr) => {
+        mod $kind {
+            #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+            async fn the_first_connection_gets_through() {
+                super::run_racing($gateway, super::checks::the_first_connection_gets_through).await;
+            }
+        }
+    };
+}
+racing!(race_anyconnect, super::Gateway::AnyConnect);
+racing!(race_openvpn, super::Gateway::OpenVpn);
+#[cfg(target_os = "linux")]
+racing!(race_ipsec, super::Gateway::Ipsec);

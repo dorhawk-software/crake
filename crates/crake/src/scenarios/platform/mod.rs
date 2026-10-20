@@ -99,9 +99,18 @@ impl Craked {
     /// craked in this test, as root, with a folder of its own (`config`)
     /// and IT's files (name, text) in its managed.d, read as the service
     /// reads them when it starts.
-    pub async fn start_with(managed: &[(&str, String)]) -> (Self, App) {
+    /// craked with IT's files `managed`, and the first-SYN race on if
+    /// `race` (Linux: the scenarios run with it off, so passive probing is
+    /// what they prove; one scenario proves the race).
+    pub async fn start_with(managed: &[(&str, String)], race: bool) -> (Self, App) {
         let dir = tempfile::tempdir().unwrap();
         let mut cfg = config(dir.path());
+        #[cfg(target_os = "linux")]
+        if race {
+            cfg.race_first_syn = true;
+        }
+        #[cfg(not(target_os = "linux"))]
+        let _ = race;
         cfg.managed_dir = dir.path().join("managed.d");
         std::fs::create_dir_all(&cfg.managed_dir).unwrap();
         for (file, text) in managed {
@@ -179,7 +188,10 @@ impl Craked {
     /// The craked service the installer put there, with IT's files (name,
     /// text) in its managed.d: the service restarted to read them, as it reads them when Windows
     /// starts it (and again without them once the test is done).
-    pub async fn start_with(managed: &[(&str, String)]) -> (Self, App) {
+    /// The installed service with IT's files `managed` (Windows has no
+    /// first-SYN race: `race` is the scenarios' Linux option).
+    pub async fn start_with(managed: &[(&str, String)], race: bool) -> (Self, App) {
+        let _ = race;
         // A test that stopped the service ("stopping craked leaves
         // nothing") left it for this one to start.
         sh("if ((Get-Service craked).Status -ne 'Running') { Start-Service craked }");
