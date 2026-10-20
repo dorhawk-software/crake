@@ -56,7 +56,9 @@ cp ../wintun/LICENSE.txt "$OUT/wintun-LICENSE.txt"
 printf "openconnect %s for ARM64, built by Crake from https://www.infradead.org/openconnect/download/openconnect-%s.tar.gz\nwith one change: https://github.com/dorhawk-software/crake/blob/main/scripts/windows/openconnect-unbuffered.c\nWith MSYS2's CLANGARM64 libraries (https://packages.msys2.org).\nWintun 0.14.1 (https://www.wintun.net), unmodified.\n" "$VERSION" "$VERSION" > "$OUT/SOURCE.txt"
 # The DLLs it needs from MSYS2, followed through their own needs.
 SYS=$MINGW_PREFIX/bin
-todo=$(ls "$OUT"/*.exe "$OUT"/libopenconnect*.dll 2>/dev/null)
+# (Linked statically there is no libopenconnect DLL: ls's complaint about
+# it, under set -e, had ended the script without a word.)
+todo=$(ls "$OUT"/*.exe "$OUT"/*.dll 2>/dev/null || true)
 while [ -n "$todo" ]; do
   next=
   for f in $todo; do
