@@ -11,6 +11,8 @@ use crate::test_app::get;
 /// ACME's hosts (scripts/e2e/start.sh, ci-start.sh).
 const GIT: &str = "10.40.1.10";
 const WIKI: (&str, &str) = ("wiki.acme.internal", "10.40.1.11");
+/// A UDP service of ACME's (an echo), only through a tunnel.
+const UDP_HOST: (&str, u16) = ("10.40.1.18", 7007);
 /// One the network's router turns away when asked direct.
 const TURNED_AWAY: &str = "10.40.1.17";
 /// One nobody asks for: it stays direct until someone does.
@@ -127,6 +129,51 @@ pub(crate) async fn a_host_is_learned_by_probing(up: &mut Up) {
     let said = format!("Sent {GIT} through {}.", up.label);
     up.app
         .within(WAIT, "the probe's decision", |m| {
+            m.log.iter().any(|e| e.message == said)
+        })
+        .await;
+}
+
+/// A UDP service only the tunnel reaches (10.40.1.18:7007, an echo):
+/// its first datagrams get no answer directly, the app's own datagram is
+/// tried through the tunnel, the host is learned, and the app's next
+/// datagram is answered (Linux: craked follows UDP conversations in
+/// conntrack; macOS and Windows learn TCP hosts only, and Cloudflare
+/// carries no UDP to the CI gateways).
+pub(crate) async fn a_udp_host_is_learned(up: &mut Up) {
+    if !cfg!(target_os = "linux") {
+        super::not_here("UDP hosts are learned on Linux only");
+        return;
+    }
+    let echoed = tokio::task::spawn_blocking(|| {
+        let s = std::net::UdpSocket::bind("0.0.0.0:0").unwrap();
+        s.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
+        let mut buf = [0u8; 64];
+        let end = Instant::now() + WAIT;
+        while Instant::now() < end {
+            // As an app retrying: the same socket, a datagram a second.
+            s.send_to(b"crex?", (UDP_HOST.0, UDP_HOST.1)).unwrap();
+            if let Ok((n, _)) = s.recv_from(&mut buf) {
+                return Some(buf[..n].to_vec());
+            }
+        }
+        None
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        echoed.as_deref(),
+        Some(&b"crex?"[..]),
+        "{}:{} through {}\ncraked said:\n{}",
+        UDP_HOST.0,
+        UDP_HOST.1,
+        up.label,
+        up.said()
+    );
+    assert_eq!(way(UDP_HOST.0), up.device, "{}'s way", UDP_HOST.0);
+    let said = format!("Sent {} through {}.", UDP_HOST.0, up.label);
+    up.app
+        .within(WAIT, "the UDP host's decision", |m| {
             m.log.iter().any(|e| e.message == said)
         })
         .await;

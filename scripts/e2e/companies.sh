@@ -16,7 +16,7 @@ dummy() {
   ip link set "$name" up
   for a in "$@"; do ip addr add "$a/32" dev "$name"; done
 }
-dummy acme 10.40.0.2 10.40.1.10 10.40.1.11 10.40.1.12 10.40.1.13 10.40.1.14 10.40.1.15 10.40.1.16 10.40.1.17
+dummy acme 10.40.0.2 10.40.1.10 10.40.1.11 10.40.1.12 10.40.1.13 10.40.1.14 10.40.1.15 10.40.1.16 10.40.1.17 10.40.1.18
 dummy globex 10.41.0.2 10.41.1.10
 dummy shared 10.42.0.10
 # ACME's IPv6 host (v6.acme.internal), reached only through a tunnel too.
@@ -43,6 +43,16 @@ table ip6 companies6 {
   }
 }
 NFT
+# A UDP service of ACME's (10.40.1.18:7007, an echo), for a UDP host
+# learned through a tunnel (the scenarios' checks.rs).
+python3 -c '
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.bind(("10.40.1.18", 7007))
+while True:
+    data, peer = s.recvfrom(2048)
+    s.sendto(data, peer)
+' &
 # shop.acme.example and (for CI, whose gateway is named under
 # dorhawk.software) packages.dorhawk.software have public addresses too and
 # private ones here: split-horizon.

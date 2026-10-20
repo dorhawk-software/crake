@@ -388,6 +388,7 @@ macro_rules! every_scenario {
                 checks::nothing_is_routed_up_front,
                 checks::a_host_is_learned_by_probing,
                 checks::a_routers_unreachable_starts_the_probe,
+                checks::a_udp_host_is_learned,
                 checks::a_tunnel_name_is_routed_before_its_first_packet,
                 checks::the_internet_stays_direct,
                 checks::public_names_resolve,
