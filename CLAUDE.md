@@ -459,8 +459,10 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   **Built 2026-10-20** (docs/engineering/platforms.md, "Windows on
   ARM64"): the programs, openconnect (MSYS2 CLANGARM64), OpenVPN's and
   Wintun's ARM64 files, `crake-setup-<version>-arm64.exe`, installed and
-  removed on CI's `windows-11-arm` and in each release. Not yet: the
-  gateway tests on ARM64, and a real Windows on ARM (the user's Mac).
+  removed on CI's `windows-11-arm` and in each release; the gateway
+  tests on ARM64 by hand through the Doctor (system `windows-arm64`,
+  first passed 2026-10-21). Not yet: a real Windows on ARM (the user's
+  Mac).
 - **Browser sign-in on Windows.** The openconnect Crake builds for
   Windows has no `--external-browser`; New tunnel and sign-in say so
   (2026-10-20). Building it in (and an opener there: `BROWSER` is

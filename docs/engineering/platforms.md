@@ -189,8 +189,11 @@ ovpn-dco, tap-windows6), so it gets a build of its own:
   system `windows-arm64`: main's ARM64 installer and test binary, the
   `crake-windows-arm64-tests` artifact, on windows-11-arm). Not in every
   CI run: uncached, the ARM64 builds take ~25 minutes, and the shared
-  Cloudflare gateways would be held that much longer. Not yet: anyone
-  using it on a real Windows on ARM (the checklist).
+  Cloudflare gateways would be held that much longer. First run
+  2026-10-21 (Doctor run 39508002820, AnyConnect): crake-acme up on
+  Wintun's ARM64 driver, a host learned (its route), ACME's domain sent
+  to craked's DNS by an NRPT rule, and everything gone after. Not yet:
+  anyone using it on a real Windows on ARM (the checklist).
 
 **macOS (started 2026-10-11, after Windows' phase 4, as the user
 suggested).** Same layout as Windows. craked's `sys/macos/`: the
