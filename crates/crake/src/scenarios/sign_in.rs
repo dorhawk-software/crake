@@ -23,13 +23,12 @@ pub(crate) async fn switching_on_again_uses_what_was_kept(up: &mut Up) {
     if !up.gateway.keeps_sign_in() {
         sign_in_and_connect(&mut up.app, up.gateway, &["hunter2"]).await;
     } else {
-        let kept = up
-            .app
-            .model
-            .tunnels
-            .iter()
-            .any(|t| t.name == name && t.signed_in);
-        assert!(kept, "{} keeps its sign-in while off", up.label);
+        // The flag may follow "off" by a moment (CI's Mac, 2026-10-20).
+        up.app
+            .until("its sign-in kept while off", |m| {
+                m.tunnels.iter().any(|t| t.name == name && t.signed_in)
+            })
+            .await;
         up.app.send(Command::Connect(name.into()));
         up.app
             .within(WAIT, "connected with the kept sign-in", |m| {
