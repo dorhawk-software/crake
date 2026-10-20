@@ -7,7 +7,10 @@
 # in /usr/local/libexec/crake (the system's /usr is sealed). openconnect isn't
 # bundled: Homebrew's is used. CRAKE_UNIVERSAL=1 builds for Apple Silicon
 # and Intel and joins each binary into one (lipo; releases do); otherwise
-# for this Mac's own architecture only (CI, quicker).
+# for this Mac's own architecture only (CI, quicker). CRAKE_PREBUILT=<dir>
+# joins builds made elsewhere instead (the release builds each architecture
+# in a job of its own, at once: <dir>/macos-bin-<target>/ holds each one's
+# crake, craked and crake-hook).
 # Signed with the Developer ID when a keychain holds it
 # (scripts/macos-signing.sh setup; CRAKE_KEYCHAIN names that keychain):
 # every binary with the hardened runtime and a secure timestamp, as
@@ -25,7 +28,17 @@ PROFILE=${CRAKE_PROFILE:-release}
 DIR=$PROFILE
 [ "$PROFILE" != dev ] || DIR=debug
 ARCHS="arm64"
-if [ -n "${CRAKE_UNIVERSAL:-}" ]; then
+if [ -n "${CRAKE_PREBUILT:-}" ]; then
+  ARCHS="arm64,x86_64"
+  BIN=target/universal/$DIR
+  mkdir -p "$BIN"
+  for f in crake craked crake-hook; do
+    lipo -create -output "$BIN/$f" \
+      "$CRAKE_PREBUILT/macos-bin-aarch64-apple-darwin/$f" "$CRAKE_PREBUILT/macos-bin-x86_64-apple-darwin/$f"
+    # Artifacts don't keep the executable bit.
+    chmod +x "$BIN/$f"
+  done
+elif [ -n "${CRAKE_UNIVERSAL:-}" ]; then
   ARCHS="arm64,x86_64"
   rustup target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null
   for t in aarch64-apple-darwin x86_64-apple-darwin; do
