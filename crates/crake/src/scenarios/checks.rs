@@ -148,11 +148,15 @@ pub(crate) async fn public_names_resolve(_up: &mut Up) {
 pub(crate) async fn a_name_public_dns_doesnt_know_is_rescued(up: &mut Up) {
     let (name, at) = RESCUED;
     let found = look_up(name).await;
-    assert!(
-        found.iter().any(|a| a.to_string() == at),
-        "{name}: {found:?}\n{}",
-        platform::diagnose(&up.device)
-    );
+    if !found.iter().any(|a| a.to_string() == at) {
+        up.app.settle(Duration::from_secs(1)).await;
+        panic!(
+            "{name}: {found:?}\n{}\n{}\ncraked said:\n{}",
+            platform::name_diagnosis(name),
+            platform::diagnose(&up.device),
+            up.said()
+        );
+    }
     assert_eq!(way(at), up.device, "{at}'s way, before any connection");
     assert!(page(at).await.is_ok_and(|b| b.contains("crex")), "{name}");
 }
@@ -264,6 +268,51 @@ pub(crate) async fn names_are_kept_private_while_off(up: &mut Up) {
             "{name} was asked of public DNS with its tunnel off:\n{since}"
         );
     }
+}
+
+/// An upgrade with the tunnel up: it comes back signed in, asking
+/// nothing, and what it had learned goes through it again (Windows: this
+/// run's installer over the running service; Linux and macOS: craked
+/// handing over as the packages' upgrade scripts make it).
+pub(crate) async fn an_upgrade_keeps_the_tunnel_signed_in(up: &mut Up) {
+    if !up.gateway.keeps_sign_in() {
+        super::not_here(
+            "IPsec's sign-in isn't handed over across an upgrade yet (CLAUDE.md, Not now)",
+        );
+        return;
+    }
+    assert!(
+        page_within(GIT).await.is_some(),
+        "{GIT} through {}",
+        up.label
+    );
+    let Some(app) = up.crake.upgrade().await else {
+        super::not_here("no installer to upgrade with (CRAKE_INSTALLER)");
+        return;
+    };
+    up.app = app;
+    let name = up.name;
+    let said = "Crake was updated. Your tunnels are reconnecting with your sign-ins.";
+    up.app
+        .within(WAIT, "back, signed in", |m| {
+            m.tunnels
+                .iter()
+                .any(|t| t.name == name && t.state == "connected")
+                && m.log.iter().any(|e| e.message == said)
+        })
+        .await;
+    up.device = up.crake.device(name);
+    let end = Instant::now() + WAIT;
+    while way(GIT) != up.device {
+        assert!(
+            Instant::now() < end,
+            "{GIT} goes {:?} after the upgrade, not {}",
+            way(GIT),
+            up.device
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+    assert!(answers(GIT).await, "{GIT} after the upgrade");
 }
 
 /// craked stopping with the tunnel up (the service stopped, a reboot):

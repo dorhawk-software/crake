@@ -24,6 +24,15 @@ What's new in each Crake release, for the people using it. The newest is at the 
   folder (ProgramData\Crake\managed.d on Windows) were read only when a craked.toml was there too,
   which Windows' and macOS' installers don't make, so they never showed up. They do now.
 
+- **Updating Crake on Windows keeps your tunnels signed in.** Installing a newer Crake stopped its
+  service the plain way, which signed every tunnel out; you had to sign in again. Now the old
+  service hands the tunnels to the new one, as the Linux and macOS packages do: they come back on
+  their own, with what they had learned.
+
+- **Moving a tunnel to TCP is tried twice.** On a network that blocks UDP, Crake moves the tunnel
+  over to TCP on the same sign-in. If the gateway wasn't done with the old connection yet, the move
+  failed and the tunnel said it stopped unexpectedly. Crake now tries it once more, a moment later.
+
 - **Browser sign-in on Windows says why it isn't there.** The openconnect Crake brings on Windows
   can't sign in through the browser. New tunnel said it "needs openconnect 9 or newer; this computer
   has 9.12", and a tunnel set to it failed with openconnect's own words. Both now say it isn't built

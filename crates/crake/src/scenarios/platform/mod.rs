@@ -57,6 +57,9 @@ pub(crate) struct Craked {
     dir: tempfile::TempDir,
     #[cfg(unix)]
     pub mgr: std::sync::Arc<craked::manager::Manager>,
+    /// What it was started with, for the craked that follows it.
+    #[cfg(unix)]
+    cfg: craked::config::Config,
     /// IT's files this test put in the service's managed.d.
     #[cfg(windows)]
     managed: Vec<std::path::PathBuf>,
@@ -80,19 +83,41 @@ impl Craked {
             std::fs::write(cfg.managed_dir.join(file), text).unwrap();
         }
         cfg.add_managed();
-        let hook_socket = cfg.hook_socket.clone();
-        let mgr = craked::manager::Manager::new(cfg).unwrap();
-        mgr.init().await.unwrap();
-        craked::hook_server::serve(mgr.clone(), &hook_socket).unwrap();
-        let app = crate::test_app::serve(mgr.clone(), dir.path());
+        let (mgr, app) = Self::launch(&cfg, dir.path()).await;
         (
             Self {
                 stopped: false,
                 dir,
                 mgr,
+                cfg,
             },
             app,
         )
+    }
+
+    async fn launch(
+        cfg: &craked::config::Config,
+        dir: &std::path::Path,
+    ) -> (std::sync::Arc<craked::manager::Manager>, App) {
+        let mgr = craked::manager::Manager::new(cfg.clone()).unwrap();
+        mgr.init().await.unwrap();
+        craked::hook_server::serve(mgr.clone(), &cfg.hook_socket).unwrap();
+        let app = crate::test_app::serve(mgr.clone(), dir);
+        (mgr, app)
+    }
+
+    /// An upgrade, as the packages' scripts make one: the flag beside the
+    /// hook's socket, craked stopped (handing its tunnels over), and the
+    /// new one started in its folder, which switches them on again. The
+    /// app that follows it.
+    pub async fn upgrade(&mut self) -> Option<App> {
+        let flag = self.cfg.hook_socket.parent().unwrap().join("handover");
+        std::fs::write(flag, "").unwrap();
+        self.mgr.shutdown().await;
+        let (mgr, app) = Self::launch(&self.cfg, self.dir.path()).await;
+        mgr.resume_after_update().await;
+        self.mgr = mgr;
+        Some(app)
     }
 
     /// The socket the app reaches craked on (for a report).
@@ -169,6 +194,18 @@ impl Craked {
             sh("Restart-Service craked");
         }
         self.stopped = true;
+    }
+
+    /// An upgrade: this run's installer again, silently, over the running
+    /// service (CRAKE_INSTALLER; without one, None). The app that follows.
+    pub async fn upgrade(&mut self) -> Option<App> {
+        let setup = std::env::var("CRAKE_INSTALLER").ok()?;
+        let out = sh(&format!(
+            "$p = Start-Process '{setup}' -ArgumentList '/S' -Wait -PassThru; $p.ExitCode"
+        ));
+        assert_eq!(out.trim(), "0", "the installer: {out}");
+        let (tx, updates) = async_channel::unbounded();
+        Some(App::new(crate::client::start(tx), updates))
     }
 
     /// The service stopped with its tunnels up, as Windows stops it (the

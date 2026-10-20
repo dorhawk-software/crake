@@ -434,12 +434,19 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   ("Network is unreachable"), so an IPv6-only internal host (a name with
   only an AAAA record) can't be reached through a tunnel there, and
   there's no packet to probe from. macOS' scoped default route has the
-  same effect; Windows' tunnel default route (metric 9000) is taken by
-  all IPv6 there instead. Fixing it on Linux means a main-table route of
+  same effect, and macOS' resolver asks no AAAA at all there (CI's Mac:
+  an IPv6-only name came back empty); Windows' tunnel default route
+  (metric 9000) is taken by all IPv6 there instead. Fixing it on Linux means a main-table route of
   Crake's (e.g. IPv6 default via the tunnel, unmarked packets refused),
   which goes against "no routes but the DNS's": the user's decision. The
   e2e network has IPv6 (as most do); the probe scenario says `not_here`
   where the runner's network has none.
+- **IPsec across an upgrade (2026-10-20).** The handover (resume.json)
+  carries openconnect's sessions and OpenVPN's tokens, not IPsec's: its
+  password is the app's (keyring) and charon's SA ends with craked, so an
+  upgrade switches an IPsec tunnel off. Handing it over would mean
+  keeping charon running across craked's restart (its own unit already
+  is) and adopting its SA; the upgrade scenario says `not_here` for it.
 - **Browser sign-in on Windows.** The openconnect Crake builds for
   Windows has no `--external-browser`; New tunnel and sign-in say so
   (2026-10-20). Building it in (and an opener there: `BROWSER` is

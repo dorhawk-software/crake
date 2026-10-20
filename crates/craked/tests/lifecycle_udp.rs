@@ -134,3 +134,45 @@ async fn a_connect_from_the_openconnect_being_replaced_is_ignored() {
     mgr.disconnect("acme").unwrap();
     wait_for(&mgr, "acme", TunnelState::Off).await;
 }
+
+/// DTLS fails, and the openconnect that replaces it over TCP dies at once
+/// (on CI's Windows through Cloudflare, 2026-10-20: "Unrecoverable I/O
+/// error", the gateway not yet done with the old connection).
+const FAKE_REPLACEMENT_FAILS_ONCE: &str = r#"#!/bin/sh
+trap 'exit 0' TERM HUP
+echo "$*" >> "$CRAKE_TEST_CALLS"
+read -r cookie
+case "$*" in
+  *--no-dtls*)
+    if [ "$(grep -c -- --no-dtls "$CRAKE_TEST_CALLS")" = 1 ]; then
+      echo "Unrecoverable I/O error; exiting." >&2
+      exit 1
+    fi ;;
+  *) echo "DTLS handshake timed out" >&2 ;;
+esac
+export TUNDEV=crake-acme INTERNAL_IP4_ADDRESS=10.40.1.7
+reason=connect "$CRAKE_TEST_HOOK" || exit 1
+while :; do sleep 0.1; done
+"#;
+
+/// The replacement over TCP failing before it came up is tried once more,
+/// not taken as the tunnel stopping.
+#[tokio::test]
+async fn a_replacement_that_fails_at_once_is_tried_again() {
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = setup(dir.path(), FAKE_REPLACEMENT_FAILS_ONCE);
+    let calls = dir.path().join("calls");
+    let socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    let _srv = hook_server::serve(mgr.clone(), &socket).unwrap();
+    let session =
+        craked::auth::parse("COOKIE='s3cret'\nCONNECT_URL='https://vpn.acme.example/'\n").unwrap();
+    mgr.connect_with("acme", Some(session)).unwrap();
+    wait_for(&mgr, "acme", TunnelState::Connected).await;
+    let runs = std::fs::read_to_string(&calls).unwrap();
+    assert_eq!(runs.lines().count(), 3, "{runs}");
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(!log.contains("stopped unexpectedly"), "{log}");
+    mgr.disconnect("acme").unwrap();
+    wait_for(&mgr, "acme", TunnelState::Off).await;
+}

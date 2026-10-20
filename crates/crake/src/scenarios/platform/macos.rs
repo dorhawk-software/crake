@@ -133,3 +133,7 @@ pub(crate) fn network_has_ipv6() -> bool {
         .find_map(|l| l.trim().strip_prefix("interface: ").map(str::to_owned))
         .is_some_and(|i| !i.starts_with("utun"))
 }
+
+/// The system asks for a name's IPv6 addresses only where the network
+/// has IPv6 of its own (macOS' resolver).
+pub(crate) const NAMES_NEED_NETWORK_IPV6: bool = true;

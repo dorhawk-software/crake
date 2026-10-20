@@ -48,8 +48,23 @@ fn recent(path: &std::path::Path, fresh: Duration) -> bool {
 }
 
 impl Manager {
+    /// craked's runtime folder: beside the hook's socket (tmpfs); on
+    /// Windows, whose hook is a named pipe, a private folder beside its
+    /// state (until 2026-10-20 handover looked for the pipe's "folder",
+    /// so an upgrade there logged every tunnel off).
+    pub(super) fn run_dir(&self) -> PathBuf {
+        if cfg!(windows) {
+            self.cfg.state_path.with_file_name("run")
+        } else {
+            self.cfg.hook_socket.parent().map_or_else(
+                || self.cfg.state_path.with_file_name("run"),
+                std::path::Path::to_path_buf,
+            )
+        }
+    }
+
     fn runtime_file(&self, name: &str) -> Option<PathBuf> {
-        Some(self.cfg.hook_socket.parent()?.join(name))
+        Some(self.run_dir().join(name))
     }
 
     /// Stop every tunnel (daemon shutdown): log their sessions off, or, when
@@ -160,6 +175,10 @@ impl Manager {
 
 /// Written for root alone, replacing any older one.
 fn write_private(path: &std::path::Path, resume: &Resume) -> anyhow::Result<()> {
+    // Windows' run folder may not be there yet (Linux's is the service's).
+    if let Some(dir) = path.parent().filter(|d| !d.exists()) {
+        crate::sys::create_private_dir(dir)?;
+    }
     let mut f = crate::sys::create_private(path)?;
     f.write_all(&serde_json::to_vec(resume)?)?;
     Ok(())

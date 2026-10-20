@@ -50,6 +50,14 @@ pub(crate) async fn an_ipv6_host_is_learned_by_probing(up: &mut Up) {
 /// A name whose only address is IPv6, which only the tunnel's DNS knows:
 /// routed before the app's first packet.
 pub(crate) async fn an_ipv6_name_is_routed_before_its_first_packet(up: &mut Up) {
+    // macOS doesn't ask for IPv6 addresses at all on a network without
+    // IPv6 of its own (CLAUDE.md, Not now).
+    if platform::NAMES_NEED_NETWORK_IPV6 && !platform::network_has_ipv6() {
+        super::not_here(
+            "this network has no IPv6 of its own, so the system asks no IPv6 addresses",
+        );
+        return;
+    }
     let found = look_up6(V6_NAME).await;
     assert!(
         found.iter().any(|a| a.to_string() == V6),

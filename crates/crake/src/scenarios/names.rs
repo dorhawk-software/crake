@@ -134,7 +134,9 @@ pub(crate) async fn another_programs_dns_change_is_put_back(up: &mut Up) {
     let end = std::time::Instant::now() + Duration::from_secs(5);
     loop {
         let link = platform::sh(&format!("resolvectl status {dev}"));
-        let back = link.contains("Default Route: no")
+        // resolvectl says "Default Route: no", or (older) "-DefaultRoute".
+        let back = !link.contains("Default Route: yes")
+            && !link.contains("+DefaultRoute")
             && link.contains("~acme.internal")
             && !link.contains("~.");
         if back {

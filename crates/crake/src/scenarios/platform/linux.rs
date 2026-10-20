@@ -167,3 +167,7 @@ pub(crate) fn network_has_ipv6() -> bool {
         .lines()
         .any(|l| !l.contains("crake-") && !l.contains("table"))
 }
+
+/// The system asks for a name's IPv6 addresses only where the network
+/// has IPv6 of its own (macOS' resolver).
+pub(crate) const NAMES_NEED_NETWORK_IPV6: bool = false;

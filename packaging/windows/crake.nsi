@@ -65,7 +65,14 @@ FunctionEnd
 
 Section "Crake"
   ; An older Crake: its app and service stop before their files change.
+  ; Its tunnels stay signed in: the flag has the service hand them over to
+  ; the new one instead of logging them off (as the Linux packages' upgrade
+  ; does; craked ignores a flag older than two minutes).
   nsExec::Exec 'taskkill /IM crake.exe /F'
+  ReadEnvStr $1 PROGRAMDATA
+  CreateDirectory "$1\Crake\run"
+  FileOpen $0 "$1\Crake\run\handover" w
+  FileClose $0
   nsExec::Exec 'sc.exe stop craked'
   Sleep 3000
 

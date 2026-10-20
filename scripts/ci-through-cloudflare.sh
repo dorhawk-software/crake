@@ -124,6 +124,7 @@ else
     CRAKE_GATEWAY_OPENVPN="127.0.0.1 1194" CRAKE_GATEWAY_CA="$WORK/ready/openvpn-ca.crt" \
     CRAKE_GATEWAY_USER_CERT="$WORK/ready/acme-user.p12" \
     CRAKE_OPENCONNECT="C:/Program Files/Crake/openconnect/openconnect.exe" \
+    CRAKE_INSTALLER="$2" \
     "$3" $FILTER --test-threads=1 --nocapture || status=$?
   [ "$status" = 0 ] || tail -n 60 "C:/ProgramData/Crake/craked.log"
 fi

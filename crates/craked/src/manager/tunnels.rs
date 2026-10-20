@@ -7,6 +7,8 @@ use super::*;
 /// Leaving: the tunnels get 12 s to log off, looked at every POLL.
 const STOP_POLLS: u32 = 120;
 const POLL: Duration = Duration::from_millis(100);
+/// How long a replacement over TCP that ended at once waits to try again.
+const REPLACE_AGAIN_AFTER: Duration = Duration::from_secs(2);
 
 impl Manager {
     pub fn connect(self: &Arc<Self>, name: &str) -> Result<()> {
@@ -286,6 +288,8 @@ impl Manager {
             || network
                 .as_deref()
                 .is_some_and(|n| self.networks.lock().unwrap().udp_blocked(n));
+        // Replaced over TCP (7b), and that replacement tried once more.
+        let (mut replaced, mut retried) = (false, false);
         let (state, reason) = loop {
             let mut child = match self
                 .spawn_openconnect(&config, session.clone(), no_dtls)
@@ -317,15 +321,33 @@ impl Manager {
             forward_output(&mut child, output);
 
             tokio::select! {
-                status = child.wait() => break match status {
-                    Ok(s) if s.success() => (TunnelState::Off, None),
-                    Ok(s) => {
-                        let tail = last_line.lock().unwrap().clone();
-                        let why = crake_proto::trouble::from_openconnect(&tail)
-                            .unwrap_or_else(|| format!("openconnect exited with {s}. {tail}").trim().to_owned());
-                        (TunnelState::Trouble, Some(why))
+                status = child.wait() => {
+                    let ended = match status {
+                        Ok(s) if s.success() => (TunnelState::Off, None),
+                        Ok(s) => {
+                            let tail = last_line.lock().unwrap().clone();
+                            let why = crake_proto::trouble::from_openconnect(&tail)
+                                .unwrap_or_else(|| format!("openconnect exited with {s}. {tail}").trim().to_owned());
+                            (TunnelState::Trouble, Some(why))
+                        }
+                        Err(e) => (TunnelState::Trouble, Some(e.to_string())),
+                    };
+                    // The replacement over TCP ending before it came up: the
+                    // gateway may not have let the old connection go yet
+                    // (CI's Windows through Cloudflare, 2026-10-20:
+                    // "Unrecoverable I/O error"). Once more, after a moment.
+                    let up = self
+                        .tunnels
+                        .lock()
+                        .unwrap()
+                        .get(&name)
+                        .is_some_and(|e| e.state == TunnelState::Connected);
+                    if ended.0 == TunnelState::Trouble && replaced && !retried && !up {
+                        retried = true;
+                        tokio::time::sleep(REPLACE_AGAIN_AFTER).await;
+                        continue;
                     }
-                    Err(e) => (TunnelState::Trouble, Some(e.to_string())),
+                    break ended;
                 },
                 how = &mut stop_rx => {
                     let keep = matches!(how, Ok(Stop::KeepSession));
@@ -382,6 +404,7 @@ impl Manager {
                         e.replacing = false;
                     }
                     no_dtls = true;
+                    replaced = true;
                 }
             }
         };

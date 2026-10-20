@@ -102,7 +102,10 @@ pub(crate) fn acme_dns_answers(name: &str, at: &str) -> bool {
 pub(crate) fn name_diagnosis(name: &str) -> String {
     sh(&format!(
         "Resolve-DnsName {name} -ErrorAction Continue | Out-String; \
-         Resolve-DnsName {name} -Server 127.53.0.1 -DnsOnly -ErrorAction Continue | Out-String"
+         foreach ($t in 'A', 'AAAA') {{ \
+           \"$t of craked's DNS server:\"; \
+           Resolve-DnsName {name} -Type $t -Server 127.53.0.1 -DnsOnly -ErrorAction Continue | Out-String }}; \
+         Get-DnsClientCache -Entry {name} -ErrorAction SilentlyContinue | Out-String"
     ))
 }
 
@@ -126,3 +129,7 @@ pub(crate) fn left_after_stop() -> String {
     .trim()
     .to_owned()
 }
+
+/// The system asks for a name's IPv6 addresses only where the network
+/// has IPv6 of its own (macOS' resolver).
+pub(crate) const NAMES_NEED_NETWORK_IPV6: bool = false;

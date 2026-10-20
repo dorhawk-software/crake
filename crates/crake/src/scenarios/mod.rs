@@ -547,6 +547,7 @@ macro_rules! every_scenario {
                 checks::names_resolve_after_switching_off,
                 checks::names_are_kept_private_while_off,
                 checks::stopping_craked_leaves_nothing,
+                checks::an_upgrade_keeps_the_tunnel_signed_in,
                 names::a_public_name_with_a_private_address_goes_through,
                 names::a_tunnel_dns_that_stops_answering_is_stood_in_for,
                 names::another_programs_dns_change_is_put_back,

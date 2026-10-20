@@ -87,20 +87,6 @@ impl Manager {
         self.finish(&name, &label, state, reason).await;
     }
 
-    /// Where a run's files go: craked's runtime folder beside the hook's
-    /// socket (tmpfs); on Windows, whose hook is a named pipe, a private
-    /// folder beside its state.
-    fn run_dir(&self) -> PathBuf {
-        if cfg!(windows) {
-            self.cfg.state_path.with_file_name("run")
-        } else {
-            self.cfg.hook_socket.parent().map_or_else(
-                || self.cfg.state_path.with_file_name("run"),
-                Path::to_path_buf,
-            )
-        }
-    }
-
     /// A run's config: the profile as checked, root's (SYSTEM's) only.
     fn run_config(&self, name: &str) -> PathBuf {
         self.run_dir().join(format!("openvpn-{name}.conf"))
