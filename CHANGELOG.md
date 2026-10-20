@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.13.0 (2026-10-20)
+
 - **Signing in through the browser works for AnyConnect and other openconnect gateways.** Crake
   handed openconnect the browser's name without its folder, and openconnect doesn't look for it, so
   the browser never opened on Linux or macOS and the sign-in waited forever. It's found where your
