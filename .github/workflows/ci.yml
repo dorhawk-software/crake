@@ -287,6 +287,47 @@ jobs:
           name: crake-windows-tests
           path: target/ci/crake-tests.exe
 
+  # Windows on ARM64 (planned with the user, 2026-10-20: a Windows 11 for
+  # ARM VM on an Apple Silicon Mac runs no x64 drivers): Crake's own
+  # programs built and tested natively on GitHub's ARM64 Windows runner.
+  # Its openconnect, drivers and installer come next (CLAUDE.md, Not now).
+  windows-arm64-build:
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      # Never saved: GitHub keeps 10 GB of caches per repository and the
+      # other Rust caches fill ~9 (a sixth pushed theirs out). Uncached it
+      # builds alongside, off the run's critical path.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
+      - name: The tests that aren't Linux's own, on Windows for ARM64
+        env:
+          CRAKE_WINDOWS_ADMIN: "1"
+        run: cargo test --workspace --locked
+      - name: crake.exe, craked.exe and crake-hook.exe for ARM64 (unsigned)
+        run: cargo build --release --locked -p crake -p craked
+      - name: ARM64 programs, and no Visual C++ runtime needed
+        shell: pwsh
+        run: |
+          foreach ($f in 'crake', 'craked', 'crake-hook') {
+            $b = [System.IO.File]::ReadAllBytes("target/release/$f.exe")
+            $pe = [BitConverter]::ToInt32($b, 0x3c)
+            $machine = [BitConverter]::ToUInt16($b, $pe + 4)
+            if ($machine -ne 0xAA64) { throw "$f.exe is for machine 0x$('{0:X}' -f $machine), not ARM64" }
+            if (Select-String -Path "target/release/$f.exe" -Pattern 'VCRUNTIME140' -SimpleMatch -Quiet) {
+              throw "$f.exe needs VCRUNTIME140.dll"
+            }
+          }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: crake-windows-arm64
+          path: |
+            target/release/crake.exe
+            target/release/craked.exe
+            target/release/crake-hook.exe
+
   # The installer, as a release builds it (release.yml), from this run's
   # executables: openconnect built from source and OpenVPN taken from its
   # MSI, both kept in a cache while their scripts don't change.
