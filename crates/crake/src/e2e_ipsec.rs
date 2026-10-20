@@ -137,10 +137,14 @@ async fn a_password_sign_in_over_ikev2() {
         info.dns,
         ["10.40.0.2".parse::<std::net::Ipv4Addr>().unwrap()]
     );
-    // Only the first of the gateway's networks (it has 10.42.0.0/16 too):
-    // charon runs updown once per pair of selectors and the hook hands
-    // craked the first; a hint only, so later (CLAUDE.md, 7k's "Not yet").
-    assert_eq!(info.split_include, ["10.40.0.0/16"]);
+    // Both of the gateway's networks, as hints: charon runs updown once
+    // per pair of selectors, the second a moment after the first.
+    until("both of the gateway's networks", || {
+        let hints = mgr.get(&name).unwrap().info.unwrap().split_include;
+        (hints.iter().any(|n| n == "10.40.0.0/16") && hints.iter().any(|n| n == "10.42.0.0/16"))
+            .then_some(())
+    })
+    .await;
 
     // The internet still answers direct: 203.0.113.80 drops what comes
     // through a tunnel.
