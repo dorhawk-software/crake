@@ -143,3 +143,75 @@ pub(crate) async fn another_programs_dns_change_is_put_back(up: &mut Up) {
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
 }
+
+/// Another VPN client serving ACME's domain (on Linux a link of its own in
+/// resolved, `othervpn0`, whose DNS is the network's public DNS stand-in,
+/// which logs what it's asked), removed again when the scenario ends.
+#[cfg(target_os = "linux")]
+struct OtherClient;
+
+#[cfg(target_os = "linux")]
+impl OtherClient {
+    fn serving(domain: &str) -> Self {
+        let said = platform::sh(&format!(
+            "ip link add othervpn0 type dummy && ip link set othervpn0 up && \
+             resolvectl dns othervpn0 203.0.113.53 && resolvectl domain othervpn0 '~{domain}' && \
+             resolvectl domain othervpn0"
+        ));
+        assert!(said.contains(domain), "the other client's link: {said}");
+        Self
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl Drop for OtherClient {
+    fn drop(&mut self) {
+        platform::sh("ip link del othervpn0");
+    }
+}
+
+/// With another VPN client serving ACME's domain (a colleague's own
+/// AnyConnect, 2026-10-14), switching ACME off leaves those names to it:
+/// they go to its DNS instead of being refused at once (Linux; macOS'
+/// tests/macos.rs and Windows' VM test play theirs: /etc/resolver files
+/// and NRPT rules not Crake's).
+pub(crate) async fn another_clients_names_are_left_to_it(up: &mut Up) {
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = up;
+        super::not_here("another client is played on Linux here (macOS: tests/macos.rs)");
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let _other = OtherClient::serving("acme.internal");
+        up.off().await;
+        let before = platform::public_questions().unwrap_or_default();
+        let name = WIKI.0;
+        let end = std::time::Instant::now() + WAIT;
+        loop {
+            // craked looks at others' links every 2 s; the other client's
+            // DNS says it doesn't know the name, but it was asked.
+            let _ = look_up(name).await;
+            let after = platform::public_questions().unwrap_or_default();
+            let since = after.strip_prefix(before.as_str()).unwrap_or(&after);
+            if since.contains(name) {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < end,
+                "{name} never reached the other client's DNS:\n{}\ncraked said:\n{}",
+                platform::sh("resolvectl domain"),
+                up.said()
+            );
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+        // resolved asks every link whose domain fits: the question reaching
+        // the other client's DNS doesn't say Crake left it alone. Its own
+        // refusing link mustn't carry the domain.
+        let hush = platform::sh("resolvectl domain crake-hush");
+        assert!(
+            !hush.contains("acme.internal"),
+            "Crake keeps acme.internal private though another client serves it: {hush}"
+        );
+    }
+}

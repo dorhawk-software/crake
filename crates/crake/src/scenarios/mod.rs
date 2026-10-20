@@ -403,6 +403,7 @@ macro_rules! every_scenario {
                 names::a_public_name_with_a_private_address_goes_through,
                 names::a_tunnel_dns_that_stops_answering_is_stood_in_for,
                 names::another_programs_dns_change_is_put_back,
+                names::another_clients_names_are_left_to_it,
                 hosts::undo_sends_a_host_direct_and_redo_brings_it_back,
                 hosts::a_host_added_by_hand_goes_through,
                 hosts::a_name_added_by_hand_goes_through,
