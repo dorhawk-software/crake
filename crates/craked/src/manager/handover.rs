@@ -38,6 +38,11 @@ struct Resume {
     /// OpenVPN tunnels: the gateway's token.
     #[serde(default)]
     openvpn: BTreeMap<String, crate::openvpn::Token>,
+    /// IPsec tunnels that were up: charon's SA ends with craked, and its
+    /// password is the app's, so the new craked switches them on and asks
+    /// (the app answers from the keyring when it keeps it).
+    #[serde(default)]
+    ipsec: Vec<String>,
 }
 
 /// `path` exists and was written within `fresh`.
@@ -92,6 +97,10 @@ impl Manager {
                     if let Some(fields) = &e.attached {
                         resume.attached.insert(name.clone(), fields.clone());
                     }
+                    if e.config.protocol == crate::config::Protocol::Ipsec {
+                        resume.ipsec.push(name.clone());
+                        e.handover = true;
+                    }
                 }
                 let how = if e.handover {
                     Stop::KeepSession
@@ -105,7 +114,11 @@ impl Manager {
                 }
             }
         }
-        if resume.sessions.is_empty() && resume.attached.is_empty() && resume.openvpn.is_empty() {
+        if resume.sessions.is_empty()
+            && resume.attached.is_empty()
+            && resume.openvpn.is_empty()
+            && resume.ipsec.is_empty()
+        {
             return;
         }
         if let Some(path) = self.runtime_file(RESUME)
@@ -151,6 +164,15 @@ impl Manager {
             if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
                 e.handover = true;
                 e.token = Some(token.clone());
+            }
+            match self.connect(name) {
+                Ok(()) => back += 1,
+                Err(e) => tracing::error!("{name} after the update: {e:#}"),
+            }
+        }
+        for name in &resume.ipsec {
+            if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
+                e.handover = true;
             }
             match self.connect(name) {
                 Ok(()) => back += 1,

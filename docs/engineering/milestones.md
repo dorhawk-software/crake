@@ -1334,6 +1334,12 @@
    each start (`TunnelConfig::gateway_key_file`; an app-added tunnel's is
    craked's copy in `profiles/`). Tested: policy and config units, the
    `it_ipsec` scenarios (scope held, can't be changed or removed).
+   **Across an upgrade (2026-10-20):** charon's SA ends with craked and
+   the password is the app's, so the old craked names the IPsec tunnels
+   that were up in resume.json (`ipsec`), and the new one switches them on
+   and asks; the app answers from the keyring when it keeps the password
+   (the upgrade scenario for IPsec). Keeping charon's SA itself across the
+   restart was weighed and left: its unit stops with craked.
    **"Change the key…" (2026-10-20):** a key the gateway turns down ends
    the sign-in window's failure with Change the key… in Try again's
    place, opening the tunnel's Edit (as ipsec-tunnel.html drew it; window
@@ -1341,8 +1347,7 @@
    Not yet: a gateway with several networks shows only the first as a
    hint (charon runs updown once per pair of selectors, and craked takes
    the first call's; seen 2026-10-20 when the e2e gateway got
-   10.42.0.0/16 too), handing an IPsec tunnel over across an upgrade
-   (CLAUDE.md, Not now), certificates (the gateway's or the user's), the
+   10.42.0.0/16 too), certificates (the gateway's or the user's), the
    FortiGate by hand.
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or
    Windows problem without a colleague's machine):** `.github/workflows/

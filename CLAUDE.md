@@ -456,12 +456,6 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   choosing at install), and CI building and testing it (GitHub has
   Windows ARM64 runners). Detail in docs/engineering/platforms.md when
   started.
-- **IPsec across an upgrade (2026-10-20).** The handover (resume.json)
-  carries openconnect's sessions and OpenVPN's tokens, not IPsec's: its
-  password is the app's (keyring) and charon's SA ends with craked, so an
-  upgrade switches an IPsec tunnel off. Handing it over would mean
-  keeping charon running across craked's restart (its own unit already
-  is) and adopting its SA; the upgrade scenario says `not_here` for it.
 - **Browser sign-in on Windows.** The openconnect Crake builds for
   Windows has no `--external-browser`; New tunnel and sign-in say so
   (2026-10-20). Building it in (and an opener there: `BROWSER` is

@@ -20,6 +20,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
 - **"Change the key…" when the gateway turns the key down.** An IPsec sign-in refused for its key
   now ends with a button that opens the tunnel's Edit, instead of Try again, which couldn't help.
 
+- **IPsec tunnels come back after an update.** Updating Crake switched IPsec tunnels off. Now they
+  switch on again by themselves, and if you keep the password in your keyring they sign in without
+  asking.
+
 - **Names kept private once another VPN client lets them go.** When another VPN program had been
   serving a company's names and stopped, Crake took them back to keep them private, but if the
   system's resolver wasn't ready that moment, it never tried again, and those names could go to

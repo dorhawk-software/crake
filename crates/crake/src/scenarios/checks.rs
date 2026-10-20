@@ -271,16 +271,11 @@ pub(crate) async fn names_are_kept_private_while_off(up: &mut Up) {
 }
 
 /// An upgrade with the tunnel up: it comes back signed in, asking
-/// nothing, and what it had learned goes through it again (Windows: this
+/// nothing (IPsec: its password, which the app keeps), and what it had
+/// learned goes through it again (Windows: this
 /// run's installer over the running service; Linux and macOS: craked
 /// handing over as the packages' upgrade scripts make it).
 pub(crate) async fn an_upgrade_keeps_the_tunnel_signed_in(up: &mut Up) {
-    if !up.gateway.keeps_sign_in() {
-        super::not_here(
-            "IPsec's sign-in isn't handed over across an upgrade yet (CLAUDE.md, Not now)",
-        );
-        return;
-    }
     assert!(
         page_within(GIT).await.is_some(),
         "{GIT} through {}",
@@ -292,6 +287,16 @@ pub(crate) async fn an_upgrade_keeps_the_tunnel_signed_in(up: &mut Up) {
     };
     up.app = app;
     let name = up.name;
+    // IPsec's password is the app's: the new craked asks it, and the app
+    // answers from the keyring (these tests keep none: answered here).
+    if !up.gateway.keeps_sign_in() {
+        let ask = up.app.asked("password").await;
+        up.app.send(crate::client::Command::Answer(
+            name.into(),
+            ask["id"].parse().unwrap(),
+            "hunter2".into(),
+        ));
+    }
     let said = "Crake was updated. Your tunnels are reconnecting with your sign-ins.";
     up.app
         .within(WAIT, "back, signed in", |m| {
