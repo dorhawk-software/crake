@@ -30,6 +30,7 @@ fn config(dir: &std::path::Path) -> Config {
         probing: false,
         race_first_syn: false,
         probe_wait_secs: 3,
+        dns_check_secs: craked::config::DNS_CHECK_SECS,
         never: vec![],
         use_resolved: false,
         apply_network: false,

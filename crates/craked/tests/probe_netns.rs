@@ -336,6 +336,7 @@ async fn start_probe(race: bool) -> Probe {
         probing: true,
         race_first_syn: race,
         probe_wait_secs: 1,
+        dns_check_secs: craked::config::DNS_CHECK_SECS,
         never: vec!["10.70.9.0/24".parse().unwrap()],
         use_resolved: false,
         apply_network: true,

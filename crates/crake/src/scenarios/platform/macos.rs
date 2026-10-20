@@ -23,6 +23,8 @@ pub(crate) fn config(dir: &Path) -> Config {
         probe_wait_secs: 1,
         race_first_syn: false,
         managed_dir: dir.join("managed.d"),
+        // A tunnel's DNS asked every 5 s: an outage noticed in seconds.
+        dns_check_secs: super::DNS_CHECK_SECS,
         ..Config::default()
     }
 }

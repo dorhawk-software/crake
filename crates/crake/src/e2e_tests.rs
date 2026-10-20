@@ -40,6 +40,7 @@ pub(crate) fn config(dir: &std::path::Path) -> Config {
         probing: true,
         race_first_syn: false,
         probe_wait_secs: 1,
+        dns_check_secs: craked::config::DNS_CHECK_SECS,
         never: vec![],
         use_resolved: false, // no systemd in the container
         apply_network: true,

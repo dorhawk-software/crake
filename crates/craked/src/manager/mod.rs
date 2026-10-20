@@ -202,13 +202,9 @@ const SEEN_NAME_FOR: Duration = Duration::from_secs(3600);
 
 /// How long to wait for one tunnel DNS server.
 const TUNNEL_DNS_WAIT: Duration = Duration::from_millis(800);
-
-/// How often each tunnel's DNS is asked whether it still answers (7h), how
-/// long it gets, and how many silences in a row mean it stopped.
-const DNS_CHECK_EVERY: Duration = Duration::from_secs(30);
-
+/// How long a tunnel's DNS gets to answer the check (7h; how often:
+/// `Config::dns_check_secs`), and how many silences in a row mean it stopped.
 const DNS_CHECK_WAIT: Duration = Duration::from_secs(3);
-
 const DNS_CHECK_MISSES: u8 = 2;
 
 /// How often an OpenVPN 3 tunnel's device is looked at.
@@ -410,7 +406,7 @@ impl Manager {
             let this = Arc::clone(self);
             tokio::spawn(async move {
                 loop {
-                    tokio::time::sleep(DNS_CHECK_EVERY).await;
+                    tokio::time::sleep(Duration::from_secs(this.cfg.dns_check_secs)).await;
                     this.check_dns().await;
                 }
             });

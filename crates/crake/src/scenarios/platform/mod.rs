@@ -22,6 +22,12 @@ pub(crate) use windows::*;
 
 use crate::test_app::{App, get};
 
+/// How often craked asks a tunnel's DNS in these tests (30 s by default:
+/// one outage scenario took 3 minutes of CI's Windows). Windows' installed
+/// service reads it from the craked.toml ci-through-cloudflare.sh writes.
+#[cfg(unix)]
+pub(crate) const DNS_CHECK_SECS: u64 = 5;
+
 /// ACME's DNS server, which every test gateway pushes.
 pub(crate) const ACME_DNS: &str = "10.40.0.2";
 

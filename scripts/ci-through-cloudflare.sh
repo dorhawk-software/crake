@@ -39,6 +39,9 @@ else
   # Silent, as a company's software deployment would: the service and both
   # engines' drivers (crake.nsi).
   powershell -NoProfile -Command "\$p = Start-Process '$2' -ArgumentList '/S' -Wait -PassThru; exit \$p.ExitCode"
+  # A tunnel's DNS asked every 5 s, not 30: the outage scenario's wait
+  # (the scenarios' craked on Linux and macOS is told the same).
+  printf 'dns_check_secs = 5\n' > "C:/ProgramData/Crake/craked.toml"
   # craked's debug lines in its log, for a failure's message (as the VM
   # test sets them).
   powershell -NoProfile -Command "Set-ItemProperty HKLM:\\SYSTEM\\CurrentControlSet\\Services\\craked -Name Environment -Type MultiString -Value 'RUST_LOG=craked=debug,info'; Restart-Service craked"

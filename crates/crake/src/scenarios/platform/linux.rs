@@ -44,6 +44,8 @@ pub(crate) fn config(dir: &Path) -> Config {
     Config {
         use_resolved: true,
         tunnels: vec![],
+        // A tunnel's DNS asked every 5 s: an outage noticed in seconds.
+        dns_check_secs: super::DNS_CHECK_SECS,
         ..crate::e2e_tests::config(dir)
     }
 }

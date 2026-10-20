@@ -58,6 +58,11 @@ pub struct Config {
     /// Seconds to wait for an answer before probing: 1, 2, 3 or 5.
     #[serde(default = "default_probe_wait")]
     pub probe_wait_secs: u64,
+    /// How often each connected tunnel's DNS is asked whether it still
+    /// answers (7h; two silences in a row are an outage). Tests make it
+    /// short: at 30 s one outage scenario took 3 minutes of CI's Windows.
+    #[serde(default = "default_dns_check")]
+    pub dns_check_secs: u64,
     /// Hold the first SYN of a new connection to race direct against the
     /// tunnels, so even the first connection is routed (Linux only).
     #[serde(default = "yes")]
@@ -305,6 +310,7 @@ impl Default for Config {
             probing: true,
             race_first_syn: true,
             probe_wait_secs: default_probe_wait(),
+            dns_check_secs: default_dns_check(),
             never: Vec::new(),
             use_resolved: true,
             apply_network: true,
@@ -402,6 +408,8 @@ pub const MAX_DAYS: u64 = 365;
 /// "Never": ten years.
 pub const NEVER_DAYS: u64 = 3650;
 /// The log is kept a month unless set otherwise.
+/// A tunnel's DNS is asked every half minute whether it still answers.
+pub const DNS_CHECK_SECS: u64 = 30;
 pub const LOG_DAYS: u64 = 30;
 
 fn default_managed_dir() -> PathBuf {
@@ -409,6 +417,9 @@ fn default_managed_dir() -> PathBuf {
 }
 fn default_expiry_days() -> u64 {
     EXPIRY_DAYS
+}
+fn default_dns_check() -> u64 {
+    DNS_CHECK_SECS
 }
 fn default_probe_wait() -> u64 {
     PROBE_WAIT

@@ -180,6 +180,12 @@ The user doesn't want development builds installed on their machine.
   scenario asks for up to 5 s and prints each miss. If it shows up again,
   craked's DNS server needs a debug line per question to say why (the
   new adapter not taking traffic yet is the guess).
+  CI time (2026-10-20): Windows' gateway tests run on two runners at once
+  (`windows-gateways (anyconnect)` and `(openvpn)`, split by
+  CRAKE_GATEWAY_FILTER), and the scenarios' craked asks a tunnel's DNS
+  every 5 s (`dns_check_secs`; Windows' service from the craked.toml
+  ci-through-cloudflare.sh writes): the outage scenario took 3 minutes
+  at the default 30.
   The older chained tests (`e2e_tests.rs` and the rest) still run; their
   checks move into scenarios as the testing-gaps catalogue is worked down.
 - CI (`.github/workflows/ci.yml`, on every push; a new push cancels the

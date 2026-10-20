@@ -235,7 +235,7 @@ jobs:
         if: env.HAVE_TUNNEL == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: scripts/ci-gateways.sh wait macos windows-gateways
+        run: scripts/ci-gateways.sh wait macos "windows-gateways (anyconnect)" "windows-gateways (openvpn)"
       - name: What the gateways said
         if: always() && env.HAVE_TUNNEL == 'true'
         run: |
@@ -322,14 +322,26 @@ jobs:
 
   # Crake installed on a Windows runner as a person would have it, signed
   # in to ACME's gateways through Cloudflare Tunnel (7j).
+  # On two runners at once, each with its own installed service: one ran
+  # all 95 tests in 20 minutes, the longest job of the run (2026-10-20).
   windows-gateways:
     needs: [windows-build, windows-installer]
     runs-on: windows-latest
     permissions:
       contents: read
       actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - half: anyconnect
+            filter: scenarios::anyconnect scenarios::it_anyconnect scenarios::new_tunnel gateway_tests windows_journey e2e_protocols::each_protocols_sign_in
+          - half: openvpn
+            filter: scenarios::openvpn scenarios::it_openvpn
+    name: windows-gateways (${{ matrix.half }})
     env:
       HAVE_TUNNEL: ${{ secrets.CF_ACCESS_CLIENT_ID != '' }}
+      CRAKE_GATEWAY_FILTER: ${{ matrix.filter }}
     steps:
       - name: Without Cloudflare Tunnel, nothing to do
         if: env.HAVE_TUNNEL != 'true'
