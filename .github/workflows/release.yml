@@ -289,6 +289,18 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" \
             --verify-tag --title "Crake ${GITHUB_REF_NAME#v}" --notes-file notes.md
+      # The run's page lists the jobs' hand-offs (its artifacts, gone at the
+      # end): it says where the downloads are.
+      - name: Where to download it
+        run: |
+          V=${GITHUB_REF_NAME#v}
+          {
+            echo "## Crake $V is out"
+            echo
+            echo "Download it from [the release](https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME), not from this run."
+            echo
+            scripts/release-notes.sh --which "$V"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   homebrew:
     needs: publish
@@ -352,3 +364,23 @@ jobs:
             exit 0
           fi
           scripts/aur-publish.sh "${GITHUB_REF_NAME#v}"
+
+  # The jobs hand each other a dozen artifacts (programs, openconnect, the
+  # installers before and after their tests): all of it is on the release
+  # now, and the run's page listed them as if they were downloads. Gone
+  # once the release and the cask are out; kept when anything failed (for
+  # a re-run) and after a rehearsal (to look at).
+  tidy:
+    needs: [publish, homebrew]
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      - name: The run's artifacts deleted
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --paginate --jq '.artifacts[].id' |
+            while read -r id; do
+              gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$id"
+            done

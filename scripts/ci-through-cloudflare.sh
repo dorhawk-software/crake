@@ -97,6 +97,15 @@ until gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n gateways-ready
   [ "$i" -lt "$WAIT_TRIES" ] || { echo "the gateways never said they're up (their job: ${job:-not found})" >&2; exit 1; }
   sleep 10
 done
+# A re-run of only the failed jobs finds the first attempt's word that the
+# gateways are up, but not their job, which had finished: Cloudflare then
+# answered "bad handshake" for five minutes (2026-10-21). Said at once.
+case "$(gateways_job)" in
+  completed*)
+    echo "::error::The gateways job had already finished: re-running only the failed jobs doesn't start it again. Re-run all jobs."
+    exit 1
+    ;;
+esac
 i=0
 until curl -sk -o /dev/null https://127.0.0.1:8443; do
   i=$((i + 1))
