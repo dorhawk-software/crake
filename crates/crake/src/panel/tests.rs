@@ -326,21 +326,19 @@ fn an_updated_service_asks_for_a_restart(cx: &mut TestAppContext) {
     assert!(matches!(w.click("Restart", cx), Request::Restart));
 }
 
-/// A new version is out (asked of dorhawk.software): Download opens its
-/// page; Not now remembers that version; switched off in Settings, it's
+/// A new version is out (asked of dorhawk.software): Download fetches it;
+/// Not now remembers that version; switched off in Settings, it's
 /// not said.
 #[gpui_kit::test]
-fn a_new_version_links_its_page_until_not_now(cx: &mut TestAppContext) {
+fn a_new_version_is_downloaded_until_not_now(cx: &mut TestAppContext) {
     let w = open(cx, Prefs::default());
     w.model.update(cx, |m, cx| {
         m.newest = Some("99.1.0".into());
         cx.notify();
     });
     match w.click("Download", cx) {
-        Request::OpenUrl(url) => assert_eq!(
-            url,
-            "https://github.com/dorhawk-software/crake/releases/tag/v99.1.0"
-        ),
+        // This computer's installer, or the page (versions::tests).
+        Request::OpenUrl(url) => assert_eq!(url, crate::versions::download("99.1.0")),
         other => panic!("{other:?}"),
     }
     match w.click("Not now", cx) {
