@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.14.0 (2026-10-21)
+
 - **IPsec gateways that prove themselves with a certificate.** New tunnel asks how the gateway
   proves itself: with a key from your IT team, or with its certificate, as a website does. Crake
   checks that the certificate is for the gateway, signed by an authority this computer knows or by
