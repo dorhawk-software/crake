@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: IPsec certificates</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  /* DESIGN.md's tokens. */
+  :root { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --line-strong: #BDBDB8; --ink: #1A1C1E;
+    --muted: #5A5F64; --accent: #0F766E; --accent-ink: #FFFFFF; --accent-soft: #E2F1EF; --danger: #B42318;
+    /* The proposal's own marker for what changes: outside Crake's palette. */
+    --mark: #C026D3; }
+  body.dark { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --line-strong: #4A4E53; --ink: #ECEDEE;
+    --muted: #A9AEB4; --accent: #2DD4BF; --accent-ink: #0B1514; --accent-soft: #17332F; --danger: #F97066; --mark: #E879F9; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  ::selection { background: var(--accent-soft); color: var(--ink); }
+  .page { padding: 28px 40px 56px; max-width: 1520px; }
+  h1 { font-size: 20px; margin: 0 0 10px; }
+  h2.sec { font-size: 17px; margin: 44px 0 6px; }
+  .intro, .note { color: var(--muted); font-size: 13px; max-width: 78ch; }
+  .intro { margin-bottom: 10px; }
+  .intro b, .note b { color: var(--ink); }
+  .note { margin: 4px 0 14px; }
+  .note ol, .intro ol, .note ul { margin: 6px 0 0; padding-left: 20px; }
+  .note li + li, .intro li + li { margin-top: 4px; }
+  .mark-key { display: inline-block; width: 22px; height: 12px; border: 2px dashed var(--mark); border-radius: 3px; vertical-align: -2px; }
+  .pair { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
+  .col { width: 720px; }
+  .cap { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 8px; max-width: 720px; }
+  .cap .rec2 { color: var(--ink); }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+  .changed { outline: 2px dashed var(--mark); outline-offset: 4px; }
+  li.changed { outline-offset: -3px; }
+  .choice { display: inline-block; font-size: 12px; font-weight: 700; color: var(--panel); background: var(--ink); border-radius: 4px; padding: 1px 7px; margin-right: 6px; }
+
+  /* New tunnel, as the app draws it (new_tunnel/view.rs, widgets.rs, ipsec.rs). */
+  .win { width: 720px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .bar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 57px; box-sizing: border-box; padding: 0 12px; border-bottom: 1px solid var(--line); }
+  .bar .cancel { padding: 0 12px; font-weight: 600; }
+  .bar .name { font-size: 15px; font-weight: 700; }
+  .bar .x { justify-self: end; width: 32px; height: 32px; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; }
+  .stepsbar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0 32px; border-bottom: 1px solid var(--line); }
+  .stepsbar div { display: flex; align-items: center; gap: 8px; height: 50px; box-sizing: border-box; color: var(--muted); font-weight: 500; }
+  .stepsbar .cur { color: var(--ink); font-weight: 700; box-shadow: inset 0 -2px 0 var(--accent); }
+  .stepsbar .done { color: var(--ink); }
+  .stepsbar span { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line-strong); box-sizing: border-box; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .stepsbar .cur span { border-color: var(--accent); color: var(--accent); }
+  .stepsbar .done span { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .body { padding: 26px 32px 8px; }
+  .body h3 { margin: 0; font-size: 22px; font-weight: 700; }
+  .fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; margin-top: 18px; align-items: start; }
+  .lab { display: flex; align-items: baseline; justify-content: space-between; height: 20px; font-weight: 600; margin-bottom: 6px; }
+  .lab .act { font-size: 13px; font-weight: 600; color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+  .lab .opt { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .field { box-sizing: border-box; height: 42px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel);
+    display: flex; align-items: center; justify-content: space-between; font-size: 15px; white-space: nowrap; overflow: hidden; }
+  .field.mono { font-size: 14px; }
+  .field.kept { background: var(--surface); border-color: var(--line); color: var(--muted); }
+  .field.empty { color: var(--muted); }
+  .dd svg { color: var(--muted); flex: none; }
+  .dots { letter-spacing: 3px; font-size: 18px; }
+  .line { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; font-size: 13px; line-height: 19px; color: var(--muted); }
+  .line.ink { color: var(--ink); }
+  .line .act, .act-inline { color: var(--ink); font-weight: 600; white-space: nowrap; text-decoration: underline; text-underline-offset: 2px; }
+  .own { display: block; margin-top: 4px; }
+  .ptitle { margin-top: 24px; font-weight: 600; }
+  .list { margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .p { box-sizing: border-box; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 56px;
+    padding: 8px 14px; border-top: 1px solid var(--line); background: var(--panel); }
+  .p:first-child { border-top: none; }
+  .p.on { background: var(--accent-soft); }
+  .p.more { min-height: 46px; }
+  .p .n { display: block; font-weight: 600; }
+  .p .s { display: block; font-size: 13px; color: var(--muted); }
+  .p .c { font-size: 12px; color: var(--muted); }
+  .p .beta { margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .radio { width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--line-strong); display: flex; align-items: center; justify-content: center; flex: none; }
+  .on .radio { border-color: var(--accent); }
+  .on .radio::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .foot { display: flex; align-items: center; gap: 10px; padding: 16px 32px 22px; border-top: 1px solid var(--line); margin-top: 22px; }
+  .foot .grow { flex: 1; }
+  .foot .of { font-size: 13px; color: var(--muted); }
+  .primary { height: 42px; padding: 0 20px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); font-weight: 700; display: flex; align-items: center; }
+  .back { height: 42px; padding: 0 16px; border-radius: 6px; border: 1px solid var(--line); font-weight: 600; display: flex; align-items: center; }
+  .card2 { margin-top: 18px; padding: 14px 16px; border-radius: 8px; background: var(--surface); }
+  .card2 b { display: block; font-weight: 600; }
+  .card2 span { color: var(--muted); }
+  /* The app's card (new_tunnel/widgets.rs `card`): AnyConnect's step 2 and step 3's routing cards. */
+  .ways { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+  .cards2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .card { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+  .card.on { border: 2px solid var(--accent); padding: 13px 15px; }
+  .card .radio { margin-top: 2px; }
+  .card b { display: block; font-size: 15px; line-height: 22px; font-weight: 700; }
+  .card .d { display: block; color: var(--muted); }
+  .adv { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .adv .h { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .filerow { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .btn { box-sizing: border-box; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; font-weight: 600; display: flex; align-items: center; }
+  .fname { font-size: 13px; color: var(--muted); }
+  .tick { display: flex; gap: 8px; align-items: center; margin-top: 14px; }
+  .box { width: 16px; height: 16px; box-sizing: border-box; border-radius: 4px; background: var(--accent); display: flex; align-items: center; justify-content: center; color: var(--accent-ink); flex: none; }
+
+  /* The sign-in window (design/screens/sign-in.html). */
+  .signin { width: 340px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px 22px 18px; }
+  .signin h4 { margin: 0; font-size: 19px; font-weight: 700; text-wrap: balance; }
+  .signin p { margin: 6px 0 0; color: var(--muted); }
+  .signin p.ink { color: var(--ink); }
+  .fp { margin-top: 12px; font-size: 12px; color: var(--muted); word-break: break-all; }
+  .steps { list-style: none; margin: 18px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; }
+  .steps li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; align-items: center; padding: 11px 12px; }
+  .steps li + li { border-top: 1px solid var(--line); }
+  .steps .now { font-weight: 700; }
+  .steps .later { color: var(--muted); }
+  .said { margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .link { margin-top: 10px; font-size: 13px; font-weight: 600; color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+  .sbuttons { display: flex; gap: 8px; margin-top: 18px; }
+  .sbuttons .grow { flex: 1; }
+  .sb { box-sizing: border-box; height: 40px; padding: 0 14px; border-radius: 6px; font-weight: 600; display: flex; align-items: center; }
+  .sb.primary2 { background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 0 18px; }
+  .sb.focus { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
+  .states { width: 720px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 32px 22px; }
+  .states .k { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 18px; }
+  .states .k:first-child { margin-top: 0; }
+
+  /* Build notes: plain prose, outside the app. */
+  .build { max-width: 78ch; font-size: 13px; color: var(--muted); }
+  .build h3 { font-size: 14px; color: var(--ink); margin: 18px 0 4px; }
+  .build b { color: var(--ink); }
+  .build code { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; font-size: 12px; color: var(--ink); }
+</style>
+</head>
+<body>
+<script>if (new URLSearchParams(location.search).get('dark') === 'true') document.body.classList.add('dark');</script>
+<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+  <symbol id="check" viewBox="0 0 18 18"><path d="M4 9.5l3.2 3.2L14 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="tick" viewBox="0 0 18 18"><path d="M6 15V4M12 15V8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+  <symbol id="fail" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6.5 6.5l5 5M11.5 6.5l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="wait" viewBox="0 0 18 18"><circle cx="3" cy="9" r="2" fill="currentColor"/><circle cx="9" cy="9" r="2" fill="currentColor" opacity=".6"/><circle cx="15" cy="9" r="2" fill="currentColor" opacity=".3"/></symbol>
+  <symbol id="todo" viewBox="0 0 18 18"><circle cx="9" cy="9" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <!-- assets/icons/disclose-down.svg: a 10 px filled triangle. -->
+  <symbol id="disclose" viewBox="0 0 10 10"><path d="M1 3h8L5 8z" fill="currentColor"/></symbol>
+  <symbol id="x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+</svg>
+<div class="page">
+  <h1>Proposal: IPsec with certificates (CLAUDE.md, 7k)</h1>
+  <div class="intro">Today an IPsec tunnel works one way only: the gateway proves itself with a <b>key</b> from IT (the
+    pre-shared key), and you sign in with a <b>username and password</b>. Many gateways work differently. The gateway proves
+    itself with a <b>certificate</b>, as a website does (Windows' built-in VPN works that way, and so do many FortiGates and
+    strongSwan servers). Or you sign in with <b>your own certificate</b>, from a smart card, your keyring or a file, sometimes
+    followed by your password. This proposal covers all three: the gateway's certificate, your certificate, and your
+    certificate with a password. Untrusted gateway certificates are handled as you chose: when this computer doesn't know who
+    signed the certificate, Crake asks, with AnyConnect's question. “Today” is drawn from the code (new_tunnel/ipsec.rs,
+    widgets.rs, view.rs), at the app's size. <span class="mark-key"></span> marks what changes.
+    <b>Two choices for you:</b>
+    <ol>
+      <li><b>Step 1, how the gateway proves itself:</b> two cards side by side, “A key” or “Its certificate” (A,
+        recommended), or the key field as today with a link under it (B) (1).</li>
+      <li><b>Step 2, your certificate and a password:</b> a third card, “Certificate and password” (A, recommended), or a
+        tick under “Certificate” (B) (2).</li>
+    </ol>
+    <b>To prove before building:</b> strongSwan doesn't hand over the certificate of a gateway it doesn't trust. Crake needs
+    it for the trust question, and also to tell a wrong name from an unknown authority (5).</div>
+
+  <!-- 1 · Step 1 -->
+  <h2 class="sec">1 · Step 1: how the gateway proves itself</h2>
+  <div class="note">Asked where the key is asked today, since it replaces the key. When the window opens, “A key” is
+    chosen, which is today's behaviour. It's drawn here with “Its certificate” chosen. Its slot on the grid, where the key
+    was, takes IT's certificate authority, which is optional. So the company's domains don't move when you switch, and an
+    authority file from IT goes in the step where you say the gateway has a certificate.</div>
+  <div class="pair">
+    <div>
+      <div class="cap">Today (drawn from the code)</div>
+      <div class="win">
+        <div class="bar"><span class="cancel">Cancel</span><span class="name">New tunnel</span><span class="x"><svg width="14" height="14"><use href="#x"/></svg></span></div>
+        <div class="stepsbar"><div class="cur"><span>1</span>Server</div><div><span>2</span>Sign-in</div><div><span>3</span>Routing</div></div>
+        <div class="body">
+          <h3>Where does it connect?</h3>
+          <div class="fields">
+            <div><div class="lab">Name</div><div class="field">Nordbank</div></div>
+            <div><div class="lab">Gateway</div><div class="field mono">gw.nordbank.example</div></div>
+          </div>
+          <div class="ptitle">Protocol</div>
+          <div class="list">
+            <div class="p on"><span class="radio"></span><span><span class="n">IPsec (IKEv2)<span class="beta">Beta</span></span><span class="s">FortiClient's “IPsec VPN”, and other IKEv2 gateways</span></span><span class="c mono">ipsec</span></div>
+            <div class="p more"><svg width="16" height="16" style="justify-self: center"><use href="#chev"/></svg><span>Choose the protocol yourself</span><span class="s" style="font-size: 13px; color: var(--muted)">9 more</span></div>
+          </div>
+          <div class="line"><span>Beta: Crake hasn't been tried against a real IPsec gateway yet. If it doesn't connect, Copy for helpdesk in the sign-in window says why.</span></div>
+          <div class="fields" style="margin-top: 20px">
+            <div><div class="lab">Gateway's key<span class="act">Show</span></div><div class="field"><span class="dots">••••••••••••</span></div>
+              <div class="line"><span>From your IT team, who may call it the pre-shared key. Only Crake's service can read it.</span></div></div>
+            <div><div class="lab">Company domains<span class="opt">optional</span></div><div class="field mono">nordbank.internal nordbank.example</div>
+              <div class="line"><span>Names under them go to the tunnel's DNS. Without them, Crake asks public DNS first and finds those names a moment later.</span></div></div>
+          </div>
+        </div>
+        <div class="foot"><span class="grow"></span><span class="of">Step 1 of 3</span><span class="primary">Continue</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap"><span class="choice">A</span><span class="rec2">After: two cards, “Its certificate” chosen (recommended)</span></div>
+      <div class="win">
+        <div class="bar"><span class="cancel">Cancel</span><span class="name">New tunnel</span><span class="x"><svg width="14" height="14"><use href="#x"/></svg></span></div>
+        <div class="stepsbar"><div class="cur"><span>1</span>Server</div><div><span>2</span>Sign-in</div><div><span>3</span>Routing</div></div>
+        <div class="body">
+          <h3>Where does it connect?</h3>
+          <div class="fields">
+            <div><div class="lab">Name</div><div class="field">Nordbank</div></div>
+            <div><div class="lab">Gateway</div><div class="field mono">gw.nordbank.example</div></div>
+          </div>
+          <div class="ptitle">Protocol</div>
+          <div class="list">
+            <div class="p on"><span class="radio"></span><span><span class="n">IPsec (IKEv2)<span class="beta">Beta</span></span><span class="s">FortiClient's “IPsec VPN”, and other IKEv2 gateways</span></span><span class="c mono">ipsec</span></div>
+            <div class="p more"><svg width="16" height="16" style="justify-self: center"><use href="#chev"/></svg><span>Choose the protocol yourself</span><span class="s" style="font-size: 13px; color: var(--muted)">9 more</span></div>
+          </div>
+          <div class="line"><span>Beta: Crake hasn't been tried against a real IPsec gateway yet. If it doesn't connect, Copy for helpdesk in the sign-in window says why.</span></div>
+          <div class="changed" style="margin-top: 22px">
+            <div style="font-weight: 600">How the gateway proves it's Nordbank's</div>
+            <div class="cards2">
+              <div class="card"><span class="radio"></span><div><b>A key</b><span class="d">From your IT team, who may call it the pre-shared key.</span></div></div>
+              <div class="card on"><span class="radio"></span><div><b>Its certificate</b><span class="d">As a website does. If IT gave you no key, it's this.</span></div></div>
+            </div>
+            <div class="line"><span>Crake checks that its certificate is for gw.nordbank.example, and asks you before trusting one signed by an authority this computer doesn't know.</span></div>
+          </div>
+          <div class="fields" style="margin-top: 20px">
+            <div class="changed"><div class="lab">IT's certificate authority<span class="opt">optional</span></div>
+              <div class="filerow" style="margin-top: 3px"><span class="btn">Choose a file…</span></div>
+              <div class="line" style="margin-top: 13px"><span>Only if your IT team gave one. Crake then trusts it for Nordbank alone, and doesn't ask.</span></div></div>
+            <div><div class="lab">Company domains<span class="opt">optional</span></div><div class="field mono">nordbank.internal nordbank.example</div>
+              <div class="line"><span>Names under them go to the tunnel's DNS. Without them, Crake asks public DNS first and finds those names a moment later.</span></div></div>
+          </div>
+        </div>
+        <div class="foot"><span class="grow"></span><span class="of">Step 1 of 3</span><span class="primary">Continue</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top: 12px"><b>With “A key” chosen,</b> the grid is today's, with the key in its slot.
+    Only that slot changes when you switch, so nothing below it moves. Continue works as today: pressed with no key and
+    “A key” chosen, it says “Add the gateway's key, or choose Its certificate if IT gave none.” (today: “Add the gateway's
+    key. Your IT team gives it with the gateway's address.”). With “Its certificate”, nothing in step 1 is required. The
+    line under the cards names the gateway as typed. A gateway typed as an address says so instead (4). Until a name is
+    typed, the title reads “How the gateway proves itself”. A chosen authority file shows its name in mono beside “Choose
+    another…”, as your certificate file does in step 2.</div>
+  <div class="pair" style="margin-top: 14px">
+    <div class="col">
+      <div class="cap"><span class="choice">A</span><span class="rec2">Why two cards, recommended</span></div>
+      <div class="note" style="margin: 0">Both ways are in sight. Someone whose IT gave no key sees at once that this is
+        fine, and isn't stopped at a field they can't fill. Each card's line says how to tell which one applies. The cards
+        are the app's own (step 3's “What should go through it?” and step 2's ways), so nothing new is learned. It costs
+        step 1 about 110 px in height: the title and one row of cards.</div>
+    </div>
+    <div>
+      <div class="cap"><span class="choice">B</span>The key as today, with a way out under it</div>
+      <div class="win" style="padding: 14px 32px 18px">
+        <div class="fields" style="margin-top: 0">
+          <div><div class="lab">Gateway's key<span class="act">Show</span></div><div class="field"><span class="dots">••••••••••••</span></div>
+            <div class="line changed"><span>From your IT team, who may call it the pre-shared key. No key? <span class="act">It has a certificate</span></span></div></div>
+          <div><div class="lab">Company domains<span class="opt">optional</span></div><div class="field mono">nordbank.internal nordbank.example</div>
+            <div class="line"><span>Names under them go to the tunnel's DNS.</span></div></div>
+        </div>
+        <div class="cap" style="margin: 20px 0 8px">After “It has a certificate”</div>
+        <div class="fields" style="margin-top: 0">
+          <div class="changed"><div class="lab">IT's certificate authority<span class="opt">optional</span></div>
+            <div class="filerow" style="margin-top: 3px"><span class="btn">Choose a file…</span></div>
+            <div class="line" style="margin-top: 13px"><span>Only if your IT team gave one. <span class="act">Use a key instead</span></span></div></div>
+          <div><div class="lab">Company domains<span class="opt">optional</span></div><div class="field mono">nordbank.internal nordbank.example</div>
+            <div class="line"><span>Names under them go to the tunnel's DNS.</span></div></div>
+        </div>
+      </div>
+      <div class="note" style="margin-top: 10px; max-width: 720px">Step 1 doesn't grow. But the second way hides behind a link in
+        a help line, so someone with no key may stop at the empty field first. And once it's taken, nothing on screen says how
+        the gateway will be checked.</div>
+    </div>
+  </div>
+
+  <!-- 2 · Step 2 -->
+  <h2 class="sec">2 · Step 2: how you sign in</h2>
+  <div class="note">Today IPsec's step 2 is one plain card, “Username and password”. It becomes the app's choice of cards,
+    as AnyConnect's step 2 has them, without the browser, which IPsec has no way to use. “Certificate” reuses AnyConnect's
+    “Certificate from” as it is: smart card, system keyring, or a file whose copy Crake keeps in the keyring.</div>
+  <div class="pair">
+    <div>
+      <div class="cap">Today (drawn from the code; Advanced opened)</div>
+      <div class="win">
+        <div class="bar"><span class="cancel">Cancel</span><span class="name">New tunnel</span><span class="x"><svg width="14" height="14"><use href="#x"/></svg></span></div>
+        <div class="stepsbar"><div class="done"><span><svg width="10" height="10"><use href="#check"/></svg></span>Server</div><div class="cur"><span>2</span>Sign-in</div><div><span>3</span>Routing</div></div>
+        <div class="body">
+          <h3>How do you sign in?</h3>
+          <div class="card2"><b>Username and password</b><span>Nordbank's gateway asks for them when you switch it on.</span></div>
+          <div style="margin-top: 18px; width: 320px"><div class="lab">Username</div><div class="field">ondrej.simon</div></div>
+          <div class="adv">
+            <div class="h"><svg width="10" height="10"><use href="#disclose"/></svg>Advanced</div>
+            <div style="margin-top: 12px; width: 420px">
+              <div class="lab">Gateway's identity<span class="opt">optional</span></div><div class="field mono empty"></div>
+              <div class="line"><span>Only if your IT team gave one, like vpn.nordbank.example. Crake then signs in only to a gateway that proves it's that one.</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="foot"><span class="back">Back</span><span class="grow"></span><span class="of">Step 2 of 3</span><span class="primary">Continue</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap"><span class="choice">A</span><span class="rec2">After: three cards, “Certificate and password” chosen (recommended)</span></div>
+      <div class="win">
+        <div class="bar"><span class="cancel">Cancel</span><span class="name">New tunnel</span><span class="x"><svg width="14" height="14"><use href="#x"/></svg></span></div>
+        <div class="stepsbar"><div class="done"><span><svg width="10" height="10"><use href="#check"/></svg></span>Server</div><div class="cur"><span>2</span>Sign-in</div><div><span>3</span>Routing</div></div>
+        <div class="body">
+          <h3>How do you sign in?</h3>
+          <div class="ways changed">
+            <div class="card"><span class="radio"></span><div><b>Username and password</b><span class="d">Nordbank's gateway asks for them when you switch it on.</span></div></div>
+            <div class="card"><span class="radio"></span><div><b>Certificate</b><span class="d">From a smart card, your keyring or a file.</span></div></div>
+            <div class="card on"><span class="radio"></span><div><b>Certificate and password</b><span class="d">Your certificate first, then the gateway asks for your password.</span></div></div>
+          </div>
+          <div class="fields changed" style="grid-template-columns: 320px 320px; margin-top: 18px">
+            <div><div class="lab">Certificate from</div><div class="field dd"><span>A file…</span><svg width="16" height="16"><use href="#chev"/></svg></div>
+              <div class="filerow"><span class="btn">Choose another…</span><span class="fname mono">nordbank-ondrej.p12</span></div></div>
+            <div><div class="lab">Username</div><div class="field">ondrej.simon</div></div>
+          </div>
+          <div class="line"><span>Crake keeps a copy in the system keyring, so you can delete the file. Your gateway password goes to the keyring too, never into Crake's files.</span></div>
+          <div class="adv">
+            <div class="h"><svg width="10" height="10"><use href="#disclose"/></svg>Advanced</div>
+            <div style="margin-top: 12px; width: 420px">
+              <div class="lab">Gateway's identity<span class="opt">optional</span></div><div class="field mono empty"></div>
+              <div class="line changed"><span>Only if your IT team gave one, like vpn.nordbank.example. Without it, the gateway's certificate must be for gw.nordbank.example.</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="foot"><span class="back">Back</span><span class="grow"></span><span class="of">Step 2 of 3</span><span class="primary">Continue</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top: 12px"><b>Each card shows what it needs.</b> “Username and password” shows today's
+    Username field and today's line (“Your password goes to the system keyring, never into Crake's files.”). “Certificate”
+    shows “Certificate from” alone. The third card shows both, side by side. The line under them follows the certificate's
+    source: for a file it's today's line, and with a password it adds where the password goes. For a smart card or the
+    keyring there's no file line. The gateway's identity line keeps today's words with a key. With a certificate it says
+    what's checked when the field is empty, since that check is new. Continue works as today. Pressed with no file chosen, it
+    says “Choose the certificate file.”. With “Certificate” alone, it no longer asks for a username (today IPsec always
+    does).</div>
+  <div class="pair" style="margin-top: 14px">
+    <div class="col">
+      <div class="cap"><span class="choice">A</span><span class="rec2">Why a third card, recommended</span></div>
+      <div class="note" style="margin: 0">IT says it as one thing (“your certificate and your Windows password”), and the
+        cards let you pick that thing as said. AnyConnect's step 2 shows three cards today too, so the window is no taller
+        than AnyConnect's. A tick that adds a field is a second decision hidden inside the first.</div>
+    </div>
+    <div>
+      <div class="cap"><span class="choice">B</span>Two cards, and a tick under “Certificate”</div>
+      <div class="win" style="padding: 14px 32px 18px">
+        <div class="ways" style="margin-top: 0">
+          <div class="card"><span class="radio"></span><div><b>Username and password</b><span class="d">Nordbank's gateway asks for them when you switch it on.</span></div></div>
+          <div class="card on"><span class="radio"></span><div><b>Certificate</b><span class="d">From a smart card, your keyring or a file.</span></div></div>
+        </div>
+        <div style="margin-top: 18px; width: 320px"><div class="lab">Certificate from</div><div class="field dd"><span>Smart card (PKCS#11)</span><svg width="16" height="16"><use href="#chev"/></svg></div></div>
+        <div class="tick changed"><span class="box"><svg width="11" height="11"><use href="#check"/></svg></span>The gateway asks for my password too</div>
+        <div style="margin-top: 14px; width: 320px"><div class="lab">Username</div><div class="field">ondrej.simon</div></div>
+      </div>
+      <div class="note" style="margin-top: 10px; max-width: 720px">The list is one card shorter. But “and a password” turns up
+        only after choosing Certificate, and someone told “certificate and password” has to work out that it's two steps.</div>
+    </div>
+  </div>
+
+  <!-- 3 · The sign-in window -->
+  <h2 class="sec">3 · The sign-in window</h2>
+  <div class="note">Today's shapes (sign-in.html, signin_view/), with today's words wherever they already fit. <b>The trust
+    question is AnyConnect's</b>, with the same title, sentence and buttons. It gains one line saying whose certificate it
+    is and who signed it, so you can read it out to IT, and a variant for a certificate that changed. Both come to
+    AnyConnect's question in the same change, so the two stay one question. Trusting keeps that one certificate for Nordbank.
+    Unlocking a certificate file (“Unlock your certificate”) and a smart card's PIN (“Nordbank asks for your PIN”) are
+    AnyConnect's today, unchanged, so they're not drawn.</div>
+  <div class="pair">
+    <div>
+      <div class="cap">The gateway's certificate isn't signed by an authority this computer knows</div>
+      <div class="signin">
+        <h4>Crake can't vouch for Nordbank's gateway</h4>
+        <p>Its certificate isn't signed by an authority this computer knows. Trust it only if your IT says this is the right one.</p>
+        <p class="ink changed" style="margin-top: 12px">For gw.nordbank.example, signed by “Nordbank Root CA”.</p>
+        <div class="fp mono">pin-sha256:3mXq0vJ8n2Rk9TzQe1bWfL7cYhUa4sDp6GoNiVxE5yM=</div>
+        <div class="sbuttons"><span class="grow"></span><span class="sb">Don't connect</span><span class="sb primary2">Trust it</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">Asked again: the certificate changed since you trusted it</div>
+      <div class="signin">
+        <h4>Crake can't vouch for Nordbank's gateway</h4>
+        <p class="ink changed">It shows a different certificate from the one you trusted on 21 October. Trust it only if your IT says it was renewed.</p>
+        <p class="ink" style="margin-top: 12px">For gw.nordbank.example, signed by “Nordbank Root CA”.</p>
+        <div class="fp mono">pin-sha256:Q7tBv2Lk8sNw0Ez5RcYm1XpHa3Jd9UfG4oKiTeV6bWs=</div>
+        <div class="sbuttons"><span class="grow"></span><span class="sb focus changed">Don't connect</span><span class="sb primary2">Trust it</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">Signing in (today's steps; new: “The gateway is Nordbank's” and the two sign-in rows)</div>
+      <div class="signin">
+        <h4>Sign in to Nordbank</h4>
+        <p>This window updates by itself.</p>
+        <ol class="steps changed">
+          <li><svg width="18" height="18" style="color: var(--accent)"><use href="#tick"/></svg><span>Reached <span class="mono" style="font-size: 13px">gw.nordbank.example</span></span></li>
+          <li><svg width="18" height="18" style="color: var(--accent)"><use href="#tick"/></svg><span>The gateway is Nordbank's</span></li>
+          <li class="now"><svg width="18" height="18" style="color: var(--ink)"><use href="#wait"/></svg><span>Signing in with your certificate</span></li>
+          <li class="later"><svg width="18" height="18" style="color: var(--line-strong)"><use href="#todo"/></svg><span>Signing in as ondrej.simon</span></li>
+          <li class="later"><svg width="18" height="18" style="color: var(--line-strong)"><use href="#todo"/></svg><span>Tunnel up</span></li>
+        </ol>
+        <div class="sbuttons"><span class="grow"></span><span class="sb">Cancel</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top: 12px">In the changed variant, the keyboard's focus starts on “Don't connect”: the moment
+    calls for a second look, and Enter shouldn't trust it. Today's steps are a fixed three rows (Reached, Signing in, Tunnel
+    up). These take the rows the tunnel needs: no “The gateway is Nordbank's” for a key, which proves it in the same exchange
+    as your sign-in, as today, and no second sign-in row for “Certificate” alone.</div>
+
+  <div class="note" style="margin-top: 22px"><b>When it fails</b>, it fails in today's failure shape. The sentence says who
+    can fix it. The primary button acts on the failure only where you can, and never takes you past a check.</div>
+  <div class="pair">
+    <div>
+      <div class="cap">The certificate is for another name</div>
+      <div class="signin">
+        <h4>Couldn't sign in to Nordbank</h4>
+        <p class="ink changed">The gateway's certificate is for vpn.globex.example, not gw.nordbank.example. Your IT team can tell you whether that's right.</p>
+        <ol class="steps">
+          <li><svg width="18" height="18" style="color: var(--accent)"><use href="#tick"/></svg><span>Reached <span class="mono" style="font-size: 13px">gw.nordbank.example</span></span></li>
+          <li class="changed"><svg width="18" height="18" style="color: var(--danger)"><use href="#fail"/></svg><span>Its certificate named another gateway</span></li>
+        </ol>
+        <div class="said">strongSwan said: no trusted RSA public key found for 'gw.nordbank.example'</div>
+        <div class="link">Copy for helpdesk</div>
+        <div class="sbuttons"><span class="grow"></span><span class="sb changed">Close</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">Your certificate was turned down</div>
+      <div class="signin">
+        <h4>Couldn't sign in to Nordbank</h4>
+        <p class="ink changed">Nordbank's gateway didn't accept your certificate. Your IT team can tell you which one it expects.</p>
+        <ol class="steps">
+          <li><svg width="18" height="18" style="color: var(--accent)"><use href="#tick"/></svg><span>Reached <span class="mono" style="font-size: 13px">gw.nordbank.example</span></span></li>
+          <li><svg width="18" height="18" style="color: var(--accent)"><use href="#tick"/></svg><span>The gateway is Nordbank's</span></li>
+          <li class="changed"><svg width="18" height="18" style="color: var(--danger)"><use href="#fail"/></svg><span>Your certificate wasn't accepted</span></li>
+        </ol>
+        <div class="said">strongSwan said: received AUTHENTICATION_FAILED notify error</div>
+        <div class="link">Copy for helpdesk</div>
+        <div class="sbuttons"><span class="grow"></span><span class="sb">Close</span><span class="sb primary2 changed">Change the certificate…</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">Your certificate has run out</div>
+      <div class="signin">
+        <h4>Couldn't sign in to Nordbank</h4>
+        <p class="ink changed">Your certificate ran out on 3 March 2026. Your IT team can give you a new one.</p>
+        <ol class="steps">
+          <li class="changed"><svg width="18" height="18" style="color: var(--danger)"><use href="#fail"/></svg><span>Your certificate has run out</span></li>
+        </ol>
+        <div class="said">Nothing was sent to the gateway.</div>
+        <div class="link">Copy for helpdesk</div>
+        <div class="sbuttons"><span class="grow"></span><span class="sb">Close</span><span class="sb primary2 changed">Change the certificate…</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top: 12px"><b>A wrong name has no way past it in the window, on purpose.</b> It's the one
+    failure that may mean someone is in the way. Close, plain as in every failure, is the only button, so the only way through is a gateway's identity
+    from IT, typed in Edit. <b>The checks go in order:</b> the name first, then the authority. A certificate that's both
+    untrusted and for another name ends here, and is never offered to be trusted. “Change the certificate…” opens the
+    tunnel's Edit at step 2, as today's “Change the key…” opens step 1. A certificate that has run out is caught before
+    anything is sent: Crake reads its dates when it opens it. <b>“strongSwan said:”</b> is what these lines should say.
+    Today an IPsec failure says “openconnect said:” (<span class="mono">Spec::program</span>), a bug fixed apart from this
+    proposal.</div>
+
+  <!-- 4 · Edit, and other states -->
+  <h2 class="sec">4 · Edit, and the other states</h2>
+  <div class="states">
+    <div class="k">Step 1, a gateway typed as an address (few certificates name one)</div>
+    <div class="line ink changed"><span>Its certificate must be for 203.0.113.5. If your IT team gave the gateway a name, put it under Gateway's identity in the next step.</span></div>
+    <div class="k">Edit, step 1: the gateway's certificate, trusted by you</div>
+    <div class="line ink changed"><span>You trusted its certificate on 21 October (signed by “Nordbank Root CA”). <span class="act">Stop trusting it</span></span></div>
+    <div class="k">Edit, step 1: switched from “A key” to “Its certificate” (today's kept-key shape; “Keep the key”, since no new key was typed, where today says “Keep the old key”)</div>
+    <div class="line changed"><span>The kept key is dropped when you save.<span class="act own">Keep the key</span></span></div>
+    <div class="k">Edit, step 2: a certificate file kept in the keyring (new: today Edit shows only “Choose a file…”)</div>
+    <div class="line ink changed"><span>Kept in your keyring: nordbank-ondrej.p12. <span class="act">Choose another…</span></span></div>
+    <div class="k">IT's certificate authority: the file isn't one</div>
+    <div class="line ink changed"><span>“nordbank.ovpn” isn't a certificate. IT's authority is a .crt, .pem or .cer file.</span></div>
+    <div class="k">The sign-in window: the gateway's certificate has run out, or isn't valid yet</div>
+    <div class="changed"><div class="line ink"><span>Nordbank's gateway shows a certificate that ran out on 18 October. Your IT team needs to renew it.</span></div>
+    <div class="line ink"><span>Nordbank's gateway shows a certificate that's valid only from 1 November. If this computer's date is wrong, correct it and try again.</span></div></div>
+    <div class="k">The sign-in window: your certificate isn't valid yet</div>
+    <div class="line ink changed"><span>Your certificate is valid only from 1 November. If this computer's date is wrong, correct it and try again.</span></div>
+    <div class="k">The sign-in window: no smart card, a wrong PIN, a locked card (checked when you connect, as for AnyConnect)</div>
+    <div class="changed"><div class="line ink"><span>No smart card found. Put it in and try again.</span></div>
+    <div class="line ink"><span>The card didn't take that PIN. Type it again.</span></div>
+    <div class="line ink"><span>The card is locked after too many wrong PINs. Your IT team can unlock it.</span></div></div>
+    <div class="k">A tunnel from IT (managed): the same choices as IT set them, read-only, in today's managed look</div>
+    <div class="line ink"><span>Nordbank's gateway proves itself with its certificate. You sign in with your certificate and your password. Set by your IT team.</span></div>
+  </div>
+  <div class="note" style="margin-top: 10px">“Stop trusting it” removes the trust, so the next connection asks again.
+    AnyConnect's Edit has no such line today and gets the same one. A wrong PIN asks again, as a refused password does today.
+    A locked card isn't asked again.</div>
+
+  <!-- 5 · Build notes -->
+  <h2 class="sec">5 · What has to be proven first, and how it's built</h2>
+  <div class="build">
+    <h3>To prove first (a short spike, before any UI)</h3>
+    <ul>
+      <li><b>The gateway's certificate.</b> strongSwan checks the certificate against the authorities it has and logs only
+        its name (“received end entity cert "CN=gw.nordbank.example"”), never the certificate itself. Its most detailed
+        decryption log level dumps the gateway's decrypted replies, which carry it. So craked would read the certificate out
+        of that dump. The trust question, the wrong-name failure (telling a wrong name from an unknown authority needs the
+        names in the certificate) and the “changed” variant all depend on this. On “Trust it”, craked loads that one certificate
+        as trusted for this connection alone. To prove: that the dump is whole (IKE fragments and long certificates
+        included), and that a pinned certificate is trusted without its authority.</li>
+      <li><b>The dump holds secrets too.</b> At that level strongSwan also dumps your own sign-in: the EAP identity and, with
+        a password, a response that can be cracked. So the dump goes to craked's memory only, through VICI's log stream,
+        and only for the gateway's first reply. It never reaches the journal, Crake's log, reports or Copy for
+        helpdesk.</li>
+      <li><b>If the spike fails:</b> there's no question, and no telling a wrong name from an unknown authority. Both end in
+        today's failure shape: “Crake can't vouch for Nordbank's gateway. Ask your IT team for its certificate
+        authority, or whether its name is right.”, with <span class="act-inline">Choose IT's certificate authority…</span>, which opens Edit at step 1. The
+        rest of this proposal stands as drawn.</li>
+      <li><b>Your certificate, in IKE or over EAP.</b> Some gateways take your certificate in IKE itself, others over
+        EAP-TLS, and nothing tells which before you try. craked tries IKE first, then EAP-TLS when the gateway refuses it,
+        and remembers what worked. To prove against strongSwan and a FortiGate.</li>
+    </ul>
+    <h3>How it maps onto strongSwan</h3>
+    <ul>
+      <li><b>The gateway's certificate:</b> <code>remote.auth = pubkey</code>, with <code>remote.id</code> set to the
+        gateway as typed (or the identity under Advanced). strongSwan's default, <code>%any</code>, would accept any trusted
+        certificate for any name. The authorities are the system's (the distribution's CA bundle), or IT's file alone when one
+        is given.</li>
+      <li><b>Your certificate:</b> <code>local.auth = pubkey</code>. The app reads the certificate and its key from the
+        keyring (or the file) and hands them to craked when it connects, as AnyConnect's are handed over today (craked runs as
+        root and can't open your keyring). craked loads them over VICI, in memory only. A smart card goes through strongSwan's
+        pkcs11 plugin, with the PIN as the token's secret. With a password as well, a second round: <code>local-2.auth =
+        eap</code> (RFC 4739).</li>
+      <li><b>IT's files (managed.d):</b> <code>gateway_ca_file</code> beside <code>gateway_key_file</code>, and <code>sign_in
+        = "certificate"</code> or <code>"certificate and password"</code> with <code>certificate</code>, as AnyConnect's
+        files have it. A file that names neither a key nor an authority trusts the system's authorities.</li>
+      <li><b>The sign-in window's steps</b> become a list the tunnel gives (today a fixed three rows,
+        <code>signin_view/widgets.rs</code>).</li>
+      <li><b>Privacy:</b> Copy for helpdesk and reports carry the gateway certificate's names and fingerprint. Your own
+        certificate's subject is often your full name and email address, so the copy without host names replaces it too.
+        Neither ever carries a private key, a PIN or a password.</li>
+      <li><b>Tests:</b> the e2e gateway gets an authority of its own and three connections: its certificate with a password,
+        your certificate, and both. The scenario suite runs each, plus the trust question, a renewed certificate, a wrong
+        name, an address, and certificates that have run out or aren't valid yet.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

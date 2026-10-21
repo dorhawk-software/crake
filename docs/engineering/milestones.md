@@ -1349,7 +1349,10 @@
    selectors, and each later call's network is added to the tunnel's
    hints (`add_hints`; until 2026-10-20 only the first call's showed;
    `nothing_is_routed_up_front` checks both of the e2e gateway's).
-   Not yet: certificates (the gateway's or the user's), the FortiGate by
+   Not yet: certificates (the gateway's or the user's; proposed
+   2026-10-21 in design/proposals/ipsec-certificates.html, waiting for
+   the user's choice and a spike on reading the gateway's certificate),
+   the FortiGate by
    hand.
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or
    Windows problem without a colleague's machine):** `.github/workflows/
