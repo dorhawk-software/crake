@@ -38,7 +38,7 @@ impl Manager {
         };
         let mut fields = fields.clone();
         let profile = take_profile(&mut fields, true)?;
-        let secret = take_secret(&mut fields, true)?;
+        let secret = take_secret(&mut fields, None)?;
         let own = crate::own::OwnTunnel::from_map(&name, &fields)?;
         if let Some(text) = &profile {
             self.keep_profile(&name, text)?;
@@ -86,7 +86,9 @@ impl Manager {
         }
         let mut fields = fields.clone();
         let profile = take_profile(&mut fields, false)?;
-        let secret = take_secret(&mut fields, false)?;
+        let kept =
+            crate::ipsec::Secret::read(&crate::ipsec::secret_path(&self.cfg.state_path, name)).ok();
+        let secret = take_secret(&mut fields, kept.as_ref())?;
         let own = crate::own::OwnTunnel::from_map(name, &fields)?;
         let (was, routed, moved) = {
             let mut map = self.tunnels.lock().unwrap();
@@ -266,26 +268,102 @@ fn take_profile(fields: &mut HashMap<String, String>, adding: bool) -> Result<Op
     Ok(Some(text))
 }
 
-/// An IPsec tunnel's gateway key and identity from AddTunnel's fields
-/// (the key needed when adding, optional when changing one): never kept
-/// with the rest of the tunnel.
+/// An IPsec tunnel's gateway proof and identity from AddTunnel's fields,
+/// never kept with the rest of the tunnel. `gateway_proof` is "key" (the
+/// default) or "certificate" (design/proposals/ipsec-certificates.html,
+/// 1); a field left out when changing a tunnel keeps what `kept` has (the
+/// key, IT's authority, the identity), and an empty one clears it.
 fn take_secret(
     fields: &mut HashMap<String, String>,
-    adding: bool,
+    kept: Option<&crate::ipsec::Secret>,
 ) -> Result<Option<crate::ipsec::Secret>> {
     let ipsec = fields.get("protocol").map(String::as_str) == Some("ipsec");
     let key = fields
         .remove("gateway_key")
         .filter(|k| !k.trim().is_empty());
     let id = fields.remove("gateway_id");
+    let proof = fields.remove("gateway_proof");
+    let ca = fields.remove("gateway_ca");
     if !ipsec {
         return Ok(None);
     }
-    let Some(key) = key else {
-        if adding {
-            bail!("An IPsec tunnel needs the gateway\u{2019}s key (its pre-shared key).");
-        }
-        return Ok(None);
+    let id = id.or_else(|| kept.and_then(|k| k.gateway_id.clone()));
+    let certificate = match proof.as_deref() {
+        Some("certificate") => true,
+        Some("key") => false,
+        Some(other) => bail!("{other:?} isn't how a gateway proves itself (key or certificate)."),
+        None => key.is_none() && kept.is_some_and(|k| k.key.is_none()),
+    };
+    if certificate {
+        let ca = ca.or_else(|| kept.and_then(|k| k.ca.clone()));
+        return crate::ipsec::Secret::certificate(id.as_deref(), ca.as_deref()).map(Some);
+    }
+    let Some(key) = key.or_else(|| kept.and_then(|k| k.key.clone())) else {
+        bail!("An IPsec tunnel needs the gateway\u{2019}s key (its pre-shared key).");
     };
     crate::ipsec::Secret::from_fields(&key, id.as_deref()).map(Some)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ipsec::Secret;
+
+    fn ipsec(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        let mut f: HashMap<String, String> = pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        f.insert("protocol".into(), "ipsec".into());
+        f
+    }
+
+    const CA: &str = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----";
+
+    #[test]
+    fn a_new_tunnel_needs_a_key_or_says_it_has_a_certificate() {
+        assert!(take_secret(&mut ipsec(&[]), None).is_err());
+        let s = take_secret(&mut ipsec(&[("gateway_key", "k")]), None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(s.key.as_deref(), Some("k"));
+        let mut f = ipsec(&[("gateway_proof", "certificate"), ("gateway_ca", CA)]);
+        let s = take_secret(&mut f, None).unwrap().unwrap();
+        assert_eq!((s.key, s.ca.as_deref()), (None, Some(CA)));
+        assert!(!f.contains_key("gateway_ca"), "never kept with the tunnel");
+        assert!(take_secret(&mut ipsec(&[("gateway_proof", "magic")]), None).is_err());
+    }
+
+    #[test]
+    fn a_change_keeps_what_it_leaves_out() {
+        let key = Secret::from_fields("k", Some("vpn.acme.example")).unwrap();
+        // The key and identity stay when neither is given.
+        let s = take_secret(&mut ipsec(&[]), Some(&key)).unwrap().unwrap();
+        assert_eq!(s, key);
+        // Switched to a certificate: the key goes, the identity stays.
+        let mut f = ipsec(&[("gateway_proof", "certificate")]);
+        let s = take_secret(&mut f, Some(&key)).unwrap().unwrap();
+        assert_eq!(s.key, None);
+        assert_eq!(s.gateway_id.as_deref(), Some("vpn.acme.example"));
+        // A certificate tunnel keeps IT's authority, and its proof.
+        let cert = Secret::certificate(None, Some(CA)).unwrap();
+        let s = take_secret(&mut ipsec(&[]), Some(&cert)).unwrap().unwrap();
+        assert_eq!(s, cert);
+        // An empty authority clears it: the system's are trusted again.
+        let s = take_secret(&mut ipsec(&[("gateway_ca", "")]), Some(&cert))
+            .unwrap()
+            .unwrap();
+        assert_eq!(s.ca, None);
+        // Back to a key: one is needed.
+        assert!(take_secret(&mut ipsec(&[("gateway_proof", "key")]), Some(&cert)).is_err());
+    }
+
+    #[test]
+    fn other_protocols_have_no_secret() {
+        let mut f: HashMap<String, String> =
+            [("protocol".to_owned(), "anyconnect".to_owned())].into();
+        f.insert("gateway_key".into(), "k".into());
+        assert_eq!(take_secret(&mut f, None).unwrap(), None);
+        assert!(!f.contains_key("gateway_key"));
+    }
 }

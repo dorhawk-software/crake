@@ -31,6 +31,10 @@ const REFUSED: [&str; 4] = [
 /// gateway's proof checked with the key Crake has, and it failed ("tried 1
 /// shared key for 'a' - 'b', but MAC mismatched").
 const KEY_MISMATCH: &str = "MAC mismatched";
+/// What charon's log says when the gateway's certificate isn't one it can
+/// trust for the gateway's identity: signed by no authority it has, or for
+/// another name ("no trusted RSA public key found for 'vpn.acme.example'").
+const UNTRUSTED: (&str, &str) = ("no trusted ", " public key found for");
 /// Lines of charon's log worth giving as a failure's reason.
 const TELLING: [&str; 4] = ["failed", "error", "unable", "giving up"];
 
@@ -71,6 +75,18 @@ struct Local<'a> {
 struct Remote<'a> {
     auth: &'a str,
     id: &'a str,
+    /// IT's authority, the only one trusted for this gateway; the
+    /// system's (loaded with charon, `load_authority`) when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cacerts: Vec<&'a str>,
+}
+
+#[derive(Serialize)]
+struct Cert<'a> {
+    #[serde(rename = "type")]
+    kind: &'a str,
+    flag: &'a str,
+    data: &'a str,
 }
 
 #[derive(Serialize)]
@@ -150,6 +166,8 @@ pub enum Signed {
     Refused,
     /// The gateway's key doesn't match it (only IT can help).
     KeyRefused,
+    /// The gateway's certificate isn't one to trust for its identity.
+    Untrusted,
     /// Anything else, in charon's words.
     Failed(String),
 }
@@ -168,9 +186,18 @@ impl Vici {
         }
     }
 
-    /// The tunnel's connection, its gateway's key and the user's password.
+    /// The tunnel's connection, its gateway's key (or what checks its
+    /// certificate) and the user's password.
     pub async fn load(&mut self, t: &Tunnel<'_>, password: &str) -> Result<()> {
-        let gateway_id = t.secret.gateway_id.as_deref().unwrap_or("%any");
+        let key = t.secret.key.as_deref();
+        // A certificate is checked for a name: the identity IT gave, else
+        // the gateway as typed (strongSwan's "%any" would take any trusted
+        // certificate for any name).
+        let gateway_id = match (&t.secret.gateway_id, key) {
+            (Some(id), _) => id.as_str(),
+            (None, Some(_)) => "%any",
+            (None, None) => t.gateway,
+        };
         let if_id = t.if_id.to_string();
         let child = Child {
             remote_ts: vec!["0.0.0.0/0", "::/0"],
@@ -190,24 +217,27 @@ impl Vici {
                 eap_id: t.user,
             },
             remote: Remote {
-                auth: "psk",
+                auth: if key.is_some() { "psk" } else { "pubkey" },
                 id: gateway_id,
+                cacerts: t.secret.ca.as_deref().into_iter().collect(),
             },
             children: BTreeMap::from([(t.name, child)]),
         };
         self.ask("load-conn", BTreeMap::from([(t.name, conn)]))
             .await?;
-        let owners = t.secret.gateway_id.as_deref().into_iter().collect();
-        self.ask(
-            "load-shared",
-            Shared {
-                id: shared_id(t.name, "ike"),
-                kind: "IKE",
-                data: &t.secret.key,
-                owners,
-            },
-        )
-        .await?;
+        if let Some(key) = key {
+            let owners = t.secret.gateway_id.as_deref().into_iter().collect();
+            self.ask(
+                "load-shared",
+                Shared {
+                    id: shared_id(t.name, "ike"),
+                    kind: "IKE",
+                    data: key,
+                    owners,
+                },
+            )
+            .await?;
+        }
         self.ask(
             "load-shared",
             Shared {
@@ -215,6 +245,21 @@ impl Vici {
                 kind: "EAP",
                 data: password,
                 owners: vec![t.user],
+            },
+        )
+        .await
+    }
+
+    /// One of the system's certificate authorities (PEM), trusted for any
+    /// gateway that proves itself with a certificate and names no
+    /// authority of IT's.
+    pub async fn load_authority(&mut self, pem: &str) -> Result<()> {
+        self.ask(
+            "load-cert",
+            Cert {
+                kind: "X509",
+                flag: "CA",
+                data: pem,
             },
         )
         .await
@@ -243,6 +288,12 @@ impl Vici {
                 Err(e) => {
                     if said.iter().any(|l| l.contains(KEY_MISMATCH)) {
                         return Signed::KeyRefused;
+                    }
+                    if said
+                        .iter()
+                        .any(|l| l.contains(UNTRUSTED.0) && l.contains(UNTRUSTED.1))
+                    {
+                        return Signed::Untrusted;
                     }
                     if said.iter().any(|l| REFUSED.iter().any(|r| l.contains(r))) {
                         return Signed::Refused;
@@ -347,6 +398,18 @@ mod tests {
             "generating INFORMATIONAL request 2 [ N(AUTH_FAILED) ]",
         ]);
         assert!(said.iter().any(|l| l.contains(KEY_MISMATCH)));
+    }
+
+    #[test]
+    fn strongswans_words_for_a_certificate_it_cant_trust() {
+        let said = lines(&[
+            "received end entity cert \"CN=vpn.acme.example\"",
+            "no trusted RSA public key found for 'vpn.acme.example'",
+        ]);
+        assert!(
+            said.iter()
+                .any(|l| l.contains(UNTRUSTED.0) && l.contains(UNTRUSTED.1))
+        );
     }
 
     #[test]

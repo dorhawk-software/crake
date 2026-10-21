@@ -56,6 +56,16 @@ RUN sed -i '/^default-domain/d' /etc/ocserv/ocserv.conf \
  && cat /etc/ocserv/ocserv-companies.conf >> /etc/ocserv/ocserv.conf
 COPY openvpn.conf /etc/openvpn/e2e/server.conf
 COPY ipsec.conf /etc/swanctl/conf.d/acme.conf
+# The IPsec gateway that proves itself with a certificate (acme-cert in
+# ipsec.conf), signed by an authority of ACME's own that the client's
+# system doesn't know: IT hands its certificate out (start.sh, /link).
+RUN cd /etc/swanctl \
+ && openssl req -x509 -newkey rsa:3072 -nodes -keyout /tmp/ca.key -out x509ca/acme-ipsec-ca.pem -days 3650 -subj "/CN=ACME IPsec Root" \
+ && openssl req -newkey rsa:3072 -nodes -keyout private/vpn-cert.key -out /tmp/gw.csr -subj /CN=vpn-cert.acme.example \
+ && printf 'subjectAltName=DNS:vpn-cert.acme.example\nextendedKeyUsage=serverAuth\n' > /tmp/gw.ext \
+ && openssl x509 -req -in /tmp/gw.csr -CA x509ca/acme-ipsec-ca.pem -CAkey /tmp/ca.key -CAserial /tmp/ca.srl -CAcreateserial \
+      -out x509/vpn-cert.pem -days 3650 -extfile /tmp/gw.ext \
+ && rm /tmp/ca.key /tmp/ca.srl /tmp/gw.csr /tmp/gw.ext
 COPY strongswan.conf /etc/strongswan.d/crake-e2e.conf
 COPY start.sh ci-start.sh companies.sh extras.sh client.sh relay.py sso.py picky.py cisco_sso.py /
 CMD ["/bin/sh", "/start.sh"]

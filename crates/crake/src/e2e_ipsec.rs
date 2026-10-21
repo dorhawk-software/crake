@@ -235,3 +235,69 @@ async fn a_wrong_key_then_the_right_one() {
     .await;
     mgr.shutdown().await;
 }
+
+/// A gateway that proves itself with its certificate instead of a key
+/// (design/proposals/ipsec-certificates.html): signed by an authority this
+/// computer doesn't know, it isn't trusted, and Crake says so; with IT's
+/// authority added in Edit, it connects.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_gateway_with_a_certificate() {
+    if !enabled() {
+        return;
+    }
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info,charon=debug")
+        .with_test_writer()
+        .try_init();
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = config(dir.path());
+    let hook_socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    mgr.init().await.unwrap();
+    let _hooks = craked::hook_server::serve(mgr.clone(), &hook_socket).unwrap();
+    let mut f = fields();
+    f.remove("gateway_key");
+    f.insert("gateway_proof".into(), "certificate".into());
+    f.insert("gateway_id".into(), "vpn-cert.acme.example".into());
+    f.insert("user".into(), "alice".into());
+    let name = mgr.add_tunnel(&f).unwrap();
+
+    // Only the system's authorities: the gateway's isn't one of them.
+    mgr.connect(&name).unwrap();
+    answer(&mgr, &name, "password", "hunter2").await;
+    let refused = until("refused: its certificate isn't trusted", || {
+        (state(&mgr, &name) == TunnelState::Trouble).then(|| why(&mgr, &name))
+    })
+    .await;
+    assert!(
+        refused.contains(crake_proto::trouble::UNTRUSTED),
+        "{refused}"
+    );
+    assert!(refused.contains("vpn-cert.acme.example"), "{refused}");
+
+    // IT's authority, added in Edit: trusted for this gateway, it connects.
+    let ca = std::fs::read_to_string(format!("{SHARED}/ipsec-ca.pem")).unwrap();
+    f.insert("gateway_ca".into(), ca);
+    mgr.update_tunnel(&name, &f).await.unwrap();
+    mgr.connect(&name).unwrap();
+    answer(&mgr, &name, "password", "hunter2").await;
+    until("connected, the certificate checked", || {
+        assert_ne!(
+            state(&mgr, &name),
+            TunnelState::Trouble,
+            "{}",
+            why(&mgr, &name)
+        );
+        (state(&mgr, &name) == TunnelState::Connected).then_some(())
+    })
+    .await;
+    let git = look_up_and_get("git.acme.internal", "10.40.1.10")
+        .unwrap_or_else(|e| panic!("git.acme.internal: {e}\n{}", routing()));
+    assert!(git.contains("crex"), "{git}");
+    mgr.disconnect(&name).unwrap();
+    until("off", || {
+        (state(&mgr, &name) == TunnelState::Off).then_some(())
+    })
+    .await;
+    mgr.shutdown().await;
+}

@@ -391,7 +391,7 @@ mod tests {
             t.gateway_id.as_deref(),
         )
         .unwrap();
-        assert_eq!(secret.key, "hunter2hunter2");
+        assert_eq!(secret.key.as_deref(), Some("hunter2hunter2"));
     }
 
     #[cfg(unix)]

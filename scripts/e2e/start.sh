@@ -50,6 +50,9 @@ ip route add 10.40.9.0/24 dev ipsec0
 /usr/lib/ipsec/charon > /dev/null 2>&1 &
 until [ -S /var/run/charon.vici ]; do sleep 0.1; done
 swanctl --load-all > /link/ipsec-load.log 2>&1
+# IT's certificate authority for the gateway with a certificate (acme-cert).
+cp /etc/swanctl/x509ca/acme-ipsec-ca.pem /link/ipsec-ca.pem
+chmod a+r /link/ipsec-ca.pem
 # The other protocols' sign-in (e2e_protocols.rs), one port each.
 for gw in fortinet:4431 gp:4432 f5:4433 juniper:4434; do
   python3 "/fake/fake-${gw%%:*}-server.py" 198.51.100.10 "${gw##*:}" /etc/ocserv/cert.pem /etc/ocserv/key.pem \

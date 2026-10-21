@@ -119,6 +119,18 @@ impl Manager {
                         )),
                     ));
                 }
+                Some(Signed::Untrusted) => {
+                    vici.forget(name).await;
+                    let who = config.display();
+                    let id = secret.gateway_id.as_deref().unwrap_or(&config.gateway);
+                    return Ok((
+                        TunnelState::Trouble,
+                        Some(format!(
+                            "{} {who}\u{2019}s gateway: its certificate isn\u{2019}t for {id}, or isn\u{2019}t signed by an authority this computer knows. Your IT team can tell you its certificate authority, or whether its name is right.",
+                            crake_proto::trouble::UNTRUSTED
+                        )),
+                    ));
+                }
                 Some(Signed::Failed(why)) => {
                     vici.forget(name).await;
                     return Ok((TunnelState::Trouble, Some(why)));
@@ -206,6 +218,7 @@ impl Manager {
         let c = Charon::start(&self.cfg.charon, &dir, self.cfg.charon_unit.as_deref()).await?;
         let socket = c.socket.clone();
         *charon = Some(c);
+        trust_the_systems_authorities(&socket).await;
         Ok(socket)
     }
 
@@ -215,6 +228,33 @@ impl Manager {
             c.stop().await;
         }
     }
+}
+
+/// The system's certificate authorities, for gateways that prove
+/// themselves with a certificate and name no authority of IT's: charon
+/// knows none of its own (craked's settings, not the system's). Without
+/// them the tunnels with a key still work, so a failure is only logged.
+async fn trust_the_systems_authorities(socket: &std::path::Path) {
+    let Some((path, pems)) = ipsec::system_authorities() else {
+        tracing::warn!("no certificate authorities found on this computer");
+        return;
+    };
+    let mut loaded = 0;
+    match Vici::connect(socket).await {
+        Ok(mut vici) => {
+            for pem in &pems {
+                if vici.load_authority(pem).await.is_ok() {
+                    loaded += 1;
+                }
+            }
+        }
+        Err(e) => tracing::warn!("charon's vici: {e:#}"),
+    }
+    tracing::info!(
+        "charon trusts {loaded} of {} certificate authorities in {}",
+        pems.len(),
+        path.display()
+    );
 }
 
 /// `s` as one word for the shell strongSwan runs updown with.

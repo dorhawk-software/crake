@@ -12,6 +12,10 @@ pub const SIGN_IN_REFUSED: &str = "The gateway didn\u{2019}t accept the sign-in"
 pub const OPENVPN3_ENDED: &str = "OpenVPN 3 ended its session";
 /// IPsec: the gateway's key, as IT gave it, doesn't match the gateway.
 pub const KEY_MISMATCH: &str = "The key doesn\u{2019}t match";
+/// IPsec: the gateway's certificate isn't one to trust for its name
+/// (design/proposals/ipsec-certificates.html, 5: the trust question comes
+/// once Crake reads the certificate itself).
+pub const UNTRUSTED: &str = "Crake can\u{2019}t vouch for";
 /// What to do about it.
 pub const SIGN_IN_AGAIN: &str = "Switch it on to sign in again.";
 
@@ -23,6 +27,7 @@ pub fn label(why: &str) -> Option<&'static str> {
         (SIGN_IN_REFUSED, "Sign-in refused"),
         (OPENVPN3_ENDED, "Ended by OpenVPN 3"),
         (KEY_MISMATCH, "Key doesn\u{2019}t match"),
+        (UNTRUSTED, "Gateway not trusted"),
     ]
     .into_iter()
     .find(|(start, _)| why.starts_with(start))
@@ -94,6 +99,10 @@ mod tests {
         assert_eq!(
             label(&format!("{OPENVPN3_ENDED}: tun0 is gone.")),
             Some("Ended by OpenVPN 3")
+        );
+        assert_eq!(
+            label(&format!("{UNTRUSTED} Nordbank\u{2019}s gateway.")),
+            Some("Gateway not trusted")
         );
         assert_eq!(label("openconnect exited with exit status: 1."), None);
         assert_eq!(label(""), None);
