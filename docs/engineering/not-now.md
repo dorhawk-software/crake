@@ -258,3 +258,16 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   live one from versions.json; the page's fallback is bumped by hand at
   each release. Automating it (the packages workflow updating the page, or
   Cloudflare filling it in) was offered, not decided.
+- **The sign-in window drawn taller than it was (2026-10-21, the user's
+  notebook, right after a restart and login).** An OpenVPN tunnel's browser sign-in
+  window showed its card cut at the bottom: no bottom border, Cancel and
+  "Open the page again" cut in half. Not a window the window manager
+  didn't grow: then GPUI knows the window is short, and the card shrinks
+  and scrolls inside it
+  (`signin_view::tests::a_window_left_short_keeps_its_card_inside`). So
+  GPUI drew for a taller window than the one on screen, an X11/XWayland
+  mismatch, likely while the session's scale was still settling (Crake
+  started at login). Not reproduced; on the next connect the window was
+  fine. If it comes back: `xwininfo -id <the window>` (its real size)
+  beside CRAKE_DEBUG=1's output, and whether moving the window redraws it
+  whole.

@@ -393,3 +393,46 @@ fn ipsecs_trust_question_comes_from_craked(cx: &mut TestAppContext) {
         }
     }
 }
+
+/// A window shorter than its card (one the window manager didn't grow):
+/// the card stays inside it and scrolls, its buttons still there. (Not
+/// the cause of 2026-10-21's half-cut Cancel after a restart: there the
+/// card was drawn for a taller window than the one on screen.)
+#[gpui_kit::test]
+fn a_window_left_short_keeps_its_card_inside(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open_with(cx, fake(dir.path()), "openvpn");
+    let page: std::collections::HashMap<String, String> = [
+        ("id", "7"),
+        ("kind", "browser"),
+        ("url", "https://vpn.acme.example/sso"),
+    ]
+    .iter()
+    .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+    .collect();
+    cx.update(|cx| crate::openvpn::asked("acme", &page, cx));
+    w.until("the page", cx, |s| matches!(s, Stage::Browser { .. }));
+    // Shorter than the card; the test platform never grants the resize.
+    cx.simulate_window_resize(
+        w.window,
+        gpui_kit::size(gpui_kit::px(WIDTH), gpui_kit::px(220.)),
+    );
+    let (card, viewport, cancel) = cx
+        .update_window(w.window, |_, window, cx| {
+            window.render_frame(cx);
+            window.render_frame(cx);
+            (
+                window.find("sign-in-card").bounds(),
+                window.viewport_size(),
+                window.try_find("cancel").is_some(),
+            )
+        })
+        .unwrap();
+    assert!(
+        card.bottom() <= viewport.height,
+        "the card ends at {:?}, the window at {:?}",
+        card.bottom(),
+        viewport.height
+    );
+    assert!(cancel, "Cancel is still there, a scroll away");
+}

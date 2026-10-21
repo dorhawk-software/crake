@@ -283,7 +283,8 @@ impl Render for SignIn {
                 card.id("sign-in-card")
                     .max_h(px(room(window)))
                     .overflow_y_scroll()
-                    .child(fit_window()),
+                    .child(fit_window())
+                    .test_support(),
             )
     }
 }

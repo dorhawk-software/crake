@@ -267,6 +267,8 @@ one line each:
   of its Windows and macOS parts on their runners.
 - Small screens: partly fixed; open: hundreds of hosts in tunnel detail,
   resizable windows, the work area, tall windows, a sign that it scrolls.
+- The sign-in window once drawn taller than it was, after a restart: not
+  reproduced; what to capture next time.
 - Display scale changes on Windows and macOS: not tried.
 - winget for Windows; Undo in macOS notifications.
 - OpenVPN 3 sessions whose device openvpn3 doesn't name, under the package.
