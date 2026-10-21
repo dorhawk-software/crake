@@ -4,6 +4,8 @@
 /CLAUDE.local.md
 # Personal Claude Code settings (the project's shared ones are committed).
 /.claude/settings.local.json
+# The IDE's own files (RustRover works the project out from Cargo.toml).
+/.idea/
 
 # impeccable design critiques (local working notes)
 .impeccable/
