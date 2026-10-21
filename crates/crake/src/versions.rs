@@ -15,6 +15,8 @@ use std::path::Path;
 pub const URL: &str = "https://packages.dorhawk.software/versions.json";
 /// A version's download page.
 pub const RELEASES: &str = "https://github.com/dorhawk-software/crake/releases/tag/v";
+/// Where a version's files are.
+const FILES: &str = "https://github.com/dorhawk-software/crake/releases/download/v";
 /// How long `curl` gets.
 const WAIT_SECS: &str = "15";
 /// Set for the Crake that Restart starts: it waits for the old one to go.
@@ -23,6 +25,26 @@ pub const RESTARTING: &str = "CRAKE_RESTARTING";
 pub const EVERY: u64 = 24 * 60 * 60;
 /// ...looked at once an hour while Crake runs.
 pub const LOOK: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+
+/// What Download fetches for version `v`: on Windows and macOS the
+/// installer for this computer itself (a page of six files left people
+/// guessing which was theirs); elsewhere the release's page, whose table
+/// says which file is for which system.
+pub fn download(v: &str) -> String {
+    let file = if cfg!(windows) && cfg!(target_arch = "aarch64") {
+        Some(format!("crake-setup-{v}-arm64.exe"))
+    } else if cfg!(windows) {
+        Some(format!("crake-setup-{v}.exe"))
+    } else if cfg!(target_os = "macos") {
+        Some(format!("Crake-{v}.pkg"))
+    } else {
+        None
+    };
+    match file {
+        Some(file) => format!("{FILES}{v}/{file}"),
+        None => format!("{RELEASES}{v}"),
+    }
+}
 
 /// This Crake's version.
 pub fn this() -> &'static str {
@@ -131,6 +153,21 @@ pub fn dismiss_key(version: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn download_is_this_computers_installer() {
+        let url = download("0.15.0");
+        let want = if cfg!(windows) && cfg!(target_arch = "aarch64") {
+            "https://github.com/dorhawk-software/crake/releases/download/v0.15.0/crake-setup-0.15.0-arm64.exe"
+        } else if cfg!(windows) {
+            "https://github.com/dorhawk-software/crake/releases/download/v0.15.0/crake-setup-0.15.0.exe"
+        } else if cfg!(target_os = "macos") {
+            "https://github.com/dorhawk-software/crake/releases/download/v0.15.0/Crake-0.15.0.pkg"
+        } else {
+            "https://github.com/dorhawk-software/crake/releases/tag/v0.15.0"
+        };
+        assert_eq!(url, want);
+    }
 
     #[test]
     fn versions_compare_by_their_numbers() {

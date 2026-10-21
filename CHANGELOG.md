@@ -20,6 +20,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
   network's own address; where the gateway could answer that address (on the office network), the
   page started loading and was then reset. Nothing leaves a tunnel with another address now, so
   the app's next try goes through.
+- **"Crake X is out" downloads the installer itself on Windows and Mac.** Its Download button
+  opened the release's page, with a file for every system; it now fetches the one for your computer
+  (the ARM installer on Windows on ARM).
 
 ## 0.14.0 (2026-10-21)
 

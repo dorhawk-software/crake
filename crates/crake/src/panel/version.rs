@@ -22,10 +22,7 @@ impl Panel {
             Notice::Out(v) => (
                 format!("Crake {v} is out. You have {}.", versions::this()),
                 vec![
-                    (
-                        "Download",
-                        Request::OpenUrl(format!("{}{v}", versions::RELEASES)),
-                    ),
+                    ("Download", Request::OpenUrl(versions::download(&v))),
                     ("Not now", Request::Dismiss(versions::dismiss_key(&v))),
                 ],
             ),
