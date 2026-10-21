@@ -46,5 +46,6 @@ notes=$(awk -v v="$V" '
 [ -n "$(printf '%s' "$notes" | tr -d '[:space:]')" ] ||
     fail "CHANGELOG.md has no section \"## $V (<date>)\""
 printf '%s\n' "$notes" | sed -e '/./,$!d'
-echo
+# Under a rule: the kinds (### New, …) are the release's own headings.
+printf '\n---\n\n'
 which_file "$V"

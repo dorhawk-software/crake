@@ -258,6 +258,14 @@ fn tunnels(cx: &mut TestAppContext) {
     }
 }
 
+/// About's first link opens What's new (design/proposals/whats-new.html, 3).
+#[gpui_kit::test]
+fn about_opens_whats_new(cx: &mut TestAppContext) {
+    let w = open(cx, Section::About);
+    w.click("whats-new", cx);
+    assert!(matches!(w.requests.try_recv(), Ok(Request::WhatsNew)));
+}
+
 #[gpui_kit::test]
 fn about_offers_a_coffee(cx: &mut TestAppContext) {
     let w = open(cx, Section::About);

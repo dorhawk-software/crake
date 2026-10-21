@@ -349,6 +349,32 @@ fn a_new_version_is_downloaded_until_not_now(cx: &mut TestAppContext) {
     assert!(!w.shows("version", cx), "switched off");
 }
 
+/// Updated from 0.13.1 (design/proposals/whats-new.html, 1): the panel
+/// says so with the number of changes; What's new opens the window, Not
+/// now puts it away; a fresh install says nothing.
+#[gpui_kit::test]
+fn after_an_update_the_panel_offers_whats_new(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    assert!(!w.shows("What's new", cx), "a fresh install: nothing");
+    let w = open(
+        cx,
+        Prefs {
+            seen_version: Some("0.13.1".into()),
+            existed: true,
+            ..Prefs::default()
+        },
+    );
+    assert!(matches!(w.click("What's new", cx), Request::WhatsNew));
+    assert!(matches!(w.click("Not now", cx), Request::SeenVersion));
+    // Restart wins: one version notice at a time.
+    w.model.update(cx, |m, cx| {
+        m.service_version = Some("99.0.0".into());
+        cx.notify();
+    });
+    assert!(!w.shows("What's new", cx));
+    assert!(matches!(w.click("Restart", cx), Request::Restart));
+}
+
 /// OpenVPN 3 left a connection running (design/proposals/leftover-warning.html):
 /// the panel says how to stop it, Copy puts the command on the clipboard,
 /// Got it remembers this process; a process that ended isn't said.

@@ -11,6 +11,23 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### New
+
+- **What's new, after an update.** The first time you open the panel after Crake is updated, it
+  says so, with how many changes there are since the version you had, and What's new shows them
+  in these words. Settings → About has it too, for any time.
+
+### Better
+
+- **Switched off and on, an OpenVPN tunnel doesn't send you to the browser again.** After you sign
+  in in the browser, Crake keeps the gateway's sign-in, as it does AnyConnect's, until it runs out
+  or the computer restarts. It has done so since 0.11; this is the first time it's said.
+- **"Crake X is out" downloads the installer itself on Windows and Mac.** Its Download button
+  opened the release's page, with a file for every system; it now fetches the one for your computer
+  (the ARM installer on Windows on ARM).
+
+### Fixed
+
 - **A company site with a public and a private address stays inside, over IPv6 too.** When your
   company's DNS gives a public name a private address, Crake sends it through the tunnel; the
   name's public IPv6 address was still handed out, and an app that tries IPv6 first went to the
@@ -20,11 +37,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
   network's own address; where the gateway could answer that address (on the office network), the
   page started loading and was then reset. Nothing leaves a tunnel with another address now, so
   the app's next try goes through.
-- **"Crake X is out" downloads the installer itself on Windows and Mac.** Its Download button
-  opened the release's page, with a file for every system; it now fetches the one for your computer
-  (the ARM installer on Windows on ARM).
 
 ## 0.14.0 (2026-10-21)
+
+### New
 
 - **IPsec gateways that prove themselves with a certificate.** New tunnel asks how the gateway
   proves itself: with a key from your IT team, or with its certificate, as a website does. Crake
@@ -38,6 +54,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
   your IT team gave you, and Crake keeps a copy in your keyring. Its password is asked as "Unlock your
   certificate", and remembered when you tick it. A certificate that has run out is said before
   anything is sent. A certificate the gateway turns down is said as the certificate, not the password.
+
+### Fixed
+
 - **"Remember the password in your keyring" for a certificate's file is kept.** Ticked when OpenVPN
   asked for a profile key's password, it was shown but forgotten.
 - **No AnyConnect groups for an IPsec tunnel.** Choosing IPsec at a gateway that also answered as
@@ -47,21 +66,15 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## 0.13.1 (2026-10-21)
 
+### Fixed
+
 - **Every network an IPsec gateway offers shows in tunnel detail.** A gateway offering two networks
   showed only the first under "From the gateway", and only that one was raced on the first
   connection. Both are now.
 
 ## 0.13.0 (2026-10-20)
 
-- **A certificate check fixed in a library Crake carries.** rustls-webpki, part of the window
-  toolkit's web client, could accept a certificate chain through intermediates that are no longer
-  trusted (RUSTSEC-2026-0382); updated to 0.103.16. Crake itself doesn't fetch anything through it
-  (its update check uses your system's curl), and your tunnels' TLS is openconnect's and OpenVPN's.
-
-- **Signing in through the browser works for AnyConnect and other openconnect gateways.** Crake
-  handed openconnect the browser's name without its folder, and openconnect doesn't look for it, so
-  the browser never opened on Linux or macOS and the sign-in waited forever. It's found where your
-  system keeps it now. (Found by a new test that plays a Cisco gateway's browser sign-in.)
+### New
 
 - **IPsec on NixOS.** `services.crake.ipsec = true;` brings strongSwan and runs Crake's own charon
   for IPsec tunnels, as the other distributions' packages do. New tunnel says that line on NixOS
@@ -77,8 +90,22 @@ What's new in each Crake release, for the people using it. The newest is at the 
   may go through. You switch it on and sign in with your password, as with your own. craked.toml
   takes the same.
 
+### Better
+
 - **"Change the key…" when the gateway turns the key down.** An IPsec sign-in refused for its key
   now ends with a button that opens the tunnel's Edit, instead of Try again, which couldn't help.
+
+### Fixed
+
+- **A certificate check fixed in a library Crake carries.** rustls-webpki, part of the window
+  toolkit's web client, could accept a certificate chain through intermediates that are no longer
+  trusted (RUSTSEC-2026-0382); updated to 0.103.16. Crake itself doesn't fetch anything through it
+  (its update check uses your system's curl), and your tunnels' TLS is openconnect's and OpenVPN's.
+
+- **Signing in through the browser works for AnyConnect and other openconnect gateways.** Crake
+  handed openconnect the browser's name without its folder, and openconnect doesn't look for it, so
+  the browser never opened on Linux or macOS and the sign-in waited forever. It's found where your
+  system keeps it now. (Found by a new test that plays a Cisco gateway's browser sign-in.)
 
 - **IPsec tunnels come back after an update.** Updating Crake switched IPsec tunnels off. Now they
   switch on again by themselves, and if you keep the password in your keyring they sign in without
@@ -91,6 +118,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## 0.12.0 (2026-10-20)
 
+### New
+
 - **IPsec (IKEv2) tunnels, on Linux (Beta).** New tunnel has an IPsec card for FortiGate's "IPsec
   VPN" and other IKEv2 gateways: the gateway, the key your IT team gave you and, if they named them,
   the company's domains; then your username. Crake runs strongSwan's charon itself and asks your
@@ -100,9 +129,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
   such: "The key doesn't match". On Fedora, a small SELinux module of Crake's lets strongSwan
   read Crake's settings.
 
-- **Your IT team's tunnels on Windows and macOS.** Tunnels your IT team puts in Crake's managed
-  folder (ProgramData\Crake\managed.d on Windows) were read only when a craked.toml was there too,
-  which Windows' and macOS' installers don't make, so they never showed up. They do now.
+- **You choose whether a password is kept.** Every password the sign-in window asks for has
+  "Remember the password in your keyring", ticked to start with; before, a gateway's password was
+  kept without a word, and only a certificate's had the box. One-time codes are never kept.
+
+### Better
 
 - **Updating Crake on Windows keeps your tunnels signed in, from this version on.** Installing a
   newer Crake stopped its service the plain way, which signed every tunnel out; you had to sign in
@@ -110,24 +141,45 @@ What's new in each Crake release, for the people using it. The newest is at the 
   packages do: they come back on their own, with what they had learned. The update to this
   version still signs you out once, since it's the older service that stops.
 
-- **Names only your company knows work on Windows with IPv6 about.** When a company's DNS
-  answered a name's IPv4 address but refused its IPv6 one, Crake passed on the internet's "no such
-  name" for the IPv6 question, and Windows then forgot the IPv4 answer too, so the name didn't
-  resolve. Crake now says the name exists without an IPv6 address.
-
 - **Crake's DNS rules come back on Windows and macOS.** If another program removed the rule that
   sends a company's names to its tunnel (Windows' name resolution policy, or macOS' /etc/resolver
   file), those names went to the network's DNS until the tunnel reconnected. Crake now notices
   within moments and puts its rule back, as it already did on Linux.
 
-- **Moving a tunnel to TCP is tried twice.** On a network that blocks UDP, Crake moves the tunnel
-  over to TCP on the same sign-in. If the gateway wasn't done with the old connection yet, the move
-  failed and the tunnel said it stopped unexpectedly. Crake now tries it once more, a moment later.
-
 - **Browser sign-in on Windows says why it isn't there.** The openconnect Crake brings on Windows
   can't sign in through the browser. New tunnel said it "needs openconnect 9 or newer; this computer
   has 9.12", and a tunnel set to it failed with openconnect's own words. Both now say it isn't built
   into the openconnect Crake uses there, and to use a username and password or a certificate.
+
+- **Crake's notifications carry the bird.** They name Crake's icon and its desktop entry, so the
+  desktop shows them with Crake's icon and files them under Crake, as other apps' are.
+
+- **The seconds count where you'd expect.** "Asking the gateway…" and "Saving the report…" stay
+  quiet for two seconds, then count from 3 s, the second you're in, not a 2 you've just sat through.
+  The bird beside "Asking the gateway…" is drawn in the text's colour now: teal is kept for what
+  Crake decided.
+
+### Changed
+
+- **Teal means one thing again.** Small actions and links (Import .ovpn…, Edit…, Copy for helpdesk,
+  About's links) are ink and underlined, as Diagnostics' Open already was; the update notice's
+  Restart and Download are buttons, as other notices' are. Teal is left to what Crake decided, what's
+  chosen or on, and the one main button. Copy for helpdesk now says "Copied".
+
+### Fixed
+
+- **Your IT team's tunnels on Windows and macOS.** Tunnels your IT team puts in Crake's managed
+  folder (ProgramData\Crake\managed.d on Windows) were read only when a craked.toml was there too,
+  which Windows' and macOS' installers don't make, so they never showed up. They do now.
+
+- **Names only your company knows work on Windows with IPv6 about.** When a company's DNS
+  answered a name's IPv4 address but refused its IPv6 one, Crake passed on the internet's "no such
+  name" for the IPv6 question, and Windows then forgot the IPv4 answer too, so the name didn't
+  resolve. Crake now says the name exists without an IPv6 address.
+
+- **Moving a tunnel to TCP is tried twice.** On a network that blocks UDP, Crake moves the tunnel
+  over to TCP on the same sign-in. If the gateway wasn't done with the old connection yet, the move
+  failed and the tunnel said it stopped unexpectedly. Crake now tries it once more, a moment later.
 
 - **A host another tunnel learned can go through this one.** Once a tunnel had learned a host, no
   other tunnel could learn it, even with that tunnel switched off (or gone, when your IT team removed
@@ -147,37 +199,31 @@ What's new in each Crake release, for the people using it. The newest is at the 
   names looked up then failed. It now says Connecting until the tunnel over TCP is up, and the log
   says the tunnel is up rather than "back".
 
-- **You choose whether a password is kept.** Every password the sign-in window asks for has
-  "Remember the password in your keyring", ticked to start with; before, a gateway's password was
-  kept without a word, and only a certificate's had the box. One-time codes are never kept.
-
-- **Teal means one thing again.** Small actions and links (Import .ovpn…, Edit…, Copy for helpdesk,
-  About's links) are ink and underlined, as Diagnostics' Open already was; the update notice's
-  Restart and Download are buttons, as other notices' are. Teal is left to what Crake decided, what's
-  chosen or on, and the one main button. Copy for helpdesk now says "Copied".
-
 - **Everything stays on a small screen.** On a 1366×768 laptop, Settings ran off the bottom of the
   screen, the panel's footer went missing once there were four tunnels, and a gateway's long list
   of groups pushed Cancel out of the sign-in window. Each now fits its screen and scrolls what
   doesn't fit, with its buttons kept in view; New tunnel's dropdowns scroll too.
 
-- **Crake's notifications carry the bird.** They name Crake's icon and its desktop entry, so the
-  desktop shows them with Crake's icon and files them under Crake, as other apps' are.
+### Underneath
 
 - **Windows drawn with the newest GPUI.** The toolkit Crake draws its windows with is updated
   (0.7.3), with Crake's own fix for placing the panel at the tray carried over. It needs about
   thirty fewer libraries than before.
 
-- **The seconds count where you'd expect.** "Asking the gateway…" and "Saving the report…" stay
-  quiet for two seconds, then count from 3 s, the second you're in, not a 2 you've just sat through.
-  The bird beside "Asking the gateway…" is drawn in the text's colour now: teal is kept for what
-  Crake decided.
-
 ## 0.11.1 (2026-10-19)
+
+### Better
 
 - **OpenVPN is no longer Beta.** Crake's own OpenVPN has signed in to a real company gateway
   through the browser and reached its internal network, so New tunnel shows it beside AnyConnect,
   without the Beta tag.
+
+- **"Saved …" goes when you move on.** The line under "Save a report…" stays while you're in
+  Diagnostics, to open the file or show it in its folder, and goes when you choose another section;
+  a save still under way waits for you to see how it went. It also says when names and addresses
+  were left out. Close Settings while a report is saving and a notification says how it went.
+
+### Fixed
 
 - **"Hide names and addresses when sharing" hides them all.** A report could still name a host
   whose company domain ends in a digit, or one written with its port, after "host=", in a list, in a
@@ -187,10 +233,7 @@ What's new in each Crake release, for the people using it. The newest is at the 
   addresses, more sign-in cookies and file paths wherever they stand (a Windows path with a space
   in it gave away a surname) are left out.
 
-- **"Saved …" goes when you move on.** The line under "Save a report…" stays while you're in
-  Diagnostics, to open the file or show it in its folder, and goes when you choose another section;
-  a save still under way waits for you to see how it went. It also says when names and addresses
-  were left out. Close Settings while a report is saving and a notification says how it went.
+### Underneath
 
 - **The libraries Crake is built on are up to date.** tokio 1.53.3 marked the way Crake's service
   watched its own kernel connections as unsafe; it now uses tokio's safe replacement. Also
@@ -200,6 +243,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## 0.11.0 (2026-10-19)
 
+### New
+
 - **Crake runs OpenVPN profiles itself.** Import the .ovpn file your IT team gave you (New
   tunnel, beside Gateway): Crake picks OpenVPN, takes the gateway and a name from the file, and
   keeps its own copy, which only its service can read. Signing in through your browser, with a
@@ -207,42 +252,14 @@ What's new in each Crake release, for the people using it. The newest is at the 
   something on your computer is refused, saying why. Beta until it has met a real gateway. The
   packages now recommend openvpn.
 
-- **The tray's badge reads now.** When a tunnel stops or Crake needs you, the badge sits at the
-  bird's bottom right, larger, with a "!" drawn on whole pixels, so it reads at a bar's small size.
-  On a light taskbar or menu bar it's a deeper red or amber, so it stands out there too.
-
-- **OpenVPN remembers your sign-in.** After a username and password that worked, Crake keeps them
-  in your keyring, as it does for AnyConnect, and doesn't ask again. If the gateway refuses them,
-  Crake forgets them and asks.
-
-- **On Windows, what Crake keeps is yours alone.** Its log and the hosts it learned for each tunnel
-  were readable by every user of the PC; now only Windows itself and administrators can read them.
-
-- **Another VPN client's names keep working on Windows.** With "Keep internal names private" on,
-  Crake no longer holds back names that another VPN client on the PC serves (AnyConnect,
-  GlobalProtect and the like), as it already didn't on Linux and macOS.
-
-- **Public sites a tunnel took by mistake go direct again on Windows and macOS too.** Once per
-  version, Crake tries each public address a tunnel learned and forgets those that answer
-  directly, as it already did on Linux.
-
 - **IT can set up OpenVPN tunnels too.** A managed profile in `/etc/crake/managed.d` can name a
   `.ovpn` file beside it (`protocol = "openvpn"`, `profile = "initech.ovpn"`), with the same
   learning policy as AnyConnect's; Crake checks the file as it does one you import, and says why
   if it can't run it.
 
-- **An internal site right after connecting works on networks that block UDP.** When a tunnel
-  restarted over TCP in its first seconds, a site opened in that moment could be left direct for ten
-  minutes ("No answer just then"); Crake now tries it again on the next attempt. The same when a
-  tunnel comes up after a site found no answer: it's tried through it at once.
-
 - **OpenVPN on Windows and macOS too.** On Windows it comes with Crake, with its drivers; on a Mac
   it comes with Homebrew's cask (`brew install openvpn` otherwise). On Windows, too, a company's
   internal names go to its DNS and are routed before the first packet.
-
-- **Your OpenVPN 3 tunnels move to it.** Each one is copied over once, while it's off, and the log
-  says so; OpenVPN 3 keeps its own profile. One whose profile OpenVPN 3 keeps locked stays where it
-  is, and the panel asks for its .ovpn file.
 
 - **A report for whoever is helping you.** When something isn't working, Settings → Diagnostics →
   "Save a report…" saves one text file with what they need to see: how this computer connects to
@@ -254,6 +271,40 @@ What's new in each Crake release, for the people using it. The newest is at the 
   yourself. From a terminal, `crake report` saves the same file. The log's Export, which saved its
   rows as a file, is gone: Copy for helpdesk still copies them.
 
+### Better
+
+- **The tray's badge reads now.** When a tunnel stops or Crake needs you, the badge sits at the
+  bird's bottom right, larger, with a "!" drawn on whole pixels, so it reads at a bar's small size.
+  On a light taskbar or menu bar it's a deeper red or amber, so it stands out there too.
+
+- **OpenVPN remembers your sign-in.** After a username and password that worked, Crake keeps them
+  in your keyring, as it does for AnyConnect, and doesn't ask again. If the gateway refuses them,
+  Crake forgets them and asks.
+
+- **Public sites a tunnel took by mistake go direct again on Windows and macOS too.** Once per
+  version, Crake tries each public address a tunnel learned and forgets those that answer
+  directly, as it already did on Linux.
+
+### Changed
+
+- **Your OpenVPN 3 tunnels move to it.** Each one is copied over once, while it's off, and the log
+  says so; OpenVPN 3 keeps its own profile. One whose profile OpenVPN 3 keeps locked stays where it
+  is, and the panel asks for its .ovpn file.
+
+### Fixed
+
+- **On Windows, what Crake keeps is yours alone.** Its log and the hosts it learned for each tunnel
+  were readable by every user of the PC; now only Windows itself and administrators can read them.
+
+- **Another VPN client's names keep working on Windows.** With "Keep internal names private" on,
+  Crake no longer holds back names that another VPN client on the PC serves (AnyConnect,
+  GlobalProtect and the like), as it already didn't on Linux and macOS.
+
+- **An internal site right after connecting works on networks that block UDP.** When a tunnel
+  restarted over TCP in its first seconds, a site opened in that moment could be left direct for ten
+  minutes ("No answer just then"); Crake now tries it again on the next attempt. The same when a
+  tunnel comes up after a site found no answer: it's tried through it at once.
+
 - **On a Mac, switching a tunnel off undoes all of it.** Crake turns on the Mac's packet filter
   while a tunnel is up, for connections that started before a host was routed. Switching the
   tunnel off, or quitting Crake, could leave the filter on, with Crake's rule for that tunnel
@@ -262,12 +313,16 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## 0.10.4 (2026-10-17)
 
+### Fixed
+
 - **No more large pointer for a moment.** Coming onto a Crake window, the pointer could blink
   large for an instant: GNOME had given XWayland's background a pointer at an older scale's size,
   which shows before the window's own. Crake now gives it your theme's pointer at today's size,
   and keeps it so when the scale or the pointer size changes.
 
 ## 0.10.3 (2026-10-17)
+
+### Fixed
 
 - **The panel stays above the bar.** With long names in "What Crake did" (an Azure cluster's
   private-link name, say), the panel opened from a bottom bar could grow down under it, hiding the
@@ -280,12 +335,21 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## 0.10.2 (2026-10-17)
 
+### Fixed
+
 - **"Keep internal names private" says when it can't.** If another DNS server on your computer
   holds the port Crake answers on, or Crake can't add its private DNS link, Settings → Names now
   says so under the setting, and Crake keeps trying. Before, it failed quietly, and with such a
   server running the names could reach it and go out to your provider's DNS.
 
 ## 0.10.1 (2026-10-17)
+
+### Changed
+
+- **The app icon is the bird in one ink.** The corncrake's colours are gone from the icon: it's
+  the same light bird as in the panel and the bar, calling in teal, on the dark tile.
+
+### Fixed
 
 - **The pointer keeps its size.** After the display's scale changed while Crake ran (a laptop
   docked to a large monitor, or undocked), pointing at a button or a field in Crake's windows
@@ -302,10 +366,17 @@ What's new in each Crake release, for the people using it. The newest is at the 
   and next to the bar's other icons it looked pixelated; it's drawn with soft edges, as at every
   other size, with the cut of its wing back.
 
-- **The app icon is the bird in one ink.** The corncrake's colours are gone from the icon: it's
-  the same light bird as in the panel and the bar, calling in teal, on the dark tile.
-
 ## 0.10.0 (2026-10-17)
+
+### New
+
+- **Crake says so when your desktop shows no tray icons.** Stock GNOME on Fedora and Debian
+  shows none without its AppIndicator extension, and Crake used to start with nothing on screen.
+  Now its panel opens with a note when you start it, and at login it sends one notification. Where
+  it can, Crake switches the extension on in one click, or gives you the command to install it.
+  Settings' bird row says the same.
+
+### Better
 
 - **Sign-in asks in words.** "ACME asks for your group", "…for a code", "…for your username",
   with the gateway's own words quoted under it, instead of "ACME asks: GROUP". A field Crake
@@ -333,6 +404,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
   something when Crake starts at login is dimmed less, so it can still be read; and Privacy's
   statement sits on a plain surface.
 
+### Changed
+
 - **Traffic shows its decisions, not its tunnels, in teal.** The packets moving through the graph
   are grey on every way now; the two-stroke tick marks each destination Crake learned, in the
   graph and in the table's "Way" column (it was "Goes"), the same tick as under the chart. Long
@@ -344,11 +417,7 @@ What's new in each Crake release, for the people using it. The newest is at the 
   sleep. The same bird is in the panel, in Settings and on the app icon, where it wears the
   corncrake's own colours.
 
-- **Crake says so when your desktop shows no tray icons.** Stock GNOME on Fedora and Debian
-  shows none without its AppIndicator extension, and Crake used to start with nothing on screen.
-  Now its panel opens with a note when you start it, and at login it sends one notification. Where
-  it can, Crake switches the extension on in one click, or gives you the command to install it.
-  Settings' bird row says the same.
+### Fixed
 
 - **Settings no longer says the bird is in the "top bar".** It's "the tray" on Linux and Windows
   and "the menu bar" on a Mac, with the bird itself next to the words, drawn the way that bar shows

@@ -1,5 +1,6 @@
 //! A newer Crake (design/proposals/new-version.html): "updated, restart"
-//! when a package updated craked, or "X is out" when asked and found.
+//! when a package updated craked, or "X is out" when asked and found; and
+//! once updated, What's new (`whats_new`).
 
 use super::*;
 use crate::versions::{self, Notice};
@@ -13,13 +14,22 @@ impl Panel {
     ) -> Option<impl IntoElement + use<>> {
         let prefs = cx.global::<crate::prefs::Prefs>();
         let newest = model.newest.as_deref().filter(|_| prefs.check_versions);
-        let notice = versions::notice(model.service_version.as_deref(), newest, &prefs.dismissed)?;
+        let notice = versions::notice(model.service_version.as_deref(), newest, &prefs.dismissed);
+        // One version notice at a time: Restart, then "X is out", then
+        // What's new (design/proposals/whats-new.html), which waits.
         let (text, actions): (String, Vec<(&'static str, Request)>) = match notice {
-            Notice::Restart(v) => (
+            None => (
+                crate::whats_new::notice(prefs)?,
+                vec![
+                    ("What's new", Request::WhatsNew),
+                    ("Not now", Request::SeenVersion),
+                ],
+            ),
+            Some(Notice::Restart(v)) => (
                 format!("Crake was updated to {v}. Restart it to finish."),
                 vec![("Restart", Request::Restart)],
             ),
-            Notice::Out(v) => (
+            Some(Notice::Out(v)) => (
                 format!("Crake {v} is out. You have {}.", versions::this()),
                 vec![
                     ("Download", Request::OpenUrl(versions::download(&v))),

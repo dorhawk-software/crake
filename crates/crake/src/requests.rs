@@ -338,7 +338,24 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
         Request::Quit => cx.quit(),
         Request::Restart => restart(cx),
         Request::OpenUrl(url) => cx.open_url(&url),
+        Request::WhatsNew => {
+            // From the panel's notice: since the version seen before.
+            let prefs = cx.global::<prefs::Prefs>();
+            let since = crate::whats_new::notice(prefs).and(prefs.seen_version.clone());
+            seen_version(cx);
+            crate::whats_new::open(since, cx);
+        }
+        Request::SeenVersion => seen_version(cx),
     }
+}
+
+/// This version's What's new seen: the panel's notice goes.
+fn seen_version(cx: &mut App) {
+    let prefs = cx.global_mut::<prefs::Prefs>();
+    crate::whats_new::mark_seen(prefs);
+    prefs.save();
+    let model = cx.global::<Shell>().model.clone();
+    model.update(cx, |_, cx| cx.notify());
 }
 
 /// Restart: the updated binary is started (told to wait for this one),

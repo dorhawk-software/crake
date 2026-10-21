@@ -1,5 +1,5 @@
 #!/bin/sh
-# Release Crake VERSION (CLAUDE.md, Releases): CHANGELOG.md's "Unreleased"
+# Release Crake VERSION (docs/engineering/releases.md): CHANGELOG.md's "Unreleased"
 # section becomes "## VERSION (today)", the version goes into Cargo.toml
 # (and Cargo.lock), the Nix package and the PKGBUILD, that is committed
 # and pushed to main, and once CI has passed on the commit the tag
@@ -52,6 +52,13 @@ else
     notes=$(awk '/^## Unreleased/ { on = 1; next } on && /^## / { exit } on { print }' CHANGELOG.md)
     [ -n "$(printf '%s' "$notes" | tr -d '[:space:]')" ] ||
         fail "CHANGELOG.md has nothing under \"## Unreleased\": write what changed for users first"
+    # Each change under its kind: the app's What's new shows them so
+    # (design/proposals/whats-new.html, 4).
+    outside=$(printf '%s\n' "$notes" | awk '
+        /^### / { k = substr($0, 5); ok = (k == "New" || k == "Better" || k == "Changed" || k == "Fixed" || k == "Underneath"); next }
+        /^- / && !ok { print }')
+    [ -z "$outside" ] ||
+        fail "CHANGELOG.md: a change under \"## Unreleased\" outside ### New, Better, Changed, Fixed or Underneath: $outside"
     today=$(date +%F)
     sed -i "s/^## Unreleased\$/## Unreleased\n\n## $V ($today)/" CHANGELOG.md
     sed -i "0,/^version = \"$current\"/s//version = \"$V\"/" Cargo.toml

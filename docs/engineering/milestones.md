@@ -380,6 +380,21 @@
    through a tunnel, and is remembered after that (each use keeps it
    another week); tunnel detail shows when it was last used. The user
    expected every visit to show and didn't know it records only the first.
+   What's new (2026-10-21; design/proposals/whats-new.html, chosen by the
+   user; `whats_new/`): CHANGELOG.md is built in (`include_str!`; the Nix
+   package's file set has it) and read into releases, kinds and changes
+   (`changelog.rs`; early releases keep their own headings or none). The
+   version seen is app.json's `seen_version`: no app.json at start is a
+   fresh install (seen at once, nothing said), app.json without it an
+   update from before Crake kept it ("Crake is now 0.15.0."). The panel's
+   notice comes after Restart and "X is out", counts the changes since the
+   version seen (Underneath's left out; a release with only those says
+   nothing), and goes on What's new or Not now (seen); a downgrade keeps the
+   highest. The window: three versions in full, "Show earlier versions",
+   Escape, the arrow and page keys; About's first link opens it at this
+   version. Tests: `whats_new::tests` (the rules, the window), panel and
+   Settings tests, the journey's step 3b; `CRAKE_DEMO=whatsnew` (seen
+   0.13.1) with `CRAKE_SHOW=whatsnew` or `panel`.
 7. Managed profiles and policy enforcement; helpdesk export. **Built**,
    proven in the lifecycle test (scope) and a throwaway namespace (full
    tunnel; a mutation without the LAN exclusion fails it).

@@ -1,4 +1,5 @@
-//! Settings, About: the bird, the name, the version, "Is it safe?"
+//! Settings, About: the bird, the name, the version, What's new,
+//! "Is it safe?"
 //! (design/proposals/how-secure.html, A, chosen by the user), and a coffee
 //! (design/proposals/about-coffee.html, B, chosen by the user).
 
@@ -32,7 +33,20 @@ pub(super) fn about(t: &Theme, cx: &mut Context<Settings>) -> impl IntoElement {
             .keys()
             .on_click(move |_, _, cx| cx.open_url(url))
     };
-    let _ = cx;
+    // The only link that opens a window, not the web
+    // (design/proposals/whats-new.html, 3): first.
+    let whats_new = div()
+        .id("whats-new")
+        .text_color(t.ink)
+        .font_weight(FontWeight::SEMIBOLD)
+        .underline()
+        .cursor_pointer()
+        .child("What's new")
+        .keys()
+        .on_click(cx.listener(|this, _, _, _| {
+            this.requests.send_blocking(Request::WhatsNew).ok();
+        }))
+        .test_support();
     div()
         .child(
             div()
@@ -68,6 +82,8 @@ pub(super) fn about(t: &Theme, cx: &mut Context<Settings>) -> impl IntoElement {
                 .flex()
                 .flex_wrap()
                 .gap(px(10.))
+                .child(whats_new)
+                .child(div().text_color(t.muted).child("\u{b7}"))
                 .child(link("github", "Source on GitHub", "https://github.com/dorhawk-software"))
                 .child(div().text_color(t.muted).child("\u{b7}"))
                 .child(link("site", "dorhawk.software", "https://dorhawk.software/")),

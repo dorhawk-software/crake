@@ -16,6 +16,8 @@ let
       fileset = lib.fileset.unions [
         ../../Cargo.toml ../../Cargo.lock ../../crates ../../vendor
         ../../assets ../../packaging ../../LICENSE
+        # What's new: the app reads the changelog when it's built.
+        ../../CHANGELOG.md
       ];
     };
     strictDeps = true;

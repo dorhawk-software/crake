@@ -92,6 +92,14 @@ Don't drift back into these. Each was tried and dropped for a reason.
   a button that changes its words while working ("Saving…"), which
   resizes it and moves the row; the button stays, and what's under way is
   said in a box of its own with the dashed head.
+- **What's new as a link in the panel's header** ("What's new in 0.15.0"
+  beside "Listening"), and **a word before each change in a mono badge**
+  ("New", "Fixed"; design/proposals/whats-new.html, round one, B): the
+  header carries only status and the link had no dismissal; the badges were
+  an icon per kind in another form (the user chose "quieter"), and mono is
+  for machine facts. Chosen (2026-10-21): the notices' shape in the panel
+  ("Crake is now 0.15.0: 9 changes since 0.13.1.", What's new, Not now), and
+  the kinds as small muted headings in the window.
 
 ## Principles
 
@@ -149,6 +157,15 @@ a body, and an actions row of a bordered action and a muted text dismiss
 ("Not now"); "Got it" is that bordered button. The leftover notice's
 command line, with Copy and Got it on it, is the user's choice (A2,
 2026-10-15) and stays.
+
+**What's new** (design/proposals/whats-new.html, chosen by the user
+2026-10-21): after an update, the panel's notice, neutral (the surface
+tint: nothing needs you, nothing was decided). The window: every window's
+title row, its subtitle "Since 0.13.1, the version you had"; each version's
+number (17, 700) and date (mono, as the changelog writes it), its changes
+under New, Better, Changed, Fixed and Underneath (13, 600, muted), each a
+headline (15, 600) and its sentences (14, muted), whole, as CHANGELOG.md has
+them; three versions in full, then "Show earlier versions". No teal.
 
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |

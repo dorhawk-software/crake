@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: What's new</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53; --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; }
+  body.light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8; --ink: #1A1C1E; --muted: #5A5F64; --accent: #0F766E; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 64px; max-width: 1480px; }
+  h1 { font-size: 20px; margin: 0 0 10px; }
+  .intro, .sub { color: var(--muted); font-size: 13px; max-width: 88ch; }
+  .intro b, .sub b { color: var(--ink); }
+  .intro ul, .sub ul { margin: 6px 0 0; padding-left: 20px; } .intro li + li, .sub li + li { margin-top: 4px; }
+  .cap { font-size: 15px; font-weight: 700; margin: 40px 0 4px; }
+  .sub { margin-bottom: 14px; }
+  .row { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+  .lab { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+  .shot { display: block; border-radius: 10px; }
+  .panel-shot { width: 452px; }
+  .about-shot { width: 640px; }
+  pre.md { margin: 0; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font: 400 12px/1.6 'Atkinson Hyperlegible Mono', monospace; color: var(--ink); white-space: pre-wrap; width: 520px; box-sizing: border-box; }
+  pre.md .h { color: var(--muted); }
+  /* The window, as the app would draw it. */
+  .win { width: 600px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .title { height: 56px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 20px; border-bottom: 1px solid var(--line); }
+  .title b { font-size: 17px; }
+  .title .s { flex: 1; font-size: 13px; color: var(--muted); }
+  .x { width: 32px; height: 32px; border-radius: 16px; background: var(--surface); display: grid; place-items: center; color: var(--ink); font-size: 14px; }
+  .body { padding: 0 20px 20px; }
+  .ver { padding: 20px 0 0; display: flex; align-items: baseline; gap: 10px; }
+  .ver b { font-size: 17px; }
+  .ver span { font: 400 13px 'Atkinson Hyperlegible Mono', monospace; color: var(--muted); }
+  .kind { font-size: 13px; font-weight: 600; color: var(--muted); margin: 14px 0 0; }
+  .e { padding: 6px 0 0; }
+  .e + .e { padding-top: 12px; }
+  .e .h { font-weight: 600; font-size: 15px; }
+  .e .d { color: var(--muted); }
+  .sep { border-top: 1px solid var(--line); margin-top: 24px; }
+  .more { margin-top: 22px; font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+  .q { margin-top: 36px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px; max-width: 88ch; font-size: 13px; color: var(--muted); }
+  .q b { color: var(--ink); }
+  .q ul { margin: 6px 0 0; padding-left: 20px; } .q li + li { margin-top: 4px; }
+  .toggle { position: fixed; top: 14px; right: 18px; font-size: 13px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+  .aside { margin-top: 44px; padding-top: 22px; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<span class="toggle" onclick="document.body.classList.toggle('light')">Light / dark (the window)</span>
+<div class="page">
+  <h1>Proposal: What's new</h1>
+  <div class="intro">After an update, Crake says so once, and shows what changed since the version you had, in the
+    changelog's own words. CHANGELOG.md is already written for the people using Crake, so it's built into the app:
+    the installed version's own list, nothing fetched. Asked for by the user (2026-10-21), "quieter" chosen over an
+    icon per kind. Reviewed twice (the design rules; the behaviour) and revised: what's drawn here is round two.
+    <ul>
+      <li><b>1 · The moment:</b> the first time the panel opens on a version you haven't seen, a notice in the
+        notices' place.</li>
+      <li><b>2 · The window:</b> the versions since the one you had, each version's changes under small headings.</li>
+      <li><b>3 · Settings → About:</b> "What's new" first in its links, to read it again any time.</li>
+      <li><b>4 · The changelog:</b> each release's changes sorted into kinds from now on.</li>
+    </ul>
+    Captured from the app (demo, dark) and drawn to its measurements; the window is drawn live (the toggle top right
+    switches its theme).</div>
+
+  <div class="cap">1 · The moment, the first time the panel opens after an update</div>
+  <div class="sub">The notices' shape (DESIGN.md): a sentence on the surface tint, a bordered action, a muted Not now.
+    Neutral: nothing needs you (no amber), nothing was decided (no teal). "Crake is now 0.15.0: 9 changes since
+    0.13.1." says the one number that matters (Underneath's lines don't count: they're not changes you'd notice); when the version you had isn't known (anyone coming from 0.14.0 or
+    earlier, before Crake kept it), just "Crake is now 0.15.0." It doesn't start as the restart notice does ("Crake
+    was updated to 0.15.0. Restart it to finish."), which can come just before it. What's new opens the window; Not
+    now puts it away for good (About has it).</div>
+  <div class="row">
+    <div><div class="lab">Today</div><img class="shot panel-shot" src="whats-new/panel-today.webp" alt="Today's panel, its top"></div>
+    <div><div class="lab">After an update</div><img class="shot panel-shot" src="whats-new/panel-a.webp" alt="Crake is now 0.15.0: 9 changes since 0.13.1. What's new, Not now"></div>
+  </div>
+
+  <div class="cap">2 · The window</div>
+  <div class="sub">Every window's title row (20 px in, the hairline at 56, the same ×), its subtitle the window's
+    span: "Since 0.13.1, the version you had" (opened from About: none). The content 20 px in, under the title.
+    Newest first: each version's number (17, 700) and date (mono, as the changelog writes it), then its changes
+    under small headings (13, 600, muted) in the order New, Better, Changed, Fixed, Underneath (a kind with nothing
+    in it isn't shown); each change a headline (15, 600) and its sentences (14, muted), whole, as CHANGELOG.md has
+    them. Up to three versions in full; "Show earlier versions" opens the rest in place, and goes when nothing is
+    left. Scrolls when long. No teal: nothing here is a decision.</div>
+  <div class="row">
+    <div class="win">
+      <div class="title"><b>What's new</b><span class="s">Since 0.13.1, the version you had</span><span class="x">✕</span></div>
+      <div class="body">
+        <div class="ver"><b>0.15.0</b><span>2026-10-22</span></div>
+        <div class="kind">New</div>
+        <div class="e"><div class="h">What's new, after an update.</div><div class="d">The first time you open the panel after Crake is updated, it says so, and What's new shows what changed since the version you had. Settings → About has it too.</div></div>
+        <div class="kind">Better</div>
+        <div class="e"><div class="h">"Crake X is out" downloads the installer itself on Windows and Mac.</div><div class="d">Its Download button opened the release's page, with a file for every system; it now fetches the one for your computer (the ARM installer on Windows on ARM).</div></div>
+        <div class="kind">Fixed</div>
+        <div class="e"><div class="h">A company site with a public and a private address stays inside, over IPv6 too.</div><div class="d">When your company's DNS gives a public name a private address, Crake sends it through the tunnel; the name's public IPv6 address was still handed out, and an app that tries IPv6 first went to the public site, which turns outsiders away. Now only the private address is given.</div></div>
+        <div class="e"><div class="h">The first connection to a host Crake just learned is no longer cut off.</div><div class="d">If the app tried again at the very moment Crake routed the host, that try could leave the tunnel with your network's own address; where the gateway could answer that address (on the office network), the page started loading and was then reset. Nothing leaves a tunnel with another address now, so the app's next try goes through.</div></div>
+        <div class="sep"></div>
+        <div class="ver"><b>0.14.0</b><span>2026-10-21</span></div>
+        <div class="kind">New</div>
+        <div class="e"><div class="h">IPsec gateways that prove themselves with a certificate.</div><div class="d">New tunnel asks how the gateway proves itself: with a key from your IT team, or with its certificate, as a website does. Crake checks that the certificate is for the gateway, signed by an authority this computer knows or by the one your IT team gave. When no authority here vouches for it, Crake shows you whose it is and who signed it, and asks before trusting it, as it does for AnyConnect gateways. If it changes later, Crake asks again and says so. A certificate made out to another name is never offered to be trusted.</div></div>
+        <div class="e"><div class="h">Sign in to an IPsec gateway with your own certificate.</div><div class="d">New tunnel's step 2 offers "Certificate" and "Certificate and password" beside "Username and password": choose the .p12, .pfx or .pem file your IT team gave you, and Crake keeps a copy in your keyring. Its password is asked as "Unlock your certificate", and remembered when you tick it. A certificate that has run out is said before anything is sent. A certificate the gateway turns down is said as the certificate, not the password.</div></div>
+        <div class="kind">Better</div>
+        <div class="e"><div class="h">A failed sign-in names who said why.</div><div class="d">When an IPsec or OpenVPN tunnel couldn't sign in, the sign-in window put strongSwan's or OpenVPN's words after "openconnect said:". It now names them.</div></div>
+        <div class="kind">Fixed</div>
+        <div class="e"><div class="h">"Remember the password in your keyring" for a certificate's file is kept.</div><div class="d">Ticked when OpenVPN asked for a profile key's password, it was shown but forgotten.</div></div>
+        <div class="e"><div class="h">No AnyConnect groups for an IPsec tunnel.</div><div class="d">Choosing IPsec at a gateway that also answered as AnyConnect showed AnyConnect's sign-in groups, which IPsec doesn't use.</div></div>
+        <div class="more">Show earlier versions</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cap">3 · Settings → About</div>
+  <div class="sub">"What's new" first in About's links, in the small actions' look (ink, semibold, underlined); the
+    only one that opens a window, not the web. It opens at the current version, with "Show earlier versions" below
+    (at the versions since the one you had while the panel's notice is still waiting). Opening it counts as seen.</div>
+  <div class="row">
+    <div><div class="lab">Today</div><img class="shot about-shot" src="whats-new/about-today.webp" alt="Today's About"></div>
+    <div><div class="lab">After</div><img class="shot about-shot" src="whats-new/about-after.webp" alt="After: What's new · Source on GitHub · dorhawk.software"></div>
+  </div>
+
+  <div class="cap">4 · The changelog, from now on</div>
+  <div class="sub">Each release's changes under the window's kinds; the entries as today (a bold headline, the rest
+    after it). <b>New</b>: something you couldn't do before. <b>Better</b>: something that works better than it did.
+    <b>Changed</b>: something that works differently, or is gone. <b>Fixed</b>: something that was wrong, a
+    dependency's security fix included. <b>Underneath</b>: what Crake is built on, updated (the dependency lines).
+    release.sh refuses an empty release, as now, and a change outside a kind. A release with nothing but Underneath
+    doesn't raise the panel's notice (About still lists it). The releases from 0.10.0 are sorted into kinds by hand,
+    in the same commit; 0.1.0 to 0.9.x stay as they were written, shown as "Changes" under "Show earlier versions".
+    The GitHub release's text keeps the kinds, and its "Which file?" table moves under a rule.</div>
+  <div class="row">
+    <div><div class="lab">Today</div><pre class="md"><span class="h">## 0.14.0 (2026-10-21)</span>
+
+- **IPsec gateways that prove themselves with a
+  certificate.** New tunnel asks how the gateway
+  proves itself: …
+- **No AnyConnect groups for an IPsec tunnel.**
+  Choosing IPsec at a gateway that …</pre></div>
+    <div><div class="lab">After</div><pre class="md"><span class="h">## 0.14.0 (2026-10-21)</span>
+
+<span class="h">### New</span>
+
+- **IPsec gateways that prove themselves with a
+  certificate.** New tunnel asks how the gateway
+  proves itself: …
+
+<span class="h">### Fixed</span>
+
+- **No AnyConnect groups for an IPsec tunnel.**
+  Choosing IPsec at a gateway that …</pre></div>
+  </div>
+
+  <div class="q"><b>How it behaves</b> (from the behaviour review)
+    <ul>
+      <li><b>Fresh install or update:</b> no app.json yet is a fresh install: Crake keeps its version and says
+        nothing. app.json without a version seen (everyone coming from 0.14.0 or earlier) is an update from before
+        Crake kept it: "Crake is now 0.15.0." and the current version alone. The version seen is a field of its own
+        in app.json.</li>
+      <li><b>One version notice at a time:</b> Restart first (a package updated craked), then "X is out", then this
+        one, which waits until it's shown.</li>
+      <li><b>A version back</b> (a downgrade): nothing said; the highest version seen is kept.</li>
+      <li><b>Built in:</b> CHANGELOG.md is read when Crake is built (the Nix package's file set gets it), and a test
+        reads the whole file: a section for this version (or Unreleased in a development build), known kinds only,
+        the entries as written (wrapped lines, code, blank lines between entries).</li>
+      <li><b>Keyboard:</b> the window takes focus when it opens; Escape closes it; the arrow keys and Page Up/Down
+        scroll; "Show earlier versions" is reached with Tab. GPUI gives screen readers nothing yet, so none of this
+        is promised to them.</li>
+      <li><b>Tests:</b> the rules above as unit tests; window tests (since the version seen, the three-version cap,
+        Show earlier versions, Escape, Not now keeping the version); a journey step (an older version seen, the
+        panel's notice, What's new, the window, About's link); and CRAKE_DEMO=whatsnew.</li>
+    </ul></div>
+
+  <div class="q"><b>Not in this proposal, on purpose.</b> No notification at login (the panel is where Crake talks),
+    no badge on the tray's bird (its marks say what the tunnels do), no window that opens by itself, and nothing
+    fetched from the web: the list is the installed version's own.</div>
+
+  <div class="aside sub"><b>Set aside in round one.</b> A link in the panel's header ("What's new in 0.15.0" beside
+    "Listening"): the header carries only status, and the link had no dismissal. A word before each change in a mono
+    badge ("New", "Fixed"): an icon per kind in another form, which "quieter" turned down, and mono is for machine
+    facts.</div>
+</div>
+</body>
+</html>

@@ -220,7 +220,7 @@ fn refresh_browsers(cx: &mut App) {
 /// activate it, so a window it opens would land behind the app in front.
 /// Make Crake the active app first, as menu bar apps do. (GPUI's
 /// `activate_window` only orders the window front.)
-fn to_front(cx: &mut App) {
+pub(super) fn to_front(cx: &mut App) {
     cx.global_mut::<Shell>().activations += 1;
     if cfg!(target_os = "macos") {
         cx.activate(true);

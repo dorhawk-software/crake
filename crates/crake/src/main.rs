@@ -83,6 +83,7 @@ mod tray;
 mod units;
 
 mod versions;
+mod whats_new;
 
 /// CRAKE_DEMO=arrive: a decision this often, for hosts 1 to LAST_HOST.
 const ARRIVE_EVERY: Duration = Duration::from_secs(8);
@@ -237,6 +238,10 @@ pub enum Request {
     Restart,
     /// Open a page in the browser (a new version's download page).
     OpenUrl(String),
+    /// Open What's new (from the panel's notice or About), this version seen.
+    WhatsNew,
+    /// The panel's What's new notice: Not now (this version seen).
+    SeenVersion,
     /// OpenVPN: the user's answer to question `id` of a tunnel's sign-in.
     Answer(String, u32, String),
     Quit,
@@ -415,6 +420,7 @@ fn main() {
                 },
                 Err(_) => prefs::Prefs::load(),
             });
+            whats_new::first_start(cx.global_mut::<prefs::Prefs>());
 
             // CRAKE_DEMO=1: the design's sample, no craked needed.
             let demo = std::env::var_os("CRAKE_DEMO").is_some();
@@ -493,6 +499,10 @@ fn main() {
             // with a report just saved (its row under the title).
             if std::env::var("CRAKE_SHOW").is_ok_and(|v| v == "log") {
                 open_log(cx);
+            }
+            // CRAKE_SHOW=whatsnew (development): What's new since the version seen.
+            if std::env::var("CRAKE_SHOW").is_ok_and(|v| v == "whatsnew") {
+                whats_new::open(cx.global::<prefs::Prefs>().seen_version.clone(), cx);
             }
             // CRAKE_SHOW=traffic (development): open the Traffic window.
             if std::env::var("CRAKE_SHOW").is_ok_and(|v| v == "traffic") {

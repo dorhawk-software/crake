@@ -157,6 +157,9 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
     // 3. Settings: Learning's wait, changed in craked and shown back.
     settings_wait(cx);
 
+    // 3b. What's new: after an update, from the panel's notice and About.
+    whats_new(cx);
+
     // 4. Tunnel detail: "Add a host" sends one through ACME.
     request(cx, Request::OpenDetail("acme".into()));
     let (d, view) = wait_window::<tunnel_detail::TunnelDetail>(cx, "tunnel detail opens");
@@ -308,6 +311,35 @@ fn the_log(cx: &mut TestAppContext) {
         "{report}"
     );
     assert!(report.contains("\n  ACME's names: "), "{report}");
+}
+
+/// What's new (design/proposals/whats-new.html): updated from 0.13.1, the
+/// panel says so and its What's new opens the window, this version seen;
+/// About's link opens it again, and Close closes it.
+fn whats_new(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        let prefs = cx.global_mut::<crate::prefs::Prefs>();
+        prefs.seen_version = Some("0.13.1".into());
+        prefs.existed = true;
+    });
+    let p = panel(cx);
+    click(cx, p, "What's new");
+    let (w, _) = wait_window::<crate::whats_new::WhatsNew>(cx, "What's new opens");
+    let seen = cx.read(|cx| cx.global::<crate::prefs::Prefs>().seen_version.clone());
+    assert_eq!(seen.as_deref(), Some(crate::versions::this()));
+    click(cx, w, "close");
+    until(cx, "What's new closed", Duration::from_secs(10), |cx| {
+        window::<crate::whats_new::WhatsNew>(cx).is_none()
+    });
+    request(cx, Request::Settings);
+    let (s, _) = wait_window::<settings_view::Settings>(cx, "Settings opens");
+    click(cx, s, ("section", 7usize));
+    click(cx, s, "whats-new");
+    let (w, _) = wait_window::<crate::whats_new::WhatsNew>(cx, "About opens it");
+    click(cx, w, "close");
+    until(cx, "closed again", Duration::from_secs(10), |cx| {
+        window::<crate::whats_new::WhatsNew>(cx).is_none()
+    });
 }
 
 /// Settings: Learning's wait, changed in craked and shown back.

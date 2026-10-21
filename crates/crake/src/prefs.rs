@@ -47,9 +47,15 @@ pub struct Prefs {
     /// What it said: the newest version then.
     #[serde(default)]
     pub newest_version: Option<String>,
+    /// The highest version whose What's new was seen (`whats_new`).
+    #[serde(default)]
+    pub seen_version: Option<String>,
     /// Not written (demo mode): nothing real is remembered.
     #[serde(skip)]
     pub scratch: bool,
+    /// app.json was there when Crake started (none: a fresh install).
+    #[serde(skip)]
+    pub existed: bool,
 }
 
 impl gpui_kit::Global for Prefs {}
@@ -69,7 +75,9 @@ impl Default for Prefs {
             check_versions: true,
             versions_checked_at: 0,
             newest_version: None,
+            seen_version: None,
             scratch: false,
+            existed: false,
         }
     }
 }
@@ -93,10 +101,14 @@ fn path() -> Option<PathBuf> {
 
 impl Prefs {
     pub fn load() -> Self {
-        path()
-            .and_then(|p| std::fs::read(p).ok())
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default()
+        let read = path().and_then(|p| std::fs::read(p).ok());
+        let existed = read.is_some();
+        Self {
+            existed,
+            ..read
+                .and_then(|b| serde_json::from_slice(&b).ok())
+                .unwrap_or_default()
+        }
     }
 
     pub fn save(&self) {
