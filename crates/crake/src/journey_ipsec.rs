@@ -177,6 +177,20 @@ fn an_ipsec_tunnel_added_and_signed_in(cx: &mut TestAppContext) {
 /// (scripts/e2e/ipsec-cert.conf).
 const CERT_GATEWAY: &str = "198.51.100.11";
 
+/// The e2e image's gateway with certificates is here: its authority is in
+/// the shared folder (scripts/e2e/start.sh). The package tests' gateways
+/// (scripts/deb-test/gateway.sh) have only the key's connection: said,
+/// not passed quietly.
+fn certificate_gateway_here() -> bool {
+    let here = std::path::Path::new("/mnt/link/ipsec-ca.pem").exists();
+    if !here {
+        eprintln!(
+            "not here: no IPsec gateway with a certificate (only scripts/e2e-test.sh has one)"
+        );
+    }
+    here
+}
+
 /// A gateway with a certificate no authority here vouches for
 /// (design/proposals/ipsec-certificates.html): New tunnel's "Its
 /// certificate", no key; switched on, the password, then the trust
@@ -184,7 +198,7 @@ const CERT_GATEWAY: &str = "198.51.100.11";
 /// signed it; trusted, it connects.
 #[gpui_kit::test]
 fn an_ipsec_gateway_with_a_certificate_trusted_in_the_sign_in_window(cx: &mut TestAppContext) {
-    if !enabled() || std::env::var_os("CRAKE_E2E_IPSEC").is_none() {
+    if !enabled() || std::env::var_os("CRAKE_E2E_IPSEC").is_none() || !certificate_gateway_here() {
         return;
     }
     let dir = tempfile::tempdir().unwrap();
@@ -271,7 +285,7 @@ fn an_ipsec_gateway_with_a_certificate_trusted_in_the_sign_in_window(cx: &mut Te
 /// the gateway.
 #[gpui_kit::test]
 fn an_ipsec_tunnel_with_the_users_own_certificate(cx: &mut TestAppContext) {
-    if !enabled() || std::env::var_os("CRAKE_E2E_IPSEC").is_none() {
+    if !enabled() || std::env::var_os("CRAKE_E2E_IPSEC").is_none() || !certificate_gateway_here() {
         return;
     }
     let dir = tempfile::tempdir().unwrap();

@@ -342,6 +342,10 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   crake-acme. The gateway VM now keeps dhcpcd off vpns* (test.nix). If
   it comes back after that, the cause is elsewhere: the gateway's side
   (ocserv's routes to the client right after connect) is next to look at.
+  **Came back on 2026-10-21** (run 39547770257, NixOS, step 2's GET of
+  10.40.1.10: "Connection reset by peer" 4 s in, while the gateway VM's
+  charon had just logged an address appearing on vpns0): so the cause is
+  elsewhere, as said; next is the gateway's side right after connect.
 - **All unsafe code behind one safe layer (asked for by the user,
   2026-10-14). Done 2026-10-19.** `crates/crake-os` holds every unsafe
   call Crake makes, each behind a safe function whose contract the crate
