@@ -1351,7 +1351,14 @@
    `nothing_is_routed_up_front` checks both of the e2e gateway's).
    Not yet: certificates (the gateway's or the user's; proposed
    2026-10-21 in design/proposals/ipsec-certificates.html, A and A
-   chosen by the user; first a spike on reading the gateway's certificate),
+   chosen by the user; the spike, scripts/spikes/ipsec-certificate, proved
+   the same day that an untrusted gateway's certificate can be read out of
+   charon's "enc 3" dump byte for byte, fragments included, and that a
+   pinned copy is trusted alone and strictly; a gateway sends it only when
+   asked, so the system's authorities are always loaded; a wrong
+   `remote.id` gets none, so the first attempt names no gateway; the dump
+   holds the user's own EAP messages and `reload-settings` switches it
+   off: details in the proposal's section 5),
    the FortiGate by
    hand.
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or

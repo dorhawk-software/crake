@@ -161,8 +161,9 @@
       <li><b>Step 2, your certificate and a password:</b> a third card, “Certificate and password” (A, recommended), or a
         tick under “Certificate” (B) (2).</li>
     </ol>
-    <b>To prove before building:</b> strongSwan doesn't hand over the certificate of a gateway it doesn't trust. Crake needs
-    it for the trust question, and also to tell a wrong name from an unknown authority (5).</div>
+    <b>Proven first (2026-10-21):</b> strongSwan doesn't hand over the certificate of a gateway it doesn't trust, which Crake
+    needs for the trust question and to tell a wrong name from an unknown authority. A spike read it out of strongSwan's
+    decryption dump, byte for byte, and a pinned copy let the tunnel up (5).</div>
 
   <!-- 1 · Step 1 -->
   <h2 class="sec">1 · Step 1: how the gateway proves itself</h2>
@@ -498,23 +499,36 @@
   <!-- 5 · Build notes -->
   <h2 class="sec">5 · What has to be proven first, and how it's built</h2>
   <div class="build">
-    <h3>To prove first (a short spike, before any UI)</h3>
+    <h3>Proven by the spike (2026-10-21, scripts/spikes/ipsec-certificate)</h3>
     <ul>
-      <li><b>The gateway's certificate.</b> strongSwan checks the certificate against the authorities it has and logs only
-        its name (“received end entity cert "CN=gw.nordbank.example"”), never the certificate itself. Its most detailed
-        decryption log level dumps the gateway's decrypted replies, which carry it. So craked would read the certificate out
-        of that dump. The trust question, the wrong-name failure (telling a wrong name from an unknown authority needs the
-        names in the certificate) and the “changed” variant all depend on this. On “Trust it”, craked loads that one certificate
-        as trusted for this connection alone. To prove: that the dump is whole (IKE fragments and long certificates
-        included), and that a pinned certificate is trusted without its authority.</li>
-      <li><b>The dump holds secrets too.</b> At that level strongSwan also dumps your own sign-in: the EAP identity and, with
-        a password, a response that can be cracked. So the dump goes to craked's memory only, through VICI's log stream,
-        and only for the gateway's first reply. It never reaches the journal, Crake's log, reports or Copy for
-        helpdesk.</li>
-      <li><b>If the spike fails:</b> there's no question, and no telling a wrong name from an unknown authority. Both end in
-        today's failure shape: “Crake can't vouch for Nordbank's gateway. Ask your IT team for its certificate
-        authority, or whether its name is right.”, with <span class="act-inline">Choose IT's certificate authority…</span>, which opens Edit at step 1. The
-        rest of this proposal stands as drawn.</li>
+      <li><b>The gateway's certificate comes out whole.</b> strongSwan logs only the certificate's name (“received end
+        entity cert "CN=vpn.acme.example"”), but its decryption dump (“enc 3”) carries the gateway's decrypted reply. The
+        certificate read from it was the gateway's byte for byte: a 4096-bit RSA certificate, in two fragments and in five.</li>
+      <li><b>A pinned certificate lets the tunnel up without its authority, and only that key.</b> With the certificate
+        loaded as one strongSwan trusts (its <code>x509/</code>), the tunnel came up with no authority known. A different key
+        under the same name was refused. strongSwan matches the pin by its public key, so the pin is the key, as AnyConnect's
+        <code>pin-sha256</code> is.</li>
+      <li><b>The gateway sends its certificate only when asked.</b> A client that knows no authority asks for no certificate,
+        and the spike's gateway (strongSwan's default, “if asked”) then sent none. So craked always loads the system's
+        authorities, which makes strongSwan ask.</li>
+      <li><b>A wrong name gets no certificate.</b> When the client names the gateway (<code>remote.id</code>) and the
+        gateway isn't that one, the gateway refuses before sending its certificate. So the first attempt at an untrusted
+        gateway doesn't name it (<code>%any</code>). Crake reads the certificate's names itself, checks the name before it
+        asks you, and only then connects naming the gateway, with the pin.</li>
+      <li><b>The dump holds secrets, and can be switched off.</b> It holds your own messages too: the username was in it, and
+        so was the outgoing EAP. The password wasn't, but a password's MSCHAPv2 response can be cracked. strongSwan's
+        <code>reload-settings</code> turned the dump off with charon running: after it, there were no dumps. So the dump is on
+        only for an attempt that has to read the certificate, it's written where only craked reads it (a root-only file in
+        craked's own <code>/run</code>, or VICI's log stream, not yet tried), and it's turned off and deleted once read. It
+        never reaches the journal, Crake's log, reports or Copy for helpdesk.</li>
+    </ul>
+    <ul>
+      <li><b>Not yet tried:</b> a FortiGate's and a Windows server's replies (whether they need asking too),
+        ECDSA certificates, and a gateway that sends its authority's certificate along.</li>
+      <li><b>If a real gateway defeats this:</b> there's no question, and no telling a wrong name from an unknown authority.
+        Both end in today's failure shape: “Crake can't vouch for Nordbank's gateway. Ask your IT team for its certificate
+        authority, or whether its name is right.”, with <span class="act-inline">Choose IT's certificate authority…</span>,
+        which opens Edit at step 1. The rest of this proposal stands as drawn.</li>
       <li><b>Your certificate, in IKE or over EAP.</b> Some gateways take your certificate in IKE itself, others over
         EAP-TLS, and nothing tells which before you try. craked tries IKE first, then EAP-TLS when the gateway refuses it,
         and remembers what worked. To prove against strongSwan and a FortiGate.</li>

@@ -1,0 +1,15 @@
+The spike behind design/proposals/ipsec-certificates.html, 5 (2026-10-21):
+can craked read the certificate of an IPsec gateway that strongSwan doesn't
+trust out of charon's decryption dump ("enc 3"), and does a pinned copy let
+the tunnel up? Two charons in network namespaces in the e2e gateway image,
+no network:
+
+  docker run --rm --network none --cap-add NET_ADMIN --cap-add SYS_ADMIN \
+    --security-opt apparmor=unconfined -v "$PWD/scripts/spikes/ipsec-certificate:/spike" \
+    --entrypoint sh crake-e2e-gateway /spike/run.sh        # FRAG=576 for five fragments
+
+It runs a copy of charon (/usr/local/bin/charon-spike): unconfined, the
+container's /usr/lib/ipsec/charon is confined by the host's AppArmor
+profile for charon, which can't read this folder ("abort initialization
+due to invalid configuration"). The results are in the proposal and in
+docs/engineering/milestones.md (7k). Its work/ folder is left behind.
