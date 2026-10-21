@@ -21,7 +21,7 @@ until ip -4 addr show lan 2>/dev/null | grep -q 198.51.100.10; do sleep 0.1; don
 # (ipsec-cert.conf).
 ip addr add 198.51.100.11/24 dev lan
 # The local network has IPv6 too, as most do (an IPv6 address is reached
-# by mark only where the system has some route for it: CLAUDE.md, Not now).
+# by mark only where the system has some route for it: docs/engineering/not-now.md).
 ip -6 addr add 2001:db8:1::10/64 dev lan nodad
 # The companies' networks, which only a tunnel reaches.
 sh /companies.sh lan

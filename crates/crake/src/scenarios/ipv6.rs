@@ -18,7 +18,7 @@ const V6_NAME: &str = "v6.acme.internal";
 /// runs out, the next goes through).
 pub(crate) async fn an_ipv6_host_is_learned_by_probing(up: &mut Up) {
     // An app's IPv6 connection on a network without IPv6 fails at once,
-    // with no packet to probe from (CLAUDE.md, Not now).
+    // with no packet to probe from (docs/engineering/not-now.md).
     if !platform::network_has_ipv6() {
         super::not_here("this network has no IPv6 of its own: an app's first try sends nothing");
         return;
@@ -51,7 +51,7 @@ pub(crate) async fn an_ipv6_host_is_learned_by_probing(up: &mut Up) {
 /// routed before the app's first packet.
 pub(crate) async fn an_ipv6_name_is_routed_before_its_first_packet(up: &mut Up) {
     // macOS doesn't ask for IPv6 addresses at all on a network without
-    // IPv6 of its own (CLAUDE.md, Not now).
+    // IPv6 of its own (docs/engineering/not-now.md).
     if platform::NAMES_NEED_NETWORK_IPV6 && !platform::network_has_ipv6() {
         super::not_here(
             "this network has no IPv6 of its own, so the system asks no IPv6 addresses",

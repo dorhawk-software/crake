@@ -1,6 +1,6 @@
 [package]
 name = "crake-os"
-description = "Every unsafe call Crake makes, behind safe functions (CLAUDE.md, Not now: the unsafe layer)"
+description = "Every unsafe call Crake makes, behind safe functions (docs/engineering/not-now.md: the unsafe layer)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

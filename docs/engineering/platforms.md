@@ -408,3 +408,33 @@ The installer now uses NSIS Modern UI 2 (`packaging/windows/crake.nsi`,
 done 2026-10-12): welcome page, Crake's icon, a finish page that can open
 Crake; it was the classic 90s wizard before.
 
+## Someday: other platforms
+
+Moved here from CLAUDE.md on 2026-10-21 (the user's rule on keeping CLAUDE.md small: detail lives in the documentation it belongs to; CLAUDE.md keeps the rule and a pointer). Nothing was dropped in the move; add to this file from now on.
+
+Wanted one day, not planned yet. Keep the split that makes it possible:
+decisions (host store, expiry, policy, log, probing logic) stay portable;
+everything that touches the OS stays behind small modules (`net`, `routing`,
+DNS, tray) that can get a per-OS implementation.
+
+- **Other Linux distributions:** mostly as is. Watch strict reverse-path
+  filtering (`rp_filter=1`, e.g. Fedora/RHEL): replies from routed hosts
+  arrive on the tunnel while the unmarked route points elsewhere, so they'd
+  be dropped. Ubuntu uses loose mode (2). **Fixed:** craked sets loose
+  mode on each tunnel's own interface when it comes up, over netlink
+  (RTM_SETLINK; works where /proc/sys is read-only); the kernel takes the
+  looser of `all` and the interface. The netns tests run with rp_filter=1
+  everywhere and fail without it. Debian 12/13: tested, same .deb. Needs openconnect, nftables,
+  iproute2, systemd, D-Bus and polkit. DNS learning assumes systemd-resolved;
+  distros without it need a fallback. GNOME needs the AppIndicator extension
+  for the tray; KDE has it built in. Packaging: .deb first, then .rpm / AUR.
+- **Windows:** openconnect has Windows builds (Wintun). Routing would be
+  per-host routes on the tunnel interface (IP Helper API) instead of fwmark;
+  per-domain DNS via the Name Resolution Policy Table; the daemon becomes a
+  Windows service, the tray uses the notification area. Testable in a VM.
+- **macOS:** openconnect runs there (utun). Per-host routes via the routing
+  socket, per-domain DNS via `/etc/resolver/<domain>`, a privileged launchd
+  helper, a menu bar item. Needs Apple code signing and notarization, and real
+  testing needs a Mac (macOS VMs are only allowed on Apple hardware).
+- Per-host routes are the common denominator. Crake already keeps expiry in
+  its own store, not only in nftables timeouts, so that part ports.

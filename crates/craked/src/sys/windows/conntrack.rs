@@ -158,7 +158,7 @@ static COUNTING: std::sync::Mutex<Option<(std::time::Instant, std::collections::
 /// window. Windows counts a connection's bytes once its extended
 /// statistics are on, so each is switched on when first seen here (it
 /// counts from then: an older one starts at 0). UDP isn't listed: Windows'
-/// UDP table has no other end (CLAUDE.md, Not now).
+/// UDP table has no other end (docs/engineering/not-now.md).
 pub fn open_connections() -> Option<Vec<(Flow, u64)>> {
     let now = match table() {
         Ok(t) => t,

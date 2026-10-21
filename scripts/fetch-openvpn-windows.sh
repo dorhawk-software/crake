@@ -19,7 +19,7 @@ case "$ARCH" in
     LIB=x64
     OUT=$PWD/target/windows/openvpn ;;
   arm64)
-    # Windows on ARM64 (CLAUDE.md, Not now): the same release, its ARM64 MSI.
+    # Windows on ARM64 (docs/engineering/not-now.md): the same release, its ARM64 MSI.
     MSI=OpenVPN-2.7.8-I001-arm64.msi
     MSI_SHA256=6fc0e8899cc5275ee297fb837bc84aa2bc49f8ef96d7ad93ee3fee1e7163a25c
     LIB=arm64

@@ -238,358 +238,57 @@ short:
    7k IPsec (IKEv2) with strongSwan, Linux.
 8. Someday: other platforms (Windows and macOS are built: below).
 
-## A newer Crake (built 2026-10-14; design/proposals/new-version.html)
+## A newer Crake
 
-`versions.rs`. (1) craked's D-Bus `Version` is newer than the app (a
-package updated it; the app reads it when it connects, and on the system
-bus it watches craked's name change owner (`client::owner_changes`) and
-reads everything again: until 2026-10-15 a craked restarted by the
-package went unnoticed, since the bus connection stays up, and the notice
-never came; the tests' private socket drops, so they hadn't seen it):
-the panel says "Crake was updated to X. Restart it to
-finish."; Restart starts the new binary (Linux: the path without
-" (deleted)") with `CRAKE_RESTARTING`, which waits up to 10 s for the old
-one's single-instance socket or pipe to go (`single::taken`), and quits.
-(2) Where nothing else updates Crake (`updated_elsewhere`: not the
-dorhawk apt/dnf repository, pacman, the Nix store, Homebrew's cask),
-once a day (looked at hourly, the time in app.json) the app asks
-https://packages.dorhawk.software/versions.json with the system's curl and
-says "Crake X is out. You have Y." with Download (the release page) and
-Not now (`version:X`, so the next version is said again). On by default
-(decided by the user: "automatic updates are amazing"); Settings → General
-"Tell me when there's a new version" switches it off and is only shown
-where it applies.
+`versions.rs`: "Crake was updated to X. Restart it to finish." when a
+package updated craked (Restart starts the new binary), "Crake X is out."
+where nothing else updates Crake (once a day, versions.json; Settings →
+General switches it off), then What's new once updated (`whats_new/`).
+Detail: **docs/engineering/releases.md**.
 
 ## Not now (written down to come back to)
 
 **The rule (the user, 2026-10-14): whatever we decide not to do right now
-is written down, here or next to the code it concerns, in the same
-commit.** A doc comment on a stub isn't enough; prefer code that fails
-loudly over a silent stub. Done items leave this list. Others are
-recorded where they belong: the WFP driver and OpenVPN on Windows
-(Other platforms), Windows code signing, bundling openconnect on macOS,
-"Start at login" on macOS (Releases), distros without systemd-resolved,
-the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
+is written down, in docs/engineering/not-now.md or next to the code it
+concerns, in the same commit.** A doc comment on a stub isn't enough;
+prefer code that fails loudly over a silent stub. Done items leave the
+list. Each item's history and detail: **docs/engineering/not-now.md**; in
+one line each:
 
-- **Zed upstream, GPUI change 3 (Xft.dpi at runtime; 2026-10-14).** The
-  branch is ready (github.com/ondrej-simon/zed, `x11-follow-xft-dpi`, one
-  commit); the user files the issue and opens the PR in their own words
-  (Zed's AI policy: no agent-written PRs or descriptions). Related, not a
-  duplicate: zed-industries/zed#21851. See CRAKE-PATCH.md.
-- **Two sign-in tabs, and sessions stopped before sign-in (2026-10-14).**
-  Likely openvpn3-indicator, which acted on every session (Ready,
-  Connect, the sign-in page): the user removed it the same day, and a
-  session Crake 0.6.1 started then stayed up when the app quit (the
-  morning's "quitting ends the session" was probably the indicator too;
-  7g's note that sessions outlive the app holds). Left here until a
-  web sign-in without the indicator shows one tab and no early stop.
-  Signing in to an OpenVPN 3 web sign-in profile often opens two browser
-  tabs; probably Crake and openvpn3-indicator each opening the same
-  session's page (7g). One morning four sessions in a row were stopped
-  5 to 50 s after starting, before the sign-in finished, so the browser
-  said "login success" with no session left to take it; the logs don't
-  say who stopped them. To do with the user: watch one sign-in live
-  (sessions, their sign-in pages, who calls Disconnect), and try once
-  with openvpn3-indicator quit. If the indicator opens the page too,
-  Crake could leave it to the indicator while it runs.
-- **openvpn3 leaves a session's process running (2026-10-14/15, v27.1).**
-  Cause found: openvpn3's session manager gives a new session's process
-  5 s to answer Connect; when two front-ends told the same new session to
-  connect at once (Crake and openvpn3-indicator, which acts on every
-  session), the call ran out ("Async call failed … Connect … Timeout was
-  reached" in the journal), openvpn3 later stopped and dropped the
-  session, and the process (openvpn3-service-client, user `_openvpn`)
-  kept running: invisible to `sessions-list`, reconnecting on its own for
-  days, each reconnect rewriting the other tunnels' DNS ("~." and the
-  default route). Of 25 sessions in two days, exactly the two with that
-  timeout were left over; none since the indicator was removed. Built
-  (2026-10-15): Crake doesn't send Connect to a session already under way
-  (`ovpn3/connect.rs`), waits out the timeout instead of giving up, and
-  ends a session it started whenever it can't follow it; the app notices a
-  process it saw belong to one of the user's sessions running a minute
-  after its session went (`ovpn3/leftover.rs`) and craked logs it with
-  `sudo kill -9 <pid>` (D-Bus `LeftRunning`, a notification too), and the
-  panel shows it until the process ends or "Got it"
-  (design/proposals/leftover-openvpn3.html, A2: the command with Copy and
-  Got it on its line; leftover-warning.html, 3: tinted amber, the bird's
-  head with an amber triangle, also on the tray's head, where a red trouble
-  badge wins; `panel/leftover.rs`, `tray::Badge`; `CRAKE_DEMO=leftover`).
-  Crake doesn't end the process itself (the user: not Crake's to kill;
-  craked could, with an AppArmor rule to signal outside its profile). Not now: a
-  process left from before the app started isn't recognised (telling it
-  from another user's session needs root: craked can't see the user's
-  sessions, the app can't see others'); worth reporting to OpenVPN (a
-  Connect that times out shouldn't orphan the process).
-- **macOS: what CI can't check of craked registered by the app.** The
-  user's approval (no runner can click it), so craked under launchd from
-  Crake.app, and an upgrade's restart of a registered craked
-  (`launchctl kickstart -k`, the tunnels handed over) are tried on a real
-  Mac only: the colleague's, first with 0.7.
-- **All unsafe code behind one safe layer (asked for by the user,
-  2026-10-14). Done 2026-10-19.** `crates/crake-os` holds every unsafe
-  call Crake makes, each behind a safe function whose contract the crate
-  keeps itself, with its `// SAFETY:` reasoning: Unix and Linux
-  (getifaddrs, interface names and indexes, signals, socket options,
-  netlink sockets, tun devices for tests, tokio's `AsyncFd::register` only
-  for `OwnsFd` types, WAYLAND_DISPLAY unset only while /proc says the app
-  has one thread), macOS (sysctl, link counters, CoreFoundation's arrays,
-  dictionaries and run loop, utun devices for tests; with `app`,
-  SMAppService and the displays), Windows (IP Helper, adapters, interface
-  counters, the TCP tables and their statistics, the registry, Credential
-  Manager, the service manager, console events and sessions; with `app`,
-  monitors, window placement and frames by the handle's value). crake,
-  craked, crake-hook, crake-proto and lint-literals `#![forbid(unsafe_code)]`;
-  `scripts/check-unsafe.sh` (lint gate) fails on `unsafe` anywhere else,
-  tests included (they no longer set the environment: fake scripts get
-  their paths written in). Not yet: unit tests of crake-os's Windows and
-  macOS parts on their CI runners beyond what the journeys exercise.
-- **Small screens (audit 2026-10-19, the user's question; fixed then:
-  Settings capped to its screen, the panel's middle scrolls with its
-  header and footer fixed, the sign-in card stops at its screen's bottom
-  and scrolls, New tunnel's dropdowns scroll; `panel::tests::
-  many_tunnels_keep_the_panel_on_its_screen`).** Not yet: tunnel detail
-  builds every host row at once and puts "Add a host" after them (fine
-  on screen, slow and far down with hundreds of hosts: `uniform_list`,
-  and "Add a host" above the list, a design question); no window but the
-  profile editor can be resized (`is_resizable: false`); the room left
-  for bars is a fixed 120 px off the primary monitor, not the work area
-  of the monitor the window opens on (X11's work area was unreliable
-  across monitors, place.rs); Traffic and the profile editor open as
-  tall as a big screen allows (`max_window_height_or` ignores its
-  fallback when a monitor is known); the panel's scrolling middle shows
-  no sign it scrolls but its cut-off last row.
-- **Display scale changes on Windows and macOS: not tried.** GPUI follows
-  them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
-  lists are logical; no one has docked a running Crake to a monitor with
-  another scale on either.
-- **winget for Windows.** The in-app "Crake X is out" notice is built
-  (`versions.rs`); Windows users would rather be updated by winget, like
-  Homebrew's cask on a Mac. Then `versions::updated_elsewhere` should
-  know a winget install.
-- **Undo in macOS notifications.** notify-rust has no actions there, so
-  "Use Nordbank" / Undo exist only in the panel on a Mac.
-- **OpenVPN 3 sessions whose device openvpn3 doesn't name, under the
-  package (2026-10-15).** craked finds such a device from the session's
-  process (`/proc/<pid>/fdinfo`), which the packaged service can't read
-  (openvpn3 runs as `_openvpn`; no CAP_SYS_PTRACE, and AppArmor would need
-  a rule). Seen only with an Azure gateway's profile, which the user's
-  company is dropping. Options if it matters: the capability and an
-  AppArmor rule (a wide permission for one case), or matching the
-  session's address to a tun device's.
-- **A shared practices repository for dorhawk.software (the user's idea,
-  2026-10-16; written down so it isn't lost, to do once Crake is stable).**
-  What the user has in mind, in their words' spirit: Crake grew a lot of
-  hard-won engineering practice (lints as hard errors, a magic-number lint,
-  file and function size limits, coverage floors that only rise, a journey
-  regression suite on every supported system, tests that never touch the
-  developer's machine, split and cached CI, pruned caches, two-layer Nix
-  dependency builds, release scripts that refuse an empty changelog, a
-  hand-written changelog in the product's voice, design proposals before UI
-  changes, "write down what we don't do now", nice'd builds, never
-  `nix path:` on a repo with target/...). That knowledge should outlive
-  Crake and help the sibling apps: tern (a Rust/GPUI mail client, on hold
-  until Crake is stable) and Obálka (TypeScript, React Native, which has
-  tried good patterns of its own). The plan:
-  1. A new **public** repository under dorhawk-software describing the
-     practices: each one with what it is, why it's worth it (the incident
-     or cost that taught it, e.g. the 328 GB disk fill, the cache
-     evictions), how to apply it, and how to check it's applied.
-     Actionable, not essays.
-  2. **Structure: common plus per language.** Practices that hold anywhere
-     (changelog discipline, deferrals written down, design proposals,
-     release gates, CI caching ideas, privacy rules for public repos) in a
-     common part; Rust specifics (clippy deny, lint-literals, cargo deny,
-     machete, llvm-cov floors, GPUI patterns) and TypeScript/React Native
-     specifics (from Obálka) in their own parts, with room for more.
-  3. **Central management:** project repositories register with it (or
-     hook into it), and when the practices change, the change reaches every
-     registered project (e.g. a workflow opening a pull request there), so
-     the practices are available to future agents in each repository as
-     skills, CLAUDE.md sections and checks, not just as a document.
-  4. **Usable beyond dorhawk.software:** any repository could adopt it as
-     its baseline, like a runbook of what was learned. How the hook works
-     (a template, a GitHub Action, a CLI, a skills package) is to be
-     designed when we start; this note is the reminder of the intent.
-- **IPv6 hosts on a network without IPv6 (Linux; found 2026-10-20 by
-  the scenario suite).** Crake routes by mark, after the system's own
-  route lookup; on a network with no IPv6 route at all (much office
-  Wi-Fi), an app's connection to an IPv6 address fails at once
-  ("Network is unreachable"), so an IPv6-only internal host (a name with
-  only an AAAA record) can't be reached through a tunnel there, and
-  there's no packet to probe from. macOS' scoped default route has the
-  same effect, and macOS' resolver asks no AAAA at all there (CI's Mac:
-  an IPv6-only name came back empty); Windows' tunnel default route
-  (metric 9000) is taken by all IPv6 there instead. Fixing it on Linux means a main-table route of
-  Crake's (e.g. IPv6 default via the tunnel, unmarked packets refused),
-  which goes against "no routes but the DNS's". **Decided with the user
-  (2026-10-20): left as it is** (IPv6-only internal hosts are rare;
-  dual-stack names work). If a real gateway shows one: a lowest-priority
-  IPv6 default route into the tunnel only while the network has no IPv6
-  of its own, with anything unmarked refused at once. The e2e network has
-  IPv6 (as most do); the probe scenario says `not_here` where the
-  runner's network has none.
-- **Windows on ARM64 (planned with the user, 2026-10-20).** The user's
-  coming Apple Silicon Mac runs Windows 11 for ARM in a VM, which runs
-  x64 programs emulated but never x64 drivers, and Crake for Windows is
-  x64 throughout (its programs, openconnect, Wintun, ovpn-dco,
-  tap-windows6). An ARM64 build: `aarch64-pc-windows-*` for crake,
-  craked and the hook, openconnect built for ARM64
-  (scripts/build-openconnect-windows.sh), Wintun's and OpenVPN's ARM64
-  drivers (both ship them), an installer per architecture (or one
-  choosing at install), and CI building and testing it (GitHub has
-  Windows ARM64 runners). Detail in docs/engineering/platforms.md when
-  started.
-  **Built 2026-10-20** (docs/engineering/platforms.md, "Windows on
-  ARM64"): the programs, openconnect (MSYS2 CLANGARM64), OpenVPN's and
-  Wintun's ARM64 files, `crake-setup-<version>-arm64.exe`, installed and
-  removed on CI's `windows-11-arm` and in each release; the gateway
-  tests on ARM64 by hand through the Doctor (system `windows-arm64`,
-  first passed 2026-10-21). Not yet: a real Windows on ARM (the user's
-  Mac).
-- **Browser sign-in on Windows.** The openconnect Crake builds for
-  Windows has no `--external-browser`; New tunnel and sign-in say so
-  (2026-10-20). Building it in (and an opener there: `BROWSER` is
-  xdg-open on every system but macOS) is for when someone needs it.
-- **Untried on real systems:** see "Tried by real people" below, a
-  checklist of its own.
-- **Performance: never measured.** Believed negligible (NFQUEUE holds
-  only DNS answers and racing SYNs); measure before claiming numbers.
-- **A colleague's requests (they run OpenVPN 3 profiles daily,
-  2026-10-14).** For every user, not only experts, except where said:
-  1. *See the traffic, animated* ("packets ticking by"), their first and
-     main wish: a live graph of what goes direct and what through each
-     tunnel, with tables of hosts and connections only as the detail.
-     **Built 2026-10-14** (Traffic, milestone 6; the user and the
-     colleague liked design/proposals/traffic-window.html).
-     The colleague found the first dots too fast and distracting; the
-     proposal now moves them as fast as each path's traffic (a trickle
-     crawls, a big download about twice as fast) and sends one per
-     ~250 KB, between one every four seconds and two a second.
-  2. *See the split as a whole*: every rule in one place (learned,
-     pinned, never, direct by Undo, everything else), the "tree" they'd
-     otherwise keep in a config file (that proposal's "Where things go"
-     table: built with it).
-  3. *"How is it secured, can it break my traffic?"*: **built
-     2026-10-15** as "Is it safe?" in Settings → About
-     (design/proposals/how-secure.html, A, chosen by the user; four
-     questions and answers between the links and the coffee); the same
-     words can go on the website with the explainers below.
-  4. **The power user feature:** *edit an OpenVPN 3 profile in Crake*:
-     **built 2026-10-15** (design/proposals/edit-ovpn-profile.html,
-     option A, chosen by the user; `profile_editor/`, `ovpn3/profile.rs`).
-     Tunnel detail's Profile fact has "Edit…" on its label row ("Locked"
-     when openvpn3's `locked_down` hides the text; a long name is cut and
-     shown whole on hover, as the Gateway's). The editor window shows the
-     text as openvpn3's Fetch gives it, line numbers, each inline block
-     folded into a muted line ("<ca> certificate, 31 lines, kept as they
-     are </ca>", put back byte for byte; deleting the line drops the
-     block, changing it is refused before openvpn3 sees anything),
-     changed lines tinted. "Save and reconnect" imports the new text under
-     the same name (persistent as the old one), sets the old one's tags
-     and overrides on it, then removes the old one; openvpn3's refusal is
-     said under the text and nothing changes. A tunnel that's on is
-     switched off and on again (`Request::Reconnect`). GPUI's editor: the
-     folded lines are text, not chips; the tint covers a line's text, not
-     the whole line. Tests: fold/unfold units, window tests with a
-     stand-in for openvpn3, a journey step (its container has no openvpn3:
-     the window says it couldn't read the profile), and
-     `ovpn3::profile::tests` against a real openvpn3 with a throwaway
-     profile of its own (CRAKE_OPENVPN3_TEST=1; not in CI).
-- **The Traffic window's open ends (built 2026-10-14; left for later):**
-  - *UDP on Windows, and unconnected UDP on macOS:* Windows' UDP table
-    has local endpoints only, so UDP conversations (QUIC, HTTP/3) aren't
-    listed there; on macOS only sockets connected to one address are.
-    Their bytes still count in each way's rate. Windows would need a
-    packet-level view (ETW's network events or the WFP driver noted under
-    Other platforms).
-  - *Windows and macOS' connection lists: built 2026-10-15, tested by CI
-    only* (a loopback connection's bytes, on the runners); not yet seen
-    on a real PC or Mac (the checklist under "Tried by real people").
-  - *Which app opened a connection* (the proposal's "App" column): a
-    connection to its process (Linux: the socket's inode in /proc/*/fd,
-    root only); not built.
-  - *Pointing at a path or destination* to name it and its rate, and
-    clicking one to find it in the table (the proposal's notes): not built.
-  - *AppArmor:* the profile now allows `nf_conntrack_acct`; not yet run in
-    `scripts/vm-test.sh` (AppArmor enforced, KVM; not in CI).
-- **The explainers** (docs/explainers.md): written down, not yet drawn or
-  published anywhere.
-- **The website's version number** (dorhawk-website): visitors get the
-  live one from versions.json; the page's fallback is bumped by hand at
-  each release. Automating it (the packages workflow updating the page, or
-  Cloudflare filling it in) was offered, not decided.
+- Zed upstream, GPUI change 3 (Xft.dpi at runtime): the branch is ready;
+  the user files the issue and PR in their own words (Zed's AI policy).
+- Two sign-in tabs, and OpenVPN 3 sessions stopped before sign-in: likely
+  openvpn3-indicator; to watch one sign-in live with the user.
+- openvpn3 leaves a session's process running: detected and shown (built);
+  not a process left from before the app started.
+- macOS: craked registered by the app (approval, launchd, an upgrade's
+  restart): tried on a real Mac only.
+- Unsafe code behind one safe layer (`crake-os`): done; not yet unit tests
+  of its Windows and macOS parts on their runners.
+- Small screens: partly fixed; open: hundreds of hosts in tunnel detail,
+  resizable windows, the work area, tall windows, a sign that it scrolls.
+- Display scale changes on Windows and macOS: not tried.
+- winget for Windows; Undo in macOS notifications.
+- OpenVPN 3 sessions whose device openvpn3 doesn't name, under the package.
+- A shared practices repository for dorhawk.software (the user's idea, once
+  Crake is stable).
+- IPv6-only hosts on a network without IPv6: decided, left as it is.
+- Windows on ARM64: built; not yet a real Windows on ARM.
+- Browser sign-in on Windows (openconnect without `--external-browser`).
+- Performance: never measured; measure before claiming numbers.
+- A colleague's requests (Traffic, the split as a whole, "Is it safe?",
+  the profile editor): built; the Traffic window's open ends are listed.
+- The explainers (docs/explainers.md); the website's version number.
+- Untried on real systems: the checklist below.
+
 ## Tried by real people (a checklist, ticked one by one)
 
-Asked for by the user, 2026-10-14. The tests prove the mechanics on every
-system (containers, VMs, CI's runners), but nearly every macOS fix of
-October came from a colleague using Crake on a real Mac: System Settings'
-names, the service's approval, windows behind other apps, another VPN
-client's names kept private, a panic. Windows and the other Linux
-distributions haven't met a real person yet. Each item is ticked when
-someone used Crake for it on a real machine (not a VM made for tests),
-with the date and who (a role, not a name), and what was found and fixed.
-Ubuntu 26.04 with GNOME and a bottom bar is the user's own notebook, used
-daily.
-
-**Windows** (a real PC, ideally a company laptop):
-- [ ] Installing: SmartScreen's warning for the unsigned installer, and
-  what a user has to click past (Windows code signing: applied to SignPath,
-  see Other platforms).
-- [ ] Antivirus and endpoint security: craked's service, Wintun, and the
-  routes, NRPT rules and firewall rules it writes, not blocked or flagged.
-- [ ] Another VPN client installed (AnyConnect, GlobalProtect, ...): its
-  names still resolve with "Keep internal names private" on
-  (`served_elsewhere`, built 2026-10-18: other programs' NRPT rules and
-  the adapters' DNS suffixes; the VM test adds another client's NRPT rule).
-- [ ] Group policy that owns NRPT or the firewall: Crake's rules work, or
-  it says plainly that they can't.
-- [ ] Finding the bird: Windows 11 puts new icons in the notification
-  area's overflow; what a new user sees, and whether Crake should say how.
-- [ ] The panel with a GPU: Windows' rounding and shadow (only seen in a
-  VM without one).
-- [ ] A day of real use: sign-in, hosts learned, Undo; whether the first
-  connection to a new host failing (no WFP driver) is noticed.
-- [ ] Display scale changes with Crake running (also in Not now).
-- [ ] Windows 11 for ARM (the ARM64 installer; the user's coming Mac,
-  in a VM): installing, the drivers, a tunnel up.
-- [ ] The Traffic window: connections listed with their ways and rates
-  (extended TCP statistics switched on by the service).
-
-**Linux distributions** (a real desktop, not the package test's container):
-- [ ] Fedora with GNOME: no tray icons without the AppIndicator extension
-  installed and switched on. Crake now tells them (built 2026-10-16,
-  `no_tray.rs`, `tray_host.rs`, `sys/linux/gnome_tray.rs`;
-  design/proposals/no-tray-after.html): to check on a real Fedora that
-  "Switch on AppIndicator" (EnableExtension) brings the bird at once, that
-  a just-installed extension marked in enabled-extensions is on after one
-  login, and that the panel opened by hand gets focus there.
-- [ ] KDE Plasma, X11 and Wayland: the tray, and the panel placed at it.
-  The KDE VM was removed for disk space (2026-10-14); a VM can be made
-  again (`~/.cache/crake-vms/make-vm.sh`) or a real machine used.
-- [ ] Debian's desktop, which doesn't use systemd-resolved: installing
-  Crake brings it in; the rest of name lookup (NetworkManager, other VPNs,
-  `.local` names) still works afterwards.
-- [ ] Fedora's firewalld: its own reverse-path filter (IPv6_rpfilter, in
-  nftables) doesn't drop replies through a tunnel, as strict `rp_filter`
-  would have (handled).
-- [ ] Arch: resolved isn't enabled on install; following the install
-  message gets a working Crake.
-- [ ] Native Wayland (`CRAKE_WAYLAND=1`).
-
-**macOS** (beyond what the colleague has tried):
-- [ ] The service approved by the user, craked running under launchd from
-  Crake.app, and an upgrade restarting it with tunnels kept (0.7; also in
-  Not now).
-- [ ] The panel under the menu bar, placed at the icon on each display.
-- [ ] The Traffic window: connections listed with their ways and rates.
-
-**Everywhere:**
-- [ ] Importing a real .ovpn file (New tunnel's Import .ovpn…).
-- [x] OpenVPN run by Crake itself against a real gateway (2026-10-19,
-  the user, on 0.11.0: browser sign-in, the company's internal network
-  reached).
-- [ ] Each Beta protocol against a real gateway (only AnyConnect and
-  OpenVPN 3 have met one; the Beta tag comes off as each is ticked).
+Asked for by the user, 2026-10-14: what someone has used Crake for on a
+real machine (not a VM made for tests), each item ticked with the date and
+who (a role, not a name), and what was found and fixed:
+**docs/engineering/tried-by-people.md** (tick items there). Windows, the
+other Linux desktops and most of macOS haven't met a real person yet;
+Ubuntu 26.04 with GNOME and a bottom bar is the user's own notebook.
 
 ## Lints are errors
 
@@ -666,67 +365,20 @@ found, the e2e containers, CI's jobs and caches:
 ## Releases (decided with the user, 2026-10-13)
 
 `CHANGELOG.md`, written by hand for the people using Crake, in its copy
-voice (not generated from commits, which are written for developers):
-**every user-facing change adds a line under "Unreleased" in the same
-commit.** Dependency updates too (asked by the user, 2026-10-19): a
-merged Dependabot update, or one fixed by hand, gets a line saying what
-was updated and what it means for the people using Crake, since a
-security fix in a dependency warrants at least a hotfix release, and
-release.sh refuses an "Unreleased" with nothing in it. To release, `scripts/release.sh <version>` (asked for by the
-user, 2026-10-13; `--dry-run` first shows the changes and pushes
-nothing): it refuses an empty "Unreleased", dates it
-(`## <version> (<YYYY-MM-DD>)`), puts the version into Cargo.toml (and
-Cargo.lock), packaging/nix/package.nix and packaging/arch/PKGBUILD,
-commits "Crake <version>" and pushes, waits for CI on that commit and
-pushes the tag `v<version>`. Interrupted, or after a fix CI asked for, run
-it again with the same version: it waits on main's latest commit and tags
-it. Don't push anything else to main while it waits (a push cancels the
-CI run it's waiting for).
-`.github/workflows/release.yml` refuses a tag without its section, with a
-version that disagrees, or on a commit CI hasn't passed
-(`scripts/release-notes.sh`); it builds the .deb and RPM, the Windows
-installer (openconnect included, unsigned) and the macOS package (signed,
-notarized, installed and removed on the runner) in release mode with the
-same scripts CI uses, and publishes them with SHA256SUMS as the GitHub
-release, its text the changelog's section. Then the Homebrew cask
-(`packaging/macos/crake.rb.in`, the version and the package's checksum
-filled in) is pushed to **dorhawk-software/homebrew-tap** (public, created
-with the user's go-ahead 2026-10-13; `brew install --cask
-dorhawk-software/tap/crake` installs Homebrew's openconnect with it) with
-a write deploy key of that repository only (secret
-HOMEBREW_TAP_DEPLOY_KEY; the organisation had deploy keys off, the user
-switches them on). **The apt/dnf repository (built 2026-10-13; moved to its own
-repository the same day, asked for by the user: no app should own what
-the apps share):** `packages.dorhawk.software` is published by
-**dorhawk-software/packages** (local: ~/Programming/Personal/dorhawk-packages):
-the R2 bucket `dorhawk-packages` (the user's Cloudflare account; custom
-domain, TLS 1.2 minimum, the r2.dev URL off; `/` serves index.html
-through a URL rewrite rule on the dorhawk.software zone), its signing key
-("dorhawk.software packages", B17A7118E97736C202AD5EAFF1D152DA1BBD1C97,
-RSA 4096, signing only, no expiry; private half only in the user's
-password manager and that repository's secret), the R2 token, the start
-page and the scripts all live there, with `apps.json` listing the apps
-(Crake for now). Its workflow fetches each app's latest release, tests
-the repository in no-network containers with a throwaway key, signs the
-RPMs, builds and signs the indexes, uploads them in order and installs
-from the live site; it runs when an app's release asks
-(`repository_dispatch` "release"), on a push, by hand, and hourly (stopping
-at once when nothing is new). Crake's release only asks, in its
-`packages` job, with the optional secret PACKAGES_DISPATCH_TOKEN (a
-fine-grained token of the user's: Contents read/write on that repository
-only; without it the hourly run finds the release). Crake's own release
-RPM is no longer signed; the repository signs what it serves. The
-README's "Installing" has the commands. **The AUR (2026-10-13):** the
-release's `aur` job runs `scripts/aur-publish.sh <version>` (the PKGBUILD
-with the version and the tag's source tarball's real checksum, its install
-script and a .SRCINFO made in an Arch container, where makepkg checks the
-checksum; pushed to ssh://aur@aur.archlinux.org/crake.git with the secret
-AUR_SSH_KEY; `--dry-run` pushes nothing). Skipped while there's no secret:
-AUR registration was closed that day (bot sign-ups); once the user has an
-account with the key, publish the current release by hand with the
-script, then releases keep it current. "Start at login" on macOS is
-the app's own login agent, registered with SMAppService (from 0.7; a
-LaunchAgent in ~/Library/LaunchAgents before).
+voice (not generated from commits): **every user-facing change adds a line
+under "Unreleased" in the same commit**, dependency updates too (what was
+updated and what it means for the people using Crake; a security fix in a
+dependency warrants at least a hotfix release). Each change goes under its
+kind: `### New`, `Better`, `Changed`, `Fixed`, `Underneath` (what Crake is
+built on; a dependency's security fix is Fixed), the headings the app's
+What's new shows (`whats_new/`, the changelog built in; a test reads it
+whole). To release: `scripts/release.sh <version>` (`--dry-run` first): it
+refuses an empty "Unreleased" or a change outside its kinds, dates it,
+sets the version everywhere, commits and pushes, waits for CI and pushes
+the tag; run it again with the same version after an interruption. Don't
+push anything else to main while it waits. The release workflow, the
+Homebrew tap, the apt/dnf repository (dorhawk-software/packages) and the
+AUR: **docs/engineering/releases.md**.
 
 ## Packaging and dependencies (decided with the user)
 
@@ -752,29 +404,7 @@ Apple certificates unless a key leaked.
 
 ## Someday: other platforms
 
-Wanted one day, not planned yet. Keep the split that makes it possible:
-decisions (host store, expiry, policy, log, probing logic) stay portable;
-everything that touches the OS stays behind small modules (`net`, `routing`,
-DNS, tray) that can get a per-OS implementation.
-
-- **Other Linux distributions:** mostly as is. Watch strict reverse-path
-  filtering (`rp_filter=1`, e.g. Fedora/RHEL): replies from routed hosts
-  arrive on the tunnel while the unmarked route points elsewhere, so they'd
-  be dropped. Ubuntu uses loose mode (2). **Fixed:** craked sets loose
-  mode on each tunnel's own interface when it comes up, over netlink
-  (RTM_SETLINK; works where /proc/sys is read-only); the kernel takes the
-  looser of `all` and the interface. The netns tests run with rp_filter=1
-  everywhere and fail without it. Debian 12/13: tested, same .deb. Needs openconnect, nftables,
-  iproute2, systemd, D-Bus and polkit. DNS learning assumes systemd-resolved;
-  distros without it need a fallback. GNOME needs the AppIndicator extension
-  for the tray; KDE has it built in. Packaging: .deb first, then .rpm / AUR.
-- **Windows:** openconnect has Windows builds (Wintun). Routing would be
-  per-host routes on the tunnel interface (IP Helper API) instead of fwmark;
-  per-domain DNS via the Name Resolution Policy Table; the daemon becomes a
-  Windows service, the tray uses the notification area. Testable in a VM.
-- **macOS:** openconnect runs there (utun). Per-host routes via the routing
-  socket, per-domain DNS via `/etc/resolver/<domain>`, a privileged launchd
-  helper, a menu bar item. Needs Apple code signing and notarization, and real
-  testing needs a Mac (macOS VMs are only allowed on Apple hardware).
-- Per-host routes are the common denominator. Crake already keeps expiry in
-  its own store, not only in nftables timeouts, so that part ports.
+Keep the split that makes them possible: decisions (host store, expiry,
+policy, log, probing logic) stay portable; everything that touches the OS
+stays behind small modules (`net`, `routing`, DNS, tray). The notes per
+system: **docs/engineering/platforms.md**, "Someday: other platforms".

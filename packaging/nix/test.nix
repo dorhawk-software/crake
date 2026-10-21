@@ -54,7 +54,7 @@ in {
     networking.firewall.enable = false;
     # ocserv's tunnel devices are ocserv's: dhcpcd took vpns0 as a client
     # connected ("waiting for 3rd party to configure IP address"), and the
-    # journey's first connection through it was reset (CLAUDE.md, Not now).
+    # journey's first connection through it was reset (docs/engineering/milestones.md, 4: the cause, 2026-10-21).
     networking.dhcpcd.denyInterfaces = [ "vpns*" ];
     networking.nftables.enable = true;
     # From the LAN, ACME's network doesn't answer: only the tunnel reaches it.

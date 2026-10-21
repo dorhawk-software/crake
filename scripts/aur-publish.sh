@@ -4,7 +4,7 @@
 # tarball's real checksum, its install script, and .SRCINFO, made in a
 # throwaway Arch container, where makepkg also checks the checksum
 # against the tarball before anything is pushed. Needs AUR_SSH_KEY (the
-# key on the AUR account; CLAUDE.md, Releases). The release workflow runs
+# key on the AUR account; docs/engineering/releases.md). The release workflow runs
 # it; by hand for a release that's out already:
 #   AUR_SSH_KEY="$(cat key)" scripts/aur-publish.sh VERSION [--dry-run]
 set -eu
