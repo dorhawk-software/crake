@@ -146,10 +146,11 @@ pub(super) fn card(
     id: impl Into<gpui_kit::ElementId>,
     on: bool,
     name: &'static str,
-    sub: &'static str,
+    sub: impl Into<gpui_kit::SharedString>,
     tag: Option<&'static str>,
     t: &Theme,
 ) -> Stateful<Div> {
+    let sub = sub.into();
     div()
         .id(id)
         .min_w_0()

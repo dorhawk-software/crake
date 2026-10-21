@@ -37,6 +37,9 @@ clap = { version = "4", features = ["derive"] }
 hickory-proto = { version = "0.26", default-features = false, features = ["std"] }
 base64 = "0.23"
 sha2 = "0.11"
+# A user's IPsec certificate from a .p12 file (legacy: 3DES and RC2, as
+# company-issued files often are).
+p12-keystore = { version = "0.4", features = ["pbes1"] }
 
 # Linux only: answers held in NFQUEUE until their addresses are routed.
 [target.'cfg(target_os = "linux")'.dependencies]

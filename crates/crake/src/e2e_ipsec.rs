@@ -81,8 +81,16 @@ async fn answer(mgr: &Manager, name: &str, kind: &str, text: &str) -> HashMap<St
         mgr.asking(name).filter(|a| a["kind"] == kind)
     })
     .await;
-    let id = ask["id"].parse().unwrap();
+    let id: u32 = ask["id"].parse().unwrap();
     mgr.answer(name, id, text.to_owned()).unwrap();
+    // Gone before the next is looked for: an answered question shown a
+    // moment longer was answered twice, the next one never.
+    until("the question answered", || {
+        mgr.asking(name)
+            .is_none_or(|a| a["id"] != id.to_string())
+            .then_some(())
+    })
+    .await;
     ask.into_iter().collect()
 }
 
@@ -368,6 +376,98 @@ async fn a_certificate_no_one_vouches_for_is_asked_about() {
     );
     assert!(
         refused.contains("vpn-cert.acme.example, not vpn.globex.example"),
+        "{refused}"
+    );
+    mgr.shutdown().await;
+}
+
+/// alice's certificate as the app keeps it, in base64 (the .p12 IT gave her).
+fn alices_certificate() -> String {
+    use base64::Engine as _;
+    let p12 = std::fs::read(format!("{SHARED}/ipsec-alice.p12")).unwrap();
+    base64::engine::general_purpose::STANDARD.encode(p12)
+}
+
+/// The user's own certificate (design/proposals/ipsec-certificates.html,
+/// 2): asked of the app, opened with its password (asked again when it
+/// didn't open it), and no password asked of the gateway; with a password
+/// as well, the gateway asks it after the certificate, and a wrong one is
+/// asked again; a certificate its authority didn't sign is refused as the
+/// certificate, not the password.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_users_own_certificate() {
+    if !enabled() {
+        return;
+    }
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info,charon=debug")
+        .with_test_writer()
+        .try_init();
+    let dir = tempfile::tempdir().unwrap();
+    let (mgr, _hooks) = started(dir.path()).await;
+    let mut f = certificate_fields();
+    let ca = std::fs::read_to_string(format!("{SHARED}/ipsec-ca.pem")).unwrap();
+    f.insert("gateway_ca".into(), ca);
+    f.insert("gateway_id".into(), "vpn-certs.acme.example".into());
+    f.insert("sign_in".into(), "certificate".into());
+    f.insert("certificate".into(), "keyring".into());
+    f.remove("user");
+    let name = mgr.add_tunnel(&f).unwrap();
+
+    // The certificate alone: its file's password, wrong, then right.
+    mgr.connect(&name).unwrap();
+    answer(&mgr, &name, "certificate", &alices_certificate()).await;
+    let first = answer(&mgr, &name, "key-password", "hunter3").await;
+    assert_eq!(first["retry"], "false");
+    let again = answer(&mgr, &name, "key-password", "hunter2").await;
+    assert_eq!(again["retry"], "true", "it didn't open the file");
+    until("connected with the certificate", || {
+        assert!(
+            mgr.asking(&name).is_none_or(|a| a["kind"] != "password"),
+            "no password for the gateway"
+        );
+        assert_ne!(
+            state(&mgr, &name),
+            TunnelState::Trouble,
+            "{}",
+            why(&mgr, &name)
+        );
+        (state(&mgr, &name) == TunnelState::Connected).then_some(())
+    })
+    .await;
+    off(&mgr, &name).await;
+
+    // The certificate, then the password: a wrong one is asked again.
+    f.insert("gateway_id".into(), "vpn-certpw.acme.example".into());
+    f.insert("sign_in".into(), "certificate-password".into());
+    f.insert("user".into(), "alice".into());
+    mgr.update_tunnel(&name, &f).await.unwrap();
+    mgr.connect(&name).unwrap();
+    answer(&mgr, &name, "certificate", &alices_certificate()).await;
+    answer(&mgr, &name, "key-password", "hunter2").await;
+    answer(&mgr, &name, "password", "hunter3").await;
+    let again = answer(&mgr, &name, "password", "hunter2").await;
+    assert_eq!(again["retry"], "true", "the password, refused");
+    connected(&mgr, &name).await;
+    off(&mgr, &name).await;
+
+    // One its authority didn't sign: refused, said as the certificate.
+    use base64::Engine as _;
+    let stranger = base64::engine::general_purpose::STANDARD.encode(include_bytes!(
+        "../../craked/src/ipsec/testdata/alice-nopass.p12"
+    ));
+    f.insert("gateway_id".into(), "vpn-certs.acme.example".into());
+    f.insert("sign_in".into(), "certificate".into());
+    f.remove("user");
+    mgr.update_tunnel(&name, &f).await.unwrap();
+    mgr.connect(&name).unwrap();
+    answer(&mgr, &name, "certificate", &stranger).await;
+    let refused = until("refused: the certificate", || {
+        (state(&mgr, &name) == TunnelState::Trouble).then(|| why(&mgr, &name))
+    })
+    .await;
+    assert!(
+        refused.contains(crake_proto::trouble::CERT_REFUSED),
         "{refused}"
     );
     mgr.shutdown().await;

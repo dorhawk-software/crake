@@ -42,6 +42,10 @@ pub enum AskKind {
     },
     /// A page to finish signing in on, in the browser (nothing to answer).
     Browser,
+    /// IPsec: the user's own certificate file, as the app keeps it in the
+    /// keyring (answered in base64 by the app itself, no window; empty when
+    /// it has none).
+    Certificate,
     /// An IPsec gateway's certificate no authority here vouches for:
     /// trust it? ("yes" or "no"; its details in the question's `extra`).
     Trust,
@@ -57,6 +61,7 @@ impl AskKind {
             Self::Code { echo: false } => "code",
             Self::Browser => "browser",
             Self::Trust => "trust",
+            Self::Certificate => "certificate",
         }
     }
 }

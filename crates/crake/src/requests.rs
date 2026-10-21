@@ -14,26 +14,35 @@ pub(super) fn keep_certificate(
     if cx.global::<Shell>().demo {
         return;
     }
-    let (tunnel, display) = (
-        tunnel.to_owned(),
-        fields
-            .get("display_name")
-            .cloned()
-            .unwrap_or_else(|| tunnel.to_owned()),
-    );
-    std::thread::spawn(move || {
-        if let Ok(rt) = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-        {
-            let _ = rt.block_on(keyring::set(
-                &tunnel,
-                &display,
-                keyring::Kind::Certificate,
-                &bytes,
-            ));
-        }
-    });
+    // Tests keep it where their keyring is (memory), as the sign-in reads it.
+    #[cfg(test)]
+    {
+        let _ = fields;
+        crate::openvpn::keep_certificate_for_tests(tunnel, &bytes);
+    }
+    #[cfg(not(test))]
+    {
+        let (tunnel, display) = (
+            tunnel.to_owned(),
+            fields
+                .get("display_name")
+                .cloned()
+                .unwrap_or_else(|| tunnel.to_owned()),
+        );
+        std::thread::spawn(move || {
+            if let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                let _ = rt.block_on(keyring::set(
+                    &tunnel,
+                    &display,
+                    keyring::Kind::Certificate,
+                    &bytes,
+                ));
+            }
+        });
+    }
 }
 
 /// Keep which tunnels the user left on, for "Start when you log in".

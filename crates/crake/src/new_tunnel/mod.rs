@@ -39,6 +39,8 @@ mod widgets;
 
 #[cfg(test)]
 mod tests;
+#[cfg(all(test, target_os = "linux"))]
+mod tests_ipsec;
 
 /// Steps 0 to 3: the server, sign-in, routing, the summary.
 const LAST_STEP: usize = 3;
@@ -309,6 +311,7 @@ impl NewTunnel {
                 key: field("protocol") == "ipsec" && field("gateway_proof") != "certificate",
                 certificate: field("gateway_proof") == "certificate",
                 ca: field("gateway_ca") == "kept",
+                sign_in: static_of(&ipsec::METHODS, &field("sign_in"), |m| m.0),
             },
             window,
             cx,
@@ -379,17 +382,8 @@ impl NewTunnel {
             .and_then(|v| v.split(':').nth(2))
             .filter(|_| demo)
             .map(|p| static_of(&PROTOCOLS, p, |p| p.0));
-        // newtunnel:1:ipsec:certificate: the gateway proving itself with its
-        // certificate, IT's authority picked (ipsec-certificates.html, 1);
-        // the variant after the step and the protocol.
-        // literal: CRAKE_SHOW's fourth part
-        if demo && shown.as_deref().and_then(|v| v.split(':').nth(3)) == Some("certificate") {
-            ipsec.certificate = true;
-            ipsec.ca = Some(("nordbank-ca.pem".into(), String::new()));
-            ipsec.domains.update(cx, |f, cx| {
-                f.set_value("nordbank.internal nordbank.example", window, cx)
-            });
-        }
+        let demo_cert =
+            ipsec_proof::demo(shown.as_deref().filter(|_| demo), &mut ipsec, window, cx);
         // openvpn3's profiles and the installed engines, without holding the
         // window up.
         cx.spawn(async move |this, cx| {
@@ -458,7 +452,7 @@ impl NewTunnel {
                 "" => "file",
                 _ => "file",
             },
-            cert_file: None,
+            cert_file: demo_cert,
             keep_signed_in: field("keep_signed_in") != "false",
             advanced: false,
             protocols_open: false,

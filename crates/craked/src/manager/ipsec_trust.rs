@@ -106,7 +106,7 @@ impl Manager {
 
 /// A day as the sign-in window says it: "18 October", with its year when
 /// it isn't this one's.
-fn day(date: time::Date, today: time::Date) -> String {
+pub(super) fn day(date: time::Date, today: time::Date) -> String {
     if date.year() == today.year() {
         format!("{} {}", date.day(), date.month())
     } else {

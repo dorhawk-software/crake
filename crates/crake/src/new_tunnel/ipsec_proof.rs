@@ -266,6 +266,88 @@ impl NewTunnel {
     }
 }
 
+impl NewTunnel {
+    /// Step 2's "Certificate" (ipsec-certificates.html, 2): a file, as
+    /// AnyConnect's "A file…" (`choose_certificate`), its copy kept in the
+    /// keyring; editing, the kept one stays unless another is chosen.
+    pub(super) fn ipsec_certificate_file(&self, t: &Theme, cx: &mut Context<Self>) -> Div {
+        let chosen = self.cert_file.as_ref().map(|(n, _)| n.clone());
+        let kept = self.ipsec.cert_kept && chosen.is_none();
+        div().w(px(320.)).child(label("Certificate")).child(
+            div()
+                .mt(px(3.))
+                .flex()
+                .items_center()
+                .gap(px(10.))
+                .child(
+                    div()
+                        .id("ipsec-choose-cert")
+                        .h(px(36.))
+                        .px(px(12.))
+                        .flex()
+                        .flex_none()
+                        .items_center()
+                        .border_1()
+                        .border_color(t.line)
+                        .rounded(px(6.))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .cursor_pointer()
+                        .child(if chosen.is_some() || kept {
+                            "Choose another\u{2026}"
+                        } else {
+                            "Choose a file\u{2026}"
+                        })
+                        .on_click(cx.listener(|this, _, _, cx| this.choose_certificate(cx)))
+                        .test_support(),
+                )
+                .children(
+                    chosen
+                        .or(kept.then(|| "Kept in your keyring".to_owned()))
+                        .map(|n| {
+                            div()
+                                .min_w_0()
+                                .overflow_hidden()
+                                .whitespace_nowrap()
+                                .text_ellipsis()
+                                .text_size(px(13.))
+                                .text_color(t.muted)
+                                .when(!kept, |d| d.font_family(fonts::MONO))
+                                .child(n)
+                        }),
+                ),
+        )
+    }
+}
+
+/// Where CRAKE_SHOW's variant is: after "newtunnel", the step and the
+/// protocol.
+const VARIANT: usize = 3;
+
+/// CRAKE_SHOW's IPsec variants in demo mode (development), as the
+/// proposal drew them: "newtunnel:1:ipsec:certificate", the gateway with
+/// its certificate and IT's authority picked; "…:certificate-password",
+/// step 2's third card with a file chosen (returned, for `cert_file`).
+pub(super) fn demo(
+    shown: Option<&str>,
+    ipsec: &mut super::ipsec::Ipsec,
+    window: &mut Window,
+    cx: &mut Context<NewTunnel>,
+) -> Option<(String, Vec<u8>)> {
+    let variant = shown?.split(':').nth(VARIANT)?;
+    if !variant.starts_with("certificate") {
+        return None;
+    }
+    ipsec.certificate = true;
+    ipsec.ca = Some(("nordbank-ca.pem".into(), String::new()));
+    ipsec.domains.update(cx, |f, cx| {
+        f.set_value("nordbank.internal nordbank.example", window, cx)
+    });
+    (variant == "certificate-password").then(|| {
+        ipsec.method = "certificate-password";
+        ("nordbank-ondrej.p12".to_owned(), Vec::new())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

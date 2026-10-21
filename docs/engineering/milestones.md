@@ -1376,9 +1376,28 @@
    variant (the proposal's 3): openconnect gives only the fingerprint, so
    the app would read the certificate itself (gateway_cert.rs, with the
    certificate reader moved to crake-proto), and a pinned certificate that
-   changed is a failure there (`--servercert`), not a question. Not yet:
-   the user's own certificate, New tunnel's and Edit's parts, IT's files,
-   the FortiGate by
+   changed is a failure there (`--servercert`), not a question. Built the
+   same day: New tunnel's step 1 (two cards, IT's authority in the key's
+   slot; `new_tunnel/ipsec_proof.rs`) and the user's own certificate
+   (step 2's three cards; the app keeps the file in the keyring and
+   answers craked's `certificate` question from it without a window;
+   craked opens it, `ipsec::credential`, a .p12 with p12-keystore,
+   legacy RC2 and 3DES too, or PEM with an unencrypted key; its password
+   asked as "Unlock your certificate", kept when ticked; its dates read
+   first; charon gets it as `local` (pubkey), or `local-1` and `local-2`
+   with a password, RFC 4739; a refusal before any EAP is the
+   certificate's). e2e: `the_users_own_certificate` (the gateway's
+   acme-certs and acme-certpw, alice's .p12 in /link); journeys for both.
+   Not yet, written down here: a smart card for IPsec (strongSwan's
+   PKCS#11 plugin, the PIN over vici's load-token; needs the SoftHSM test
+   image the AnyConnect smart-card test waits for too: step 2 offers only
+   a file, unlike the proposal's "Certificate from"), EAP-TLS for
+   gateways that take the certificate over EAP (the proposal's "IKE first,
+   then EAP-TLS"), a PEM file whose key has a password (said: give it as
+   a .p12), IT's files naming a certificate or IT's authority
+   (`gateway_ca_file`), the sign-in window's rows for the gateway and the
+   certificate (its steps are still a fixed three), Edit's "You trusted
+   its certificate on … Stop trusting it", the FortiGate by
    hand.
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or
    Windows problem without a colleague's machine):** `.github/workflows/

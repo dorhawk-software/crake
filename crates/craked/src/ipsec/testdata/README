@@ -1,0 +1,5 @@
+alice, a throwaway test identity (EC P-256, self-signed, CN=alice), made
+with openssl for ipsec/credential.rs's tests: alice.p12 (AES, password
+"hunter2"), alice-legacy.p12 (RC2 and 3DES, as older company-issued files
+are, password "hunter2"), alice-nopass.p12 (no password) and alice.pem
+(the certificate and its unencrypted key), alice.der (the certificate). Not a real person's, not secret.

@@ -23,6 +23,15 @@ pub const WRONG_NAME: &str = "The gateway\u{2019}s certificate is for";
 /// yet ("Nordbank's gateway shows a certificate that ran out on …").
 pub const RAN_OUT: &str = "shows a certificate that ran out on";
 pub const NOT_YET: &str = "shows a certificate that\u{2019}s valid only from";
+/// IPsec: the gateway turned the user's own certificate down
+/// ("Nordbank's gateway didn't accept your certificate. …").
+pub const CERT_REFUSED: &str = "didn\u{2019}t accept your certificate";
+/// IPsec: the user's certificate is out of its dates, read before
+/// anything is sent.
+pub const YOUR_CERT_RAN_OUT: &str = "Your certificate ran out on";
+pub const YOUR_CERT_NOT_YET: &str = "Your certificate is valid only from";
+/// IPsec: the app has no copy of the user's certificate to give.
+pub const NO_CERTIFICATE: &str = "Crake has no copy of your certificate";
 /// What to do about it.
 pub const SIGN_IN_AGAIN: &str = "Switch it on to sign in again.";
 
@@ -36,6 +45,9 @@ pub fn label(why: &str) -> Option<&'static str> {
         (KEY_MISMATCH, "Key doesn\u{2019}t match"),
         (UNTRUSTED, "Gateway not trusted"),
         (WRONG_NAME, "Certificate for another name"),
+        (YOUR_CERT_RAN_OUT, "Your certificate ran out"),
+        (YOUR_CERT_NOT_YET, "Certificate not valid yet"),
+        (NO_CERTIFICATE, "No certificate"),
     ]
     .into_iter()
     .find(|(start, _)| why.starts_with(start))
@@ -44,6 +56,7 @@ pub fn label(why: &str) -> Option<&'static str> {
         [
             (RAN_OUT, "Gateway\u{2019}s certificate ran out"),
             (NOT_YET, "Gateway\u{2019}s certificate not valid yet"),
+            (CERT_REFUSED, "Certificate not accepted"),
         ]
         .into_iter()
         .find(|(part, _)| why.contains(part))
@@ -135,6 +148,15 @@ mod tests {
             label(&format!("Nordbank\u{2019}s gateway {NOT_YET} 1 November.")),
             Some("Gateway\u{2019}s certificate not valid yet")
         );
+        assert_eq!(
+            label(&format!("Nordbank\u{2019}s gateway {CERT_REFUSED}.")),
+            Some("Certificate not accepted")
+        );
+        assert_eq!(
+            label(&format!("{YOUR_CERT_RAN_OUT} 3 March 2026.")),
+            Some("Your certificate ran out")
+        );
+        assert_eq!(label(&format!("{NO_CERTIFICATE}.")), Some("No certificate"));
         assert_eq!(label("openconnect exited with exit status: 1."), None);
         assert_eq!(label(""), None);
     }

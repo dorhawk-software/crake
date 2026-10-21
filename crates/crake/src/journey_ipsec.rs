@@ -262,3 +262,85 @@ fn an_ipsec_gateway_with_a_certificate_trusted_in_the_sign_in_window(cx: &mut Te
     let crate::journey_tests::Daemon { rt, mgr } = craked;
     rt.block_on(mgr.shutdown());
 }
+
+/// The user's own certificate (design/proposals/ipsec-certificates.html,
+/// 2): chosen in New tunnel's step 2 ("Certificate", a .p12 file), kept in
+/// the keyring; switched on, the app hands it to craked without a window,
+/// the sign-in window asks its password ("Unlock your certificate"), then
+/// whether to trust the gateway; it connects with no password asked of
+/// the gateway.
+#[gpui_kit::test]
+fn an_ipsec_tunnel_with_the_users_own_certificate(cx: &mut TestAppContext) {
+    if !enabled() || std::env::var_os("CRAKE_E2E_IPSEC").is_none() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let craked = app_with_craked(cx, dir.path());
+    let p12 = std::fs::read("/mnt/link/ipsec-alice.p12").expect("alice's .p12 from the gateway");
+
+    request(cx, Request::NewTunnel(None));
+    let (n, view) = wait_window::<crate::new_tunnel::NewTunnel>(cx, "New tunnel opens");
+    cx.simulate_window_resize(n, gpui_kit::size(gpui_kit::px(720.), gpui_kit::px(1000.)));
+    let (name, gateway, _) = view.read_with(cx, |v, _| v.fields_for_tests());
+    let (_, domains, identity) = view.read_with(cx, |v, _| v.ipsec_fields_for_tests());
+    type_into(cx, n, name, "Initech");
+    click(cx, n, ("protocol", IPSEC));
+    type_into(cx, n, gateway, CERT_GATEWAY);
+    click(cx, n, "ipsec-certificate");
+    type_into(cx, n, domains, "acme.internal");
+    click(cx, n, "next");
+    click(cx, n, ("ipsec-method", 1usize));
+    // The file chooser is the system's: the file as it would pick it.
+    view.update(cx, |v, cx| {
+        v.choose_certificate_for_tests("alice.p12", p12, cx)
+    });
+    click(cx, n, "advanced");
+    type_into(cx, n, identity, "vpn-certs.acme.example");
+    click(cx, n, "next");
+    click(cx, n, "next");
+    until(cx, "Initech added", Duration::from_secs(10), |cx| {
+        craked.mgr.get("initech").is_some() && model(cx).tunnels.iter().any(|t| t.name == "initech")
+    });
+
+    cx.executor().advance_clock(Duration::from_secs(1));
+    let (w, sign) = sign_in_of(cx, "initech");
+    until(
+        cx,
+        "asked to unlock the certificate",
+        Duration::from_secs(20),
+        |cx| {
+            sign.read_with(cx, |v, _| {
+                matches!(v.stage(), signin_view::Stage::Asking(p)
+                if matches!(p.ask, crate::signin::Ask::CertificatePassword { .. }))
+            })
+        },
+    );
+    cx.update_window(w, |_, window, cx| {
+        window.render_frame(cx);
+        window.input("hunter2", cx);
+    })
+    .unwrap();
+    click(cx, w, "continue");
+    until(
+        cx,
+        "asked to trust the gateway",
+        Duration::from_secs(30),
+        |cx| {
+            sign.read_with(cx, |v, _| {
+                matches!(v.stage(), signin_view::Stage::Asking(p)
+                if matches!(p.ask, crate::signin::Ask::TrustServer { .. }))
+            })
+        },
+    );
+    click(cx, w, "yes");
+    until(cx, "Initech connected", Duration::from_secs(30), |cx| {
+        state(cx, "initech") == "connected"
+    });
+
+    request(cx, Request::Switch("initech".into(), false));
+    until(cx, "Initech off", Duration::from_secs(15), |cx| {
+        state(cx, "initech") == "off"
+    });
+    let crate::journey_tests::Daemon { rt, mgr } = craked;
+    rt.block_on(mgr.shutdown());
+}

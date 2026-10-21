@@ -72,8 +72,18 @@ impl NewTunnel {
                 Detect::Asking(_) => Some("Still asking the gateway. A moment."),
                 _ => Some("Pick the protocol: the gateway didn\u{2019}t say."),
             },
-            2 if self.protocol == "ipsec" && self.user.read(cx).value().trim().is_empty() => {
+            2 if self.protocol == "ipsec"
+                && super::ipsec::needs_password(self.ipsec.method)
+                && self.user.read(cx).value().trim().is_empty() =>
+            {
                 Some("Your username, as your IT team gave it.")
+            }
+            2 if self.protocol == "ipsec"
+                && self.ipsec.method != "password"
+                && self.cert_file.is_none()
+                && !self.ipsec.cert_kept =>
+            {
+                Some("Choose the certificate file.")
             }
             2 if self.method == "certificate"
                 && self.cert_source == "file"
@@ -117,7 +127,7 @@ impl NewTunnel {
         // IPsec signs in with a username and password (EAP), its secrets
         // apart (`ipsec::Ipsec::fields`).
         let method = if self.protocol == "ipsec" {
-            "password"
+            self.ipsec.method
         } else {
             self.method
         };
@@ -126,7 +136,11 @@ impl NewTunnel {
             self.ipsec.fields(&mut f, cx);
         }
         f.insert("user".into(), self.user.read(cx).value().trim().to_owned());
-        let certificate = match (self.method, self.cert_source) {
+        let certificate = match (method, self.cert_source) {
+            // IPsec's is a file, kept in the keyring (no smart card yet).
+            ("certificate" | "certificate-password", _) if self.protocol == "ipsec" => {
+                "keyring".to_owned()
+            }
             ("certificate", "pkcs11") => "pkcs11:".to_owned(),
             // A chosen file is kept in the keyring (7e).
             ("certificate", _) => "keyring".to_owned(),

@@ -18,6 +18,13 @@ What's new in each Crake release, for the people using it. The newest is at the 
   who signed it, and asks before trusting it, as it does for AnyConnect gateways. If it changes
   later, Crake asks again and says so. A certificate made out to another name is never offered to
   be trusted.
+- **Sign in to an IPsec gateway with your own certificate.** New tunnel's step 2 offers "Certificate"
+  and "Certificate and password" beside "Username and password": choose the .p12, .pfx or .pem file
+  your IT team gave you, and Crake keeps a copy in your keyring. Its password is asked as "Unlock your
+  certificate", and remembered when you tick it. A certificate that has run out is said before
+  anything is sent. A certificate the gateway turns down is said as the certificate, not the password.
+- **"Remember the password in your keyring" for a certificate's file is kept.** Ticked when OpenVPN
+  asked for a profile key's password, it was shown but forgotten.
 - **No AnyConnect groups for an IPsec tunnel.** Choosing IPsec at a gateway that also answered as
   AnyConnect showed AnyConnect's sign-in groups, which IPsec doesn't use.
 - **A failed sign-in names who said why.** When an IPsec or OpenVPN tunnel couldn't sign in, the

@@ -120,39 +120,46 @@ impl Manager {
         let pin_path = ipsec::pin_path(&self.cfg.state_path, name);
         let (answers, mut answer_rx) = mpsc::unbounded_channel();
         let mut retry = false;
+        let method = config
+            .own
+            .as_ref()
+            .map_or(crate::own::SignIn::Password, |o| o.sign_in);
+        // The user's certificate: once, before the gateway is asked
+        // anything (ipsec-certificates.html, 2).
+        let credential = if method.certificate() {
+            let mut asking = super::ipsec_credential::Asking {
+                answers: &answers,
+                answer_rx: &mut answer_rx,
+                stop_rx: &mut *stop_rx,
+            };
+            match self.ipsec_credential(name, who, &mut asking).await {
+                Ok(c) => Some(c),
+                Err(ended) => return Ok(Some(ended)),
+            }
+        } else {
+            None
+        };
         // The name and password, kept across the trust question.
         let mut known: Option<(String, String)> = None;
         loop {
             let (user, password) = match known.take() {
                 Some(k) => k,
+                None if !method.password() => (String::new(), String::new()),
                 None => {
-                    let user = match &config.user {
-                        Some(u) => u.clone(),
-                        None => {
-                            let asked = (AskKind::User, retry);
-                            match self
-                                .answer_of(name, asked, &answers, &mut answer_rx, stop_rx)
-                                .await
-                            {
-                                Some(u) => u,
-                                None => return Ok(Some((TunnelState::Off, None))),
-                            }
-                        }
-                    };
-                    let asked = (AskKind::Password, retry && config.user.is_some());
-                    let Some(password) = self
-                        .answer_of(name, asked, &answers, &mut answer_rx, stop_rx)
+                    let Some(asked) = self
+                        .user_and_password(config, retry, &answers, &mut answer_rx, stop_rx)
                         .await
                     else {
                         return Ok(Some((TunnelState::Off, None)));
                     };
-                    (user, password)
+                    asked
                 }
             };
             let tunnel = Tunnel {
                 name,
                 gateway: &config.gateway,
                 secret,
+                credential: credential.as_ref(),
                 user: &user,
                 if_id,
                 updown: self.updown(name),
@@ -173,7 +180,7 @@ impl Manager {
             };
             match signed {
                 Some(Signed::In) => return Ok(None),
-                Some(Signed::Refused) => {
+                Some(refusal @ (Signed::Refused | Signed::RefusedAtFirst)) => {
                     vici.forget(name).await;
                     // A gateway asked for a name it isn't refuses before it
                     // shows its certificate (the spike): not the password.
@@ -187,6 +194,16 @@ impl Manager {
                                 why_not(&looked, who, &expected),
                             )));
                         }
+                    }
+                    // Before any password, or with no password at all: the
+                    // user's certificate.
+                    let certificate =
+                        matches!(refusal, Signed::RefusedAtFirst) || !method.password();
+                    if method.certificate() && certificate {
+                        return Ok(Some((
+                            TunnelState::Trouble,
+                            Some(super::ipsec_credential::refused(who)),
+                        )));
                     }
                     retry = true;
                 }
@@ -243,6 +260,31 @@ impl Manager {
                 }
             }
         }
+    }
+
+    /// The username (unless the tunnel has it) and password, asked; again,
+    /// saying so, after a refusal. None when it's switched off meanwhile.
+    async fn user_and_password(
+        &self,
+        config: &TunnelConfig,
+        retry: bool,
+        answers: &Answers,
+        answer_rx: &mut mpsc::UnboundedReceiver<(u32, String)>,
+        stop_rx: &mut oneshot::Receiver<Stop>,
+    ) -> Option<(String, String)> {
+        let name = &config.name;
+        let user = match &config.user {
+            Some(u) => u.clone(),
+            None => {
+                self.answer_of(name, (AskKind::User, retry), answers, answer_rx, stop_rx)
+                    .await?
+            }
+        };
+        let asked = (AskKind::Password, retry && config.user.is_some());
+        let password = self
+            .answer_of(name, asked, answers, answer_rx, stop_rx)
+            .await?;
+        Some((user, password))
     }
 
     /// Ask the user, and wait for the answer; None when it's switched off

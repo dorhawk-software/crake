@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 pub mod certificate;
 #[cfg(target_os = "linux")]
 pub mod charon;
+pub mod credential;
 pub mod env;
 #[cfg(target_os = "linux")]
 mod unit;

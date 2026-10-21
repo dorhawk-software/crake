@@ -6,13 +6,13 @@ use gpui_kit::{AnyWindowHandle, Focusable, TestAppContext, WindowOptions};
 
 use super::*;
 
-struct Opened {
-    window: AnyWindowHandle,
-    view: Entity<NewTunnel>,
-    requests: async_channel::Receiver<Request>,
+pub(super) struct Opened {
+    pub(super) window: AnyWindowHandle,
+    pub(super) view: Entity<NewTunnel>,
+    pub(super) requests: async_channel::Receiver<Request>,
 }
 
-fn open(cx: &mut TestAppContext) -> Opened {
+pub(super) fn open(cx: &mut TestAppContext) -> Opened {
     cx.update(|cx| {
         gpui_kit::init(cx);
         cx.set_global(crate::chrome::Chrome {
@@ -62,7 +62,7 @@ fn open_as_the_app(cx: &mut TestAppContext) -> Opened {
 }
 
 impl Opened {
-    fn click(&self, id: impl Into<gpui_kit::ElementId>, cx: &mut TestAppContext) {
+    pub(super) fn click(&self, id: impl Into<gpui_kit::ElementId>, cx: &mut TestAppContext) {
         let id = id.into();
         cx.update_window(self.window, |_, window, cx| {
             window.render_frame(cx);
@@ -73,7 +73,7 @@ impl Opened {
     }
 
     /// Type into the field `field` picks (it gets the focus first).
-    fn type_into(
+    pub(super) fn type_into(
         &self,
         field: impl Fn(&NewTunnel) -> Entity<InputState>,
         text: &str,
@@ -89,11 +89,15 @@ impl Opened {
         cx.run_until_parked();
     }
 
-    fn read<T>(&self, cx: &mut TestAppContext, f: impl Fn(&NewTunnel) -> T) -> T {
+    pub(super) fn read<T>(&self, cx: &mut TestAppContext, f: impl Fn(&NewTunnel) -> T) -> T {
         self.view.read_with(cx, |this, _| f(this))
     }
 
-    fn shown(&self, id: impl Into<gpui_kit::ElementId>, cx: &mut TestAppContext) -> bool {
+    pub(super) fn shown(
+        &self,
+        id: impl Into<gpui_kit::ElementId>,
+        cx: &mut TestAppContext,
+    ) -> bool {
         let id = id.into();
         cx.update_window(self.window, |_, window, cx| {
             window.render_frame(cx);
@@ -103,7 +107,7 @@ impl Opened {
     }
 
     /// The request "Add and connect" sent.
-    fn added(&self) -> HashMap<String, String> {
+    pub(super) fn added(&self) -> HashMap<String, String> {
         match self.requests.try_recv() {
             Ok(Request::AddTunnel(fields, None)) => fields,
             other => panic!("expected AddTunnel, got {other:?}"),
@@ -112,9 +116,7 @@ impl Opened {
 }
 
 const OPENVPN: usize = 8;
-const ANYCONNECT: usize = 1;
-#[cfg(target_os = "linux")]
-const IPSEC: usize = 9;
+pub(super) const ANYCONNECT: usize = 1;
 
 /// OpenVPN 3's profiles are taken over (design/proposals/openvpn-tunnel.html,
 /// 2): chosen in the Profile list, Crake takes a copy; a locked one says
@@ -560,139 +562,4 @@ fn the_protocols_fold_once_the_gateway_answered(cx: &mut TestAppContext) {
     assert!(shows(("protocol", 8usize).into(), cx), "opened");
     w.click(("protocol", 1usize), cx);
     assert_eq!(w.view.read_with(cx, |v, _| v.protocol), "anyconnect");
-}
-
-/// IPsec (design/proposals/ipsec-tunnel.html, chosen 2026-10-19): chosen,
-/// the list folds and Import .ovpn… goes; the gateway's key is asked
-/// before Continue, the username before step 3; the key, the gateway's
-/// identity and the domains go to craked with the rest.
-// IPsec is Linux's for now: elsewhere its card says "Not available".
-#[cfg(target_os = "linux")]
-#[gpui_kit::test]
-fn an_ipsec_gateway_with_its_key(cx: &mut TestAppContext) {
-    let w = open(cx);
-    w.type_into(|t| t.name.clone(), "Nordbank", cx);
-    assert!(
-        w.shown("import-ovpn", cx),
-        "the import while Detect is chosen"
-    );
-    w.click(("protocol", IPSEC), cx);
-    assert!(w.shown("protocols-more", cx), "folded after the choice");
-    assert!(
-        !w.shown(("protocol", ANYCONNECT), cx),
-        "the rest folded away"
-    );
-    assert!(!w.shown("import-ovpn", cx), "no import with IPsec chosen");
-    w.type_into(|t| t.gateway.clone(), "gw.nordbank.example", cx);
-    w.click("next", cx);
-    assert_eq!(w.read(cx, |t| t.step), 1, "no key yet");
-    assert!(
-        w.read(cx, |t| t.problem.clone())
-            .unwrap_or_default()
-            .contains("key"),
-        "the key is asked for"
-    );
-    w.type_into(|t| t.ipsec.key.clone(), "hunter2hunter2", cx);
-    w.type_into(
-        |t| t.ipsec.domains.clone(),
-        "nordbank.internal nordbank.example",
-        cx,
-    );
-    w.click("next", cx);
-    assert_eq!(w.read(cx, |t| t.step), 2);
-
-    w.click("next", cx);
-    assert_eq!(w.read(cx, |t| t.step), 2, "no username yet");
-    w.type_into(|t| t.user.clone(), "alice", cx);
-    w.click("advanced", cx);
-    w.type_into(|t| t.ipsec.identity.clone(), "vpn.nordbank.example", cx);
-    w.click("next", cx);
-    w.click("next", cx);
-
-    let fields = w.added();
-    assert_eq!(fields["protocol"], "ipsec");
-    assert_eq!(fields["gateway"], "gw.nordbank.example");
-    assert_eq!(fields["gateway_key"], "hunter2hunter2");
-    assert_eq!(fields["gateway_id"], "vpn.nordbank.example");
-    assert_eq!(fields["domains"], "nordbank.internal\nnordbank.example");
-    assert_eq!(fields["sign_in"], "password");
-    assert_eq!(fields["user"], "alice");
-}
-
-/// An IPsec gateway with a certificate (design/proposals/ipsec-certificates.html,
-/// 1, A): "Its certificate" asks for no key, says what's checked, takes IT's
-/// authority in the key's place (a file that isn't one is said and holds
-/// Continue), and sends no key.
-#[cfg(target_os = "linux")]
-#[gpui_kit::test]
-fn an_ipsec_gateway_with_its_certificate(cx: &mut TestAppContext) {
-    let w = open(cx);
-    w.type_into(|t| t.name.clone(), "Nordbank", cx);
-    w.click(("protocol", IPSEC), cx);
-    w.type_into(|t| t.gateway.clone(), "gw.nordbank.example", cx);
-    assert!(!w.read(cx, |t| t.ipsec.certificate), "a key at first");
-    w.click("ipsec-certificate", cx);
-    assert!(w.read(cx, |t| t.ipsec.certificate));
-    assert!(
-        w.shown("ipsec-choose-ca", cx),
-        "IT's authority in the key's place"
-    );
-    let line = w.view.read_with(cx, |v, cx| v.proof_line(cx));
-    assert!(line.contains("is for gw.nordbank.example"), "{line}");
-
-    // A file that isn't an authority: said, and Continue waits.
-    w.view.update(cx, |v, cx| {
-        v.set_authority(
-            "nordbank.ovpn",
-            Ok(b"client\nremote gw 1194\n".to_vec()),
-            cx,
-        )
-    });
-    w.click("next", cx);
-    assert_eq!(w.read(cx, |t| t.step), 1);
-    assert!(
-        w.read(cx, |t| t.problem.clone())
-            .unwrap_or_default()
-            .contains("isn\u{2019}t a certificate"),
-    );
-    let pem = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----";
-    w.view.update(cx, |v, cx| {
-        v.set_authority("nordbank-ca.pem", Ok(pem.as_bytes().to_vec()), cx)
-    });
-    w.click("next", cx);
-    assert_eq!(w.read(cx, |t| t.step), 2, "no key needed");
-    w.type_into(|t| t.user.clone(), "alice", cx);
-    w.click("next", cx);
-    w.click("next", cx);
-
-    let fields = w.added();
-    assert_eq!(fields["gateway_proof"], "certificate");
-    assert_eq!(fields["gateway_ca"], pem);
-    assert!(!fields.contains_key("gateway_key"), "{fields:?}");
-}
-
-/// A gateway typed as an address: few certificates name one, so the line
-/// says the identity can be given instead (ipsec-certificates.html, 4).
-#[cfg(target_os = "linux")]
-#[gpui_kit::test]
-fn an_ipsec_gateway_by_its_address_points_to_its_identity(cx: &mut TestAppContext) {
-    let w = open(cx);
-    w.type_into(|t| t.name.clone(), "Nordbank", cx);
-    w.click(("protocol", IPSEC), cx);
-    w.type_into(|t| t.gateway.clone(), "203.0.113.5", cx);
-    w.click("ipsec-certificate", cx);
-    let line = w.view.read_with(cx, |v, cx| v.proof_line(cx));
-    assert!(
-        line.starts_with("Its certificate must be for 203.0.113.5."),
-        "{line}"
-    );
-    assert!(line.contains("Gateway\u{2019}s identity"), "{line}");
-    // Back to a key: the key is asked for again, naming the other way.
-    w.click("ipsec-key", cx);
-    w.click("next", cx);
-    assert!(
-        w.read(cx, |t| t.problem.clone())
-            .unwrap_or_default()
-            .contains("or choose Its certificate"),
-    );
 }

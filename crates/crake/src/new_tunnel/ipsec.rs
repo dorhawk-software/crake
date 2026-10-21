@@ -31,6 +31,33 @@ pub(super) struct Ipsec {
     pub(super) ca_kept: bool,
     /// The picked file isn't an authority, or couldn't be read.
     pub(super) ca_problem: Option<String>,
+    /// How the user signs in: "password", "certificate" or
+    /// "certificate-password" (ipsec-certificates.html, 2, A).
+    pub(super) method: &'static str,
+    /// Editing: the user's certificate is kept in the keyring already.
+    pub(super) cert_kept: bool,
+}
+
+/// IPsec's ways to sign in, as step 2's cards (the first's line names the
+/// tunnel). No smart card yet: strongSwan's PKCS#11 needs a test of its
+/// own (docs/engineering/milestones.md, 7k).
+pub(super) const METHODS: [(&str, &str, &str); 3] = [
+    ("password", "Username and password", ""),
+    (
+        "certificate",
+        "Certificate",
+        "From a file, its copy kept in your keyring.",
+    ),
+    (
+        "certificate-password",
+        "Certificate and password",
+        "Your certificate first, then the gateway asks for your password.",
+    ),
+];
+
+/// The way it signs in needs a username and password.
+pub(super) fn needs_password(method: &str) -> bool {
+    method != "certificate"
 }
 
 /// What an edited IPsec tunnel has (craked's, never the secrets): a key,
@@ -40,6 +67,8 @@ pub(super) struct Kept {
     pub(super) key: bool,
     pub(super) certificate: bool,
     pub(super) ca: bool,
+    /// Its sign-in, as craked keeps it.
+    pub(super) sign_in: &'static str,
 }
 
 /// How long "Copied" shows after the install command is copied.
@@ -80,6 +109,8 @@ impl Ipsec {
             ca: None,
             ca_kept: kept.ca,
             ca_problem: None,
+            method: kept.sign_in,
+            cert_kept: kept.sign_in != "password",
         }
     }
 
@@ -166,6 +197,19 @@ fn looks_like_domain(d: &str) -> bool {
 }
 
 impl NewTunnel {
+    /// A certificate file as the system's chooser would give it (the IPsec
+    /// journey: the chooser is the desktop's).
+    #[cfg(all(test, target_os = "linux"))]
+    pub(crate) fn choose_certificate_for_tests(
+        &mut self,
+        name: &str,
+        bytes: Vec<u8>,
+        cx: &mut Context<Self>,
+    ) {
+        self.cert_file = Some((name.to_owned(), bytes));
+        cx.notify();
+    }
+
     /// IPsec's key, domains and gateway identity fields (the IPsec
     /// journey, Linux's only).
     #[cfg(all(test, target_os = "linux"))]
@@ -379,28 +423,59 @@ impl NewTunnel {
         } else {
             format!("{name}\u{2019}s gateway asks for them when you switch it on.")
         };
+        let mut ways = div().flex().flex_col().gap(px(8.)).mt(px(18.));
+        for (i, (id, title, sub)) in METHODS.into_iter().enumerate() {
+            let sub = if sub.is_empty() {
+                asks.clone()
+            } else {
+                sub.to_owned()
+            };
+            ways = ways.child(
+                card(
+                    ("ipsec-method", i),
+                    self.ipsec.method == id,
+                    title,
+                    sub,
+                    None,
+                    t,
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.ipsec.method = id;
+                    this.problem = None;
+                    cx.notify();
+                }))
+                .test_support(),
+            );
+        }
+        let method = self.ipsec.method;
         div()
             .child(heading("How do you sign in?"))
+            .child(ways)
             .child(
                 div()
                     .mt(px(18.))
-                    .py(px(14.))
-                    .px(px(16.))
-                    .rounded(px(8.))
-                    .bg(t.surface)
-                    .child(
-                        div()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child("Username and password"),
-                    )
-                    .child(div().text_color(t.muted).child(asks)),
+                    .flex()
+                    .gap(px(14.))
+                    .when(method != "password", |d| d.child(self.ipsec_certificate_file(t, cx)))
+                    .when(needs_password(method), |d| {
+                        d.child(
+                            div().w(px(320.)).child(label("Username")).child(
+                                field(&self.user, false, t).text_size(px(15.)),
+                            ),
+                        )
+                    }),
             )
             .child(
-                div().mt(px(18.)).child(label("Username")).child(
-                    div()
-                        .max_w(px(320.))
-                        .child(field(&self.user, false, t).text_size(px(15.))),
-                ),
+                div()
+                    .mt(px(10.))
+                    .text_size(px(13.))
+                    .line_height(px(19.))
+                    .text_color(t.muted)
+                    .child(match method {
+                        "password" => "Your password goes to the system keyring, never into Crake\u{2019}s files.",
+                        "certificate" => "Crake keeps a copy in the system keyring, so you can delete the file.",
+                        _ => "Crake keeps a copy in the system keyring, so you can delete the file. Your gateway password goes to the keyring too, never into Crake\u{2019}s files.",
+                    }),
             )
             .when(!self.ipsec.kept, |d| {
                 d.child(

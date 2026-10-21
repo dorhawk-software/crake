@@ -69,6 +69,7 @@ pub fn start(
                         // Kept only when "Remember the password in your
                         // keyring" is (OpenVPN's and IPsec's alike).
                         "password" => entry.password = remember.then(|| text.clone()),
+                        "key-password" => entry.key_password = remember.then(|| text.clone()),
                         _ => {}
                     }
                     Request::Answer(tunnel.clone(), id, text)
@@ -95,17 +96,42 @@ pub fn asked(tunnel: &str, ask: &HashMap<String, String>, cx: &mut App) {
     let kind = ask.get("kind").map(String::as_str).unwrap_or("");
     // Demo mode keeps nothing (CRAKE_DEMO never touches the keyring).
     let demo = cx.try_global::<crate::Shell>().is_some_and(|s| s.demo);
+    // IPsec: the user's certificate file, from the keyring, no window
+    // (empty when there's none: craked says so).
+    if kind == "certificate" {
+        let t = tunnel.to_owned();
+        cx.spawn(async move |cx| {
+            let found = cx
+                .background_executor()
+                .spawn({
+                    let t = t.clone();
+                    async move { if demo { None } else { kept::certificate(&t) } }
+                })
+                .await;
+            cx.update(|cx| answer(&t, id, found.unwrap_or_default(), cx))
+        })
+        .detach();
+        return;
+    }
     if let Some(k) = kept::kind(kind).filter(|_| !demo) {
         if ask.get("retry").map(String::as_str) == Some("true") {
-            // Refused: what was kept, and what was typed, goes.
+            // Refused: what was kept, and what was typed, goes (the
+            // certificate's password alone when it's what didn't work).
             cx.default_global::<Asks>()
                 .typed
                 .lock()
                 .unwrap()
                 .remove(tunnel);
             let t = tunnel.to_owned();
+            let key_password = kind == "key-password";
             cx.background_executor()
-                .spawn(async move { kept::forget(&t) })
+                .spawn(async move {
+                    if key_password {
+                        kept::forget_key_password(&t);
+                    } else {
+                        kept::forget(&t);
+                    }
+                })
                 .detach();
         } else {
             let (tunnel, ask) = (tunnel.to_owned(), ask.clone());
@@ -175,9 +201,20 @@ pub fn up(cx: &mut App) {
     }
 }
 
+/// A certificate file kept for `tunnel` where tests keep the keyring.
+#[cfg(test)]
+pub fn keep_certificate_for_tests(tunnel: &str, bytes: &[u8]) {
+    use base64::Engine as _;
+    kept::keep_certificate_for_tests(
+        tunnel,
+        &base64::engine::general_purpose::STANDARD.encode(bytes),
+    );
+}
+
 /// Removed: what was kept for it goes (with its other keyring items).
 pub fn forget(tunnel: &str) {
     kept::forget(tunnel);
+    kept::forget_key_password(tunnel);
 }
 
 /// The question in the tunnel's sign-in window.
@@ -467,6 +504,7 @@ mod tests {
             &kept::Typed {
                 user: Some("alice".into()),
                 password: Some("hunter2".into()),
+                ..Default::default()
             },
         );
         let (events, shown) = async_channel::unbounded();
@@ -533,7 +571,8 @@ mod tests {
             typed,
             Some(kept::Typed {
                 user: None,
-                password: Some("hunter3".into())
+                password: Some("hunter3".into()),
+                key_password: None,
             })
         );
     }
@@ -587,5 +626,71 @@ mod tests {
         );
         // A page isn't a question in the window.
         assert!(prompt(&ask(&[("kind", "browser"), ("url", "https://a.example/")])).is_none());
+    }
+
+    /// IPsec's certificate (ipsec-certificates.html, 2): the keyring's
+    /// copy, in base64, with no window; none kept, an empty answer (craked
+    /// says so). Its password, ticked to be remembered, is kept as the
+    /// others are, and asked again alone when it didn't open the file.
+    #[gpui_kit::test]
+    fn a_kept_certificate_is_given_without_a_window(cx: &mut gpui_kit::TestAppContext) {
+        cx.executor().allow_parking();
+        let tunnel = "cert-test";
+        keep_certificate_for_tests(tunnel, &[0x20, 0x81]);
+        let (events, shown) = async_channel::unbounded();
+        let (requests, to_craked) = async_channel::unbounded();
+        let replies = cx.update(|cx| {
+            let asks = cx.default_global::<Asks>();
+            start(tunnel.into(), events, requests, asks)
+        });
+        cx.update(|cx| asked(tunnel, &ask(&[("id", "1"), ("kind", "certificate")]), cx));
+        assert!(matches!(next(&to_craked, cx), Request::Answer(_, 1, ref t) if t == "IIE="));
+        let (other_events, _other_shown) = async_channel::unbounded();
+        let (other_requests, other_craked) = async_channel::unbounded();
+        cx.update(|cx| {
+            let asks = cx.default_global::<Asks>();
+            start("nothing-kept".into(), other_events, other_requests, asks)
+        });
+        cx.update(|cx| {
+            asked(
+                "nothing-kept",
+                &ask(&[("id", "2"), ("kind", "certificate")]),
+                cx,
+            )
+        });
+        assert!(
+            matches!(next(&other_craked, cx), Request::Answer(ref n, 2, ref t) if n == "nothing-kept" && t.is_empty())
+        );
+        assert!(shown.try_recv().is_err(), "no window for it");
+        // Its password: shown, typed with "Remember…", noted to be kept.
+        cx.update(|cx| asked(tunnel, &ask(&[("id", "3"), ("kind", "key-password")]), cx));
+        cx.run_until_parked();
+        let Ok(Event::Prompt(p)) = shown.try_recv() else {
+            panic!("the window wasn't asked");
+        };
+        assert!(matches!(
+            p.ask,
+            Ask::CertificatePassword { retry: false, .. }
+        ));
+        replies
+            .send_blocking(Reply::Answer {
+                text: "hunter2".into(),
+                remember: true,
+                keep_certificate: false,
+            })
+            .unwrap();
+        assert!(matches!(next(&to_craked, cx), Request::Answer(_, 3, ref t) if t == "hunter2"));
+        let typed = cx.update(|cx| {
+            cx.default_global::<Asks>()
+                .typed
+                .lock()
+                .unwrap()
+                .get(tunnel)
+                .cloned()
+        });
+        assert_eq!(
+            typed.and_then(|t| t.key_password).as_deref(),
+            Some("hunter2")
+        );
     }
 }

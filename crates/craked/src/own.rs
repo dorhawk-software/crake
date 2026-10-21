@@ -51,6 +51,10 @@ pub enum SignIn {
     Browser,
     Password,
     Certificate,
+    /// IPsec: the certificate, then the gateway asks for the password
+    /// (design/proposals/ipsec-certificates.html, 2, A).
+    #[serde(rename = "certificate-password")]
+    CertificatePassword,
 }
 
 impl SignIn {
@@ -59,7 +63,18 @@ impl SignIn {
             Self::Browser => "browser",
             Self::Password => "password",
             Self::Certificate => "certificate",
+            Self::CertificatePassword => "certificate-password",
         }
+    }
+
+    /// It signs in with the user's own certificate.
+    pub fn certificate(self) -> bool {
+        matches!(self, Self::Certificate | Self::CertificatePassword)
+    }
+
+    /// It signs in with a username and password.
+    pub fn password(self) -> bool {
+        matches!(self, Self::Password | Self::CertificatePassword)
     }
 }
 
@@ -144,6 +159,7 @@ impl OwnTunnel {
             "browser" => SignIn::Browser,
             "password" => SignIn::Password,
             "certificate" => SignIn::Certificate,
+            "certificate-password" if protocol == Protocol::Ipsec => SignIn::CertificatePassword,
             other => bail!("{other:?} isn't a way to sign in"),
         };
         let mode = match get("mode").unwrap_or("learn") {
@@ -303,10 +319,7 @@ impl OwnTunnel {
             display_name: Some(self.display_name.clone()),
             gateway: self.gateway.clone(),
             protocol: self.protocol,
-            user: self
-                .user
-                .clone()
-                .filter(|_| self.sign_in == SignIn::Password),
+            user: self.user.clone().filter(|_| self.sign_in.password()),
             passwd_file: None,
             dns_domains: self.domains.clone(),
             auth_args,
