@@ -12,8 +12,8 @@ mod view;
 mod tests;
 
 pub use open::open;
-/// The window, for the journeys.
-#[cfg(test)]
+/// The window, for the journeys (Linux's).
+#[cfg(all(test, target_os = "linux"))]
 pub use view::WhatsNew;
 
 use crate::prefs::Prefs;
