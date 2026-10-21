@@ -1358,7 +1358,8 @@
    asked, so the system's authorities are always loaded; a wrong
    `remote.id` gets none, so the first attempt names no gateway; the dump
    holds the user's own EAP messages and `reload-settings` switches it
-   off: details in the proposal's section 5),
+   off; vici's initiate stream at level 3 leaves the dumps out, so it's a
+   root-only file log: details in the proposal's section 5),
    the FortiGate by
    hand.
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or

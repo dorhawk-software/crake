@@ -519,7 +519,8 @@
         so was the outgoing EAP. The password wasn't, but a password's MSCHAPv2 response can be cracked. strongSwan's
         <code>reload-settings</code> turned the dump off with charon running: after it, there were no dumps. So the dump is on
         only for an attempt that has to read the certificate, it's written where only craked reads it (a root-only file in
-        craked's own <code>/run</code>, or VICI's log stream, not yet tried), and it's turned off and deleted once read. It
+        craked's own <code>/run</code>: VICI's log stream, tried, carries the level but leaves out every dump), and it's
+        turned off and deleted once read. It
         never reaches the journal, Crake's log, reports or Copy for helpdesk.</li>
     </ul>
     <ul>

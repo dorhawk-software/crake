@@ -170,3 +170,13 @@ tail -n +$n2 cl.log > cl4b.log
 grep -E "received end entity|no trusted" cl4b.log | head -2
 python3 -I $S/extract.py cl4b.log gw.der | tail -1
 openssl x509 -in got.der -inform der -noout -subject -ext subjectAltName 2>/dev/null
+swan cl --terminate --ike acme >/dev/null 2>&1 || true
+echo "== 6: the dump through vici's initiate stream alone (file log back at enc 1)"
+sed -i 's/enc = 3/enc = 1/' cl.sc; swan cl --reload-settings >/dev/null
+cp cl.conf cl/swanctl/swanctl.conf; rm -f cl/swanctl/x509/pinned.der
+swan cl --load-all --clear >/dev/null 2>&1 || swan cl --load-all >/dev/null
+n3=$(wc -l < cl.log)
+swan cl --initiate --child acme --timeout 15 --loglevel 3 > init6.log 2>&1 && echo "connected (WRONG)" || echo "refused, as it should"
+echo "file log dumps during it: $(tail -n +$n3 cl.log | grep -c 'plain =>')"
+echo "stream lines: $(wc -l < init6.log)"
+python3 -I $S/extract.py init6.log gw.der | tail -1
