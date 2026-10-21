@@ -618,3 +618,81 @@ fn an_ipsec_gateway_with_its_key(cx: &mut TestAppContext) {
     assert_eq!(fields["sign_in"], "password");
     assert_eq!(fields["user"], "alice");
 }
+
+/// An IPsec gateway with a certificate (design/proposals/ipsec-certificates.html,
+/// 1, A): "Its certificate" asks for no key, says what's checked, takes IT's
+/// authority in the key's place (a file that isn't one is said and holds
+/// Continue), and sends no key.
+#[cfg(target_os = "linux")]
+#[gpui_kit::test]
+fn an_ipsec_gateway_with_its_certificate(cx: &mut TestAppContext) {
+    let w = open(cx);
+    w.type_into(|t| t.name.clone(), "Nordbank", cx);
+    w.click(("protocol", IPSEC), cx);
+    w.type_into(|t| t.gateway.clone(), "gw.nordbank.example", cx);
+    assert!(!w.read(cx, |t| t.ipsec.certificate), "a key at first");
+    w.click("ipsec-certificate", cx);
+    assert!(w.read(cx, |t| t.ipsec.certificate));
+    assert!(
+        w.shown("ipsec-choose-ca", cx),
+        "IT's authority in the key's place"
+    );
+    let line = w.view.read_with(cx, |v, cx| v.proof_line(cx));
+    assert!(line.contains("is for gw.nordbank.example"), "{line}");
+
+    // A file that isn't an authority: said, and Continue waits.
+    w.view.update(cx, |v, cx| {
+        v.set_authority(
+            "nordbank.ovpn",
+            Ok(b"client\nremote gw 1194\n".to_vec()),
+            cx,
+        )
+    });
+    w.click("next", cx);
+    assert_eq!(w.read(cx, |t| t.step), 1);
+    assert!(
+        w.read(cx, |t| t.problem.clone())
+            .unwrap_or_default()
+            .contains("isn\u{2019}t a certificate"),
+    );
+    let pem = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----";
+    w.view.update(cx, |v, cx| {
+        v.set_authority("nordbank-ca.pem", Ok(pem.as_bytes().to_vec()), cx)
+    });
+    w.click("next", cx);
+    assert_eq!(w.read(cx, |t| t.step), 2, "no key needed");
+    w.type_into(|t| t.user.clone(), "alice", cx);
+    w.click("next", cx);
+    w.click("next", cx);
+
+    let fields = w.added();
+    assert_eq!(fields["gateway_proof"], "certificate");
+    assert_eq!(fields["gateway_ca"], pem);
+    assert!(!fields.contains_key("gateway_key"), "{fields:?}");
+}
+
+/// A gateway typed as an address: few certificates name one, so the line
+/// says the identity can be given instead (ipsec-certificates.html, 4).
+#[cfg(target_os = "linux")]
+#[gpui_kit::test]
+fn an_ipsec_gateway_by_its_address_points_to_its_identity(cx: &mut TestAppContext) {
+    let w = open(cx);
+    w.type_into(|t| t.name.clone(), "Nordbank", cx);
+    w.click(("protocol", IPSEC), cx);
+    w.type_into(|t| t.gateway.clone(), "203.0.113.5", cx);
+    w.click("ipsec-certificate", cx);
+    let line = w.view.read_with(cx, |v, cx| v.proof_line(cx));
+    assert!(
+        line.starts_with("Its certificate must be for 203.0.113.5."),
+        "{line}"
+    );
+    assert!(line.contains("Gateway\u{2019}s identity"), "{line}");
+    // Back to a key: the key is asked for again, naming the other way.
+    w.click("ipsec-key", cx);
+    w.click("next", cx);
+    assert!(
+        w.read(cx, |t| t.problem.clone())
+            .unwrap_or_default()
+            .contains("or choose Its certificate"),
+    );
+}

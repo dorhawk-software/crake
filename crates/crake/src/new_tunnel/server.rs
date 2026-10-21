@@ -519,7 +519,9 @@ impl NewTunnel {
     /// The gateway's sign-in groups to choose from, when it offers more than one.
     fn group_row(&self, t: &Theme, cx: &mut Context<Self>) -> Option<Div> {
         let groups = self.groups();
-        (groups.len() > 1 && self.protocol != "openvpn").then(|| {
+        // OpenVPN and IPsec have no groups (an IPsec tunnel chosen at a
+        // gateway that answered as AnyConnect showed AnyConnect's).
+        (groups.len() > 1 && !matches!(self.protocol, "openvpn" | "ipsec")).then(|| {
             let options: Vec<(String, String)> =
                 groups.iter().map(|g| (g.clone(), g.clone())).collect();
             div()

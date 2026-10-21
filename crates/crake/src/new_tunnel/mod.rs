@@ -23,6 +23,9 @@ mod view;
 mod import;
 // IPsec's key, domains and identity (ipsec-tunnel.html).
 mod ipsec;
+// How an IPsec gateway proves itself: its key or its certificate
+// (ipsec-certificates.html).
+mod ipsec_proof;
 
 mod routing;
 
@@ -300,7 +303,16 @@ impl NewTunnel {
         let name = input(field("display_name"), "Nordbank", window, cx);
         let gateway = input(field("gateway"), "vpn.example.com", window, cx);
         let user = input(field("user"), "your.name", window, cx);
-        let ipsec = ipsec::Ipsec::new(&field("domains"), field("protocol") == "ipsec", window, cx);
+        let mut ipsec = ipsec::Ipsec::new(
+            &field("domains"),
+            ipsec::Kept {
+                key: field("protocol") == "ipsec" && field("gateway_proof") != "certificate",
+                certificate: field("gateway_proof") == "certificate",
+                ca: field("gateway_ca") == "kept",
+            },
+            window,
+            cx,
+        );
         let list_input = input(
             String::new(),
             "*.example.internal or 10.0.0.0/16",
@@ -367,6 +379,17 @@ impl NewTunnel {
             .and_then(|v| v.split(':').nth(2))
             .filter(|_| demo)
             .map(|p| static_of(&PROTOCOLS, p, |p| p.0));
+        // newtunnel:1:ipsec:certificate: the gateway proving itself with its
+        // certificate, IT's authority picked (ipsec-certificates.html, 1);
+        // the variant after the step and the protocol.
+        // literal: CRAKE_SHOW's fourth part
+        if demo && shown.as_deref().and_then(|v| v.split(':').nth(3)) == Some("certificate") {
+            ipsec.certificate = true;
+            ipsec.ca = Some(("nordbank-ca.pem".into(), String::new()));
+            ipsec.domains.update(cx, |f, cx| {
+                f.set_value("nordbank.internal nordbank.example", window, cx)
+            });
+        }
         // openvpn3's profiles and the installed engines, without holding the
         // window up.
         cx.spawn(async move |this, cx| {

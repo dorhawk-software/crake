@@ -102,6 +102,14 @@ pub struct OwnTunnel {
     /// (as long as the gateway allows). Off: switching off logs off.
     #[serde(default = "yes")]
     pub keep_signed_in: bool,
+    /// IPsec: the gateway proves itself with its certificate, not a key
+    /// (the key and IT's authority are craked's alone, `ipsec::Secret`;
+    /// these say only which, for Edit).
+    #[serde(default)]
+    pub gateway_certificate: bool,
+    /// IPsec: IT's certificate authority is kept for it.
+    #[serde(default)]
+    pub gateway_ca: bool,
 }
 
 fn yes() -> bool {
@@ -196,7 +204,16 @@ impl OwnTunnel {
             weak_ciphers: flag("weak_ciphers"),
             client_version: flag("client_version"),
             keep_signed_in: get("keep_signed_in") != Some("false"),
+            gateway_certificate: false,
+            gateway_ca: false,
         })
+    }
+
+    /// What its secret says about the gateway's proof (`ipsec::Secret`).
+    pub fn with_secret(mut self, secret: Option<&crate::ipsec::Secret>) -> Self {
+        self.gateway_certificate = secret.is_some_and(|s| s.key.is_none());
+        self.gateway_ca = secret.is_some_and(|s| s.ca.is_some());
+        self
     }
 
     /// The text form, for the app to edit it.
@@ -226,6 +243,18 @@ impl OwnTunnel {
         m.insert("weak_ciphers".into(), self.weak_ciphers.to_string());
         m.insert("client_version".into(), self.client_version.to_string());
         m.insert("keep_signed_in".into(), self.keep_signed_in.to_string());
+        if self.protocol == Protocol::Ipsec {
+            let proof = if self.gateway_certificate {
+                "certificate"
+            } else {
+                "key"
+            };
+            m.insert("gateway_proof".into(), proof.into());
+            m.insert(
+                "gateway_ca".into(),
+                if self.gateway_ca { "kept" } else { "" }.into(),
+            );
+        }
         m
     }
 

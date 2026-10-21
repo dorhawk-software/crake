@@ -22,6 +22,24 @@ pub(super) struct Ipsec {
     had_key: bool,
     /// The install command was copied, and when ("Copied" for a while).
     copied: Option<std::time::Instant>,
+    /// The gateway proves itself with its certificate, not a key
+    /// (ipsec-certificates.html, 1; `ipsec_proof`).
+    pub(super) certificate: bool,
+    /// IT's certificate authority picked here: its file's name, and PEM.
+    pub(super) ca: Option<(String, String)>,
+    /// Editing: craked keeps IT's authority for it.
+    pub(super) ca_kept: bool,
+    /// The picked file isn't an authority, or couldn't be read.
+    pub(super) ca_problem: Option<String>,
+}
+
+/// What an edited IPsec tunnel has (craked's, never the secrets): a key,
+/// or a certificate and whether IT's authority is kept.
+#[derive(Default, Clone, Copy)]
+pub(super) struct Kept {
+    pub(super) key: bool,
+    pub(super) certificate: bool,
+    pub(super) ca: bool,
 }
 
 /// How long "Copied" shows after the install command is copied.
@@ -31,10 +49,11 @@ impl Ipsec {
     /// `domains`: the tunnel's, as AddTunnel's text gives them (a line each).
     pub(super) fn new(
         domains: &str,
-        had_key: bool,
+        kept: Kept,
         window: &mut Window,
         cx: &mut Context<NewTunnel>,
     ) -> Self {
+        let had_key = kept.key;
         let make = |value: String,
                     placeholder: &'static str,
                     masked: bool,
@@ -57,16 +76,23 @@ impl Ipsec {
             kept: had_key,
             had_key,
             copied: None,
+            certificate: kept.certificate,
+            ca: None,
+            ca_kept: kept.ca,
+            ca_problem: None,
         }
     }
 
     /// What's missing or wrong in step 1, when Continue is pressed (never
     /// before: the key's help line says where it comes from).
     pub(super) fn problem(&self, cx: &App) -> Option<String> {
-        if !self.kept && self.key.read(cx).value().trim().is_empty() {
+        if self.certificate {
+            if let Some(p) = &self.ca_problem {
+                return Some(p.clone());
+            }
+        } else if !self.kept && self.key.read(cx).value().trim().is_empty() {
             return Some(
-                "Add the gateway\u{2019}s key. Your IT team gives it with the gateway\u{2019}s address."
-                    .into(),
+                "Add the gateway\u{2019}s key, or choose Its certificate if IT gave none.".into(),
             );
         }
         self.domain_list(cx)
@@ -94,6 +120,19 @@ impl Ipsec {
     /// identity when they were typed (craked keeps them; never sent again).
     pub(super) fn fields(&self, f: &mut HashMap<String, String>, cx: &App) {
         f.insert("domains".into(), self.domain_list(cx).join("\n"));
+        let id = self.identity.read(cx).value().trim().to_owned();
+        if self.certificate {
+            // IT's authority when one was picked; a kept one stays.
+            f.insert("gateway_proof".into(), "certificate".into());
+            if let Some((_, pem)) = &self.ca {
+                f.insert("gateway_ca".into(), pem.clone());
+            }
+            if !id.is_empty() {
+                f.insert("gateway_id".into(), id);
+            }
+            return;
+        }
+        f.insert("gateway_proof".into(), "key".into());
         if self.kept {
             return;
         }
@@ -101,7 +140,6 @@ impl Ipsec {
             "gateway_key".into(),
             self.key.read(cx).value().trim().to_owned(),
         );
-        let id = self.identity.read(cx).value().trim().to_owned();
         if !id.is_empty() {
             f.insert("gateway_id".into(), id);
         }
@@ -109,7 +147,7 @@ impl Ipsec {
 
     /// The text fields in step 1, in the order Tab goes through them.
     pub(super) fn tab_fields(&self) -> Vec<Entity<InputState>> {
-        if self.kept {
+        if self.kept || self.certificate {
             vec![self.domains.clone()]
         } else {
             vec![self.key.clone(), self.domains.clone()]
@@ -270,26 +308,31 @@ impl NewTunnel {
                 "From your IT team, who may call it the pre-shared key. Only Crake\u{2019}s service can read it.",
             ))
         };
-        div()
+        // The key's slot takes IT's authority when the gateway has a
+        // certificate (ipsec-certificates.html, 1): nothing below moves.
+        let slot = if ipsec.certificate {
+            self.ipsec_authority(t, cx)
+        } else {
+            div()
+                .flex_basis(px(0.))
+                .flex_grow(1.)
+                .min_w_0()
+                .child(
+                    div()
+                        .flex()
+                        .items_baseline()
+                        .justify_between()
+                        .child(label("Gateway\u{2019}s key"))
+                        .child(key_action),
+                )
+                .child(key_field)
+                .children(key_help)
+        };
+        let grid = div()
             .flex()
             .gap(px(14.))
             .mt(px(20.))
-            .child(
-                div()
-                    .flex_basis(px(0.))
-                    .flex_grow(1.)
-                    .min_w_0()
-                    .child(
-                        div()
-                            .flex()
-                            .items_baseline()
-                            .justify_between()
-                            .child(label("Gateway\u{2019}s key"))
-                            .child(key_action),
-                    )
-                    .child(key_field)
-                    .children(key_help),
-            )
+            .child(slot)
             .child(
                 div()
                     .flex_basis(px(0.))
@@ -312,7 +355,8 @@ impl NewTunnel {
                     .child(help(
                         "Names under them go to the tunnel\u{2019}s DNS. Without them, Crake asks public DNS first and finds those names a moment later.",
                     )),
-            )
+            );
+        div().child(self.ipsec_proof(t, cx)).child(grid)
     }
 
     /// Step 2: a username and password, the gateway asking for them over
@@ -320,6 +364,16 @@ impl NewTunnel {
     /// (with the key: a kept one keeps its identity).
     pub(super) fn ipsec_sign_in(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
         let name = self.display_name(cx);
+        // With a certificate, what's checked when it's left empty is new
+        // (ipsec-certificates.html, 2); with a key, today's words.
+        let gateway = self.gateway.read(cx).value().trim().to_owned();
+        let identity_help = if self.ipsec.certificate && !gateway.is_empty() {
+            format!(
+                "Only if your IT team gave one, like vpn.nordbank.example. Without it, the gateway\u{2019}s certificate must be for {gateway}."
+            )
+        } else {
+            "Only if your IT team gave one, like vpn.nordbank.example. Crake then signs in only to a gateway that proves it\u{2019}s that one.".to_owned()
+        };
         let asks = if name.is_empty() {
             "The gateway asks for them when you switch it on.".to_owned()
         } else {
@@ -342,14 +396,11 @@ impl NewTunnel {
                     .child(div().text_color(t.muted).child(asks)),
             )
             .child(
-                div()
-                    .mt(px(18.))
-                    .child(label("Username"))
-                    .child(
-                        div()
-                            .max_w(px(320.))
-                            .child(field(&self.user, false, t).text_size(px(15.))),
-                    ),
+                div().mt(px(18.)).child(label("Username")).child(
+                    div()
+                        .max_w(px(320.))
+                        .child(field(&self.user, false, t).text_size(px(15.))),
+                ),
             )
             .when(!self.ipsec.kept, |d| {
                 d.child(
@@ -408,9 +459,7 @@ impl NewTunnel {
                                             .text_size(px(13.))
                                             .line_height(px(19.))
                                             .text_color(t.muted)
-                                            .child(
-                                                "Only if your IT team gave one, like vpn.nordbank.example. Crake then signs in only to a gateway that proves it\u{2019}s that one.",
-                                            ),
+                                            .child(identity_help.clone()),
                                     ),
                             )
                         }),

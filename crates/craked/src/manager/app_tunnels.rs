@@ -39,7 +39,7 @@ impl Manager {
         let mut fields = fields.clone();
         let profile = take_profile(&mut fields, true)?;
         let secret = take_secret(&mut fields, None)?;
-        let own = crate::own::OwnTunnel::from_map(&name, &fields)?;
+        let own = crate::own::OwnTunnel::from_map(&name, &fields)?.with_secret(secret.as_ref());
         if let Some(text) = &profile {
             self.keep_profile(&name, text)?;
         }
@@ -89,7 +89,7 @@ impl Manager {
         let kept =
             crate::ipsec::Secret::read(&crate::ipsec::secret_path(&self.cfg.state_path, name)).ok();
         let secret = take_secret(&mut fields, kept.as_ref())?;
-        let own = crate::own::OwnTunnel::from_map(name, &fields)?;
+        let own = crate::own::OwnTunnel::from_map(name, &fields)?.with_secret(secret.as_ref());
         let (was, routed, moved) = {
             let mut map = self.tunnels.lock().unwrap();
             let e = map
@@ -115,6 +115,10 @@ impl Manager {
         }
         if let Some(secret) = &secret {
             self.keep_secret(name, secret)?;
+            // Back to a key: a certificate trusted before means nothing.
+            if secret.key.is_some() {
+                let _ = std::fs::remove_file(crate::ipsec::pin_path(&self.cfg.state_path, name));
+            }
         }
         self.save_own();
         // A new scope or a full tunnel: rebuild its routing now.
@@ -194,6 +198,7 @@ impl Manager {
         self.tunnels.lock().unwrap().remove(name);
         let _ = std::fs::remove_file(crate::openvpn::profile_path(&self.cfg.state_path, name));
         let _ = std::fs::remove_file(crate::ipsec::secret_path(&self.cfg.state_path, name));
+        let _ = std::fs::remove_file(crate::ipsec::pin_path(&self.cfg.state_path, name));
         {
             let mut store = self.hosts.lock().unwrap();
             store.tunnels.remove(name);

@@ -11,6 +11,15 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **IPsec gateways that prove themselves with a certificate.** New tunnel asks how the gateway
+  proves itself: with a key from your IT team, or with its certificate, as a website does. Crake
+  checks that the certificate is for the gateway, signed by an authority this computer knows or by
+  the one your IT team gave. When no authority here vouches for it, Crake shows you whose it is and
+  who signed it, and asks before trusting it, as it does for AnyConnect gateways. If it changes
+  later, Crake asks again and says so. A certificate made out to another name is never offered to
+  be trusted.
+- **No AnyConnect groups for an IPsec tunnel.** Choosing IPsec at a gateway that also answered as
+  AnyConnect showed AnyConnect's sign-in groups, which IPsec doesn't use.
 - **A failed sign-in names who said why.** When an IPsec or OpenVPN tunnel couldn't sign in, the
   sign-in window put strongSwan's or OpenVPN's words after "openconnect said:". It now names them.
 
