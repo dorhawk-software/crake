@@ -182,7 +182,7 @@ fn release(r: &Release, first: bool, t: &Theme) -> AnyElement {
 }
 
 impl Render for WhatsNew {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = Theme::current(cx);
         let shown = super::shown_in(releases(), crate::versions::this(), self.since.as_deref());
         let mut body = div().px(px(20.)).pb(px(20.));
@@ -241,13 +241,20 @@ impl Render for WhatsNew {
             }))
             .child(self.header(shown.since.clone(), &t, cx))
             .child(
-                div()
-                    .id("versions")
-                    .flex_1()
-                    .overflow_y_scroll()
-                    .track_scroll(&self.scroll)
-                    .child(body)
-                    .test_support(),
+                crate::controls::over(
+                    "versions",
+                    div()
+                        .id("versions")
+                        .flex_1()
+                        .overflow_y_scroll()
+                        .track_scroll(&self.scroll)
+                        .child(body)
+                        .test_support(),
+                    &self.scroll,
+                    window,
+                    cx,
+                )
+                .flex_1(),
             )
     }
 }

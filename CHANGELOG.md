@@ -19,6 +19,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ### Better
 
+- **What scrolls says so.** The log, Settings, tunnel detail, Traffic, New tunnel and its lists,
+  the sign-in window, What's new and the panel show a scrollbar while you point at them, when
+  there's more than fits. It fades away when you move on.
 - **Switched off and on, an OpenVPN tunnel doesn't send you to the browser again.** After you sign
   in in the browser, Crake keeps the gateway's sign-in, as it does AnyConnect's, until it runs out
   or the computer restarts. It has done so since 0.11; this is the first time it's said.

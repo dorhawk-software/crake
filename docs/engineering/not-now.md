@@ -96,8 +96,9 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   of the monitor the window opens on (X11's work area was unreliable
   across monitors, place.rs); Traffic and the profile editor open as
   tall as a big screen allows (`max_window_height_or` ignores its
-  fallback when a monitor is known); the panel's scrolling middle shows
-  no sign it scrolls but its cut-off last row.
+  fallback when a monitor is known); the panel's scrolling middle showed
+  no sign it scrolls but its cut-off last row (done 2026-10-21: every
+  scrolling area has a scrollbar while the pointer is over it).
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with
@@ -271,3 +272,8 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   fine. If it comes back: `xwininfo -id <the window>` (its real size)
   beside CRAKE_DEBUG=1's output, and whether moving the window redraws it
   whole.
+- **No-tray's command line has no scrollbar (2026-10-21).** Every other
+  scrolling area shows one while the pointer is over it
+  (`controls::over`); the one-line install command in the no-tray
+  notice scrolls sideways under 6 px of padding, where a bar would sit
+  over the text. Its Copy is the way to the whole line.

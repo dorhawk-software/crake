@@ -196,13 +196,16 @@ impl Render for TunnelDetail {
             .child(policy(&tunnel, &t))
             .child(self.chart(&tunnel, marks, &traffic, &t, cx));
 
+        let body_scroll = crate::controls::scroll_handle("tunnel-detail-body", window, cx);
         let body = div()
             .id("body")
             .flex_none()
             .max_h(px(max_height - 60.))
             .overflow_y_scroll()
+            .track_scroll(&body_scroll)
             .child(top)
             .child(self.hosts(&tunnel, &rows, failed, &t, window, cx));
+        let body = crate::controls::over("body", body, &body_scroll, window, cx);
 
         let card = div()
             .id("tunnel-detail")

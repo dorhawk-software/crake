@@ -122,6 +122,7 @@ impl NewTunnel {
 
 impl Render for NewTunnel {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let new_tunnel_body_scroll = crate::controls::scroll_handle("new-tunnel-body", window, cx);
         // A name taken from an imported .ovpn (`import`): set here, where
         // there's the window.
         if let Some(name) = self.pending_name.take() {
@@ -198,7 +199,8 @@ impl Render for NewTunnel {
             }))
             .child(self.header(&t, title, cx))
             .child(self.steps(&t, cx))
-            .child(
+            .child(crate::controls::over(
+                "new-tunnel-body",
                 div()
                     .id("body")
                     // Its natural height; scrolls only past the screen's
@@ -219,8 +221,12 @@ impl Render for NewTunnel {
                                 .child(p),
                         )
                     })
+                    .track_scroll(&new_tunnel_body_scroll)
                     .test_support(),
-            )
+                &new_tunnel_body_scroll,
+                window,
+                cx,
+            ))
             // Footer: Back, "Step n of 3", Continue.
             .child(
                 div()

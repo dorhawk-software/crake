@@ -199,6 +199,8 @@ pub struct NewTunnel {
     send_suggested: bool,
     forget: String,
     open_select: Option<&'static str>,
+    /// The open drop-down's list scroll (one is open at a time).
+    menu_scroll: gpui_kit::ScrollHandle,
     /// What's missing, said where Continue was pressed.
     problem: Option<String>,
     /// The tallest the window may get (the screen, less some room).
@@ -469,6 +471,7 @@ impl NewTunnel {
             send_suggested: false,
             forget,
             open_select: None,
+            menu_scroll: gpui_kit::ScrollHandle::new(),
             problem: None,
             max_height: crate::place::max_window_height(),
             profiles: Vec::new(),

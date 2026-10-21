@@ -151,6 +151,13 @@ fn the_window_shows_what_changed_since_the_version_you_had(cx: &mut TestAppConte
         !w.shows("release-0.13.1", cx),
         "seen already: behind the button"
     );
+    // The button is at the end: End scrolls there.
+    cx.update_window(w.window, |_, window, cx| {
+        window.render_frame(cx);
+        window.press("end", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
     w.click("earlier", cx);
     assert!(w.shows("release-0.13.1", cx));
     assert!(
@@ -181,4 +188,61 @@ fn from_about_it_opens_at_this_version(cx: &mut TestAppContext) {
     assert!(!w.shows("since", cx));
     assert!(w.shows("earlier", cx));
     assert!(!w.shows("release-0.13.1", cx));
+}
+
+/// Pointing at the versions shows their scrollbar (hover), and moves
+/// nothing: the window stays at its top.
+#[gpui_kit::test]
+fn pointing_at_the_versions_moves_nothing(cx: &mut TestAppContext) {
+    let w = open(cx, Some("0.13.1"));
+    cx.update(|cx| crate::theme::Theme::dark().sync_components(cx));
+    let top = |cx: &mut TestAppContext| {
+        cx.update_window(w.window, |_, window, cx| {
+            window.render_frame(cx);
+            window.find("release-0.14.0").bounds().origin.y
+        })
+        .unwrap()
+    };
+    let before = top(cx);
+    cx.update_window(w.window, |_, window, cx| {
+        window.render_frame(cx);
+        window.hover("versions", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert_eq!(top(cx), before);
+}
+
+/// The bar is there while the pointer is over the versions, and gone a
+/// moment after it leaves (not while it's elsewhere, as gpui-kit's own
+/// hover had it: the user, 2026-10-21).
+#[gpui_kit::test]
+fn the_scrollbar_follows_the_pointer_over_what_scrolls(cx: &mut TestAppContext) {
+    let w = open(cx, Some("0.13.1"));
+    assert!(!w.shows("versions-bar", cx), "not pointed at: no bar");
+    let point = |id: &'static str, cx: &mut TestAppContext| {
+        cx.update_window(w.window, |_, window, cx| {
+            window.render_frame(cx);
+            window.hover(id, cx);
+        })
+        .unwrap();
+        cx.run_until_parked();
+    };
+    point("versions", cx);
+    assert!(w.shows("versions-bar", cx), "pointed at: the bar");
+    // Moving on over what scrolls, the bar shown over it: it stays (the
+    // bar's own layer once took the pointer away, and it flickered).
+    point("release-0.14.0", cx);
+    assert!(
+        w.shows("versions-bar", cx),
+        "still pointed at: still the bar"
+    );
+    point("whats-new-title", cx);
+    assert!(w.shows("versions-bar", cx), "held a moment after leaving");
+    // The hold and the fade, then the bar goes.
+    std::thread::sleep(std::time::Duration::from_millis(700));
+    cx.executor()
+        .advance_clock(std::time::Duration::from_millis(700));
+    cx.run_until_parked();
+    assert!(!w.shows("versions-bar", cx), "gone once faded");
 }

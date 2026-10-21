@@ -131,6 +131,7 @@ fn start(
 
 impl Render for SignIn {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let card_scroll = crate::controls::scroll_handle("sign-in-card", window, cx);
         let t = Theme::current(cx);
         let display = self.spec.display.clone();
         // The card of sign-in.html: 12 px corners, a hairline, 22 px inside.
@@ -275,7 +276,8 @@ impl Render for SignIn {
             .on_mouse_down(gpui_kit::MouseButton::Left, |_, window, _| {
                 window.start_window_move()
             })
-            .child(
+            .child(crate::controls::over(
+                "card",
                 // Never past its screen's bottom: a gateway's long list of
                 // groups, or a long error, scrolls inside the card instead
                 // (Cancel and Try again had gone below a 768 px screen,
@@ -283,9 +285,13 @@ impl Render for SignIn {
                 card.id("sign-in-card")
                     .max_h(px(room(window)))
                     .overflow_y_scroll()
+                    .track_scroll(&card_scroll)
                     .child(fit_window())
                     .test_support(),
-            )
+                &card_scroll,
+                window,
+                cx,
+            ))
     }
 }
 

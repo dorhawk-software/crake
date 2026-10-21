@@ -45,6 +45,8 @@ impl NewTunnel {
                 )
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.open_select = if open { None } else { Some(id) };
+                    // One list open at a time, each from its top.
+                    this.menu_scroll.set_offset(gpui_kit::point(px(0.), px(0.)));
                     cx.notify();
                 }))
                 .test_support(),
@@ -54,17 +56,10 @@ impl NewTunnel {
             // scrolls rather than running past the window's edge.
             let mut menu = div()
                 .id((id, usize::MAX))
-                .absolute()
-                .top(px(46.))
                 .max_h(px(MENU_TALLEST))
                 .overflow_y_scroll()
-                .left_0()
-                .min_w(px(180.))
-                .py(px(4.))
-                .bg(t.panel)
-                .border_1()
-                .border_color(t.line_strong)
-                .rounded(px(6.));
+                .track_scroll(&self.menu_scroll)
+                .py(px(4.));
             for (i, (value, label)) in options.into_iter().enumerate() {
                 let on = value == current;
                 let pick = pick.clone();
@@ -86,6 +81,17 @@ impl NewTunnel {
                         .test_support(),
                 );
             }
+            // Its scrollbar over the list, on a frame that holds still.
+            let menu = crate::controls::over_shown(menu, &self.menu_scroll)
+                .absolute()
+                .top(px(46.))
+                .left_0()
+                .min_w(px(180.))
+                .bg(t.panel)
+                .border_1()
+                .border_color(t.line_strong)
+                .rounded(px(6.))
+                .overflow_hidden();
             picker = picker.child(gpui_kit::deferred(menu.occlude()).with_priority(1));
         }
         picker

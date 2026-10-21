@@ -189,6 +189,7 @@ impl gpui_kit::EventEmitter<Close> for Settings {}
 
 impl Render for Settings {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let settings_main_scroll = crate::controls::scroll_handle("settings-main", window, cx);
         let t = Theme::current(cx);
         let model = self.model.read(cx).clone();
         let (title, lede, _) = self.section.info();
@@ -238,89 +239,100 @@ impl Render for Settings {
             }))
             .child(self.nav(&t, cx))
             .child(
-                div()
-                    .id("main")
-                    .flex_1()
-                    .min_w_0()
-                    .h_full()
-                    .overflow_y_scroll()
-                    .pt(px(14.))
-                    .pr(px(16.))
-                    .pb(px(32.))
-                    .pl(px(36.))
-                    .child(
-                        // No title bar: the window moves by this top strip
-                        // and the heading (not by its controls: a drag
-                        // started there would swallow their clicks).
-                        // With macOS's own buttons (`chrome`) it stays, empty:
-                        // the page keeps its place.
-                        div()
-                            .h(px(32.))
-                            .flex()
-                            .justify_end()
-                            .on_mouse_down(gpui_kit::MouseButton::Left, |_, window, _| {
-                                window.start_window_move()
-                            })
-                            .when(!system, |strip| {
-                                strip.child(
-                                    crate::chrome::close_button(&t)
-                                        .keys()
-                                        .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
-                                        .test_support(),
-                                )
-                            }),
-                    )
-                    .child(
-                        div()
-                            .max_w(px(660.))
-                            .pr(px(20.))
-                            .child(
-                                div()
-                                    .text_size(px(26.))
-                                    .line_height(px(38.))
-                                    .font_weight(FontWeight::BOLD)
-                                    .on_mouse_down(gpui_kit::MouseButton::Left, |_, window, _| {
-                                        window.start_window_move()
-                                    })
-                                    .child(title),
-                            )
-                            .child(if self.section == Section::About {
-                                // The corncrake's Latin name is its call.
-                                div()
-                                    .mt(px(4.))
-                                    .flex()
-                                    .text_color(t.muted)
-                                    .child("Named after the corncrake,\u{a0}")
-                                    .child(
-                                        div()
-                                            .id("crex")
-                                            .italic()
-                                            .underline()
-                                            .text_color(t.ink)
-                                            .cursor_pointer()
-                                            .child("Crex crex")
+                crate::controls::over(
+                    "settings-main",
+                    div()
+                        .id("main")
+                        .flex_1()
+                        .min_w_0()
+                        .h_full()
+                        .overflow_y_scroll()
+                        .pt(px(14.))
+                        .pr(px(16.))
+                        .pb(px(32.))
+                        .pl(px(36.))
+                        .child(
+                            // No title bar: the window moves by this top strip
+                            // and the heading (not by its controls: a drag
+                            // started there would swallow their clicks).
+                            // With macOS's own buttons (`chrome`) it stays, empty:
+                            // the page keeps its place.
+                            div()
+                                .h(px(32.))
+                                .flex()
+                                .justify_end()
+                                .on_mouse_down(gpui_kit::MouseButton::Left, |_, window, _| {
+                                    window.start_window_move()
+                                })
+                                .when(!system, |strip| {
+                                    strip.child(
+                                        crate::chrome::close_button(&t)
                                             .keys()
-                                            .on_click(|_, _, cx| {
-                                                cx.open_url(
-                                                    "https://en.wikipedia.org/wiki/Corn_crake",
-                                                )
-                                            }),
+                                            .on_click(cx.listener(|_, _, _, cx| cx.emit(Close)))
+                                            .test_support(),
                                     )
-                                    .child(".")
-                            } else {
-                                div().mt(px(4.)).text_color(t.muted).child(lede)
-                            })
-                            .child(body)
-                            .when_some(failed, |c, text| {
-                                c.child(
+                                }),
+                        )
+                        .child(
+                            div()
+                                .max_w(px(660.))
+                                .pr(px(20.))
+                                .child(
                                     div()
-                                        .mt(px(14.))
-                                        .text_size(px(13.))
-                                        .text_color(t.danger)
-                                        .child(text),
+                                        .text_size(px(26.))
+                                        .line_height(px(38.))
+                                        .font_weight(FontWeight::BOLD)
+                                        .on_mouse_down(
+                                            gpui_kit::MouseButton::Left,
+                                            |_, window, _| window.start_window_move(),
+                                        )
+                                        .child(title),
                                 )
-                            }),
-                    ),
+                                .child(if self.section == Section::About {
+                                    // The corncrake's Latin name is its call.
+                                    div()
+                                        .mt(px(4.))
+                                        .flex()
+                                        .text_color(t.muted)
+                                        .child("Named after the corncrake,\u{a0}")
+                                        .child(
+                                            div()
+                                                .id("crex")
+                                                .italic()
+                                                .underline()
+                                                .text_color(t.ink)
+                                                .cursor_pointer()
+                                                .child("Crex crex")
+                                                .keys()
+                                                .on_click(|_, _, cx| {
+                                                    cx.open_url(
+                                                        "https://en.wikipedia.org/wiki/Corn_crake",
+                                                    )
+                                                }),
+                                        )
+                                        .child(".")
+                                } else {
+                                    div().mt(px(4.)).text_color(t.muted).child(lede)
+                                })
+                                .child(body)
+                                .when_some(failed, |c, text| {
+                                    c.child(
+                                        div()
+                                            .mt(px(14.))
+                                            .text_size(px(13.))
+                                            .text_color(t.danger)
+                                            .child(text),
+                                    )
+                                }),
+                        )
+                        .track_scroll(&settings_main_scroll),
+                    &settings_main_scroll,
+                    window,
+                    cx,
+                )
+                .flex_1()
+                .min_w_0()
+                .h_full(),
             )
     }
 }

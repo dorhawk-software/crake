@@ -158,6 +158,15 @@ a body, and an actions row of a bordered action and a muted text dismiss
 command line, with Copy and Got it on it, is the user's choice (A2,
 2026-10-15) and stays.
 
+**Scrollbars** (asked for by the user, 2026-10-21): every area that
+scrolls has one when there's more than fits, shown while the pointer is
+over that area: fading in (0.15 s) as it enters, held 0.3 s after it
+leaves, then fading out (0.3 s); an open drop-down's while it's open. A
+thumb in lineStrong (muted when pointed at) on no track, over the
+content, never taking its width (`controls::over`,
+`Theme::sync_components`). Not gpui-kit's own "hover", which means
+pointing at the bar's strip, not at what scrolls.
+
 **What's new** (design/proposals/whats-new.html, chosen by the user
 2026-10-21): after an update, the panel's notice, neutral (the surface
 tint: nothing needs you, nothing was decided). The window: every window's

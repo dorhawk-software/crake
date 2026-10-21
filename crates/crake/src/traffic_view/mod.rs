@@ -488,15 +488,18 @@ impl Render for Traffic {
             })
             .when(!system, |h| h.child(close_button(&t, cx)));
         let graph = self.graph(&model, &t, window);
+        let body_scroll = crate::controls::scroll_handle("traffic-body", window, cx);
         let body = div()
             .id("body")
             .flex_none()
             .max_h(px(self.max_height - 60.))
             .overflow_y_scroll()
+            .track_scroll(&body_scroll)
             .child(graph)
             .child(self.strip(&model, &t))
             .child(self.tabs(&now_rows, &rule_rows, &t, cx))
             .child(self.detail(&model, &now_rows, &rule_rows, &t, cx));
+        let body = crate::controls::over("body", body, &body_scroll, window, cx);
         div()
             .id("traffic")
             .track_focus(&self.focus)

@@ -154,6 +154,7 @@ fn header_marks(model: &Model, t: &Theme) -> Vec<gpui_kit::Svg> {
 
 impl Render for Panel {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let panel_middle_scroll = crate::controls::scroll_handle("panel-middle", window, cx);
         let t = Theme::current(cx);
         // A snapshot, so the view can be built with `cx` free for its handlers.
         let model = &self.model.read(cx).clone();
@@ -188,7 +189,8 @@ impl Render for Panel {
             // pushed it off a 1366x768 screen, 2026-10-19).
             let middle = (crate::place::max_window_height() - HEADER - FOOTER).max(MIDDLE_LEAST);
             panel = panel
-                .child(
+                .child(crate::controls::over(
+                    "panel-middle",
                     div()
                         .id("panel-middle")
                         .flex()
@@ -200,8 +202,12 @@ impl Render for Panel {
                         .children(self.staying_notices(model, &t, cx))
                         .child(self.chart(model, &t, window, cx))
                         .child(self.decisions(model, &t, window, cx))
-                        .child(self.tunnels(model, &t, cx)),
-                )
+                        .child(self.tunnels(model, &t, cx))
+                        .track_scroll(&panel_middle_scroll),
+                    &panel_middle_scroll,
+                    window,
+                    cx,
+                ))
                 .child(self.footer(model, &t, cx));
         } else {
             panel = panel.child(not_running(model, &t, cx));

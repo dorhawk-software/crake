@@ -95,6 +95,16 @@ impl Theme {
             gpui_kit::component::ThemeMode::Light
         };
         gpui_kit::component::Theme::change(mode, None, cx);
+        // Scrollbars: drawn always, shown and hidden by what scrolls
+        // (`controls::over`); a thumb in lineStrong, muted when pointed at,
+        // on no track.
+        let (thumb, pointed) = (self.line_strong, self.muted);
+        gpui_kit::component::Theme::update(cx, |theme| {
+            theme.scrollbar_mode = gpui_kit::base::ScrollbarMode::Always;
+            theme.colors.scrollbar = gpui_kit::transparent_black();
+            theme.colors.scrollbar_thumb = thumb.into();
+            theme.colors.scrollbar_thumb_hover = pointed.into();
+        });
     }
 
     /// Follows the desktop's light or dark setting.

@@ -60,7 +60,8 @@ pub struct Close;
 impl gpui_kit::EventEmitter<Close> for Log {}
 
 impl Render for Log {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let days_scroll = crate::controls::scroll_handle("days", window, cx);
         let t = Theme::current(cx);
         let model = self.model.read(cx).clone();
         let days = self.days(cx);
@@ -153,12 +154,20 @@ impl Render for Log {
             .child(self.header(&t, cx))
             .child(self.filters(&model, &t, cx))
             .child(
-                div()
-                    .id("days")
-                    .flex_1()
-                    .overflow_y_scroll()
-                    .child(body)
-                    .test_support(),
+                crate::controls::over(
+                    "days",
+                    div()
+                        .id("days")
+                        .flex_1()
+                        .overflow_y_scroll()
+                        .child(body)
+                        .track_scroll(&days_scroll)
+                        .test_support(),
+                    &days_scroll,
+                    window,
+                    cx,
+                )
+                .flex_1(),
             )
     }
 }
