@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.13.1 (2026-10-21)
+
 - **Every network an IPsec gateway offers shows in tunnel detail.** A gateway offering two networks
   showed only the first under "From the gateway", and only that one was raced on the first
   connection. Both are now.
