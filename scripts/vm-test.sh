@@ -23,8 +23,13 @@ case "$REL" in
     PKG=target/rpm/crake-${VERSION}-1.x86_64.rpm; AS=crake.rpm
     IMG=target/vm/fedora-$N.qcow2
     DIR="https://download.fedoraproject.org/pub/fedora/linux/releases/$N/Cloud/x86_64/images"
-    URL=$(curl -fsSL "$DIR/" | grep -o 'Fedora-Cloud-Base-Generic[^"<]*\.qcow2' | sort -u | tail -n1)
-    URL="$DIR/$URL" ;;
+    # A mirror that times out (download.fedoraproject.org sends each request
+    # to one) left the name empty, and the folder's page was saved as the
+    # image (CI run 39552930498, 2026-10-21): retried, and said if it's gone.
+    NAME=$(curl -fsSL --retry 4 --retry-all-errors --connect-timeout 20 "$DIR/" \
+      | grep -o 'Fedora-Cloud-Base-Generic[^"<]*\.qcow2' | sort -u | tail -n1)
+    [ -n "$NAME" ] || { echo "no Fedora $N cloud image listed at $DIR/" >&2; exit 1; }
+    URL="$DIR/$NAME" ;;
   *)
     PKG=target/deb/crake_${VERSION}_amd64.deb; AS=crake.deb
     IMG=target/vm/ubuntu-$REL.img
@@ -33,7 +38,11 @@ esac
 [ -f "$PKG" ] || { echo "no $PKG: run scripts/build-deb.sh (and build-rpm.sh)" >&2; exit 1; }
 if [ ! -f "$IMG" ]; then
   mkdir -p target/vm
-  curl -fsSL -o "$IMG.part" "$URL"
+  curl -fsSL --retry 4 --retry-all-errors --connect-timeout 20 -o "$IMG.part" "$URL"
+  # A disc image, not an error page, before it's kept for the next run.
+  # (Both distributions' cloud images are qcow2; any file passes as "raw".)
+  qemu-img info --output=json "$IMG.part" 2>/dev/null | grep -q '"format": "qcow2"' \
+    || { echo "$URL isn't a qcow2 disc image" >&2; rm -f "$IMG.part"; exit 1; }
   mv "$IMG.part" "$IMG"
 fi
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/crake-vm.XXXXXX")
