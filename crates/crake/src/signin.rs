@@ -45,12 +45,14 @@ pub fn craked_asks(protocol: &str) -> bool {
 }
 
 impl Spec {
-    /// Who does the signing in, for "… said:".
+    /// Who does the signing in, for "… said:" (until 2026-10-21 every
+    /// engine but OpenVPN 3 was "openconnect", strongSwan's words too).
     pub fn program(&self) -> &'static str {
-        if self.protocol == "openvpn3" {
-            "OpenVPN 3"
-        } else {
-            "openconnect"
+        match self.protocol.as_str() {
+            "openvpn3" => "OpenVPN 3",
+            "openvpn" => "OpenVPN",
+            "ipsec" => "strongSwan",
+            _ => "openconnect",
         }
     }
 }
@@ -637,6 +639,31 @@ fn failure(lines: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// "… said:" names the program that said it.
+    #[test]
+    fn a_failure_names_who_said_it() {
+        let said = |protocol: &str| {
+            Spec {
+                tunnel: "acme".into(),
+                display: "ACME".into(),
+                gateway: "gw".into(),
+                protocol: protocol.into(),
+                user: String::new(),
+                auth_args: vec![],
+                extra_args: vec![],
+                user_agent: None,
+                keyring: false,
+                openconnect: None,
+            }
+            .program()
+        };
+        assert_eq!(said("ipsec"), "strongSwan");
+        assert_eq!(said("openvpn"), "OpenVPN");
+        assert_eq!(said("openvpn3"), "OpenVPN 3");
+        assert_eq!(said("anyconnect"), "openconnect");
+        assert_eq!(said("fortinet"), "openconnect");
+    }
 
     #[cfg(unix)]
     #[test]

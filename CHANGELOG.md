@@ -11,6 +11,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+- **A failed sign-in names who said why.** When an IPsec or OpenVPN tunnel couldn't sign in, the
+  sign-in window put strongSwan's or OpenVPN's words after "openconnect said:". It now names them.
+
 ## 0.13.1 (2026-10-21)
 
 - **Every network an IPsec gateway offers shows in tunnel detail.** A gateway offering two networks

@@ -41,7 +41,7 @@ impl NewTunnel {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .text_size(px(11.))
+                            .text_size(px(12.))
                             .font_weight(FontWeight::BOLD)
                             .text_color(if done {
                                 t.accent_ink
