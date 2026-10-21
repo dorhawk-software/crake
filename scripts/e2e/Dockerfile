@@ -56,8 +56,9 @@ RUN sed -i '/^default-domain/d' /etc/ocserv/ocserv.conf \
  && cat /etc/ocserv/ocserv-companies.conf >> /etc/ocserv/ocserv.conf
 COPY openvpn.conf /etc/openvpn/e2e/server.conf
 COPY ipsec.conf /etc/swanctl/conf.d/acme.conf
-# The IPsec gateway that proves itself with a certificate (acme-cert in
-# ipsec.conf), signed by an authority of ACME's own that the client's
+COPY ipsec-cert.conf /etc/swanctl/conf.d/acme-cert.conf
+# The IPsec gateway that proves itself with a certificate (acme-cert,
+# ipsec-cert.conf), signed by an authority of ACME's own that the client's
 # system doesn't know: IT hands its certificate out (start.sh, /link).
 RUN cd /etc/swanctl \
  && openssl req -x509 -newkey rsa:3072 -nodes -keyout /tmp/ca.key -out x509ca/acme-ipsec-ca.pem -days 3650 -subj "/CN=ACME IPsec Root" \

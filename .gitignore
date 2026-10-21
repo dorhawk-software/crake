@@ -8,3 +8,4 @@
 # impeccable design critiques (local working notes)
 .impeccable/
 scripts/spikes/*/work/
+scripts/spikes/*/__pycache__/

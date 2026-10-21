@@ -17,7 +17,8 @@ ip addr add 203.0.113.53/32 dev inet
 python3 /relay.py lan 198.51.100.10/24 /link/gateway.sock /link/client.sock &
 # openvpn and its sign-in page listen on the wire's address.
 until ip -4 addr show lan 2>/dev/null | grep -q 198.51.100.10; do sleep 0.1; done
-# The IPsec gateway with a certificate has an address of its own (ipsec.conf).
+# The IPsec gateway with a certificate has an address of its own
+# (ipsec-cert.conf).
 ip addr add 198.51.100.11/24 dev lan
 # The local network has IPv6 too, as most do (an IPv6 address is reached
 # by mark only where the system has some route for it: CLAUDE.md, Not now).
