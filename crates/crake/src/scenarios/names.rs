@@ -1,9 +1,10 @@
 //! Names a tunnel's DNS knows differently: a public name with a private
 //! address (split-horizon), and a tunnel's DNS that stops answering (7h).
 
+use std::net::Ipv6Addr;
 use std::time::Duration;
 
-use super::platform::{self, ACME_DNS, look_up};
+use super::platform::{self, ACME_DNS, look_up, look_up6};
 use super::{Up, WAIT};
 
 /// A name ACME's DNS knows, asked before its DNS goes quiet.
@@ -18,7 +19,7 @@ const NOTICED: Duration = Duration::from_secs(150);
 /// dorhawk.software through Cloudflare) that public DNS gives a public
 /// address and ACME's DNS a private one: the private one goes through the
 /// tunnel and is the answer the app gets (a company's portal that resets
-/// everyone outside it). A public name ACME's DNS has nothing else for
+/// everyone outside it), and its public IPv6 addresses aren't given. A public name ACME's DNS has nothing else for
 /// keeps its public answer.
 pub(crate) async fn a_public_name_with_a_private_address_goes_through(up: &mut Up) {
     let (name, at) = platform::SPLIT;
@@ -38,6 +39,10 @@ pub(crate) async fn a_public_name_with_a_private_address_goes_through(up: &mut U
         "{at}'s way, before any connection"
     );
     assert!(platform::answers(at).await, "{name} at {at}");
+    // Nor its public IPv6 addresses, which an app that tries IPv6 first
+    // would take around the tunnel (public DNS gives it both).
+    let six = look_up6(name).await;
+    assert!(six.iter().all(Ipv6Addr::is_unique_local), "{name}: {six:?}");
     let public = platform::PUBLIC_UNDER_ORG;
     let found = look_up(public).await;
     assert!(

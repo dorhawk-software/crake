@@ -147,63 +147,93 @@ impl Manager {
             let Some(reply) = ask(&device, &servers, &question.name, question.qtype).await else {
                 continue;
             };
-            if reply.metadata.response_code != ResponseCode::NoError {
+            if reply.metadata.response_code == ResponseCode::NXDomain {
                 continue;
             }
-            let private: Vec<IpAddr> = dns::records(&reply)
-                .into_iter()
-                .filter(|a| dns::is_private(*a) && !public.contains(a))
-                .filter(|a| learning.allows(Some(&question.name), *a))
-                .collect();
+            // A refused or failed question counts as no record of this
+            // family (some company DNS servers refuse an AAAA for a name
+            // they have an A for, as the rescue above allows for).
+            let private = if reply.metadata.response_code == ResponseCode::NoError {
+                private_of(&reply, &public, &learning, &question.name)
+            } else {
+                Vec::new()
+            };
             if private.is_empty() {
-                continue;
-            }
-            // Only if the private address answers through this tunnel (web
-            // ports): some internal answers are for the office network only,
-            // and the public address would have been the better bet.
-            let Ok((index, _, _)) = self.entry(&tunnel) else {
-                continue;
-            };
-            let mark = crate::routing::ids(index).mark;
-            let mut answers = false;
-            for port in WEB_PORTS {
-                let addr = SocketAddr::new(private[0], port);
-                if crate::probe::through_tunnel(addr, mark, WEB_PROBE)
-                    .await
-                    .is_some()
+                // Nothing private of this family, but maybe of the other:
+                // then this family's public addresses would take the app
+                // around the tunnel (an IPv6-first app went to the public
+                // IPv6 address of a name whose private IPv4 address was
+                // routed; CI's Mac, 2026-10-21). "No such record" instead.
+                let Some(other) = other_family(question.qtype) else {
+                    continue;
+                };
+                let Some(theirs) = ask(&device, &servers, &question.name, other).await else {
+                    continue;
+                };
+                let private = private_of(&theirs, &public, &learning, &question.name);
+                if private.is_empty()
+                    || self.route_private(&tunnel, &question.name, &private).await != Some(true)
                 {
-                    answers = true;
-                    break;
+                    continue;
                 }
+                let mut empty = reply;
+                empty.metadata.response_code = ResponseCode::NoError;
+                empty.answers.clear();
+                return dns::rewrite(&question, empty);
             }
-            if !answers {
-                continue;
+            match self.route_private(&tunnel, &question.name, &private).await {
+                None => continue,
+                Some(false) => return None,
+                Some(true) => return dns::rewrite(&question, reply),
             }
-            let answer = Answer {
-                name: question.name.clone(),
-                addrs: private.clone(),
-            };
-            self.learn_answer(&tunnel, &answer, Why::PrivateAddress)
-                .await;
-            // Only hand out the private address if it now goes through (not
-            // when you sent it direct, or the never list has it).
-            let routed = {
-                let store = self.hosts.lock().unwrap();
-                store
-                    .tunnels
-                    .get(&tunnel)
-                    .is_some_and(|t| private.iter().all(|a| t.covers(*a)))
-            };
-            if !routed {
-                return None;
-            }
-            return dns::rewrite(&question, reply);
         }
         self.no_split
             .lock()
             .unwrap()
             .insert((question.name.clone(), question.qtype), Instant::now());
         None
+    }
+
+    /// Routes a split-horizon name's private addresses through `tunnel`, if
+    /// they answer there (web ports): None when they don't (some internal
+    /// answers are for the office network only, and the public address
+    /// would have been the better bet), else whether they now go through
+    /// (not when you sent them direct, or the never list has them).
+    async fn route_private(&self, tunnel: &str, name: &str, private: &[IpAddr]) -> Option<bool> {
+        let covered = |hosts: &Mutex<HostStore>| {
+            let store = hosts.lock().unwrap();
+            store
+                .tunnels
+                .get(tunnel)
+                .is_some_and(|t| private.iter().all(|a| t.covers(*a)))
+        };
+        // Its other family's question routed them a moment ago.
+        if covered(&self.hosts) {
+            return Some(true);
+        }
+        let (index, _, _) = self.entry(tunnel).ok()?;
+        let mark = crate::routing::ids(index).mark;
+        let mut answers = false;
+        for port in WEB_PORTS {
+            let addr = SocketAddr::new(private[0], port);
+            if crate::probe::through_tunnel(addr, mark, WEB_PROBE)
+                .await
+                .is_some()
+            {
+                answers = true;
+                break;
+            }
+        }
+        if !answers {
+            return None;
+        }
+        let answer = Answer {
+            name: name.to_owned(),
+            addrs: private.to_vec(),
+        };
+        self.learn_answer(tunnel, &answer, Why::PrivateAddress)
+            .await;
+        Some(covered(&self.hosts))
     }
 
     /// The tunnel's organisation domain, from its gateway.
@@ -404,6 +434,21 @@ fn keep_name(kept: Option<&(String, Instant)>, name: &str, now: Instant) -> (Str
         }
         _ => (name.to_owned(), now),
     }
+}
+
+/// The private addresses in a tunnel's answer for a split-horizon name:
+/// not among the public ones, and allowed by the tunnel's policy.
+fn private_of(
+    reply: &Message,
+    public: &[IpAddr],
+    learning: &crate::policy::Learning,
+    name: &str,
+) -> Vec<IpAddr> {
+    dns::records(reply)
+        .into_iter()
+        .filter(|a| dns::is_private(*a) && !public.contains(a))
+        .filter(|a| learning.allows(Some(name), *a))
+        .collect()
 }
 
 /// An address question's other family (A for AAAA, AAAA for A).

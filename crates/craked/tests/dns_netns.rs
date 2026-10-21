@@ -186,6 +186,44 @@ fn ask_split(
     }
 }
 
+/// An AAAA question for a split name whose private IPv4 address is routed
+/// already: public DNS gives an IPv6 address, the tunnel's DNS only its
+/// IPv4 one (asked second). The app must not get the public one, which an
+/// IPv6-first app would take around the tunnel.
+fn ask_split_aaaa(
+    uplink: &mut File,
+    tun: &mut File,
+    name: &str,
+    public: Ipv6Addr,
+    private: Ipv4Addr,
+) -> Public {
+    let sock = UdpSocket::bind("0.0.0.0:0").unwrap();
+    sock.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    sock.send_to(&query_for(name, 28), "192.168.0.1:53")
+        .unwrap();
+    let q = read_query(uplink);
+    uplink.write_all(&reply(&q, 0, &[public.into()])).unwrap();
+    let mut asked = 0;
+    // The AAAA refused (as dnsmasq refuses one for a name it has only an
+    // A for), then the A.
+    for (rcode, answer) in [(5, &[][..]), (0, &[IpAddr::V4(private)][..])] {
+        if let Some(tq) = try_read_query(tun, Duration::from_millis(1500)) {
+            tun.write_all(&reply(&tq, rcode, answer)).unwrap();
+            asked += 1;
+        }
+    }
+    let mut buf = [0u8; 1500];
+    let (n, _) = sock.recv_from(&mut buf).expect("the app got an answer");
+    Public {
+        rcode: buf[3] & 0x0f,
+        addrs: craked::dns::parse_message(&buf[..n])
+            .map(|a| a.addrs)
+            .unwrap_or_default(),
+        tunnel_asked: asked == 2,
+        first_through_tunnel: false,
+    }
+}
+
 fn try_read_query(tun: &mut File, wait: Duration) -> Option<Vec<u8>> {
     let start = Instant::now();
     let mut buf = [0u8; 2048];
@@ -488,7 +526,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     let office_public: Ipv4Addr = "198.51.100.40".parse().unwrap();
     let office_private: Ipv4Addr = "10.58.9.9".parse().unwrap();
     let www_public: Ipv4Addr = "198.51.100.50".parse().unwrap();
-    let (tun_back, results, publics, splits) = tokio::task::spawn_blocking(move || {
+    let (tun_back, results, publics, (splits, fe_aaaa)) = tokio::task::spawn_blocking(move || {
         let publics = (
             // Public DNS doesn't know it; the tunnel does.
             ask_public(&mut uplink, &mut tun, "db.example.cloud", None, Some(db)),
@@ -551,6 +589,14 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
                 true,
             ),
         );
+        // Its IPv6 address asked after: not the public one.
+        let fe_aaaa = ask_split_aaaa(
+            &mut uplink,
+            &mut tun,
+            "fe.acme.example",
+            "2001:db8:5::30".parse().unwrap(),
+            fe_private,
+        );
         let r = (
             ask(&mut tun, "git.acme.internal", git),
             ask(&mut tun, "wiki.corp.example", wiki),
@@ -561,7 +607,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
             ask_aaaa(&mut tun, "v6.acme.internal", git6),
             ask_over_ipv6(&mut tun, "dns6.acme.internal", over6),
         );
-        (tun, r, publics, splits)
+        (tun, r, publics, (splits, fe_aaaa))
     })
     .await
     .unwrap();
@@ -575,6 +621,7 @@ async fn names_only_the_tunnel_knows_are_routed_before_the_first_packet() {
     publics_handled((p0, p1, p2, p3, p4), db, db6, site);
 
     splits_handled(splits, fe_private, office_public, www_public, fe6_private);
+    other_family_hidden(&fe_aaaa);
 
     let (
         git_first,
@@ -702,6 +749,14 @@ fn splits_handled(
     );
     assert_eq!(www.addrs, vec![IpAddr::V4(www_public)], "{www:?}");
     assert!(!www.first_through_tunnel, "{www:?}");
+}
+
+/// A routed private IPv4 address hides the name's public IPv6 one.
+fn other_family_hidden(fe_aaaa: &Public) {
+    assert!(
+        fe_aaaa.rcode == 0 && fe_aaaa.addrs.is_empty() && fe_aaaa.tunnel_asked,
+        "a routed private IPv4 address hides the public IPv6 one: {fe_aaaa:?}"
+    );
 }
 
 /// What the log says about the test's names.
