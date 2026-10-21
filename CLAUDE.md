@@ -325,27 +325,6 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   Crake.app, and an upgrade's restart of a registered craked
   (`launchctl kickstart -k`, the tunnels handed over) are tried on a real
   Mac only: the colleague's, first with 0.7.
-- **The journey's first connection reset once in the NixOS VM
-  (2026-10-14, CI run 38620915461 on 6e8149c, a commit that changed only
-  CI files).** Step 2's GET of 10.40.1.10 failed with "Connection reset by
-  peer" (journey_tests.rs, `get`), where the first-SYN race should hold
-  the SYN until ACME takes the host; the same journey passed on f5a4efc
-  and on every distribution's package test. Not reproduced. If it comes
-  back: craked's log around the race (`race_held`: did direct "answer"
-  with a reset from the gateway VM, which is also the client's default
-  route?), and whether the app saw a reset or a refused connect.
-  **Again on 2026-10-18** (run 39135556942 on 8cba704, step 2 again,
-  "Connection reset by peer" 0.3 s after ACME connected). The gateway VM
-  drops what the LAN sends to ACME's network (no reset from there), and
-  its own dhcpcd had just taken ocserv's new vpns0 ("waiting for 3rd
-  party to configure IP address"), as dhcpcd once took the client's
-  crake-acme. The gateway VM now keeps dhcpcd off vpns* (test.nix). If
-  it comes back after that, the cause is elsewhere: the gateway's side
-  (ocserv's routes to the client right after connect) is next to look at.
-  **Came back on 2026-10-21** (run 39547770257, NixOS, step 2's GET of
-  10.40.1.10: "Connection reset by peer" 4 s in, while the gateway VM's
-  charon had just logged an address appearing on vpns0): so the cause is
-  elsewhere, as said; next is the gateway's side right after connect.
 - **All unsafe code behind one safe layer (asked for by the user,
   2026-10-14). Done 2026-10-19.** `crates/crake-os` holds every unsafe
   call Crake makes, each behind a safe function whose contract the crate

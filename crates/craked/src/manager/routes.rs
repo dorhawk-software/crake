@@ -68,6 +68,8 @@ impl Manager {
                 learned: &learned,
                 full_except: full_except.as_deref(),
                 ipv6: info.address6.is_some(),
+                address: info.address,
+                address6: info.address6.map(|(a, _)| a),
             })
             .await?;
         self.set_routed(name, true);

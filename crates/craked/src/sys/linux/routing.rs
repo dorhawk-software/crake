@@ -6,6 +6,8 @@
 //! - chain `out_n` (route, output): destinations in either set get mark M
 //! - chain `nat_n` (nat, postrouting): masquerade out of the tunnel, so the
 //!   source address matches the tunnel's
+//! - chain `leave_n` (filter, postrouting, after NAT): nothing leaves the
+//!   tunnel with an address other than its own (see `up_script`)
 //! - chain `dns_n` (filter, input): answers from the tunnel's DNS servers
 //!   (UDP and TCP) go to NFQUEUE so craked can route their addresses first
 //!   (see `dns_queue`)
@@ -64,12 +66,17 @@ fn set_defs(name: &str, timeout: u64) -> String {
     )
 }
 
+/// After source NAT (srcnat, 100): `leave_n` sees the address a packet
+/// really leaves with.
+const LEAVE_PRIORITY: u16 = 101;
+
 fn chain_defs(name: &str) -> String {
     format!(
         "add chain inet {TABLE} out_{name} {{ type route hook output priority mangle; policy accept; }}\n\
          add chain inet {TABLE} nat_{name} {{ type nat hook postrouting priority srcnat; policy accept; }}\n\
          add chain inet {TABLE} dns_{name} {{ type filter hook input priority filter; policy accept; }}\n\
-         add chain inet {TABLE} block_{name} {{ type filter hook output priority filter; policy accept; }}\n"
+         add chain inet {TABLE} block_{name} {{ type filter hook output priority filter; policy accept; }}\n\
+         add chain inet {TABLE} leave_{name} {{ type filter hook postrouting priority {LEAVE_PRIORITY}; policy accept; }}\n"
     )
 }
 
@@ -86,6 +93,8 @@ pub fn up_script(plan: &Plan) -> String {
         learned,
         full_except,
         ipv6,
+        address,
+        address6,
     } = *plan;
     let mark = ids(index).mark;
     let direct = crate::plan::DIRECT_MARK;
@@ -99,6 +108,7 @@ pub fn up_script(plan: &Plan) -> String {
          flush chain inet {TABLE} nat_{name}\n\
          flush chain inet {TABLE} dns_{name}\n\
          flush chain inet {TABLE} block_{name}\n\
+         flush chain inet {TABLE} leave_{name}\n\
          flush set inet {TABLE} {ls}\n\
          flush set inet {TABLE} {ps}\n\
          flush set inet {TABLE} {ls6}\n\
@@ -152,6 +162,23 @@ pub fn up_script(plan: &Plan) -> String {
                  add rule inet {TABLE} block_{name} meta mark 0 ip6 daddr != {{ {list6} }} drop\n"
             )
         };
+    }
+    // A connection the tunnel took after its first packet went direct
+    // keeps that packet's NAT (none): its SYN, retried just as Crake
+    // learned the host and before it forgot the stuck attempt, left
+    // through the tunnel with the LAN's address, a gateway answering that
+    // address over the LAN completed it, and the next packet, masqueraded
+    // once the attempt was forgotten, was reset (the NixOS journey,
+    // 2026-10-14 to 21). Dropped, the SYN is simply retried.
+    if let Some(a) = address {
+        s += &format!(
+            "add rule inet {TABLE} leave_{name} oifname \"{device}\" ip saddr != {a} drop\n"
+        );
+    }
+    if let Some(a) = address6 {
+        s += &format!(
+            "add rule inet {TABLE} leave_{name} oifname \"{device}\" ip6 saddr != {{ {a}, fe80::/10, :: }} drop\n"
+        );
     }
     if !dns.is_empty() {
         let servers: Vec<String> = dns.iter().map(Ipv4Addr::to_string).collect();
@@ -301,7 +328,8 @@ pub fn down_script(name: &str) -> String {
     s += &chain_defs(name);
     s += &format!(
         "delete chain inet {TABLE} out_{name}\ndelete chain inet {TABLE} nat_{name}\n\
-         delete chain inet {TABLE} dns_{name}\ndelete chain inet {TABLE} block_{name}\n"
+         delete chain inet {TABLE} dns_{name}\ndelete chain inet {TABLE} block_{name}\n\
+         delete chain inet {TABLE} leave_{name}\n"
     );
     s += &set_defs(name, 1);
     s += &format!(
@@ -654,8 +682,16 @@ mod tests {
             ],
             full_except: None,
             ipv6: false,
+            address: Some("10.40.255.50".parse().unwrap()),
+            address6: Some("fd40:ff::50".parse().unwrap()),
         });
         assert!(s.contains("add element inet crake pinned_acme { 10.40.0.0/16 }"));
+        // Nothing leaves the tunnel with another address, after NAT.
+        assert!(s.contains("leave_acme { type filter hook postrouting priority 101;"));
+        assert!(s.contains("leave_acme oifname \"crake-acme\" ip saddr != 10.40.255.50 drop"));
+        assert!(s.contains(
+            "leave_acme oifname \"crake-acme\" ip6 saddr != { fd40:ff::50, fe80::/10, :: } drop"
+        ));
         assert!(s.contains("add element inet crake learned_acme { 10.33.1.1 timeout 60s }"));
         assert!(!s.contains("10.33.1.2"), "expired hosts are not loaded");
         // IPv6 goes in its own sets, with its own ip6 marking rules.
@@ -695,6 +731,8 @@ mod tests {
                 "fd00:1a::/64".parse().unwrap(),
             ]),
             ipv6: true,
+            address: None,
+            address6: None,
         });
         assert!(full.contains(
             "add rule inet crake out_globex meta mark 0 ip daddr != { 127.0.0.0/8, 169.254.0.0/16, \
@@ -716,6 +754,8 @@ mod tests {
             learned: &[],
             full_except: Some(&[]),
             ipv6: false,
+            address: None,
+            address6: None,
         });
         assert!(no_v6.contains(
             "add rule inet crake block_globex meta mark 0 ip6 daddr != { ::1, fe80::/10, ff00::/8 } \

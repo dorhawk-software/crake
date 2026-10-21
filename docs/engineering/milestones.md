@@ -87,7 +87,14 @@
    destroyed early = reset); the host is tried through each routed tunnel in
    order with the tunnel's fwmark; the first that answers gets it, and the
    stuck conntrack entry is deleted so the app's next SYN retry is routed and
-   NATed afresh. Never probed: own LAN/bridges (on-link), loopback etc., the
+   NATed afresh. A retry in the moment between the two (the host routed,
+   the entry not yet deleted) kept its first packet's NAT (none) and left
+   the tunnel with the LAN's address; a gateway that answers that address
+   over the LAN completed the connection, and the next packet, NATed once
+   the entry was gone, was reset. That was the NixOS journey's "Connection
+   reset by peer" (2026-10-14, 18 and 21; reproduced in netns.rs). Since
+   2026-10-21 nothing leaves a tunnel with an address other than its own
+   (`leave_n`, after NAT): such a retry is dropped and retried again. Never probed: own LAN/bridges (on-link), loopback etc., the
    gateway, hosts a tunnel that's up routes (until 2026-10-20 any
    tunnel's, so a host learned by one that was off, or by an IT tunnel
    whose file was gone, could be learned by no other: found by the

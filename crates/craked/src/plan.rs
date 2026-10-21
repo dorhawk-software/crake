@@ -70,6 +70,9 @@ pub struct Plan<'a> {
     /// Without one, a full tunnel refuses IPv6 rather than let it go
     /// around the tunnel.
     pub ipv6: bool,
+    /// The tunnel's own addresses: nothing leaves it with another (Linux).
+    pub address: Option<Ipv4Addr>,
+    pub address6: Option<Ipv6Addr>,
 }
 
 /// IPv6 that stays on its way whatever a full tunnel does: loopback,

@@ -101,6 +101,8 @@ async fn a_tunnel_on_a_utun_device() {
             learned: &learned,
             full_except: None,
             ipv6: true,
+            address: None,
+            address6: None,
         })
         .await
         .unwrap();

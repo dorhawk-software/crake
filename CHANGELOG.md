@@ -15,6 +15,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
   company's DNS gives a public name a private address, Crake sends it through the tunnel; the
   name's public IPv6 address was still handed out, and an app that tries IPv6 first went to the
   public site, which turns outsiders away. Now only the private address is given.
+- **The first connection to a host Crake just learned is no longer cut off.** If the app tried
+  again at the very moment Crake routed the host, that try could leave the tunnel with your
+  network's own address; where the gateway could answer that address (on the office network), the
+  page started loading and was then reset. Nothing leaves a tunnel with another address now, so
+  the app's next try goes through.
 
 ## 0.14.0 (2026-10-21)
 

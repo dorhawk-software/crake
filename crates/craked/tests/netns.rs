@@ -206,6 +206,26 @@ async fn routes_only_what_it_is_told() {
 
     // Masquerade: the tunnel's address is the source.
     assert!(sh("nft list chain inet crake nat_acme").contains("masquerade"));
+    // A conversation that began direct keeps its first packet's NAT
+    // (none): once its host is routed, it never leaves through the tunnel
+    // with the LAN's address (a gateway answering that address over the
+    // LAN completed a connection the next packet reset; the NixOS journey).
+    let early = std::net::UdpSocket::bind("0.0.0.0:0").unwrap();
+    early.connect("10.33.1.9:9").unwrap();
+    early.send(b"direct").unwrap();
+    mgr.add_host("acme", "10.33.1.9").await.unwrap();
+    let before = tx();
+    // Refused here ("operation not permitted"); a TCP SYN the kernel
+    // retries is simply retried again.
+    let _ = early.send(b"again");
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert_eq!(
+        tx(),
+        before,
+        "{}",
+        sh("nft list chain inet crake leave_acme")
+    );
+    assert!(goes_through_tunnel("10.33.1.9"), "a new conversation does");
 
     // Off: everything of this tunnel leaves the kernel; decisions stay on disk.
     mgr.disconnect("acme").unwrap();
@@ -257,7 +277,7 @@ async fn routes_only_what_it_is_told() {
         "Sent 10.33.1.1 through ACME.",
         "Stopped sending 10.33.1.1 through ACME.",
         "Unpinned 10.40.0.0/16 from ACME.",
-        "ACME is up. Sending 3 known destinations through it.",
+        "ACME is up. Sending 4 known destinations through it.",
     ] {
         assert!(log.contains(want), "missing {want:?} in\n{log}");
     }
