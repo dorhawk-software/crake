@@ -62,6 +62,14 @@ Don't drift back into these. Each was tried and dropped for a reason.
   bordered buttons for them** (its B, the panel's Dismiss everywhere: two
   looks, since a link in a sentence stays text, and a faint fill in dark).
   A was chosen (see Colour).
+- **The gateway's certificate behind a link under the key** ("No key? It has
+  a certificate", design/proposals/ipsec-certificates.html, 1, B), and
+  **"and a password" as a tick under Certificate** (its 2, B): the second
+  way hidden in a help line, so someone with no key stops at a field they
+  can't fill, and a second decision hidden inside the first. Chosen by the
+  user (2026-10-21): two cards in step 1, "A key" / "Its certificate",
+  with IT's certificate authority in the key's slot; a third card in step 2,
+  "Certificate and password".
 - **An IPsec tunnel's domains in step 3** (ipsec-tunnel.html, 2, B):
   beside "Only what I list", whose list takes names for another purpose
   (what may go through, not where a name is asked). Chosen: step 1, under
