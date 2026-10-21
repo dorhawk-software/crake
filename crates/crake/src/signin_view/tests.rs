@@ -341,3 +341,55 @@ fn a_refused_key_offers_to_change_it(cx: &mut TestAppContext) {
     }
     assert!(w.closed.get(), "the window closes");
 }
+
+/// IPsec's trust question (design/proposals/ipsec-certificates.html, 3),
+/// asked by craked: whose certificate it is and who signed it; changed
+/// since it was trusted, it says so and the keyboard starts on "Don't
+/// connect"; "Trust it" goes back to craked with the question's id.
+#[gpui_kit::test]
+fn ipsecs_trust_question_comes_from_craked(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open_with(cx, fake(dir.path()), "ipsec");
+    let ask: std::collections::HashMap<String, String> = [
+        ("id", "9"),
+        ("kind", "trust"),
+        ("fingerprint", "pin-sha256:AbC="),
+        ("for", "gw.nordbank.example"),
+        ("issuer", "Nordbank Root CA"),
+        ("trusted_on", "2020-10-21"),
+        ("retry", "true"),
+    ]
+    .iter()
+    .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+    .collect();
+    cx.update(|cx| crate::openvpn::asked("acme", &ask, cx));
+    w.until("the trust question", cx, |s| {
+        matches!(s, Stage::Asking(p) if matches!(&p.ask, Ask::TrustServer { about: Some(a), trusted_on: Some(d), .. }
+            if a.contains("gw.nordbank.example") && a.contains("Nordbank Root CA") && d == "21 October 2020"))
+    });
+    let starts_on_dont_connect = cx
+        .update_window(w.window, |_, window, cx| {
+            window.render_frame(cx);
+            w.view.read(cx).dont_connect.is_focused(window)
+        })
+        .unwrap();
+    assert!(
+        starts_on_dont_connect,
+        "a changed certificate: a second look"
+    );
+    w.click("yes", cx);
+    let end = Instant::now() + Duration::from_secs(5);
+    loop {
+        match w.requests.try_recv() {
+            Ok(Request::Answer(tunnel, id, text)) => {
+                assert_eq!((tunnel.as_str(), id, text.as_str()), ("acme", 9, "yes"));
+                break;
+            }
+            Ok(_) => {}
+            Err(_) => {
+                assert!(Instant::now() < end, "the answer never went to craked");
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        }
+    }
+}

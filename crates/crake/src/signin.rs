@@ -69,9 +69,16 @@ pub enum Ask {
     Secret,
     Text,
     Choice(Vec<String>),
-    /// openconnect can't verify the gateway's certificate.
+    /// openconnect, or craked for IPsec, can't verify the gateway's
+    /// certificate (design/proposals/ipsec-certificates.html, 3).
     TrustServer {
         fingerprint: Option<String>,
+        /// Whose certificate it is and who signed it ("For
+        /// gw.nordbank.example, signed by “Nordbank Root CA”."), when known.
+        about: Option<String>,
+        /// The day the certificate it replaces was trusted ("21 October"):
+        /// it changed since.
+        trusted_on: Option<String>,
     },
 }
 
@@ -554,7 +561,11 @@ pub fn classify(question: &str, lines: &[String]) -> Prompt {
                 .map(str::to_owned)
         });
         return Prompt {
-            ask: Ask::TrustServer { fingerprint },
+            ask: Ask::TrustServer {
+                fingerprint,
+                about: None,
+                trusted_on: None,
+            },
             label: q.into(),
             words: None,
             refused: false,
@@ -758,7 +769,9 @@ mod tests {
         assert_eq!(
             p.ask,
             Ask::TrustServer {
-                fingerprint: Some("pin-sha256:AbC=".into())
+                fingerprint: Some("pin-sha256:AbC=".into()),
+                about: None,
+                trusted_on: None,
             }
         );
 

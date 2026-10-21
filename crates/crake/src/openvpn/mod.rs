@@ -244,6 +244,26 @@ pub fn prompt(ask: &HashMap<String, String>) -> Option<Prompt> {
         ),
         "code" => (Ask::Secret, "Code"),
         "code-visible" => (Ask::Text, "Code"),
+        // IPsec: a gateway's certificate no authority here vouches for.
+        "trust" => {
+            let some = |k: &str| Some(get(k).to_owned()).filter(|v| !v.is_empty());
+            let about = some("for").map(|name| match some("issuer") {
+                Some(issuer) => format!("For {name}, signed by \u{201c}{issuer}\u{201d}."),
+                None => format!("For {name}."),
+            });
+            let trusted_on = some("trusted_on").and_then(|d| said_day(&d));
+            let ask = Ask::TrustServer {
+                fingerprint: some("fingerprint"),
+                about,
+                trusted_on,
+            };
+            return Some(Prompt {
+                ask,
+                label: String::new(),
+                words: None,
+                refused: false,
+            });
+        }
         _ => return None,
     };
     Some(Prompt {
@@ -251,6 +271,19 @@ pub fn prompt(ask: &HashMap<String, String>) -> Option<Prompt> {
         label: label.to_owned(),
         words,
         refused,
+    })
+}
+
+/// A day craked gives ("2026-10-21") as the window says it: "21 October",
+/// with its year when it isn't this one's.
+fn said_day(iso: &str) -> Option<String> {
+    let day: jiff::civil::Date = iso.parse().ok()?;
+    let this_year = jiff::Zoned::now().year();
+    let month = day.strftime("%B");
+    Some(if day.year() == this_year {
+        format!("{} {month}", day.day())
+    } else {
+        format!("{} {month} {}", day.day(), day.year())
     })
 }
 
@@ -527,6 +560,30 @@ mod tests {
                 from_file: None,
                 retry: true
             }
+        );
+        // IPsec's trust question: whose certificate, who signed it, and
+        // the day the one it replaces was trusted.
+        let p = prompt(&ask(&[
+            ("kind", "trust"),
+            ("fingerprint", "pin-sha256:AbC="),
+            ("for", "gw.nordbank.example"),
+            ("issuer", "Nordbank Root CA"),
+            ("trusted_on", "2020-10-21"),
+        ]))
+        .unwrap();
+        assert_eq!(
+            p.ask,
+            Ask::TrustServer {
+                fingerprint: Some("pin-sha256:AbC=".into()),
+                about: Some(
+                    "For gw.nordbank.example, signed by \u{201c}Nordbank Root CA\u{201d}.".into()
+                ),
+                trusted_on: Some("21 October 2020".into()),
+            }
+        );
+        let p = prompt(&ask(&[("kind", "trust"), ("for", "gw.nordbank.example")])).unwrap();
+        assert!(
+            matches!(p.ask, Ask::TrustServer { about: Some(a), trusted_on: None, .. } if a == "For gw.nordbank.example.")
         );
         // A page isn't a question in the window.
         assert!(prompt(&ask(&[("kind", "browser"), ("url", "https://a.example/")])).is_none());

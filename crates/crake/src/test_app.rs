@@ -199,7 +199,7 @@ pub(crate) async fn sign_in_with(
             Event::Done(session) => return Ok((session, asked)),
             Event::Failed(why) => panic!("sign-in failed: {why} (asked {asked:?})"),
             Event::Prompt(p) => match p.ask {
-                Ask::TrustServer { fingerprint } => {
+                Ask::TrustServer { fingerprint, .. } => {
                     assert!(fingerprint.is_some(), "the window shows the fingerprint");
                     asked.push("trust");
                     "yes"

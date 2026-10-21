@@ -77,6 +77,9 @@ pub struct SignIn {
     field: Entity<InputState>,
     /// The window's own focus, for Esc.
     focus: gpui_kit::FocusHandle,
+    /// The trust question's "Don't connect", where the keyboard starts when
+    /// the gateway's certificate changed.
+    dont_connect: gpui_kit::FocusHandle,
     remember: bool,
     keep_certificate: bool,
     model: Entity<Model>,
@@ -437,6 +440,7 @@ impl SignIn {
             stage: Stage::Reaching,
             field,
             focus: cx.focus_handle(),
+            dont_connect: cx.focus_handle(),
             remember: true,
             keep_certificate: true,
             _subscriptions: subscriptions,
@@ -462,7 +466,19 @@ impl SignIn {
                     f.set_value("", window, cx);
                     f.set_masked(secret, window, cx);
                 });
-                self.field.update(cx, |f, cx| f.focus(window, cx));
+                // A certificate that changed since it was trusted: the
+                // keyboard starts on "Don't connect", for a second look.
+                if matches!(
+                    prompt.ask,
+                    Ask::TrustServer {
+                        trusted_on: Some(_),
+                        ..
+                    }
+                ) {
+                    window.focus(&self.dont_connect, cx);
+                } else {
+                    self.field.update(cx, |f, cx| f.focus(window, cx));
+                }
                 self.stage = Stage::Asking(prompt);
             }
             Event::Done(session) => {

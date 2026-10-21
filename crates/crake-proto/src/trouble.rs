@@ -16,6 +16,13 @@ pub const KEY_MISMATCH: &str = "The key doesn\u{2019}t match";
 /// (design/proposals/ipsec-certificates.html, 5: the trust question comes
 /// once Crake reads the certificate itself).
 pub const UNTRUSTED: &str = "Crake can\u{2019}t vouch for";
+/// IPsec: the gateway's certificate is for another name; craked read it
+/// (never offered to be trusted).
+pub const WRONG_NAME: &str = "The gateway\u{2019}s certificate is for";
+/// IPsec: the gateway's certificate is out of its dates, or not in them
+/// yet ("Nordbank's gateway shows a certificate that ran out on …").
+pub const RAN_OUT: &str = "shows a certificate that ran out on";
+pub const NOT_YET: &str = "shows a certificate that\u{2019}s valid only from";
 /// What to do about it.
 pub const SIGN_IN_AGAIN: &str = "Switch it on to sign in again.";
 
@@ -28,9 +35,19 @@ pub fn label(why: &str) -> Option<&'static str> {
         (OPENVPN3_ENDED, "Ended by OpenVPN 3"),
         (KEY_MISMATCH, "Key doesn\u{2019}t match"),
         (UNTRUSTED, "Gateway not trusted"),
+        (WRONG_NAME, "Certificate for another name"),
     ]
     .into_iter()
     .find(|(start, _)| why.starts_with(start))
+    .or_else(|| {
+        // Said after the tunnel's name ("Nordbank's gateway shows …").
+        [
+            (RAN_OUT, "Gateway\u{2019}s certificate ran out"),
+            (NOT_YET, "Gateway\u{2019}s certificate not valid yet"),
+        ]
+        .into_iter()
+        .find(|(part, _)| why.contains(part))
+    })
     .map(|(_, words)| words)
 }
 
@@ -103,6 +120,20 @@ mod tests {
         assert_eq!(
             label(&format!("{UNTRUSTED} Nordbank\u{2019}s gateway.")),
             Some("Gateway not trusted")
+        );
+        assert_eq!(
+            label(&format!(
+                "{WRONG_NAME} vpn.globex.example, not gw.nordbank.example."
+            )),
+            Some("Certificate for another name")
+        );
+        assert_eq!(
+            label(&format!("Nordbank\u{2019}s gateway {RAN_OUT} 18 October.")),
+            Some("Gateway\u{2019}s certificate ran out")
+        );
+        assert_eq!(
+            label(&format!("Nordbank\u{2019}s gateway {NOT_YET} 1 November.")),
+            Some("Gateway\u{2019}s certificate not valid yet")
         );
         assert_eq!(label("openconnect exited with exit status: 1."), None);
         assert_eq!(label(""), None);

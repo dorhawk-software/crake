@@ -66,80 +66,11 @@ impl Manager {
         let if_id = ipsec::if_id(index);
         self.net.xfrm(dev, if_id, ipsec::MTU).await?;
         let mut vici = Vici::connect(&socket).await?;
-        let (answers, mut answer_rx) = mpsc::unbounded_channel();
-        let mut retry = false;
-        loop {
-            let user = match &config.user {
-                Some(u) => u.clone(),
-                None => {
-                    let asked = (AskKind::User, retry);
-                    match self
-                        .answer_of(name, asked, &answers, &mut answer_rx, stop_rx)
-                        .await
-                    {
-                        Some(u) => u,
-                        None => return Ok((TunnelState::Off, None)),
-                    }
-                }
-            };
-            let asked = (AskKind::Password, retry && config.user.is_some());
-            let Some(password) = self
-                .answer_of(name, asked, &answers, &mut answer_rx, stop_rx)
-                .await
-            else {
-                return Ok((TunnelState::Off, None));
-            };
-            let tunnel = Tunnel {
-                name,
-                gateway: &config.gateway,
-                secret: &secret,
-                user: &user,
-                if_id,
-                updown: self.updown(name),
-            };
-            vici.load(&tunnel, &password).await?;
-            let signed = tokio::select! {
-                s = vici.initiate(name) => Some(s),
-                _ = &mut *stop_rx => None,
-            };
-            match signed {
-                Some(Signed::In) => break,
-                Some(Signed::Refused) => {
-                    vici.forget(name).await;
-                    retry = true;
-                }
-                Some(Signed::KeyRefused) => {
-                    vici.forget(name).await;
-                    let who = config.display();
-                    return Ok((
-                        TunnelState::Trouble,
-                        Some(format!(
-                            "{} {who}\u{2019}s gateway. Your IT team can tell you the right one; change it in {who}\u{2019}s Edit.",
-                            crake_proto::trouble::KEY_MISMATCH
-                        )),
-                    ));
-                }
-                Some(Signed::Untrusted) => {
-                    vici.forget(name).await;
-                    let who = config.display();
-                    let id = secret.gateway_id.as_deref().unwrap_or(&config.gateway);
-                    return Ok((
-                        TunnelState::Trouble,
-                        Some(format!(
-                            "{} {who}\u{2019}s gateway: its certificate isn\u{2019}t for {id}, or isn\u{2019}t signed by an authority this computer knows. Your IT team can tell you its certificate authority, or whether its name is right.",
-                            crake_proto::trouble::UNTRUSTED
-                        )),
-                    ));
-                }
-                Some(Signed::Failed(why)) => {
-                    vici.forget(name).await;
-                    return Ok((TunnelState::Trouble, Some(why)));
-                }
-                None => {
-                    vici.end(name).await;
-                    return Ok((TunnelState::Off, None));
-                }
-            }
+        if let Some(ended) = self
+            .sign_in_ipsec(config, &secret, if_id, &mut vici, stop_rx)
+            .await?
+        {
+            return Ok(ended);
         }
         // Up (the hook said so); until it's switched off or ends.
         loop {
@@ -165,17 +96,181 @@ impl Manager {
         }
     }
 
+    /// Sign in: the user's name and password (asked unless the tunnel has
+    /// the name, asked again after a refusal), and, for a gateway whose
+    /// certificate no authority here vouches for, the trust question
+    /// (`ipsec_trust`). None once signed in; else how the run ended.
+    async fn sign_in_ipsec(
+        &self,
+        config: &TunnelConfig,
+        secret: &Secret,
+        if_id: u32,
+        vici: &mut Vici,
+        stop_rx: &mut oneshot::Receiver<Stop>,
+    ) -> Result<Option<Ended>> {
+        use super::ipsec_trust::{Looked, why_not};
+        use crate::ipsec::certificate;
+        let name = &config.name;
+        let who = config.display();
+        // The name the gateway's certificate must be for.
+        let expected = secret
+            .gateway_id
+            .clone()
+            .unwrap_or_else(|| config.gateway.clone());
+        let pin_path = ipsec::pin_path(&self.cfg.state_path, name);
+        let (answers, mut answer_rx) = mpsc::unbounded_channel();
+        let mut retry = false;
+        // The name and password, kept across the trust question.
+        let mut known: Option<(String, String)> = None;
+        loop {
+            let (user, password) = match known.take() {
+                Some(k) => k,
+                None => {
+                    let user = match &config.user {
+                        Some(u) => u.clone(),
+                        None => {
+                            let asked = (AskKind::User, retry);
+                            match self
+                                .answer_of(name, asked, &answers, &mut answer_rx, stop_rx)
+                                .await
+                            {
+                                Some(u) => u,
+                                None => return Ok(Some((TunnelState::Off, None))),
+                            }
+                        }
+                    };
+                    let asked = (AskKind::Password, retry && config.user.is_some());
+                    let Some(password) = self
+                        .answer_of(name, asked, &answers, &mut answer_rx, stop_rx)
+                        .await
+                    else {
+                        return Ok(Some((TunnelState::Off, None)));
+                    };
+                    (user, password)
+                }
+            };
+            let tunnel = Tunnel {
+                name,
+                gateway: &config.gateway,
+                secret,
+                user: &user,
+                if_id,
+                updown: self.updown(name),
+            };
+            // A certificate the user trusted for this gateway, by its key.
+            let pin = secret
+                .key
+                .is_none()
+                .then(|| ipsec::Pin::read(&pin_path))
+                .flatten();
+            if let Some(der) = pin.as_ref().and_then(ipsec::Pin::der) {
+                vici.load_trusted(&certificate::pem(&der)).await?;
+            }
+            vici.load(&tunnel, &password).await?;
+            let signed = tokio::select! {
+                s = vici.initiate(name) => Some(s),
+                _ = &mut *stop_rx => None,
+            };
+            match signed {
+                Some(Signed::In) => return Ok(None),
+                Some(Signed::Refused) => {
+                    vici.forget(name).await;
+                    // A gateway asked for a name it isn't refuses before it
+                    // shows its certificate (the spike): not the password.
+                    if secret.key.is_none() {
+                        let looked = self
+                            .look_at_gateway(vici, &tunnel, &password, &expected)
+                            .await;
+                        if let Looked::WrongName(_) = looked {
+                            return Ok(Some((
+                                TunnelState::Trouble,
+                                why_not(&looked, who, &expected),
+                            )));
+                        }
+                    }
+                    retry = true;
+                }
+                Some(Signed::KeyRefused) => {
+                    vici.forget(name).await;
+                    return Ok(Some((
+                        TunnelState::Trouble,
+                        Some(format!(
+                            "{} {who}\u{2019}s gateway. Your IT team can tell you the right one; change it in {who}\u{2019}s Edit.",
+                            crake_proto::trouble::KEY_MISMATCH
+                        )),
+                    )));
+                }
+                Some(Signed::Untrusted) => {
+                    vici.forget(name).await;
+                    let mut looked = self
+                        .look_at_gateway(vici, &tunnel, &password, &expected)
+                        .await;
+                    // IT's authority is the only one for this gateway, and
+                    // a certificate already trusted can't be asked again:
+                    // nothing to ask either way.
+                    if let Looked::Ask(cert) = &looked {
+                        let same = pin.as_ref().and_then(ipsec::Pin::der).as_deref()
+                            == Some(cert.der.as_slice());
+                        if secret.ca.is_some() || same {
+                            looked = Looked::Unread;
+                        }
+                    }
+                    if let Some(why) = why_not(&looked, who, &expected) {
+                        return Ok(Some((TunnelState::Trouble, Some(why))));
+                    }
+                    let Looked::Ask(cert) = looked else {
+                        return Ok(Some((TunnelState::Trouble, None)));
+                    };
+                    let extra = Self::trust_question(&cert, &expected, pin.as_ref());
+                    let asked = (AskKind::Trust, pin.is_some());
+                    let answer = self
+                        .answer_more(name, asked, extra, &answers, &mut answer_rx, stop_rx)
+                        .await;
+                    if answer.as_deref() != Some("yes") {
+                        return Ok(Some((TunnelState::Off, None)));
+                    }
+                    self.keep_pin(name, &cert)?;
+                    known = Some((user, password));
+                    retry = false;
+                }
+                Some(Signed::Failed(why)) => {
+                    vici.forget(name).await;
+                    return Ok(Some((TunnelState::Trouble, Some(why))));
+                }
+                None => {
+                    vici.end(name).await;
+                    return Ok(Some((TunnelState::Off, None)));
+                }
+            }
+        }
+    }
+
     /// Ask the user, and wait for the answer; None when it's switched off
     /// meanwhile.
     async fn answer_of(
         &self,
         name: &str,
-        (kind, retry): (AskKind, bool),
+        asked: (AskKind, bool),
         answers: &Answers,
         answer_rx: &mut mpsc::UnboundedReceiver<(u32, String)>,
         stop_rx: &mut oneshot::Receiver<Stop>,
     ) -> Option<String> {
-        let id = self.ask(name, (kind, String::new(), None, retry), answers);
+        let extra = std::collections::BTreeMap::new();
+        self.answer_more(name, asked, extra, answers, answer_rx, stop_rx)
+            .await
+    }
+
+    /// `answer_of`, the question with more about it.
+    async fn answer_more(
+        &self,
+        name: &str,
+        (kind, retry): (AskKind, bool),
+        extra: std::collections::BTreeMap<String, String>,
+        answers: &Answers,
+        answer_rx: &mut mpsc::UnboundedReceiver<(u32, String)>,
+        stop_rx: &mut oneshot::Receiver<Stop>,
+    ) -> Option<String> {
+        let id = self.ask_more(name, (kind, String::new(), None, retry), extra, answers);
         loop {
             tokio::select! {
                 _ = &mut *stop_rx => {

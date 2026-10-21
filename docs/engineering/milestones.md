@@ -1349,7 +1349,7 @@
    selectors, and each later call's network is added to the tunnel's
    hints (`add_hints`; until 2026-10-20 only the first call's showed;
    `nothing_is_routed_up_front` checks both of the e2e gateway's).
-   Not yet: certificates (the gateway's or the user's; proposed
+   Certificates (the gateway's and the user's; proposed
    2026-10-21 in design/proposals/ipsec-certificates.html, A and A
    chosen by the user; the spike, scripts/spikes/ipsec-certificate, proved
    the same day that an untrusted gateway's certificate can be read out of
@@ -1359,7 +1359,25 @@
    `remote.id` gets none, so the first attempt names no gateway; the dump
    holds the user's own EAP messages and `reload-settings` switches it
    off; vici's initiate stream at level 3 leaves the dumps out, so it's a
-   root-only file log: details in the proposal's section 5),
+   root-only file log: details in the proposal's section 5). Built
+   2026-10-21: a gateway with a certificate (craked's secret has no key;
+   the system's authorities, loaded over vici when charon starts, or IT's
+   alone; checked for the gateway's name), the look at an untrusted one
+   (`ipsec::certificate`, `manager/ipsec_trust.rs`: name first, then its
+   dates, then the trust question, `AskKind::Trust`; trusted, it's pinned
+   in `profiles/<name>.ipsec-pin` and loaded before each connection), a
+   refusal for a wrong name told apart from a wrong password by a look
+   (the gateway refuses that name before it shows its certificate); e2e:
+   `a_gateway_with_a_certificate_from_its_authority`,
+   `a_certificate_no_one_vouches_for_is_asked_about` (the e2e gateway's
+   acme-cert on 198.51.100.11; its strongswan.conf raises the half-open
+   limits, since every look leaves one). Not yet: AnyConnect's question
+   getting the same "For …, signed by …" line and the changed-certificate
+   variant (the proposal's 3): openconnect gives only the fingerprint, so
+   the app would read the certificate itself (gateway_cert.rs, with the
+   certificate reader moved to crake-proto), and a pinned certificate that
+   changed is a failure there (`--servercert`), not a question. Not yet:
+   the user's own certificate, New tunnel's and Edit's parts, IT's files,
    the FortiGate by
    hand.
    **The Doctor (2026-10-18, asked for by the user: investigate a Mac or

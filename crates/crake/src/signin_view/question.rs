@@ -16,27 +16,20 @@ impl SignIn {
         let display = &self.spec.display;
         let mut body = div().flex().flex_col();
         match &prompt.ask {
-            Ask::TrustServer { fingerprint } => {
-                body = body
-                    .child(title(format!("Crake can\u{2019}t vouch for {display}\u{2019}s gateway")))
-                    .child(para(
-                        "Its certificate isn\u{2019}t signed by an authority this computer knows. Trust it only if your IT says this is the right one."
-                            .into(),
-                        t.muted,
-                    ))
-                    .when_some(fingerprint.clone(), |b, f| {
-                        b.child(div().mt(px(12.)).font_family(fonts::MONO).text_size(px(12.)).text_color(t.muted).child(f))
-                    })
-                    .child(
-                        buttons().child(div().flex_1())
-                            .child(button("no", "Don\u{2019}t connect", Look::Text, t).on_click(cx.listener(|this, _, _, cx| {
-                                this.reply("no".into(), cx)
-                            })).test_support())
-                            .child(button("yes", "Trust it", Look::Primary, t).on_click(cx.listener(|this, _, _, cx| {
-                                this.reply("yes".into(), cx)
-                            })).test_support()),
-                    );
-                return body;
+            Ask::TrustServer {
+                fingerprint,
+                about,
+                trusted_on,
+            } => {
+                return self.trust_question(
+                    (
+                        fingerprint.as_deref(),
+                        about.as_deref(),
+                        trusted_on.as_deref(),
+                    ),
+                    t,
+                    cx,
+                );
             }
             Ask::Choice(options) => {
                 body = body
@@ -196,5 +189,67 @@ impl SignIn {
                         .test_support(),
                 ),
         )
+    }
+
+    /// The gateway's certificate, no authority here vouching for it: trust
+    /// it? (`fingerprint`, `about` whose it is, `trusted_on` the day the
+    /// one it replaces was trusted.)
+    fn trust_question(
+        &self,
+        (fingerprint, about, trusted_on): (Option<&str>, Option<&str>, Option<&str>),
+        t: &Theme,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let display = &self.spec.display;
+        // A certificate that changed since it was trusted says so, in ink
+        // (design/proposals/ipsec-certificates.html, 3).
+        let (why, colour) = match trusted_on {
+            Some(day) => (
+                format!(
+                    "It shows a different certificate from the one you trusted on {day}. Trust it only if your IT says it was renewed."
+                ),
+                t.ink,
+            ),
+            None => (
+                "Its certificate isn\u{2019}t signed by an authority this computer knows. Trust it only if your IT says this is the right one."
+                    .into(),
+                t.muted,
+            ),
+        };
+        div()
+            .flex()
+            .flex_col()
+            .child(title(format!(
+                "Crake can\u{2019}t vouch for {display}\u{2019}s gateway"
+            )))
+            .child(para(why, colour))
+            .when_some(about, |b, a| b.child(para(a.to_owned(), t.ink).mt(px(12.))))
+            .when_some(fingerprint, |b, f| {
+                b.child(
+                    div()
+                        .mt(px(12.))
+                        .font_family(fonts::MONO)
+                        .text_size(px(12.))
+                        .text_color(t.muted)
+                        .child(f.to_owned()),
+                )
+            })
+            .child(
+                buttons()
+                    .child(div().flex_1())
+                    .child(
+                        button("no", "Don\u{2019}t connect", Look::Text, t)
+                            .track_focus(&self.dont_connect)
+                            .keys()
+                            .on_click(cx.listener(|this, _, _, cx| this.reply("no".into(), cx)))
+                            .test_support(),
+                    )
+                    .child(
+                        button("yes", "Trust it", Look::Primary, t)
+                            .keys()
+                            .on_click(cx.listener(|this, _, _, cx| this.reply("yes".into(), cx)))
+                            .test_support(),
+                    ),
+            )
     }
 }

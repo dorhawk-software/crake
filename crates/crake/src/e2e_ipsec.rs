@@ -236,12 +236,50 @@ async fn a_wrong_key_then_the_right_one() {
     mgr.shutdown().await;
 }
 
-/// A gateway that proves itself with its certificate instead of a key
-/// (design/proposals/ipsec-certificates.html): signed by an authority this
-/// computer doesn't know, it isn't trusted, and Crake says so; with IT's
-/// authority added in Edit, it connects.
+/// The e2e gateway's address for its connection with a certificate.
+const CERT_GATEWAY: &str = "198.51.100.11";
+
+/// A tunnel to the gateway with a certificate, under its name.
+fn certificate_fields() -> HashMap<String, String> {
+    let mut f = fields();
+    f.remove("gateway_key");
+    f.insert("gateway".into(), CERT_GATEWAY.into());
+    f.insert("gateway_proof".into(), "certificate".into());
+    f.insert("gateway_id".into(), "vpn-cert.acme.example".into());
+    f.insert("user".into(), "alice".into());
+    f
+}
+
+async fn started(dir: &std::path::Path) -> (std::sync::Arc<Manager>, impl Drop) {
+    let cfg = config(dir);
+    let hook_socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    mgr.init().await.unwrap();
+    let hooks = craked::hook_server::serve(mgr.clone(), &hook_socket).unwrap();
+    (mgr, hooks)
+}
+
+async fn connected(mgr: &Manager, name: &str) {
+    until("connected", || {
+        assert_ne!(state(mgr, name), TunnelState::Trouble, "{}", why(mgr, name));
+        (state(mgr, name) == TunnelState::Connected).then_some(())
+    })
+    .await;
+}
+
+async fn off(mgr: &Manager, name: &str) {
+    mgr.disconnect(name).unwrap();
+    until("off", || {
+        (state(mgr, name) == TunnelState::Off).then_some(())
+    })
+    .await;
+}
+
+/// A gateway that proves itself with its certificate, signed by IT's
+/// authority (design/proposals/ipsec-certificates.html, 1): trusted for
+/// this gateway alone, it connects, with nothing asked but the password.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn a_gateway_with_a_certificate() {
+async fn a_gateway_with_a_certificate_from_its_authority() {
     if !enabled() {
         return;
     }
@@ -250,54 +288,87 @@ async fn a_gateway_with_a_certificate() {
         .with_test_writer()
         .try_init();
     let dir = tempfile::tempdir().unwrap();
-    let cfg = config(dir.path());
-    let hook_socket = cfg.hook_socket.clone();
-    let mgr = Manager::new(cfg).unwrap();
-    mgr.init().await.unwrap();
-    let _hooks = craked::hook_server::serve(mgr.clone(), &hook_socket).unwrap();
-    let mut f = fields();
-    f.remove("gateway_key");
-    f.insert("gateway_proof".into(), "certificate".into());
-    f.insert("gateway_id".into(), "vpn-cert.acme.example".into());
-    f.insert("user".into(), "alice".into());
+    let (mgr, _hooks) = started(dir.path()).await;
+    let mut f = certificate_fields();
+    let ca = std::fs::read_to_string(format!("{SHARED}/ipsec-ca.pem")).unwrap();
+    f.insert("gateway_ca".into(), ca);
     let name = mgr.add_tunnel(&f).unwrap();
-
-    // Only the system's authorities: the gateway's isn't one of them.
     mgr.connect(&name).unwrap();
     answer(&mgr, &name, "password", "hunter2").await;
-    let refused = until("refused: its certificate isn't trusted", || {
+    connected(&mgr, &name).await;
+    let git = look_up_and_get("git.acme.internal", "10.40.1.10")
+        .unwrap_or_else(|e| panic!("git.acme.internal: {e}\n{}", routing()));
+    assert!(git.contains("crex"), "{git}");
+    off(&mgr, &name).await;
+    mgr.shutdown().await;
+}
+
+/// A gateway's certificate no authority here vouches for
+/// (ipsec-certificates.html, 3): Crake reads it out of charon's dump and
+/// asks, as AnyConnect's question asks; not trusted, it stays off;
+/// trusted, it connects, and isn't asked about again. A gateway named
+/// otherwise than its certificate is never offered to be trusted.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_certificate_no_one_vouches_for_is_asked_about() {
+    if !enabled() {
+        return;
+    }
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info,charon=debug")
+        .with_test_writer()
+        .try_init();
+    let dir = tempfile::tempdir().unwrap();
+    let (mgr, _hooks) = started(dir.path()).await;
+    let mut f = certificate_fields();
+    let name = mgr.add_tunnel(&f).unwrap();
+
+    // Asked; "no": it stays off.
+    mgr.connect(&name).unwrap();
+    answer(&mgr, &name, "password", "hunter2").await;
+    let asked = answer(&mgr, &name, "trust", "no").await;
+    assert_eq!(asked["for"], "vpn-cert.acme.example");
+    assert_eq!(asked["issuer"], "ACME IPsec Root");
+    assert!(asked["fingerprint"].starts_with("pin-sha256:"), "{asked:?}");
+    assert_eq!(asked["retry"], "false", "nothing trusted before");
+    until("off, not trusted", || {
+        (state(&mgr, &name) == TunnelState::Off).then_some(())
+    })
+    .await;
+
+    // Asked again; "yes": it connects, the password not asked twice.
+    mgr.connect(&name).unwrap();
+    answer(&mgr, &name, "password", "hunter2").await;
+    answer(&mgr, &name, "trust", "yes").await;
+    connected(&mgr, &name).await;
+    off(&mgr, &name).await;
+
+    // Trusted: only the password, next time.
+    mgr.connect(&name).unwrap();
+    answer(&mgr, &name, "password", "hunter2").await;
+    connected(&mgr, &name).await;
+    off(&mgr, &name).await;
+
+    // Named otherwise: the gateway refuses that name before showing its
+    // certificate; Crake looks, and says the certificate is for another.
+    f.insert("gateway_id".into(), "vpn.globex.example".into());
+    mgr.update_tunnel(&name, &f).await.unwrap();
+    mgr.connect(&name).unwrap();
+    answer(&mgr, &name, "password", "hunter2").await;
+    let refused = until("refused: another name", || {
+        assert!(
+            mgr.asking(&name).is_none_or(|a| a["kind"] != "trust"),
+            "never asked"
+        );
         (state(&mgr, &name) == TunnelState::Trouble).then(|| why(&mgr, &name))
     })
     .await;
     assert!(
-        refused.contains(crake_proto::trouble::UNTRUSTED),
+        refused.contains(crake_proto::trouble::WRONG_NAME),
         "{refused}"
     );
-    assert!(refused.contains("vpn-cert.acme.example"), "{refused}");
-
-    // IT's authority, added in Edit: trusted for this gateway, it connects.
-    let ca = std::fs::read_to_string(format!("{SHARED}/ipsec-ca.pem")).unwrap();
-    f.insert("gateway_ca".into(), ca);
-    mgr.update_tunnel(&name, &f).await.unwrap();
-    mgr.connect(&name).unwrap();
-    answer(&mgr, &name, "password", "hunter2").await;
-    until("connected, the certificate checked", || {
-        assert_ne!(
-            state(&mgr, &name),
-            TunnelState::Trouble,
-            "{}",
-            why(&mgr, &name)
-        );
-        (state(&mgr, &name) == TunnelState::Connected).then_some(())
-    })
-    .await;
-    let git = look_up_and_get("git.acme.internal", "10.40.1.10")
-        .unwrap_or_else(|e| panic!("git.acme.internal: {e}\n{}", routing()));
-    assert!(git.contains("crex"), "{git}");
-    mgr.disconnect(&name).unwrap();
-    until("off", || {
-        (state(&mgr, &name) == TunnelState::Off).then_some(())
-    })
-    .await;
+    assert!(
+        refused.contains("vpn-cert.acme.example, not vpn.globex.example"),
+        "{refused}"
+    );
     mgr.shutdown().await;
 }

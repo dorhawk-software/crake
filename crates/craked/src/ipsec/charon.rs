@@ -45,8 +45,18 @@ const PLUGINS: &str = "random nonce openssl aes sha1 sha2 hmac gmp kdf curve2551
                        socket-default vici updown eap-identity eap-mschapv2 eap-md5 eap-gtc \
                        eap-dynamic";
 
-/// craked's charon settings.
-pub fn conf(socket: &Path) -> String {
+/// The file charon dumps what it decrypts into, while craked looks at a
+/// gateway's certificate (`Charon::dump`): in craked's own folder, root's
+/// alone, never the journal (design/proposals/ipsec-certificates.html, 5).
+pub const DUMP: &str = "dump.log";
+/// charon's log level for its decryption dumps ("enc 3"), and off.
+const DUMPING: i8 = 3;
+const QUIET: i8 = -1;
+
+/// craked's charon settings; `dump`, its dump's file and whether it's on.
+pub fn conf(socket: &Path, dump: (&Path, bool)) -> String {
+    let (dump_path, on) = dump;
+    let enc = if on { DUMPING } else { QUIET };
     format!(
         "charon {{\n\
          \x20 port = 0\n\
@@ -71,9 +81,16 @@ pub fn conf(socket: &Path) -> String {
          \x20   stderr {{\n\
          \x20     default = 1\n\
          \x20   }}\n\
+         \x20   dump {{\n\
+         \x20     path = {}\n\
+         \x20     ike_name = yes\n\
+         \x20     default = {QUIET}\n\
+         \x20     enc = {enc}\n\
+         \x20   }}\n\
          \x20 }}\n\
          }}\n",
-        socket.display()
+        socket.display(),
+        dump_path.display(),
     )
 }
 
@@ -100,6 +117,10 @@ enum Runs {
 pub struct Charon {
     runs: Runs,
     pub socket: PathBuf,
+    settings: PathBuf,
+    /// Its decryption dump's file, and how many looks at a gateway want it.
+    pub dump: PathBuf,
+    dumping: usize,
     /// Its last lines (run as craked's child), for why it didn't start.
     heard: Arc<Mutex<Vec<String>>>,
 }
@@ -119,12 +140,13 @@ impl Charon {
             .with_context(|| format!("making {}", dir.display()))?;
         let socket = dir.join("charon.vici");
         let settings = dir.join("strongswan.conf");
-        {
-            use std::io::Write;
-            let mut f = crate::sys::create_private(&settings)
-                .with_context(|| format!("writing {}", settings.display()))?;
-            f.write_all(conf(&socket).as_bytes())?;
-        }
+        let dump = dir.join(DUMP);
+        write_settings(&settings, &conf(&socket, (&dump, false)))?;
+        // Made by craked, root's alone, before charon writes to it.
+        drop(
+            crate::sys::create_private(&dump)
+                .with_context(|| format!("making {}", dump.display()))?,
+        );
         let _ = std::fs::remove_file(&socket);
         let heard = Arc::new(Mutex::new(Vec::new()));
         let runs = match unit {
@@ -134,6 +156,9 @@ impl Charon {
         let mut charon = Self {
             runs,
             socket,
+            settings,
+            dump,
+            dumping: 0,
             heard,
         };
         let deadline = tokio::time::Instant::now() + START_WAIT;
@@ -171,6 +196,28 @@ impl Charon {
         Ok(charon)
     }
 
+    /// Its decryption dump on (for one more look at a gateway) or off (one
+    /// look fewer), written to its settings; charon reads them again when
+    /// told (vici's `reload-settings`). Off, the dump's file is emptied:
+    /// charon keeps it open, so it isn't removed.
+    pub fn dump(&mut self, on: bool) -> Result<()> {
+        self.dumping = if on {
+            self.dumping + 1
+        } else {
+            self.dumping.saturating_sub(1)
+        };
+        let dumping = self.dumping > 0;
+        write_settings(&self.settings, &conf(&self.socket, (&self.dump, dumping)))?;
+        if !dumping {
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(&self.dump)
+                .and_then(|f| f.set_len(0))
+                .with_context(|| format!("emptying {}", self.dump.display()))?;
+        }
+        Ok(())
+    }
+
     /// It hasn't ended.
     pub async fn running(&mut self) -> bool {
         match &mut self.runs {
@@ -193,6 +240,15 @@ impl Charon {
         }
         let _ = std::fs::remove_file(&self.socket);
     }
+}
+
+/// charon's settings, root's alone.
+fn write_settings(path: &Path, text: &str) -> Result<()> {
+    use std::io::Write;
+    let mut f =
+        crate::sys::create_private(path).with_context(|| format!("writing {}", path.display()))?;
+    f.write_all(text.as_bytes())?;
+    Ok(())
 }
 
 /// charon as craked's child, its log kept in `heard`.
@@ -244,7 +300,8 @@ mod tests {
 
     #[test]
     fn craked_s_charon_leaves_the_system_alone() {
-        let c = conf(Path::new("/run/crake/ipsec/charon.vici"));
+        let dump = Path::new("/run/crake/ipsec/dump.log");
+        let c = conf(Path::new("/run/crake/ipsec/charon.vici"), (dump, false));
         for line in [
             "port = 0",
             "port_nat_t = 0",
@@ -256,5 +313,20 @@ mod tests {
             assert!(c.contains(line), "{line} in\n{c}");
         }
         assert!(!c.contains("resolve"), "resolv.conf is resolved's");
+    }
+
+    #[test]
+    fn the_dump_is_on_only_while_a_gateway_is_looked_at() {
+        let socket = Path::new("/run/crake/ipsec/charon.vici");
+        let dump = Path::new("/run/crake/ipsec/dump.log");
+        let off = conf(socket, (dump, false));
+        assert!(off.contains("path = /run/crake/ipsec/dump.log"), "{off}");
+        assert!(off.contains("enc = -1"), "{off}");
+        assert!(off.contains("ike_name = yes"), "this connection's alone");
+        let on = conf(socket, (dump, true));
+        assert!(on.contains("enc = 3"), "{on}");
+        // Only the dump's file: the journal (stderr) never gets it.
+        let stderr = on.split("dump {").next().unwrap();
+        assert!(!stderr.contains("enc = 3"), "{on}");
     }
 }

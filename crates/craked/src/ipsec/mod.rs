@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
+pub mod certificate;
 #[cfg(target_os = "linux")]
 pub mod charon;
 pub mod env;
@@ -141,6 +142,45 @@ pub fn secret_path(state_path: &Path, tunnel: &str) -> PathBuf {
         .join(format!("{tunnel}.ipsec"))
 }
 
+/// A gateway's certificate the user trusted (the trust question), kept
+/// beside the tunnel's secret: IT's tunnels have one too, their secret
+/// being IT's files.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Pin {
+    /// The certificate, DER in base64.
+    pub der: String,
+    /// The day it was trusted ("2026-10-21"), for "the one you trusted on".
+    pub trusted_on: String,
+}
+
+impl Pin {
+    pub fn new(der: &[u8], today: time::Date) -> Self {
+        use base64::Engine as _;
+        Self {
+            der: base64::engine::general_purpose::STANDARD.encode(der),
+            trusted_on: today.to_string(),
+        }
+    }
+
+    pub fn der(&self) -> Option<Vec<u8>> {
+        use base64::Engine as _;
+        base64::engine::general_purpose::STANDARD
+            .decode(&self.der)
+            .ok()
+    }
+
+    pub fn read(path: &Path) -> Option<Self> {
+        serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()
+    }
+}
+
+/// Where craked keeps the certificate trusted for a tunnel's gateway.
+pub fn pin_path(state_path: &Path, tunnel: &str) -> PathBuf {
+    state_path
+        .with_file_name("profiles")
+        .join(format!("{tunnel}.ipsec-pin"))
+}
+
 /// The XFRM interface ID of the tunnel at `index` (a tunnel's mark and
 /// table come from its index too): never 0, which means none.
 pub fn if_id(index: usize) -> u32 {
@@ -243,6 +283,21 @@ mod tests {
         let pems = pem_certificates(&text);
         assert_eq!(pems, [format!("{one}\n"), format!("{one}\n")]);
         assert!(pem_certificates("-----BEGIN CERTIFICATE-----\ncut").is_empty());
+    }
+
+    #[test]
+    fn a_pin_keeps_the_certificate_and_its_day() {
+        let day = time::Date::from_calendar_date(2026, time::Month::October, 21).unwrap();
+        let pin = Pin::new(&[1, 2, 3], day);
+        assert_eq!(pin.trusted_on, "2026-10-21");
+        assert_eq!(pin.der(), Some(vec![1, 2, 3]));
+        let dir = tempfile::tempdir().unwrap();
+        let path = pin_path(&dir.path().join("hosts.json"), "acme");
+        assert!(path.ends_with("profiles/acme.ipsec-pin"));
+        assert_eq!(Pin::read(&path), None);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, serde_json::to_string(&pin).unwrap()).unwrap();
+        assert_eq!(Pin::read(&path), Some(pin));
     }
 
     #[test]

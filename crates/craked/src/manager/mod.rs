@@ -34,6 +34,8 @@ mod hook;
 mod host_ops;
 #[cfg(target_os = "linux")]
 mod ipsec;
+#[cfg(target_os = "linux")]
+mod ipsec_trust;
 mod live;
 mod naming;
 mod openvpn;

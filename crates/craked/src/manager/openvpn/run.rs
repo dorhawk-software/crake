@@ -317,6 +317,17 @@ impl Manager {
         ask: (AskKind, String, Option<String>, bool),
         answers: &Answers,
     ) -> u32 {
+        self.ask_more(name, ask, std::collections::BTreeMap::new(), answers)
+    }
+
+    /// `ask`, with more about the question (`openvpn::Ask::extra`).
+    pub(in crate::manager) fn ask_more(
+        &self,
+        name: &str,
+        ask: (AskKind, String, Option<String>, bool),
+        extra: std::collections::BTreeMap<String, String>,
+        answers: &Answers,
+    ) -> u32 {
         let id = NEXT_ASK.fetch_add(1, Ordering::Relaxed);
         let (kind, label, url, retry) = ask;
         let ask = openvpn::Ask {
@@ -325,6 +336,7 @@ impl Manager {
             label,
             url,
             retry,
+            extra,
         };
         if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
             e.asking = Some((ask, answers.clone()));

@@ -131,6 +131,9 @@ struct Terminate<'a> {
 }
 
 #[derive(Serialize)]
+struct Nothing {}
+
+#[derive(Serialize)]
 struct Named<'a> {
     name: &'a str,
 }
@@ -189,11 +192,32 @@ impl Vici {
     /// The tunnel's connection, its gateway's key (or what checks its
     /// certificate) and the user's password.
     pub async fn load(&mut self, t: &Tunnel<'_>, password: &str) -> Result<()> {
+        self.load_as(t, t.name, password).await
+    }
+
+    /// The connection a look at the gateway's certificate makes
+    /// (`look_name`): the tunnel's, naming no gateway, since a gateway
+    /// asked for another name refuses before it shows its certificate
+    /// (the spike, scripts/spikes/ipsec-certificate). It's never trusted
+    /// that way: it fails at the certificate, before the user's password.
+    pub async fn look(&mut self, t: &Tunnel<'_>, password: &str) -> Signed {
+        let name = look_name(t.name);
+        if let Err(e) = self.load_as(t, &name, password).await {
+            return Signed::Failed(format!("{e:#}"));
+        }
+        let signed = self.initiate(&name).await;
+        self.end(&name).await;
+        signed
+    }
+
+    async fn load_as(&mut self, t: &Tunnel<'_>, name: &str, password: &str) -> Result<()> {
         let key = t.secret.key.as_deref();
+        let look = name != t.name;
         // A certificate is checked for a name: the identity IT gave, else
         // the gateway as typed (strongSwan's "%any" would take any trusted
-        // certificate for any name).
+        // certificate for any name), but by a look.
         let gateway_id = match (&t.secret.gateway_id, key) {
+            _ if look => "%any",
             (Some(id), _) => id.as_str(),
             (None, Some(_)) => "%any",
             (None, None) => t.gateway,
@@ -221,10 +245,13 @@ impl Vici {
                 id: gateway_id,
                 cacerts: t.secret.ca.as_deref().into_iter().collect(),
             },
-            children: BTreeMap::from([(t.name, child)]),
+            children: BTreeMap::from([(name, child)]),
         };
-        self.ask("load-conn", BTreeMap::from([(t.name, conn)]))
+        self.ask("load-conn", BTreeMap::from([(name, conn)]))
             .await?;
+        if look {
+            return Ok(());
+        }
         if let Some(key) = key {
             let owners = t.secret.gateway_id.as_deref().into_iter().collect();
             self.ask(
@@ -263,6 +290,25 @@ impl Vici {
             },
         )
         .await
+    }
+
+    /// A gateway's certificate the user trusted (PEM): charon trusts it as
+    /// it is, by its key, for the name the connection asks for.
+    pub async fn load_trusted(&mut self, pem: &str) -> Result<()> {
+        self.ask(
+            "load-cert",
+            Cert {
+                kind: "X509",
+                flag: "NONE",
+                data: pem,
+            },
+        )
+        .await
+    }
+
+    /// charon reads its settings again (its dump on or off, `Charon::dump`).
+    pub async fn reload_settings(&mut self) -> Result<()> {
+        self.ask("reload-settings", Nothing {}).await
     }
 
     /// Sign in and bring the tunnel up.
@@ -353,6 +399,12 @@ impl Vici {
                 .await;
         }
     }
+}
+
+/// The connection a look at `tunnel`'s gateway makes (a tunnel's name is
+/// letters, digits and dashes: never this).
+pub fn look_name(tunnel: &str) -> String {
+    format!("look:{tunnel}")
 }
 
 /// The line of charon's log that says most about a failure: the last that

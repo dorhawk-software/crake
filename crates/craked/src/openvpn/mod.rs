@@ -42,6 +42,9 @@ pub enum AskKind {
     },
     /// A page to finish signing in on, in the browser (nothing to answer).
     Browser,
+    /// An IPsec gateway's certificate no authority here vouches for:
+    /// trust it? ("yes" or "no"; its details in the question's `extra`).
+    Trust,
 }
 
 impl AskKind {
@@ -53,6 +56,7 @@ impl AskKind {
             Self::Code { echo: true } => "code-visible",
             Self::Code { echo: false } => "code",
             Self::Browser => "browser",
+            Self::Trust => "trust",
         }
     }
 }
@@ -69,6 +73,8 @@ pub struct Ask {
     pub url: Option<String>,
     /// The last answer was refused.
     pub retry: bool,
+    /// More about the question (the trust question's certificate).
+    pub extra: BTreeMap<String, String>,
 }
 
 impl Ask {
@@ -80,6 +86,7 @@ impl Ask {
         m.insert("label".into(), self.label.clone());
         m.insert("url".into(), self.url.clone().unwrap_or_default());
         m.insert("retry".into(), self.retry.to_string());
+        m.extend(self.extra.clone());
         m
     }
 }
