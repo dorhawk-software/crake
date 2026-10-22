@@ -273,6 +273,16 @@ fn run(
                     user_agent = Some(ANYCONNECT.into());
                     continue;
                 }
+                // Everything openconnect said, on the app's output (a
+                // helpdesk; CI, where a sign-in through Cloudflare now and
+                // then ends with only "Failed to complete authentication",
+                // 2026-10-21; a failed test shows it): the window shows one
+                // line.
+                eprintln!(
+                    "signing in to {} failed; openconnect said:\n{}",
+                    spec.gateway,
+                    lines.join("\n")
+                );
                 return Err(failure(&lines));
             }
         }

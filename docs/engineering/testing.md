@@ -69,7 +69,20 @@ The user doesn't want development builds installed on their machine.
   service and the CI gateways through Cloudflare (the `windows-gateways`
   job), and `macos_journey` (craked as a process of its own, as root)
   in the `macos` job; both pass in every run (checked 2026-10-19, after
-  this line had said macOS was still to do).
+  this line had said macOS was still to do). Not quite every run
+  (2026-10-21): an AnyConnect sign-in through Cloudflare on Windows
+  ended with only "Failed to complete authentication", nothing asked, in
+  3 of about 40 runs (jobs 118699372307, 118902199444, 119238810525),
+  each time a different test and the next run green. The cause isn't
+  known (the logs kept only that line); since then a failed sign-in
+  prints everything openconnect said (`signin.rs`), which a failed test
+  shows. Read it the next time before retrying anything in the tests: a
+  retry would also hide a sign-in that really fails now and then.
+  OpenVPN's upgrade scenario failed once in CI too (2026-10-21): the test
+  gateway turned the kept token away because the new connection came from
+  the source port of a client that had just ended (reproduced: "session
+  id in token changed"); craked now sends a kept token twice before
+  forgetting it (`openvpn/sign_in.rs`, `TOKEN_TRIES`).
 - `scripts/netns-test.sh`: real nftables and policy routing inside a
   disposable container with no network (host filesystem read-only, with a
   `/run` of its own: until 2026-10-15 the container saw this computer's

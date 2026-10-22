@@ -48,11 +48,19 @@ enum Collecting {
     Browser,
 }
 
+/// A kept token is sent twice before it's forgotten: refused, openvpn tries
+/// again from a new source port, and the refusal may have been the gateway's
+/// leftover state for an earlier client with the same address and port
+/// ("session id in token changed": CI's test gateway, 2026-10-21; a NAT
+/// reusing a port does the same).
+const TOKEN_TRIES: u32 = 2;
+
 pub struct SignIn {
     token: Option<Token>,
     credentials: Option<(String, Option<String>)>,
     sent: Sent,
-    tried_token: bool,
+    /// Times the kept token was sent (at most `TOKEN_TRIES`).
+    token_tries: u32,
     tried_credentials: bool,
     /// A dynamic challenge to answer at the next request.
     crv1: Option<Crv1>,
@@ -70,7 +78,7 @@ impl SignIn {
             token,
             credentials,
             sent: Sent::Nothing,
-            tried_token: false,
+            token_tries: 0,
             tried_credentials: false,
             crv1: None,
             refused: false,
@@ -128,8 +136,12 @@ impl SignIn {
             self.collecting = Some(Collecting::Crv1(c));
             return vec![ask];
         }
-        if let Some(t) = self.token.clone().filter(|_| !self.tried_token) {
-            self.tried_token = true;
+        if let Some(t) = self
+            .token
+            .clone()
+            .filter(|_| self.token_tries < TOKEN_TRIES)
+        {
+            self.token_tries += 1;
             return self.send_auth(Sent::Token, &t.user, &t.token);
         }
         // The profile's own, once; refused, the user is asked for both.
@@ -156,10 +168,12 @@ impl SignIn {
             return Vec::new();
         }
         match self.sent {
-            Sent::Token => {
+            Sent::Token if self.token_tries >= TOKEN_TRIES => {
                 self.token = None;
                 vec![Do::Forget]
             }
+            // Once more, from a new port, before it's forgotten.
+            Sent::Token => Vec::new(),
             // The profile's placeholder wasn't it: the user is asked.
             Sent::Credentials => Vec::new(),
             Sent::User | Sent::Nothing => {
@@ -307,6 +321,12 @@ mod tests {
             token: "SESS_ID_AT_old".into(),
         };
         let mut s = SignIn::new(Some(token), None);
+        assert_eq!(
+            said(&mut s, NEED_AUTH)[1],
+            Do::Send(r#"password "Auth" "SESS_ID_AT_old""#.into())
+        );
+        // Refused once: sent again (openvpn's next try comes from a new port).
+        assert!(said(&mut s, ">PASSWORD:Verification Failed: 'Auth'").is_empty());
         assert_eq!(
             said(&mut s, NEED_AUTH)[1],
             Do::Send(r#"password "Auth" "SESS_ID_AT_old""#.into())
