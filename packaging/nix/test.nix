@@ -194,7 +194,14 @@ in {
         # (dbus-send fails on the refusal; the driver's shell has pipefail)
         client.succeed("(setpriv --reuid=nobody --regid=$(id -g nobody) --clear-groups "
                        + "dbus-send --system --print-reply --dest=software.dorhawk.Crake1 /software/dorhawk/Crake1 "
-                       + "software.dorhawk.Crake1.RemoveTunnel string:globex 2>&1 || true) | grep 'not authorized to switch tunnels'")
+                       + "software.dorhawk.Crake1.RemoveTunnel string:globex 2>&1 || true) | grep 'not authorized to use Crake'")
+
+    with subtest("reading is refused too, and the state folder is root's"):
+        # Until 2026-10-21 anyone could read the log and the hosts.
+        client.succeed("(setpriv --reuid=nobody --regid=$(id -g nobody) --clear-groups "
+                       + "dbus-send --system --print-reply --dest=software.dorhawk.Crake1 /software/dorhawk/Crake1 "
+                       + "software.dorhawk.Crake1.RecentLog uint32:10 2>&1 || true) | grep 'not authorized to use Crake'")
+        client.succeed("test \"$(stat -c %a /var/lib/crake)\" = 700")
 
     with subtest("signs in and connects through craked"):
         client.succeed(call + "AddTunnel 'a{ss}' 4 display_name ACME gateway https://${gw} protocol anyconnect user alice")

@@ -94,6 +94,8 @@ in {
         RuntimeDirectory = "crake";
         RuntimeDirectoryPreserve = "restart";
         StateDirectory = "crake";
+        # The log and the hosts are the service's alone (craked closes it too).
+        StateDirectoryMode = "0700";
         AmbientCapabilities = [ "CAP_NET_ADMIN" "CAP_NET_RAW" "CAP_NET_BIND_SERVICE" ];
         CapabilityBoundingSet = [ "CAP_NET_ADMIN" "CAP_NET_RAW" "CAP_NET_BIND_SERVICE" "CAP_KILL" ];
         NoNewPrivileges = true;
