@@ -31,6 +31,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ### Fixed
 
+- **Your log is yours alone.** Crake's log (which hosts you reached, and when), the hosts it learned
+  and its traffic counts could be read by every user of the computer, from its files and from
+  Crake's service, and its decisions were announced to all of them. Now the files are readable by
+  Crake's service alone, it answers only the person at the computer, and tells only them. Settings
+  said the log was in your home folder; it says where it really is now.
 - **A company site with a public and a private address stays inside, over IPv6 too.** When your
   company's DNS gives a public name a private address, Crake sends it through the tunnel; the
   name's public IPv6 address was still handed out, and an app that tries IPv6 first went to the

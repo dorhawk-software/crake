@@ -158,7 +158,11 @@ are shared with passive probing (`try_tunnels`).
 
 ### Log and privacy
 
-- Append-only JSON lines in `~/.local/share/crake/log` (per user), retention
+- Append-only JSON lines in craked's state directory (`crake_proto::LOG_PATH`:
+  `/var/lib/crake/log` on Linux), which craked closes to itself at start
+  (`config::own_state_dir`; until 2026-10-21 every user could read it). Reading
+  craked's API is guarded like changing it, and its signals go only to
+  callers let in (`dbus/guard.rs`). Retention
   configurable (default 30 days). Each entry is a decision: routed, left alone,
   undone, or a system event, with the reason and timing.
 - "Copy for helpdesk" produces a readable plain-text summary; optionally with

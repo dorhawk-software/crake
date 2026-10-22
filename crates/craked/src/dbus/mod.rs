@@ -1,5 +1,6 @@
-//! `software.dorhawk.Crake1` on the system bus. Reads are open to every local
-//! user; switching a tunnel needs polkit's `software.dorhawk.crake.manage-tunnels`.
+//! `software.dorhawk.Crake1` on the system bus. Reading and changing alike
+//! need polkit's `software.dorhawk.crake.manage-tunnels` (`guard`): the log
+//! and the hosts say where someone connects.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -18,15 +19,19 @@ use crate::manager::{Manager, Snapshot};
 // loopback port.
 mod serve;
 pub use serve::*;
+// Who may use it, reading included.
+mod guard;
 
 pub const POLKIT_ACTION: &str = "software.dorhawk.crake.manage-tunnels";
 
 pub struct Service {
     mgr: Arc<Manager>,
     guard: Guard,
+    /// Callers the guard let in: they hear the signals.
+    allowed: Arc<guard::Allowed>,
 }
 
-/// Who may change things (reading is open to every caller that got in).
+/// Who may use the API, reading included (`guard`).
 #[derive(Clone, Copy)]
 enum Guard {
     /// Whoever can open the socket (the session bus, or a development
@@ -47,11 +52,22 @@ enum Guard {
 impl Service {
     /// One dictionary per tunnel: name, display_name, state, interface, gateway,
     /// protocol, address, dns, domains, split_include, split_exclude.
-    async fn list_tunnels(&self) -> Vec<HashMap<String, OwnedValue>> {
-        self.mgr.list().iter().map(to_dict).collect()
+    async fn list_tunnels(
+        &self,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+    ) -> fdo::Result<Vec<HashMap<String, OwnedValue>>> {
+        self.authorize(&hdr, conn).await?;
+        Ok(self.mgr.list().iter().map(to_dict).collect())
     }
 
-    async fn get_tunnel(&self, name: &str) -> fdo::Result<HashMap<String, OwnedValue>> {
+    async fn get_tunnel(
+        &self,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+        name: &str,
+    ) -> fdo::Result<HashMap<String, OwnedValue>> {
+        self.authorize(&hdr, conn).await?;
         self.mgr
             .get(name)
             .map(|s| to_dict(&s))
@@ -321,8 +337,13 @@ impl Service {
 
     /// The Settings window's values, each in its text form (lists one item
     /// per line, "never" for no limit).
-    async fn settings(&self) -> HashMap<String, String> {
-        self.mgr.settings()
+    async fn settings(
+        &self,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+    ) -> fdo::Result<HashMap<String, String>> {
+        self.authorize(&hdr, conn).await?;
+        Ok(self.mgr.settings())
     }
 
     async fn set_setting(
@@ -352,45 +373,79 @@ impl Service {
     async fn settings_changed(emitter: &SignalEmitter<'_>) -> zbus::Result<()>;
 
     /// The last `count` log entries, oldest first, one JSON object each.
-    async fn recent_log(&self, count: u32) -> Vec<String> {
-        self.mgr
+    async fn recent_log(
+        &self,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+        count: u32,
+    ) -> fdo::Result<Vec<String>> {
+        self.authorize(&hdr, conn).await?;
+        Ok(self
+            .mgr
             .log()
             .recent(count.min(MAX_RECENT) as usize)
             .iter()
             .filter_map(|e| serde_json::to_string(e).ok())
-            .collect()
+            .collect())
     }
 
     /// craked's view of the computer, line by line (each tunnel's device,
     /// address and DNS; who answers the system's DNS): for the app's
     /// helpdesk copies.
-    async fn diagnostics(&self) -> Vec<String> {
-        self.mgr.diagnostics()
+    async fn diagnostics(
+        &self,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+    ) -> fdo::Result<Vec<String>> {
+        self.authorize(&hdr, conn).await?;
+        Ok(self.mgr.diagnostics())
     }
 
     /// Direct traffic per minute for the last hour: (minute since the epoch,
     /// bytes), oldest first. Counters only.
-    async fn traffic_last_hour(&self) -> Vec<(u64, u64)> {
-        self.mgr.traffic()
+    async fn traffic_last_hour(
+        &self,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+    ) -> fdo::Result<Vec<(u64, u64)>> {
+        self.authorize(&hdr, conn).await?;
+        Ok(self.mgr.traffic())
     }
 
     /// All traffic per minute for the last two days: (minute since
     /// the epoch the slot starts at, bytes), oldest first. Counters only.
-    async fn traffic_days(&self) -> Vec<(u64, u64)> {
-        self.mgr.traffic_days()
+    async fn traffic_days(
+        &self,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+    ) -> fdo::Result<Vec<(u64, u64)>> {
+        self.authorize(&hdr, conn).await?;
+        Ok(self.mgr.traffic_days())
     }
 
     /// Traffic through one tunnel per minute, two days: (minute since the
     /// epoch, bytes), oldest first. Counters only.
-    async fn tunnel_traffic(&self, tunnel: &str) -> Vec<(u64, u64)> {
-        self.mgr.tunnel_traffic(tunnel)
+    async fn tunnel_traffic(
+        &self,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+        tunnel: &str,
+    ) -> fdo::Result<Vec<(u64, u64)>> {
+        self.authorize(&hdr, conn).await?;
+        Ok(self.mgr.tunnel_traffic(tunnel))
     }
 
     /// Tunnel detail's host list: one dictionary per host, with `target`,
     /// `name`, `kind` (pinned | learned | direct), `learned_at` (seconds
     /// since the epoch), `how` (probe | dns | inside | split | you),
     /// `used_ago` and `expires_in` (seconds), each only when known.
-    async fn host_details(&self, tunnel: &str) -> fdo::Result<Vec<HashMap<String, String>>> {
+    async fn host_details(
+        &self,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+        tunnel: &str,
+    ) -> fdo::Result<Vec<HashMap<String, String>>> {
+        self.authorize(&hdr, conn).await?;
         let rows = self.mgr.hosts(tunnel).await.map_err(failed)?;
         Ok(rows
             .into_iter()
@@ -456,7 +511,13 @@ impl Service {
 
     /// (target, DNS name or "", kind: pinned | learned | direct, seconds until
     /// a learned host expires; 0 otherwise)
-    async fn list_hosts(&self, tunnel: &str) -> fdo::Result<Vec<(String, String, String, u64)>> {
+    async fn list_hosts(
+        &self,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+        tunnel: &str,
+    ) -> fdo::Result<Vec<(String, String, String, u64)>> {
+        self.authorize(&hdr, conn).await?;
         let rows = self.mgr.hosts(tunnel).await.map_err(failed)?;
         Ok(rows
             .into_iter()
@@ -492,82 +553,8 @@ impl Service {
     ) -> zbus::Result<()>;
 }
 
-impl Service {
-    async fn authorize(&self, hdr: &Header<'_>, conn: &Connection) -> fdo::Result<()> {
-        match self.guard {
-            Guard::Open => return Ok(()),
-            Guard::Polkit => {}
-            #[cfg(windows)]
-            Guard::ConsoleSession => return in_console_session(conn).await,
-            #[cfg(target_os = "macos")]
-            Guard::ConsoleUser => return console_user(conn).await,
-        }
-        let sender = hdr
-            .sender()
-            .ok_or_else(|| fdo::Error::AccessDenied("no sender".into()))?;
-        match check_polkit(conn, sender.as_str()).await {
-            Ok(true) => Ok(()),
-            Ok(false) => Err(fdo::Error::AccessDenied(
-                "not authorized to switch tunnels".into(),
-            )),
-            Err(e) => Err(fdo::Error::AccessDenied(format!("polkit: {e}"))),
-        }
-    }
-}
-
-/// The caller runs in the console session (Windows).
-#[cfg(windows)]
-async fn in_console_session(conn: &Connection) -> fdo::Result<()> {
-    let pid = conn.peer_creds().await.ok().and_then(|c| c.process_id());
-    if pid.is_some_and(crate::sys::in_console_session) {
-        Ok(())
-    } else {
-        Err(fdo::Error::AccessDenied(
-            "only the signed-in user can switch tunnels".into(),
-        ))
-    }
-}
-
-/// The caller is the user at the console, or root (macOS).
-#[cfg(target_os = "macos")]
-async fn console_user(conn: &Connection) -> fdo::Result<()> {
-    use std::os::unix::fs::MetadataExt;
-    let caller = conn.peer_creds().await.ok().and_then(|c| c.unix_user_id());
-    let console = std::fs::metadata("/dev/console").ok().map(|m| m.uid());
-    match caller {
-        Some(0) => Ok(()),
-        Some(uid) if Some(uid) == console => Ok(()),
-        _ => Err(fdo::Error::AccessDenied(
-            "only the user at the console can switch tunnels".into(),
-        )),
-    }
-}
-
 fn failed(e: anyhow::Error) -> fdo::Error {
     fdo::Error::Failed(format!("{e:#}"))
-}
-
-async fn check_polkit(conn: &Connection, sender: &str) -> zbus::Result<bool> {
-    let proxy = zbus::Proxy::new(
-        conn,
-        "org.freedesktop.PolicyKit1",
-        "/org/freedesktop/PolicyKit1/Authority",
-        "org.freedesktop.PolicyKit1.Authority",
-    )
-    .await?;
-    let subject = (
-        "system-bus-name",
-        HashMap::from([("name", Value::from(sender))]),
-    );
-    let details: HashMap<&str, &str> = HashMap::new();
-    // Flags 0: never prompt from the daemon; the action's defaults decide.
-    let (authorized, _challenge, _details): (bool, bool, HashMap<String, String>) = proxy
-        .call(
-            "CheckAuthorization",
-            &(subject, POLKIT_ACTION, details, 0u32, ""),
-        )
-        .await?;
-    Ok(authorized)
 }
 
 fn to_dict(s: &Snapshot) -> HashMap<String, OwnedValue> {

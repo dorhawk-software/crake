@@ -102,6 +102,12 @@ async fn run(args: Args, external: Option<oneshot::Receiver<()>>) -> Result<()> 
         );
         Config::without_file()
     };
+    // The log and the hosts are the service's alone (`own_state_dir`).
+    if let Some(dir) = craked::config::own_state_dir(&cfg)
+        && let Err(e) = craked::sys::create_private_dir(dir)
+    {
+        tracing::warn!("couldn't close {} to other users: {e:#}", dir.display());
+    }
     let socket = cfg.hook_socket.clone();
     let mgr = Manager::new(cfg)?;
     mgr.init().await?;

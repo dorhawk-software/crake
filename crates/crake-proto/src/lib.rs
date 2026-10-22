@@ -11,6 +11,23 @@ pub mod openvpn_profile;
 pub mod report;
 pub mod trouble;
 
+/// Where craked keeps its state and log, its own alone (craked's
+/// `config::own_state_dir`; Settings → Privacy says it).
+#[cfg(target_os = "linux")]
+pub const STATE_DIR: &str = "/var/lib/crake";
+/// macOS: where system daemons keep theirs.
+#[cfg(target_os = "macos")]
+pub const STATE_DIR: &str = "/var/db/crake";
+#[cfg(windows)]
+pub const STATE_DIR: &str = r"C:\ProgramData\Crake";
+/// craked's log, in `STATE_DIR`, unless its configuration says otherwise.
+#[cfg(target_os = "linux")]
+pub const LOG_PATH: &str = "/var/lib/crake/log";
+#[cfg(target_os = "macos")]
+pub const LOG_PATH: &str = "/var/db/crake/log";
+#[cfg(windows)]
+pub const LOG_PATH: &str = r"C:\ProgramData\Crake\log";
+
 /// Where `craked` listens for the hook, unless configured otherwise.
 #[cfg(target_os = "linux")]
 pub const DEFAULT_HOOK_SOCKET: &str = "/run/crake/hook.sock";
@@ -369,6 +386,12 @@ fn unquote(v: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_log_is_in_the_state_directory() {
+        let log = std::path::Path::new(LOG_PATH);
+        assert_eq!(log.parent(), Some(std::path::Path::new(STATE_DIR)));
+    }
 
     #[test]
     fn openvpns_script_calls_in_openconnects_words() {

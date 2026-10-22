@@ -131,7 +131,7 @@ impl Settings {
                                             .font_family(fonts::MONO)
                                             .text_size(px(12.))
                                             .text_color(t.muted)
-                                            .child("~/.local/share/crake/log"),
+                                            .child(crake_proto::LOG_PATH),
                                     ),
                             )
                             .child(keep),

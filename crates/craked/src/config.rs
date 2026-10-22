@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use crake_proto::{DEFAULT_HOOK_PATH, DEFAULT_HOOK_SOCKET, valid_tunnel_name};
+use crake_proto::{DEFAULT_HOOK_PATH, DEFAULT_HOOK_SOCKET, LOG_PATH, STATE_DIR, valid_tunnel_name};
 use serde::Deserialize;
 
 #[cfg(unix)]
@@ -9,14 +9,6 @@ pub const DEFAULT_CONFIG: &str = "/etc/crake/craked.toml";
 #[cfg(windows)]
 pub const DEFAULT_CONFIG: &str = r"C:\ProgramData\Crake\craked.toml";
 
-/// Where craked keeps its state and log.
-#[cfg(target_os = "linux")]
-const STATE_DIR: &str = "/var/lib/crake";
-/// macOS: where system daemons keep theirs.
-#[cfg(target_os = "macos")]
-const STATE_DIR: &str = "/var/db/crake";
-#[cfg(windows)]
-const STATE_DIR: &str = r"C:\ProgramData\Crake";
 /// IT's managed tunnels.
 #[cfg(unix)]
 const MANAGED_DIR: &str = "/etc/crake/managed.d";
@@ -409,8 +401,21 @@ fn default_charon() -> PathBuf {
     .find(|p| p.exists())
     .unwrap_or_else(|| "/usr/lib/ipsec/charon".into())
 }
+/// The service's own state folder, when the log or the hosts are kept in
+/// it (not a development config's paths elsewhere): closed to all but the
+/// service at start (`sys::create_private_dir`). Its log (which hosts were
+/// reached, and when), the hosts it learned and the traffic it counted
+/// are no one else's: until 2026-10-21 the folder was 0755 on Linux and
+/// macOS, its files 0644, while Settings said the log was kept in your
+/// home folder (Windows' was locked from 2026-10-18). The app never reads
+/// them: everything it shows comes through the service.
+pub fn own_state_dir(cfg: &Config) -> Option<&'static Path> {
+    let dir = Path::new(STATE_DIR);
+    (cfg.log_path.starts_with(dir) || cfg.state_path.starts_with(dir)).then_some(dir)
+}
+
 fn default_log_path() -> PathBuf {
-    PathBuf::from(STATE_DIR).join("log")
+    PathBuf::from(LOG_PATH)
 }
 fn default_state_path() -> PathBuf {
     PathBuf::from(STATE_DIR).join("hosts.json")
@@ -452,6 +457,19 @@ fn yes() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_service_closes_its_own_folder_only() {
+        let cfg = Config::default();
+        assert_eq!(own_state_dir(&cfg), Some(Path::new(STATE_DIR)));
+        // A development config's paths elsewhere: left as they are.
+        let dev = Config {
+            log_path: "/tmp/crake-dev/log".into(),
+            state_path: "/tmp/crake-dev/hosts.json".into(),
+            ..Config::default()
+        };
+        assert_eq!(own_state_dir(&dev), None);
+    }
 
     #[test]
     fn parses_and_validates() {

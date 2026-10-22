@@ -60,8 +60,12 @@ install() {
     check "kept in craked's state directory" test -s /var/lib/crake/tunnels.json
     # Someone without an active session at this computer: craked asked
     # polkit, which said no (craked's own words, not the bus's).
-    check "polkit refuses others" sh -c "setpriv --reuid=nobody --regid=$(id -g nobody) --clear-groups dbus-send --system --print-reply --dest=software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1.RemoveTunnel string:globex 2>&1 | grep 'not authorized to switch tunnels'"
-    check "anyone may read" as_nobody busctl --system call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 Settings
+    check "polkit refuses others" sh -c "setpriv --reuid=nobody --regid=$(id -g nobody) --clear-groups dbus-send --system --print-reply --dest=software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1.RemoveTunnel string:globex 2>&1 | grep 'not authorized to use Crake'"
+    # Reading too (until 2026-10-21 anyone could read the log and the
+    # hosts, over the bus and from the files).
+    check "polkit refuses others a read" sh -c "setpriv --reuid=nobody --regid=$(id -g nobody) --clear-groups dbus-send --system --print-reply --dest=software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1.RecentLog uint32:10 2>&1 | grep 'not authorized to use Crake'"
+    check "craked's state directory is root's alone" sh -c 'test "$(stat -c %a /var/lib/crake)" = 700'
+    check "others can't read what's in it" sh -c "! setpriv --reuid=nobody --regid=$(id -g nobody) --clear-groups cat /var/lib/crake/tunnels.json 2>/dev/null"
     # For the tunnel phase, while the archive can still be reached.
     if [ "$PM" = pacman ]; then
         check "the gateway's software" pacman -S --noconfirm --needed curl

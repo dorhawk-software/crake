@@ -187,7 +187,7 @@ Crake sits between you and your network. It's built accordingly.
 |                                  |                                                                                                   |
 | -------------------------------- | ------------------------------------------------------------------------------------------------- |
 | **Nothing leaves your machine.** | No account, no server, no telemetry. Ever. Every decision is made on your computer.               |
-| **The log stays here.**          | Kept in your home folder for 30 days by default, or only in memory. Clearing it takes one click.  |
+| **The log stays here.**          | Kept by Crake's service, readable by it alone, 30 days by default or only in memory. Clearing it takes one click. |
 | **Secrets in your keyring.**     | Passwords and certificates go to your system's keyring, never to Crake's own files.                |
 | **Internal names stay internal.**| With a tunnel off, its company's names aren't asked of public DNS.                                 |
 | **Sharing can be anonymous.**    | One switch, "Hide names and addresses when sharing", leaves them out of helpdesk copies and reports. A report is saved on your computer for you to read first; Crake sends it nowhere. |
