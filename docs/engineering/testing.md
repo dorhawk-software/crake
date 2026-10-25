@@ -83,6 +83,12 @@ The user doesn't want development builds installed on their machine.
   the source port of a client that had just ended (reproduced: "session
   id in token changed"); craked now sends a kept token twice before
   forgetting it (`openvpn/sign_in.rs`, `TOKEN_TRIES`).
+  The gateways job waits for the jobs that use them, each at most 50
+  minutes from its own start (`scripts/ci-gateways.sh`, 2026-10-25): it had
+  counted from its own start, and the 0.15.0 release commit's Windows
+  build, which missed its cache after the version bump (40 minutes instead
+  of 8), used the time up, so the gateways went in the middle of
+  Windows' tests ("SSL connection failure: Error in the pull function").
 - `scripts/netns-test.sh`: real nftables and policy routing inside a
   disposable container with no network (host filesystem read-only, with a
   `/run` of its own: until 2026-10-15 the container saw this computer's

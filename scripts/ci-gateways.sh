@@ -10,9 +10,15 @@
 set -eu
 cd "$(dirname "$0")/.."
 NAME=crake-ci-gateways
-# How long the gateways wait for the job that uses them: the Mac's job
-# takes ~10 minutes; past this something hangs.
+# How long a job that uses the gateways may run, from its own start: the
+# Mac's and Windows' take ~10 minutes; past this something hangs. Until
+# 2026-10-25 it counted from the gateways' start, so a Windows build that
+# missed its cache (40 minutes, after the 0.15.0 version bump) used it up
+# and the gateways went in the middle of Windows' tests.
 WAIT_MINUTES=50
+# And how long the gateways wait in all, for jobs that haven't started yet
+# (their builds before them): GitHub's own limit for a job is six hours.
+ALL_MINUTES=180
 case "${1:-}" in
   up)
     OUT=$2
@@ -34,23 +40,34 @@ case "${1:-}" in
     ;;
   wait)
     shift
-    end=$(( $(date +%s) + WAIT_MINUTES * 60 ))
+    end=$(( $(date +%s) + ALL_MINUTES * 60 ))
     while [ "$(date +%s)" -lt "$end" ]; do
       # GitHub's API fails now and then (a 502, 2026-10-20): asked again
       # at the next look, not taken for the jobs' end.
       if ! jobs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --paginate \
-        --jq '.jobs[] | "\(.name) \(.status)"'); then
+        --jq '.jobs[] | "\(.name)\t\(.status)\t\(.started_at)"'); then
         sleep 20
         continue
       fi
       left=
+      hung=
+      now=$(date +%s)
       for job in "$@"; do
-        echo "$jobs" | grep -qx "$job completed" || left="$left $job"
+        line=$(printf '%s\n' "$jobs" | awk -F '\t' -v j="$job" '$1 == j' | head -n 1)
+        status=$(printf '%s' "$line" | cut -f 2)
+        [ "$status" = completed ] && continue
+        left="$left $job"
+        # Running: its own clock; queued behind its build: none yet.
+        if [ "$status" = in_progress ]; then
+          started=$(date -d "$(printf '%s' "$line" | cut -f 3)" +%s 2>/dev/null || echo "$now")
+          [ $((now - started)) -lt $((WAIT_MINUTES * 60)) ] || hung="$hung $job"
+        fi
       done
       [ -z "$left" ] && { echo "$* done"; exit 0; }
+      [ -z "$hung" ] || { echo "running for over $WAIT_MINUTES minutes:$hung" >&2; exit 1; }
       sleep 20
     done
-    echo "still going after $WAIT_MINUTES minutes:$left" >&2
+    echo "still not done after $ALL_MINUTES minutes:$left" >&2
     exit 1
     ;;
   down)
