@@ -10,7 +10,7 @@ use std::sync::LazyLock;
 
 pub use crate::sys::tray::{Handle, start};
 
-mod art;
+pub(crate) mod art;
 mod motion;
 
 pub use art::Art;
@@ -149,8 +149,8 @@ pub struct Icon {
 /// The largest image sent to the tray.
 const SIZE: u32 = 64;
 /// The sizes trays show icons at: 16 to 24 px (1x and 1.25x and 1.5x
-/// notification areas, GNOME's and KDE's bars), 32 to 48 (2x and more),
-/// 36 (macOS' menu bar on a Retina screen).
+/// notification areas, GNOME's and KDE's bars), 32 to 48 (2x and more);
+/// the Mac's menu bar has a drawing of its own (`art::MAC_SIZE`).
 const SMALL: [u32; 9] = [16, 20, 22, 24, 28, 32, 36, 40, 48];
 
 static ICONS: LazyLock<[Icon; 10]> = LazyLock::new(|| {
@@ -246,11 +246,14 @@ fn argb(tree: &resvg::usvg::Tree, size: u32) -> Vec<u8> {
     data
 }
 
-/// The badges' colours on a light bar (Windows' light taskbar, macOS'
+/// The marks' colours on a light bar (Windows' light taskbar, macOS'
 /// light menu bar), in place of the dark bar's: DESIGN.md's light danger
 /// and warning, and what goes on them (the dark ones are 2.4:1 and 1.5:1
-/// against a light bar; design/proposals/tray-badge.html).
-const ON_LIGHT_BAR: [(&str, &str); 4] = [
+/// against a light bar; design/proposals/tray-badge.html), and the light
+/// theme's accent for the call (the dark one was 1.6:1 there, found
+/// 2026-10-25 by the Mac's proposal).
+const ON_LIGHT_BAR: [(&str, &str); 5] = [
+    (art::CALL, "#0F766E"),
     (art::TROUBLE, "#B42318"),
     (art::ON_TROUBLE, "#FFFFFF"),
     (art::WARNING, "#BF7E12"),
@@ -267,10 +270,16 @@ pub fn for_light_bar(svg: &str, ink: &str) -> String {
         })
 }
 
+/// How far a pixel's colour may be from a mark's and still be taken for
+/// it: an anti-aliased edge comes back from its alpha a few steps off
+/// (most of a 2 px call mark is edge; with exact matches only, most of it
+/// stayed the dark bar's teal, found 2026-10-25).
+#[cfg(any(windows, target_os = "macos", test))]
+const NEAR: i16 = 24;
+
 /// A pixel of the tray's image for a light bar: the grey bird drawn
-/// `ink`, a badge's colour its light-bar one (the badge sits on whole
-/// pixels, so its colours arrive exact; its edges only fade).
-#[cfg(any(windows, target_os = "macos"))]
+/// `ink`, a mark's colour (or one near it, an edge's) its light-bar one.
+#[cfg(any(windows, target_os = "macos", test))]
 // literal: "#rrggbb" read as its three bytes
 pub fn light_bar_pixel([r, g, b]: [u8; 3], ink: [u8; 3]) -> [u8; 3] {
     if r == g && g == b {
@@ -280,9 +289,10 @@ pub fn light_bar_pixel([r, g, b]: [u8; 3], ink: [u8; 3]) -> [u8; 3] {
         let v = u32::from_str_radix(&h[1..], 16).unwrap_or(0);
         v.to_be_bytes()
     };
+    let near = |a: u8, b: u8| (i16::from(a) - i16::from(b)).abs() <= NEAR;
     for (dark, light) in ON_LIGHT_BAR {
         let [_, dr, dg, db] = hex(dark);
-        if [dr, dg, db] == [r, g, b] {
+        if near(dr, r) && near(dg, g) && near(db, b) {
             let [_, lr, lg, lb] = hex(light);
             return [lr, lg, lb];
         }

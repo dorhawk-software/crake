@@ -231,8 +231,16 @@ fn the_scrollbar_follows_the_pointer_over_what_scrolls(cx: &mut TestAppContext) 
     point("versions", cx);
     assert!(w.shows("versions-bar", cx), "pointed at: the bar");
     // Moving on over what scrolls, the bar shown over it: it stays (the
-    // bar's own layer once took the pointer away, and it flickered).
-    point("release-0.14.0", cx);
+    // bar's own layer once took the pointer away, and it flickered). The
+    // newest release, at the top: an older one may be below the fold.
+    let newest = changelog::releases()
+        .iter()
+        .find(|r| r.version != changelog::UNRELEASED)
+        .unwrap();
+    point(
+        Box::leak(format!("release-{}", newest.version).into_boxed_str()),
+        cx,
+    );
     assert!(
         w.shows("versions-bar", cx),
         "still pointed at: still the bar"

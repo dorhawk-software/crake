@@ -194,10 +194,11 @@ mod tests {
             let svg = crate::tray::resting_svg(shape);
             assert!(svg.contains(r#"width="32" height="32""#), "{shape:?}");
         }
-        // The light bar's head is dark; the teal marks stay teal.
+        // The light bar's head is dark; the call marks the light theme's
+        // teal (the dark one was 1.6:1 on a light bar).
         let light = String::from_utf8(drawing(Shape::Routed, true).bytes().to_vec()).unwrap();
         assert!(!light.contains("#ffffff") && light.contains(INK_ON_LIGHT));
-        assert!(light.contains("#2DD4BF"));
+        assert!(light.contains("#0F766E") && !light.contains("#2DD4BF"));
     }
 
     #[test]

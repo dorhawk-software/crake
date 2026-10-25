@@ -275,6 +275,8 @@ one line each:
   reproduced; what to capture next time.
 - Display scale changes on Windows and macOS: not tried.
 - winget for Windows; Undo in macOS notifications.
+- macOS colouring the menu bar's bird itself (a template image): waits for
+  the menu bar's own appearance and a real Mac to try it.
 - No-tray's one-line command: no scrollbar (it would cover the text).
 - OpenVPN 3 sessions whose device openvpn3 doesn't name, under the package.
 - A shared practices repository for dorhawk.software (the user's idea, once

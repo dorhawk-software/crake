@@ -11,6 +11,19 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### Better
+
+- **On a Mac, the bird in the menu bar is the size of its neighbours.** It was the largest icon
+  there, a little soft and sitting low: drawn for Linux's small bars and stretched. Now it's drawn
+  for the Mac's own bar, as tall as the icons beside it and on their line, with a rounder eye, and
+  asleep it's dimmed less, so it doesn't look disabled.
+
+### Fixed
+
+- **The call marks read on a light bar.** When Crake routes a host, the two marks in front of the
+  bird's bill were the dark theme's teal, faint on Windows' light taskbar or a light Mac menu bar.
+  They're the light theme's teal there now.
+
 ## 0.15.0 (2026-10-25)
 
 ### New

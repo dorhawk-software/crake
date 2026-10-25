@@ -342,8 +342,8 @@ on the circle's middle (at 16 px: a 1 px stem three rows tall, a gap, a
 1 px dot), and none where the circle has no room for one. On a light bar
 (Windows' light taskbar, macOS' light menu bar) the bird is drawn dark and
 the badge takes the light theme's danger and warning (#B42318 with a white
-"!", #BF7E12 with a dark one): the dark ones are 2.4:1 and 1.5:1 against a
-light bar.
+"!", #BF7E12 with a dark one), and the call marks its accent (#0F766E): the
+dark ones are 2.4:1, 1.5:1 and 1.6:1 against a light bar.
 
 The bird changes shape, never colour; only the state marks are coloured
 (dark-mode accent, danger and warning, the bar is dark), with a gap cut
@@ -353,6 +353,19 @@ second follows, twice (crex, crex); going to sleep, the eye closes, then
 the head drops and dims. The whole bird with grass
 (`crake-*-symbolic.svg`: the same bust standing in the grass) stays for
 places with room; `CRAKE_TRAY=bird` shows it in the bar.
+
+**On the Mac** (design/proposals/menu-bar-mac.html, C, chosen 2026-10-25):
+the menu bar's neighbours are glyphs about 15 pt tall with room around
+them, not solid squares, so filling the slot made the bird the largest icon
+in the bar. The Mac gets its own image (`Art::svg_mac`): 44 px, which the
+tray library shows at 22 pt, 2 px a point; in it the 32 px drawing 1:1 on
+whole pixels, its middle on the neighbours' line, the same place in every
+state. Its eye is round and a little larger, which a Retina screen can
+hold; asleep it is dimmed to 70 %, not 45 % (beside the Mac's
+full-strength icons 45 % read as disabled). Rejected there: the same bust
+only scaled down (A: its 3 px square eye barely showed), a one-pixel wing
+cut (a grey hairline, as the thin cuts above), and the bird as a line (B:
+the bill became a bump, a cartoon seal).
 
 Rejected for the bar (bird-calling.html and the rounds before it): detail
 on the old dome (cut lines, a shaded throat, nape streaks, feather

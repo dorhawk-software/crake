@@ -61,11 +61,13 @@ fn the_badge_reads_at_sixteen_pixels() {
 }
 
 #[test]
-fn a_light_bar_gets_the_light_themes_badge() {
-    let svg = resting_svg(Shape::Trouble) + &resting_svg(Shape::Warning);
+fn a_light_bar_gets_the_light_themes_marks() {
+    let svg =
+        resting_svg(Shape::Trouble) + &resting_svg(Shape::Warning) + &resting_svg(Shape::Routed);
     let light = for_light_bar(&svg, "#1f1f1f");
     for dark in [
         "#ffffff",
+        art::CALL,
         art::TROUBLE,
         art::ON_TROUBLE,
         art::WARNING,
@@ -73,7 +75,9 @@ fn a_light_bar_gets_the_light_themes_badge() {
     ] {
         assert!(!light.contains(dark), "{dark} is left");
     }
-    for colour in ["#1f1f1f", "#B42318", "#FFFFFF", "#BF7E12", "#1A1C1E"] {
+    for colour in [
+        "#1f1f1f", "#0F766E", "#B42318", "#FFFFFF", "#BF7E12", "#1A1C1E",
+    ] {
         assert!(light.contains(colour), "{colour} is missing");
     }
 }
@@ -212,6 +216,94 @@ fn asleep_is_plain_at_a_glance() {
     assert!(x0 > 0 && y0 > 0 && x1 < 64, "drawn from {x0},{y0} to {x1}");
     // The eye is shut: no hole where the open eye would be.
     assert_ne!(px(icon, 14.5, 7.)[0], 0);
+}
+
+/// The Mac's drawing of `shape` (menu-bar-mac.html, C), as ARGB at its
+/// size, and the rows and columns its ink covers.
+fn mac(shape: Shape) -> (Vec<u8>, (usize, usize), (usize, usize)) {
+    let n = art::MAC_SIZE as usize;
+    let data = raster(&rest(shape).svg_mac(), art::MAC_SIZE);
+    let (mut rows, mut cols) = ((n, 0), (n, 0));
+    for y in 0..n {
+        for x in 0..n {
+            if data[(y * n + x) * 4] > 0 {
+                rows = (rows.0.min(y), rows.1.max(y));
+                cols = (cols.0.min(x), cols.1.max(x));
+            }
+        }
+    }
+    (data, rows, cols)
+}
+
+#[test]
+fn the_macs_bird_is_its_neighbours_size() {
+    // About 31 px of the 44 (15 pt; 1Password, the moon and Wi-Fi are 25
+    // to 32), on their middle line, the image's, and inside
+    // the image in every state: the badge, the call and the dropped head
+    // too, so nothing beside it moves.
+    let n = art::MAC_SIZE as usize;
+    let (_, rows, _) = mac(Shape::Listening);
+    let tall = rows.1 - rows.0 + 1;
+    assert!((29..=31).contains(&tall), "{tall} px tall");
+    assert!(
+        (20..=22).contains(&((rows.0 + rows.1) / 2)),
+        "rows {rows:?}"
+    );
+    for shape in [Shape::Off, Shape::Routed, Shape::Trouble, Shape::Warning] {
+        let (_, rows, cols) = mac(shape);
+        assert!(
+            rows.0 > 0 && rows.1 < n - 1 && cols.0 > 0 && cols.1 < n - 1,
+            "{shape:?}: {rows:?} {cols:?}"
+        );
+    }
+}
+
+#[test]
+fn the_macs_bird_has_its_eye_and_dims_less_asleep() {
+    let n = art::MAC_SIZE as usize;
+    let at = |data: &[u8], x: usize, y: usize| data[(y * n + x) * 4];
+    // The round eye is a hole (where the raised head puts it: 14, 7 of the
+    // 32 px drawing, 6 and 6 px in); the breast is solid, the wing a cut.
+    let (listening, ..) = mac(Shape::Listening);
+    assert_eq!(at(&listening, 6 + 14, 6 + 7), 0, "the eye is see-through");
+    assert_eq!(at(&listening, 6 + 16, 6 + 26), 255, "the breast is solid");
+    assert_eq!(at(&listening, 6 + 10, 6 + 24), 0, "the wing is a cut");
+    // Asleep is dimmed less than in other bars (70 %, not 45 %).
+    let ink = |d: &[u8]| d.chunks(4).map(|p| u64::from(p[0])).sum::<u64>();
+    let (off, ..) = mac(Shape::Off);
+    let peak = off.chunks(4).map(|p| p[0]).max().unwrap();
+    assert!((170..=185).contains(&peak), "asleep at {peak} of 255");
+    assert!(ink(&off) * 2 > ink(&listening), "asleep isn't half gone");
+}
+
+#[test]
+fn a_light_bar_leaves_no_dark_bar_mark() {
+    // Windows and the Mac recolour the drawn image pixel by pixel: the
+    // anti-aliased edges of the call marks and the badges too, not only
+    // the pixels that came back exactly a mark's colour.
+    let hex = |h: &str| u32::from_str_radix(&h[1..], 16).unwrap().to_be_bytes();
+    let near = |p: [u8; 3], h: &str| {
+        let [_, r, g, b] = hex(h);
+        p.iter()
+            .zip([r, g, b])
+            .all(|(a, b)| (i16::from(*a) - i16::from(b)).abs() <= 24)
+    };
+    for shape in [Shape::Routed, Shape::Trouble, Shape::Warning] {
+        for (n, data) in [
+            (32, raster(&rest(shape).svg_at(32), 32)),
+            (art::MAC_SIZE, raster(&rest(shape).svg_mac(), art::MAC_SIZE)),
+        ] {
+            for p in data.chunks(4).filter(|p| p[0] > 0) {
+                let light = light_bar_pixel([p[1], p[2], p[3]], [0x1f, 0x1f, 0x1f]);
+                for dark in [art::CALL, art::TROUBLE, art::WARNING] {
+                    assert!(
+                        !near(light, dark),
+                        "{shape:?} at {n} px: {light:?} is still {dark}"
+                    );
+                }
+            }
+        }
+    }
 }
 
 #[test]
@@ -355,4 +447,24 @@ fn write_badge_proposal() {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../design/proposals/tray-badge");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("art.js"), js).unwrap();
+}
+
+/// The Mac's drawing of each state, as art.rs draws it, for
+/// design/proposals/menu-bar-mac.html's "as built" bars:
+/// `cargo test -p crake write_mac_proposal -- --ignored`.
+#[test]
+#[ignore]
+fn write_mac_proposal() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../design/proposals/menu-bar-mac/built");
+    std::fs::create_dir_all(&dir).unwrap();
+    for shape in SHAPES {
+        let svg = rest(shape).svg_mac();
+        std::fs::write(dir.join(format!("{shape:?}.svg").to_lowercase()), &svg).unwrap();
+        std::fs::write(
+            dir.join(format!("{shape:?}-light.svg").to_lowercase()),
+            for_light_bar(&svg, "#292929"),
+        )
+        .unwrap();
+    }
 }

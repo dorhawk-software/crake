@@ -109,6 +109,45 @@ const RAISED: f32 = -20.;
 const DROPPED: f32 = 25.;
 /// How bright an asleep bird is.
 const ASLEEP: f32 = 0.45;
+
+/// How a bar draws the bird: its eye, and how bright it is asleep.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Look {
+    /// The eye a round hole this wide (a radius in the drawing's units),
+    /// or the square on whole pixels.
+    round_eye: Option<f32>,
+    asleep: f32,
+}
+
+/// Every bar but the Mac's: the drawing as DESIGN.md has it.
+const BAR: Look = Look {
+    round_eye: None,
+    asleep: ASLEEP,
+};
+
+// literal: the Mac's drawing (design/proposals/menu-bar-mac.html, C)
+/// The Mac's menu bar (design/proposals/menu-bar-mac.html, C, chosen by the
+/// owner 2026-10-25): its neighbours are glyphs about 15 pt tall on a
+/// Retina screen, so the bird is drawn at that height (`MAC_BIRD`), with
+/// the round eye twice the pixels can hold, a little larger, and dimmed
+/// less asleep (beside the Mac's full-strength icons 45 % read as
+/// disabled). C's one-pixel wing cut went: a diagonal that thin is a grey
+/// hairline, as DESIGN.md's rejected thin cuts were.
+const MAC: Look = Look {
+    round_eye: Some(2.1),
+    asleep: 0.7,
+};
+/// The Mac's image: tray-icon shows N pixels as N points, at most the bar's
+/// 22, so 44 px is 22 pt at 2 px a point (a 36 px bird was stretched to
+/// 44 px, larger and softer than its neighbours).
+pub const MAC_SIZE: u32 = 44;
+/// The bird's square in it: the 32 px drawing as it is (31 px of ink awake,
+/// from 1Password's top), and where it sits, on even pixels so every snapped
+/// detail stays on whole ones at 2x and at 1x too (a 1x display halves the
+/// image): its middle on its neighbours' line, half a pixel below the
+/// image's (measured on the owner's screenshot).
+const MAC_BIRD: u32 = 32;
+const MAC_AT: (u32, u32) = (6, 6);
 // literal: the bird's drawing (design/proposals/bird-calling.html)
 /// The call marks, in front of the open bill, and their width.
 const MARK_1: (P, P) = ((27.8, 4.4), (30.4, 1.8));
@@ -125,6 +164,8 @@ pub(super) const BADGE: Place = Place {
 /// The badges' colours for a dark bar (DESIGN.md's dark danger and
 /// warning, and what goes on them); `tray::for_light_bar` swaps them.
 pub(super) const TROUBLE: &str = "#F97066";
+/// The call marks' teal (DESIGN.md's dark-mode accent).
+pub(super) const CALL: &str = "#2DD4BF";
 pub(super) const ON_TROUBLE: &str = "#0b1514";
 pub(super) const WARNING: &str = "#F5B740";
 pub(super) const ON_WARNING: &str = "#1a1408";
@@ -443,8 +484,23 @@ impl Art {
     }
 
     /// The parts with the badge at `place`.
-    // literal: the bird's drawing (design/proposals/bird-calling.html)
     pub(super) fn parts_at(&self, n: u32, ink: &str, place: Place) -> Parts {
+        self.parts_look(n, ink, place, BAR)
+    }
+
+    /// The bird for the Mac's menu bar, white: `MAC_SIZE` px, the bird
+    /// drawn the Mac's way (`MAC`) in its square inside.
+    pub fn svg_mac(&self) -> String {
+        let Parts { defs, ink, over } = self.parts_look(MAC_BIRD, "#ffffff", BADGE, MAC);
+        let (n, (x, y)) = (MAC_SIZE, MAC_AT);
+        format!(
+            r##"<svg xmlns="http://www.w3.org/2000/svg" width="{n}" height="{n}" viewBox="0 0 {n} {n}"><defs>{defs}</defs><g transform="translate({x} {y})">{ink}{over}</g></svg>"##
+        )
+    }
+
+    /// The parts drawn as `look` says.
+    // literal: the bird's drawing (design/proposals/bird-calling.html)
+    fn parts_look(&self, n: u32, ink: &str, place: Place, look: Look) -> Parts {
         let s = n as f32 / SQUARE;
         let tilt = RAISED + (DROPPED - RAISED) * self.sleep;
         let head: [P; POINTS] = if self.dashes.is_some() {
@@ -462,7 +518,19 @@ impl Art {
         let (ex, ey) = (ex * s, ey * s);
         let side = (EYE_SIDE * s).round().max(2.);
         let slit = (SLIT.1 * s).round().max(1.);
-        let eye = if self.sleep >= 0.98 {
+        let eye = if let Some(r) = look.round_eye.filter(|_| self.sleep < 0.98) {
+            // Round, on the pixel grid's corner nearest its place; closing,
+            // it flattens to the slit's height.
+            // Narrowing to the slit's width and turning with the head as it
+            // closes, so the asleep slit takes over without a jump.
+            let (r, (cx, cy)) = (r * s, (ex.round(), ey.round()));
+            let half = (SLIT.0 * s).round() / 2.;
+            let rx = half + (r - half) * self.eye;
+            let ry = (slit / 2.).max(r * self.eye);
+            format!(
+                r##"<ellipse cx="{cx:.0}" cy="{cy:.0}" rx="{rx:.2}" ry="{ry:.2}" fill="#000" transform="rotate({tilt:.1} {cx:.0} {cy:.0})"/>"##
+            )
+        } else if self.sleep >= 0.98 {
             let w = (SLIT.0 * s).round();
             format!(
                 r##"<rect x="{:.0}" y="{:.0}" width="{w:.0}" height="{slit:.0}" fill="#000" transform="rotate({tilt:.1} {ex:.2} {ey:.2})"/>"##,
@@ -487,7 +555,7 @@ impl Art {
         // The gaps cut for the coloured marks, and the marks.
         let (mut cut, mut over) = (String::new(), String::new());
         if let Some((a, b, opacity)) = self.calls {
-            let (c, o) = marks(s, a, b, opacity, "#2DD4BF");
+            let (c, o) = marks(s, a, b, opacity, CALL);
             cut += &c;
             over += &o;
         }
@@ -506,7 +574,7 @@ impl Art {
             r##"<mask id="m" maskUnits="userSpaceOnUse" x="-8" y="-8" width="{m}" height="{m}"><rect x="-8" y="-8" width="{m}" height="{m}" fill="#fff"/>{eye}{wing}{cut}</mask><mask id="c" maskUnits="userSpaceOnUse" x="-8" y="-8" width="{m}" height="{m}"><rect x="-8" y="-8" width="{m}" height="{m}" fill="#fff"/>{cut}</mask>"##
         );
         let dim = ((self.sleep - 0.5) * 2.).clamp(0., 1.);
-        let opacity = self.fill * (1. - (1. - ASLEEP) * dim);
+        let opacity = self.fill * (1. - (1. - look.asleep) * dim);
         let mut art = String::new();
         if opacity > 0.005 {
             art += &format!(
@@ -539,6 +607,11 @@ impl Art {
             small: SMALL
                 .iter()
                 .map(|&n| (n, raster(&self.svg_at(n), n)))
+                // The Mac's menu bar has its own drawing (`MAC`).
+                .chain(
+                    cfg!(target_os = "macos")
+                        .then(|| (MAC_SIZE, raster(&self.svg_mac(), MAC_SIZE))),
+                )
                 .collect(),
         }
     }

@@ -121,10 +121,12 @@ pub fn light_bar() -> bool {
         })
 }
 
-/// The menu bar's icon size in pixels: 18 points, on a Retina screen.
+/// The menu bar's image in pixels: the Mac's own drawing of the bird,
+/// which tray-icon shows at 22 pt (`tray::art::MAC_SIZE`; until 0.15.0 a
+/// 36 px image, which it showed at 22 pt too, stretched, the bird filling
+/// it: larger and softer than the bar's other icons).
 pub fn tray_icon_size() -> u32 {
-    const RETINA_18_POINTS: u32 = 36;
-    RETINA_18_POINTS
+    crate::tray::art::MAC_SIZE
 }
 
 /// The panel opening upward: never here (it hangs from the menu bar), so

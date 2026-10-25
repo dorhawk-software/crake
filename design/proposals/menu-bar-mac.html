@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The bird in the Mac's menu bar</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --ink: #1A1C1E; --muted: #5A5F64;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4;
+    }
+  }
+  :root[data-theme="dark"] {
+    --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--panel); color: var(--ink);
+    font: 14px/1.5 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+  }
+  ::selection { background: #0F766E; color: #fff; }
+  main { max-width: 1240px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 40px 0 4px; }
+  p, li { max-width: 78ch; }
+  p { margin: 6px 0; }
+  ul { margin: 6px 0; padding-left: 20px; }
+  .muted { color: var(--muted); }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', monospace; font-size: 13px; }
+  .decided { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin-top: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 16px; margin-top: 12px; }
+  figure { margin: 0; }
+  figcaption { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  figcaption b { color: var(--ink); }
+  img { display: block; max-width: 100%; height: auto; border-radius: 6px; }
+  /* The strips are the bar's device pixels (2x): shown at half, as on the Mac. */
+  .strip img { width: 270px; }
+  /* The close-ups: each device pixel three times, unsmoothed. */
+  .close img { width: 690px; image-rendering: pixelated; }
+  .grid:has(.close) { grid-template-columns: minmax(0, 1fr); }
+</style>
+</head>
+<body>
+<main>
+  <h1>The bird in the Mac's menu bar</h1>
+  <p class="muted">2026-10-25. From the owner's screenshot of macOS Tahoe's menu bar: the bird looked
+    &ldquo;large&rdquo; beside the other icons, which look &ldquo;smaller but very detailed&rdquo;.</p>
+
+  <div class="decided"><b>Decided by the owner (2026-10-25): C, and dimmed less asleep (70 %).</b> Built as below:
+    C's round, larger eye; its one-pixel wing cut was dropped, since both assessments measured it as a grey
+    hairline (the thin cuts DESIGN.md had already rejected). A (the same bust at the neighbours' size) and B (the
+    bird as a line) were turned down. Linux and Windows keep their drawing; light bars everywhere get the light
+    theme's teal for the call marks (the dark one was 1.6:1 there).</div>
+
+  <h2>Why it looked large</h2>
+  <ul>
+    <li><b>22 pt, stretched.</b> Crake gave macOS a 36 px image. The tray library shows an image's pixels as
+      points, at most the bar's 22, so the bird was drawn at 22 pt (44 device pixels) from 36: the largest a
+      menu bar icon may be, and soft. On the screenshot it is 39 px tall against 1Password's and the CZ input
+      source's 32, the moon's 28 and Wi-Fi's 25.</li>
+    <li><b>It filled its slot.</b> DESIGN.md has the bird fill its square, base off the bottom edge, for Linux's
+      bars, where icons are solid squares in 16&ndash;24 px. The Mac's neighbours are glyphs with room around them,
+      on the bar's middle line; the bird's base sat 6 px below theirs.</li>
+    <li><b>Drawn for 16 px.</b> A Retina screen shows the square with twice the pixels, which the neighbours spend on
+      fine lines and holes; the bird was the bold low-resolution silhouette, enlarged.</li>
+  </ul>
+
+  <h2>Before and after</h2>
+  <p>The owner's bar, the bird replaced; top to bottom: off, connecting, listening, routed, trouble, needs you.
+    &ldquo;Before&rdquo; is redrawn as macOS showed it (22 pt), &ldquo;after&rdquo; is <span
+    class="mono">tray/art.rs</span>'s Mac drawing exactly (<span class="mono">Art::svg_mac</span>: a 44 px image,
+    the 32 px drawing in it 1:1 at whole pixels). Strips at the Mac's size: its pixels shown at half.</p>
+  <div class="grid">
+    <figure class="strip"><figcaption><b>Before</b></figcaption><img src="menu-bar-mac/today22-dark.webp" alt="Before, a dark bar"></figure>
+    <figure class="strip"><figcaption><b>After</b></figcaption><img src="menu-bar-mac/built-dark.webp" alt="After, a dark bar"></figure>
+    <figure class="strip"><figcaption><b>Before</b>, a light bar</figcaption><img src="menu-bar-mac/today22-light.webp" alt="Before, a light bar"></figure>
+    <figure class="strip"><figcaption><b>After</b>, a light bar</figcaption><img src="menu-bar-mac/built-light.webp" alt="After, a light bar"></figure>
+  </div>
+  <p class="muted">The light bar is made from the dark screenshot (its icons turned dark as macOS does over a
+    light wallpaper). Before, on it, the call marks are the dark bar's teal, as Crake drew them (1.6:1); after,
+    the light theme's, on every light bar.</p>
+  <ul>
+    <li><b>Size and place:</b> 31 px of ink awake, from 1Password's top to a pixel above its base, on the
+      neighbours' middle line. The image is the same 44 px in every state and the bird keeps its place in it, so
+      nothing beside it moves.</li>
+    <li><b>Detail:</b> the eye a round hole, larger; the wing's cut, the parted bill, the call marks and the badges
+      on whole pixels on a Retina screen, and on even ones, so a 1&times; display (which halves the image) keeps them
+      on whole pixels too, a little softer (a drawing of its own for 1&times; is written down).</li>
+    <li><b>Asleep:</b> 70 % instead of 45 %: the dropped head and the shut eye say it.</li>
+    <li><b>Connecting</b> stays the lightest thing in the bar (a dashed outline, the bill shut). It's legible; if
+      it reads too faint on a real Mac, its line can be heavier there.</li>
+  </ul>
+
+  <h2>Up close</h2>
+  <p>Each device pixel three times; before on the left, after on the right.</p>
+  <div class="grid">
+    <figure class="close"><figcaption><b>A dark bar</b></figcaption><img src="menu-bar-mac/close-dark.webp" alt="Up close, a dark bar"></figure>
+    <figure class="close"><figcaption><b>A light bar</b></figcaption><img src="menu-bar-mac/close-light.webp" alt="Up close, a light bar"></figure>
+  </div>
+
+  <h2>Not yet: macOS colouring the bird itself</h2>
+  <p>A &ldquo;template&rdquo; image would let macOS colour the bird for the bar over any wallpaper and dim it on an
+    inactive display. Crake still picks white or dark itself, from dark mode. Done halfway (a template only while
+    no coloured mark shows), the bird could change colour when the teal call or a badge comes and goes, wherever the
+    wallpaper and dark mode disagree; done fully, Crake reads the menu bar's own appearance (the status button's)
+    for the coloured states. That needs a real Mac to try, and is written down in docs/engineering/not-now.md.</p>
+
+  <h2>The options shown (round one)</h2>
+  <p class="muted">Mock-ups from the spec drawings, scaled: A, the same bust at the neighbours' size; C, A with a
+    round eye and a one-pixel wing cut; B, the bird as a line. Off, listening, routed, trouble.</p>
+  <div class="grid">
+    <figure class="strip"><figcaption><b>A</b></figcaption><img src="menu-bar-mac/a-dark.webp" alt="Option A"></figure>
+    <figure class="strip"><figcaption><b>C</b> (chosen)</figcaption><img src="menu-bar-mac/c-dark.webp" alt="Option C"></figure>
+    <figure class="strip"><figcaption><b>B</b> (a cartoon seal: the bill becomes a bump)</figcaption><img src="menu-bar-mac/b-dark.webp" alt="Option B"></figure>
+  </div>
+</main>
+</body>
+</html>

@@ -277,3 +277,19 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   (`controls::over`); the one-line install command in the no-tray
   notice scrolls sideways under 6 px of padding, where a bar would sit
   over the text. Its Copy is the way to the whole line.
+- **macOS colouring the bird itself (2026-10-25, the menu bar proposal).**
+  A template image would let macOS colour the bird for the bar over any
+  wallpaper and dim it on an inactive display; Crake still draws it white
+  or dark from dark mode (`sys::macos::host::light_bar`), which is wrong
+  where the wallpaper sets the bar's colour (Tahoe). A template only while
+  no coloured mark shows would make the bird change colour when the teal
+  call or a badge comes and goes wherever the two disagree, so it waits
+  for the whole of it: the coloured states drawn by the status button's
+  own appearance (`TrayIcon::ns_status_item`, `effectiveAppearance`), tried
+  on a real Mac (design/proposals/menu-bar-mac.html).
+- **A 1x drawing for the Mac's menu bar (2026-10-25).** The Mac's bird is
+  one 44 px image (22 pt at 2x, `tray::art::MAC_SIZE`); on a 1x display
+  macOS halves it. It sits on even pixels so its snapped details stay on
+  whole ones, but a 16 px drawing of its own would be crisper there: an
+  NSImage with both, set through `TrayIcon::ns_status_item` (tray-icon
+  makes one image of N pixels at N points). With the template item above.
