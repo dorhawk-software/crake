@@ -50,6 +50,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
   network's own address; where the gateway could answer that address (on the office network), the
   page started loading and was then reset. Nothing leaves a tunnel with another address now, so
   the app's next try goes through.
+- **Opening an IPsec certificate file is safer.** ctutils, which Crake uses when it opens a
+  `.p12` certificate with its password, is updated to 0.4.5: before, its comparisons could take
+  slightly different times depending on the secret (RUSTSEC-2026-0385). It all happens on your
+  own computer, so the risk was small.
 
 ## 0.14.0 (2026-10-21)
 
