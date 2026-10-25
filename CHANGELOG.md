@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.15.0 (2026-10-25)
+
 ### New
 
 - **What's new, after an update.** The first time you open the panel after Crake is updated, it

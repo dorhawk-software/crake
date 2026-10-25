@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/crake-proto", "crates/crake-os", "crates/craked", "crates/crake", "crates/lint-literals"]
 
 [workspace.package]
-version = "0.14.0"
+version = "0.15.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 # Not on crates.io: built and shipped as Crake.

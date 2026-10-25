@@ -10,7 +10,7 @@
 let
   commonArgs = {
     pname = "crake";
-    version = "0.14.0";
+    version = "0.15.0";
     src = lib.fileset.toSource {
       root = ../..;
       fileset = lib.fileset.unions [
