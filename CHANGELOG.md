@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.15.1 (2026-10-25)
+
 ### Better
 
 - **On a Mac, the bird in the menu bar is the size of its neighbours.** It was the largest icon
