@@ -38,6 +38,8 @@ jobs:
           version=${GITHUB_REF_NAME#v}
           [ "$GITHUB_EVENT_NAME" = push ] || version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
           scripts/release-notes.sh "$version" > notes.md
+          # Which file is for whom, for the run's page (publish has no checkout).
+          scripts/release-notes.sh --which "$version" > which.md
       - name: The tagged commit passed CI
         if: github.event_name == 'push'
         env:
@@ -52,7 +54,9 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: notes
-          path: notes.md
+          path: |
+            notes.md
+            which.md
 
   linux:
     needs: notes
@@ -290,7 +294,9 @@ jobs:
           gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" \
             --verify-tag --title "Crake ${GITHUB_REF_NAME#v}" --notes-file notes.md
       # The run's page lists the jobs' hand-offs (its artifacts, gone at the
-      # end): it says where the downloads are.
+      # end): it says where the downloads are. The guide comes from the notes
+      # job (this job has no checkout: 0.15.0's run failed here, after the
+      # release was up, and skipped the cask, the repository and the AUR).
       - name: Where to download it
         run: |
           V=${GITHUB_REF_NAME#v}
@@ -299,7 +305,7 @@ jobs:
             echo
             echo "Download it from [the release](https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME), not from this run."
             echo
-            scripts/release-notes.sh --which "$V"
+            cat dist/notes/which.md
           } >> "$GITHUB_STEP_SUMMARY"
 
   homebrew:
