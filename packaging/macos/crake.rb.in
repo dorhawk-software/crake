@@ -10,7 +10,9 @@ cask "crake" do
   desc "VPN client that sends only the hosts that need it through a tunnel"
   homepage "https://dorhawk.software/crake/"
 
-  depends_on macos: ">= :monterey"
+  # Monterey or newer (a string comparison is deprecated: Homebrew warned
+  # on every install, 2026-10-25).
+  depends_on macos: :monterey
   depends_on formula: "openconnect"
   # OpenVPN profiles (craked runs Homebrew's openvpn).
   depends_on formula: "openvpn"
