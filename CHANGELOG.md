@@ -25,6 +25,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 - **A certificate password that's wrong says so.** Crake asked for it again in the same words,
   so it looked as if nothing had happened. Now it says "That password didn't open it."
+- **A company site that asks you to sign in from outside opens as it does in the office.** When
+  the company's DNS gives a name another public address, one that only answers through the
+  tunnel, Crake now uses that one. It used only private ones, so the site's public face asked
+  for a username and password instead.
 - **New tunnel waits for Crake's service.** Without it, the window closed as if the tunnel had
   been added, and nothing came. Now it stays open, says why, and adds the tunnel once you try
   again.

@@ -23,6 +23,32 @@ const NOTICED: Duration = Duration::from_secs(150);
 /// keeps its public answer.
 pub(crate) async fn a_public_name_with_a_private_address_goes_through(up: &mut Up) {
     let (name, at) = platform::SPLIT;
+    goes_through(up, name, at).await;
+    // Nor its public IPv6 addresses, which an app that tries IPv6 first
+    // would take around the tunnel (public DNS gives it both).
+    let six = look_up6(name).await;
+    assert!(six.iter().all(Ipv6Addr::is_unique_local), "{name}: {six:?}");
+    let public = platform::PUBLIC_UNDER_ORG;
+    let found = look_up(public).await;
+    assert!(
+        !found.is_empty() && found.iter().all(|a| !a.is_private()),
+        "{public}: {found:?}"
+    );
+}
+
+/// A name under ACME's own domain that public DNS gives one public address
+/// and ACME's DNS another public one, from ACME's own range, which answers
+/// only through the tunnel: that one goes through and is the app's answer
+/// (a company's test site whose public address asked outsiders to sign
+/// in, 2026-10-26). Split-horizon had taken only private addresses.
+pub(crate) async fn a_public_name_with_another_public_address_goes_through(up: &mut Up) {
+    let (name, at) = platform::OTHER_PUBLIC;
+    goes_through(up, name, at).await;
+}
+
+/// `name` resolves to `at` alone, routed through the tunnel before any
+/// connection, and answers there.
+async fn goes_through(up: &mut Up, name: &'static str, at: &'static str) {
     let found = look_up(name).await;
     if !found.iter().map(ToString::to_string).eq([at.to_owned()]) {
         up.app.settle(Duration::from_secs(1)).await;
@@ -39,16 +65,6 @@ pub(crate) async fn a_public_name_with_a_private_address_goes_through(up: &mut U
         "{at}'s way, before any connection"
     );
     assert!(platform::answers(at).await, "{name} at {at}");
-    // Nor its public IPv6 addresses, which an app that tries IPv6 first
-    // would take around the tunnel (public DNS gives it both).
-    let six = look_up6(name).await;
-    assert!(six.iter().all(Ipv6Addr::is_unique_local), "{name}: {six:?}");
-    let public = platform::PUBLIC_UNDER_ORG;
-    let found = look_up(public).await;
-    assert!(
-        !found.is_empty() && found.iter().all(|a| !a.is_private()),
-        "{public}: {found:?}"
-    );
 }
 
 /// ACME's DNS stops answering while the tunnel is up: craked notices and

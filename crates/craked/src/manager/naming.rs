@@ -1,5 +1,6 @@
 //! Learning from DNS: answers from a tunnel's DNS, names public DNS doesn't
-//! know, and public names with a private address (split-horizon).
+//! know, and public names the company's DNS answers differently
+//! (split-horizon).
 
 use super::*;
 
@@ -115,10 +116,11 @@ impl Manager {
     }
 
     /// A public answer for a name under a tunnel's organisation (the
-    /// gateway's own domain, e.g. acme.example): ask that tunnel's DNS too. When it
-    /// knows a private address the public DNS doesn't, that is the one that
-    /// works (the public one often only lets the company's addresses in):
-    /// route it and hand the app the tunnel's answer instead.
+    /// gateway's own domain, e.g. acme.example): ask that tunnel's DNS too.
+    /// When it knows an address the public DNS doesn't, private or one that
+    /// answers only through the tunnel, that is the one that works (the
+    /// public one often only lets the company in, or asks outsiders to sign
+    /// in): route it and hand the app the tunnel's answer instead.
     pub(super) async fn split_horizon(&self, payload: &[u8]) -> Option<Vec<u8>> {
         let (question, public) = dns::public_answer(payload)?;
         let tunnels: Vec<_> = self
@@ -154,7 +156,7 @@ impl Manager {
             // family (some company DNS servers refuse an AAAA for a name
             // they have an A for, as the rescue above allows for).
             let private = if reply.metadata.response_code == ResponseCode::NoError {
-                private_of(&reply, &public, &learning, &question.name)
+                own_of(&reply, &public, &learning, &question.name)
             } else {
                 Vec::new()
             };
@@ -170,9 +172,9 @@ impl Manager {
                 let Some(theirs) = ask(&device, &servers, &question.name, other).await else {
                     continue;
                 };
-                let private = private_of(&theirs, &public, &learning, &question.name);
+                let private = own_of(&theirs, &public, &learning, &question.name);
                 if private.is_empty()
-                    || self.route_private(&tunnel, &question.name, &private).await != Some(true)
+                    || self.route_own(&tunnel, &question.name, &private).await != Some(true)
                 {
                     continue;
                 }
@@ -181,7 +183,7 @@ impl Manager {
                 empty.answers.clear();
                 return dns::rewrite(&question, empty);
             }
-            match self.route_private(&tunnel, &question.name, &private).await {
+            match self.route_own(&tunnel, &question.name, &private).await {
                 None => continue,
                 Some(false) => return None,
                 Some(true) => return dns::rewrite(&question, reply),
@@ -194,12 +196,14 @@ impl Manager {
         None
     }
 
-    /// Routes a split-horizon name's private addresses through `tunnel`, if
-    /// they answer there (web ports): None when they don't (some internal
+    /// Routes a split-horizon name's own addresses through `tunnel`, if they
+    /// answer there (web ports): None when they don't (some internal
     /// answers are for the office network only, and the public address
-    /// would have been the better bet), else whether they now go through
-    /// (not when you sent them direct, or the never list has them).
-    async fn route_private(&self, tunnel: &str, name: &str, private: &[IpAddr]) -> Option<bool> {
+    /// would have been the better bet), or when a public one of them answers
+    /// directly too (a name that only resolves differently there, as a
+    /// CDN's does, needs no tunnel); else whether they now go through (not
+    /// when you sent them direct, or the never list has them).
+    async fn route_own(&self, tunnel: &str, name: &str, private: &[IpAddr]) -> Option<bool> {
         let covered = |hosts: &Mutex<HostStore>| {
             let store = hosts.lock().unwrap();
             store
@@ -213,26 +217,45 @@ impl Manager {
         }
         let (index, _, _) = self.entry(tunnel).ok()?;
         let mark = crate::routing::ids(index).mark;
-        let mut answers = false;
-        for port in WEB_PORTS {
-            let addr = SocketAddr::new(private[0], port);
-            if crate::probe::through_tunnel(addr, mark, WEB_PROBE)
-                .await
-                .is_some()
-            {
-                answers = true;
-                break;
+        let through = async {
+            for port in WEB_PORTS {
+                let addr = SocketAddr::new(private[0], port);
+                if crate::probe::through_tunnel(addr, mark, WEB_PROBE)
+                    .await
+                    .is_some()
+                {
+                    return true;
+                }
             }
-        }
-        if !answers {
+            false
+        };
+        let public = private.iter().copied().find(|a| !dns::is_private(*a));
+        let direct = async {
+            let Some(public) = public else {
+                return false;
+            };
+            let tries = WEB_PORTS
+                .map(|port| crate::probe::direct(SocketAddr::new(public, port), DIRECT_WAIT));
+            let [a, b] = tries;
+            let (a, b) = tokio::join!(a, b);
+            [a, b]
+                .iter()
+                .any(|t| matches!(t, crate::probe::DirectTry::Answered(_)))
+        };
+        let (through, direct) = tokio::join!(through, direct);
+        if !through || direct {
             return None;
         }
         let answer = Answer {
             name: name.to_owned(),
             addrs: private.to_vec(),
         };
-        self.learn_answer(tunnel, &answer, Why::PrivateAddress)
-            .await;
+        let why = if public.is_some() {
+            Why::OtherAddress
+        } else {
+            Why::PrivateAddress
+        };
+        self.learn_answer(tunnel, &answer, why).await;
         Some(covered(&self.hosts))
     }
 
@@ -329,7 +352,7 @@ impl Manager {
             let how = match &why {
                 Why::TunnelDomain => "dns",
                 Why::PublicFailed => "inside",
-                Why::PrivateAddress => "split",
+                Why::PrivateAddress | Why::OtherAddress => "split",
             };
             match self.learn_one(name, *addr, Some(&answer.name), how).await {
                 Ok(()) => sent.push(addr.to_string()),
@@ -343,6 +366,11 @@ impl Manager {
                 Why::PublicFailed => format!("Public DNS didn't know it; {label}'s DNS did."),
                 Why::PrivateAddress => {
                     format!("Public name, private address: {label}'s DNS knows it.")
+                }
+                Why::OtherAddress => {
+                    format!(
+                        "{label}'s DNS knows another address, one that answers only through {label}."
+                    )
                 }
             };
             self.ask_first(name, &label, &answer.name, why, &addrs);
@@ -364,6 +392,10 @@ impl Manager {
                     ),
                     Why::PrivateAddress => format!(
                         "Public name, private address: {label}'s DNS knows it as {}. Routed before the first packet.",
+                        sent.join(", ")
+                    ),
+                    Why::OtherAddress => format!(
+                        "{label}'s DNS knows it as {}, which answers only through {label}. Routed before the first packet.",
                         sent.join(", ")
                     ),
                 },
@@ -436,9 +468,10 @@ fn keep_name(kept: Option<&(String, Instant)>, name: &str, now: Instant) -> (Str
     }
 }
 
-/// The private addresses in a tunnel's answer for a split-horizon name:
-/// not among the public ones, and allowed by the tunnel's policy.
-fn private_of(
+/// A tunnel's own addresses in its answer for a split-horizon name: not
+/// among the public ones, and allowed by the tunnel's policy. Private
+/// ones, or public ones (`route_own` then checks they need the tunnel).
+fn own_of(
     reply: &Message,
     public: &[IpAddr],
     learning: &crate::policy::Learning,
@@ -446,7 +479,7 @@ fn private_of(
 ) -> Vec<IpAddr> {
     dns::records(reply)
         .into_iter()
-        .filter(|a| dns::is_private(*a) && !public.contains(a))
+        .filter(|a| !public.contains(a))
         .filter(|a| learning.allows(Some(name), *a))
         .collect()
 }
@@ -463,6 +496,31 @@ fn other_family(qtype: RecordType) -> Option<RecordType> {
 #[cfg(test)]
 mod name_tests {
     use super::*;
+
+    /// A tunnel's own addresses for a split-horizon name: those public DNS
+    /// didn't give, private or public (`route_own` checks a public one
+    /// answers only through the tunnel), within the tunnel's policy.
+    #[test]
+    fn a_tunnels_own_addresses_are_those_public_dns_didnt_give() {
+        let ip = |s: &str| -> IpAddr { s.parse().unwrap() };
+        let v4 = |s: &str| -> Ipv4Addr { s.parse().unwrap() };
+        let name = "intra.acme.example";
+        let reply = Message::from_vec(&crate::dns::tests::response(
+            name,
+            &[v4("203.0.113.80"), v4("192.0.2.40"), v4("10.40.1.16")],
+        ))
+        .unwrap();
+        let public = [ip("203.0.113.80")];
+        let anything = crate::policy::Learning::Anything;
+        assert_eq!(
+            own_of(&reply, &public, &anything, name),
+            [ip("192.0.2.40"), ip("10.40.1.16")]
+        );
+        // The same answer as public DNS's: nothing of its own.
+        let same =
+            Message::from_vec(&crate::dns::tests::response(name, &[v4("203.0.113.80")])).unwrap();
+        assert!(own_of(&same, &public, &anything, name).is_empty());
+    }
 
     #[test]
     fn an_address_keeps_its_name_while_it_is_fresh() {

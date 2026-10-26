@@ -189,6 +189,10 @@ pub(crate) const NAMES_NEED_NETWORK_IPV6: bool = false;
 /// ACME's DNS, and one with only a public one (the public DNS stand-in's).
 pub(crate) const SPLIT: (&str, &str) = ("shop.acme.example", "10.40.1.16");
 pub(crate) const PUBLIC_UNDER_ORG: &str = "www.acme.example";
+/// Split-horizon with ACME's own public address: a name public DNS gives
+/// one public address and ACME's DNS another (companies.sh), which
+/// answers only through the tunnel.
+pub(crate) const OTHER_PUBLIC: (&str, &str) = ("intra.acme.example", "192.0.2.40");
 /// What another program does to the tunnel's DNS: openvpn3's reconnect
 /// makes its link every name's DNS ("~." and the default route).
 pub(crate) fn rewrite_tunnel_dns(dev: &str) -> String {

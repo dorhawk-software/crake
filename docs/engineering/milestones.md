@@ -32,7 +32,14 @@
    tunnel's answer. Otherwise the public answer stands; names without a
    split aren't asked again for 5 min. Found with a real customer portal
    whose public address resets clients from outside the company while the
-   company's DNS gives a private one (CLAUDE.local.md). Only A queries; the policy scope, undo and never apply.
+   company's DNS gives a private one (CLAUDE.local.md). Since 2026-10-26
+   the company's DNS may give another *public* address too (a company that
+   numbers its inside from its own public range; the public address asked
+   outsiders to sign in): taken when it answers through the tunnel and not
+   directly within DIRECT_WAIT (as the first-SYN race), so a name that only
+   resolves differently there (a CDN's) stays direct (`route_own`; the
+   scenario `a_public_name_with_another_public_address_goes_through`,
+   ACME's 192.0.2.40 in companies.sh). Only A queries; the policy scope, undo and never apply.
    "Keep internal names private" (Settings, on by default): the domains of
    tunnels that are off (as pushed when last up, plus configured) go to a
    dummy link `crake-hush` in resolved, whose DNS (169.254.53.53, craked)

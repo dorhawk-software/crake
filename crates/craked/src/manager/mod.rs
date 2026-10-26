@@ -200,6 +200,9 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
 /// Does an address answer through a tunnel? Its web ports, each given a
 /// third of the probe's time.
 const WEB_PORTS: [u16; 2] = [443, 80];
+/// A reachable host answers directly within a round trip; past this it is
+/// treated as silently dropped (only a tunnel might reach it).
+const DIRECT_WAIT: Duration = Duration::from_millis(400);
 const WEB_PROBE: Duration = Duration::from_secs(PROBE_TIMEOUT.as_secs() / 3);
 /// Changes queued for the D-Bus signal before slow listeners miss some.
 const CHANGES_BACKLOG: usize = 64;
@@ -235,6 +238,10 @@ enum Why {
     /// Public DNS gave a public address; the tunnel's DNS knows a private one
     /// (split-horizon DNS, e.g. a service that only lets the company in).
     PrivateAddress,
+    /// The tunnel's DNS knows another public address, one that answers only
+    /// through the tunnel (a company numbering its inside from its own public
+    /// range; the public one asked outsiders to sign in, 2026-10-26).
+    OtherAddress,
 }
 
 /// "ACME", "ACME and Nordbank", "ACME, Globex and Nordbank".

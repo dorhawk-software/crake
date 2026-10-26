@@ -144,6 +144,10 @@ pub(crate) const NAMES_NEED_NETWORK_IPV6: bool = true;
 /// ACME's DNS, and one with only a public one (the internet's (the gateway is named under dorhawk.software here, scripts/ci-through-cloudflare.sh)).
 pub(crate) const SPLIT: (&str, &str) = ("packages.dorhawk.software", "10.40.1.16");
 pub(crate) const PUBLIC_UNDER_ORG: &str = "dorhawk.software";
+/// Split-horizon with ACME's own public address: a name public DNS gives
+/// one public address and ACME's DNS another (companies.sh), which
+/// answers only through the tunnel.
+pub(crate) const OTHER_PUBLIC: (&str, &str) = ("www.dorhawk.software", "192.0.2.40");
 /// What another program does to the tunnel's DNS: a VPN client clearing
 /// /etc/resolver takes Crake's file for ACME's domain.
 pub(crate) fn rewrite_tunnel_dns(_dev: &str) -> String {

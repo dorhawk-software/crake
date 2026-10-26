@@ -38,7 +38,8 @@ dnsmasq --no-resolv --no-hosts --listen-address=203.0.113.53 --bind-interfaces \
   --pid-file=/run/dnsmasq-public.pid --log-queries --log-facility=/link/public-dns.log \
   --address=/one.one.one.one/203.0.113.80 --address=/vpn.acme.example/198.51.100.10 \
   --address=/shop.acme.example/203.0.113.80 --address=/shop.acme.example/2001:db8:80::80 \
-  --address=/www.acme.example/203.0.113.80 --address=/#/
+  --address=/www.acme.example/203.0.113.80 --address=/intra.acme.example/203.0.113.80 \
+  --address=/#/
 busybox httpd -p 80 -h /srv/www
 cp /etc/openvpn/e2e/ca.crt /link/openvpn-ca.crt
 # carol's certificate, for the client's certificate sign-in.

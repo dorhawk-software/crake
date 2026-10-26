@@ -208,10 +208,8 @@ impl Manager {
             return false;
         };
         let addr = SocketAddr::new(flow.dst, flow.dport);
-        // A reachable host answers directly within a round trip; past this it
-        // is treated as silently dropped (only a tunnel might reach it), so
-        // the first connection isn't held for the whole probe wait.
-        const DIRECT_WAIT: Duration = Duration::from_millis(400);
+        // Past DIRECT_WAIT only a tunnel might reach it, so the first
+        // connection isn't held for the whole probe wait.
         let why = match crate::probe::direct(addr, DIRECT_WAIT).await {
             crate::probe::DirectTry::Answered(_) => return false,
             crate::probe::DirectTry::Failed(why) => why,

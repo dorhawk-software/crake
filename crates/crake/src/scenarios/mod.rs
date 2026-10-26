@@ -416,6 +416,7 @@ macro_rules! every_scenario {
                 checks::stopping_craked_leaves_nothing,
                 checks::an_upgrade_keeps_the_tunnel_signed_in,
                 names::a_public_name_with_a_private_address_goes_through,
+                names::a_public_name_with_another_public_address_goes_through,
                 names::a_tunnel_dns_that_stops_answering_is_stood_in_for,
                 names::another_programs_dns_change_is_put_back,
                 names::another_clients_names_are_left_to_it,
