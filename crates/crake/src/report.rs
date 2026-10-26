@@ -92,10 +92,10 @@ pub async fn gather_from(socket: Option<PathBuf>) -> Gathered {
     let computer = match api.call::<_, String>("Report", &()).await {
         Ok(json) => serde_json::from_str(&json)
             .map_err(|e| format!("craked's answer didn't read ({e}): {NOT_READ}")),
-        Err(zbus::Error::MethodError(name, ..)) if name.contains("AccessDenied") => Err(format!(
+        Err(e) if named(&e, "AccessDenied") => Err(format!(
             "Crake's service tells only the person at the screen, or an administrator: {NOT_READ}"
         )),
-        Err(zbus::Error::MethodError(name, ..)) if name.contains("UnknownMethod") => Err(format!(
+        Err(e) if named(&e, "UnknownMethod") => Err(format!(
             "craked {service} is older than this Crake and can't say: {NOT_READ}"
         )),
         Err(e) => Err(format!("craked couldn't be asked ({e}): {NOT_READ}")),
@@ -110,8 +110,12 @@ pub async fn gather_from(socket: Option<PathBuf>) -> Gathered {
 
 /// The system bus has no craked on it.
 fn is_absent(e: &zbus::Error) -> bool {
-    matches!(e, zbus::Error::MethodError(name, ..)
-        if name.contains("ServiceUnknown") || name.contains("NameHasNoOwner"))
+    named(e, "ServiceUnknown") || named(e, "NameHasNoOwner")
+}
+
+/// A D-Bus error reply whose name has `part` in it.
+fn named(e: &zbus::Error, part: &str) -> bool {
+    crate::client::error_name(e).is_some_and(|name| name.contains(part))
 }
 
 /// `gather`, on a thread and runtime of its own: the app's windows keep

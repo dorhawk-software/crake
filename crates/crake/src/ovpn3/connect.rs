@@ -54,7 +54,7 @@ pub(super) async fn connect(conn: &Connection, path: &str) -> Result<(), String>
     }
     match call::<_, ()>(conn, SESSIONS, path, SESSIONS, "Connect", &()).await {
         Ok(()) => Ok(()),
-        Err(zbus::Error::MethodError(_, Some(text), _)) if still_on_its_way(&text) => Ok(()),
+        Err(e) if crate::client::error_text(&e).is_some_and(|t| still_on_its_way(&t)) => Ok(()),
         Err(e) => Err(format!("OpenVPN 3 couldn\u{2019}t connect: {e}")),
     }
 }

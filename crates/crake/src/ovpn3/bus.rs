@@ -72,9 +72,10 @@ const CONFIGURATION_MANAGER: &str = "/net/openvpn/v3/configuration";
 
 /// An error a service gives while it's still starting: no object there yet.
 fn starting(e: &zbus::Error) -> bool {
-    matches!(e, zbus::Error::MethodError(name, _, _)
-        if name.as_str() == "org.freedesktop.DBus.Error.UnknownObject"
-            || name.as_str() == "org.freedesktop.DBus.Error.UnknownMethod")
+    crate::client::error_name(e).is_some_and(|name| {
+        name == "org.freedesktop.DBus.Error.UnknownObject"
+            || name == "org.freedesktop.DBus.Error.UnknownMethod"
+    })
 }
 
 pub(super) async fn property<T>(

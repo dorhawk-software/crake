@@ -30,10 +30,7 @@ fn runtime() -> Result<tokio::runtime::Runtime, String> {
 
 /// openvpn3's own words for a refusal.
 fn said(e: zbus::Error) -> String {
-    match e {
-        zbus::Error::MethodError(_, Some(said), _) => said,
-        other => other.to_string(),
-    }
+    crate::client::error_text(&e).unwrap_or_else(|| e.to_string())
 }
 
 /// The profiles named `name`.
@@ -84,7 +81,7 @@ pub fn fetch(name: &str) -> Result<Fetched, String> {
         {
             Ok(text) => Ok(Fetched::Text(text)),
             // Not the owner's to read (shared with the user, say).
-            Err(zbus::Error::MethodError(..)) => Ok(Fetched::Locked),
+            Err(e) if crate::client::error_name(&e).is_some() => Ok(Fetched::Locked),
             Err(e) => Err(e.to_string()),
         }
     })

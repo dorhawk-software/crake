@@ -579,14 +579,54 @@ async fn session(
                     }
                 };
                 if let Err(e) = result {
-                    let text = match &e {
-                        zbus::Error::MethodError(_, Some(text), _) => text.clone(),
-                        other => other.to_string(),
-                    };
+                    let text = error_text(&e).unwrap_or_else(|| e.to_string());
                     if !send(Update::Failed(text)).await { return Ok(()); }
                 }
             }
         }
+    }
+}
+
+/// A D-Bus error reply's name ("org.freedesktop.DBus.Error.AccessDenied").
+/// zbus 6 hands the standard ones over as `Error::FDO`, the rest (craked's
+/// own words come as `Failed`, a standard one) as `MethodError`.
+pub(crate) fn error_name(e: &zbus::Error) -> Option<String> {
+    use zbus::DBusError;
+    match e {
+        zbus::Error::MethodError(name, ..) => Some(name.to_string()),
+        zbus::Error::FDO(e) => Some(e.name().to_string()),
+        _ => None,
+    }
+}
+
+/// What a D-Bus error reply says, without its name: a refusal in the
+/// service's own words, shown as it is (with zbus 6's `Display`, the
+/// name came first: "org.freedesktop.DBus.Error.Failed: ACME isn't…").
+pub(crate) fn error_text(e: &zbus::Error) -> Option<String> {
+    use zbus::DBusError;
+    match e {
+        zbus::Error::MethodError(_, text, _) => text.clone(),
+        zbus::Error::FDO(e) => e.description().map(str::to_owned),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod error_tests {
+    #[test]
+    fn a_refusal_reads_in_the_services_words() {
+        let refused = zbus::Error::from(zbus::fdo::Error::Failed(
+            "ACME isn\u{2019}t one you added here.".into(),
+        ));
+        assert_eq!(
+            super::error_text(&refused).as_deref(),
+            Some("ACME isn\u{2019}t one you added here.")
+        );
+        assert_eq!(
+            super::error_name(&refused).as_deref(),
+            Some("org.freedesktop.DBus.Error.Failed")
+        );
+        assert_eq!(super::error_text(&zbus::Error::Unsupported), None);
     }
 }
 

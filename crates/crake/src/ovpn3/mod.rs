@@ -110,10 +110,7 @@ pub fn import(name: &str, config: &str) -> Result<(), String> {
             &(name, config, false, true),
         )
         .await
-        .map_err(|e| match e {
-            zbus::Error::MethodError(_, Some(said), _) => said,
-            other => other.to_string(),
-        })?;
+        .map_err(|e| crate::client::error_text(&e).unwrap_or_else(|| e.to_string()))?;
         Ok(())
     })
 }
@@ -229,15 +226,17 @@ async fn drive(
         loop {
             match call::<_, ()>(conn, SESSIONS, path, SESSIONS, "Ready", &()).await {
                 Ok(()) => break,
-                Err(zbus::Error::MethodError(_, Some(text), _))
-                    if text.contains("web authentication") =>
+                Err(e)
+                    if crate::client::error_text(&e)
+                        .is_some_and(|t| t.contains("web authentication")) =>
                 {
                     answer(conn, path, events, replies, &mut opened).await?;
                     connect = false;
                     break;
                 }
-                Err(zbus::Error::MethodError(_, Some(text), _))
-                    if text.contains("credentials") || text.contains("input") =>
+                Err(e)
+                    if crate::client::error_text(&e)
+                        .is_some_and(|t| t.contains("credentials") || t.contains("input")) =>
                 {
                     answer(conn, path, events, replies, &mut opened).await?;
                 }
