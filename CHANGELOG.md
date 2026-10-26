@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.15.4 (2026-10-26)
+
 ### Better
 
 - **Copy a host from Traffic's picture.** Click a name on the right of the picture to copy it,
