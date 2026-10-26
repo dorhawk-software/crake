@@ -5,6 +5,7 @@
 //! with a button to that page (design/proposals/macos-service-approval.html,
 //! option A). Elsewhere the package runs it: nothing to ask.
 
+#[cfg(any(target_os = "macos", test))]
 use std::time::Duration;
 
 /// How long craked may be out of reach while macOS says it's switched on
@@ -12,11 +13,13 @@ use std::time::Duration;
 /// again within seconds (KeepAlive), so past this it isn't loaded at all.
 /// Homebrew's cask upgrade does that: it takes the daemon out of launchd
 /// (`launchctl remove`) and macOS still says "enabled" (found 2026-10-26).
+#[cfg(any(target_os = "macos", test))]
 pub const REVIVE_AFTER: Duration = Duration::from_secs(15);
 
 /// How the app brings back a craked that macOS says is on but launchd
 /// doesn't run. `launchctl bootstrap` can't: only SMAppService loads a
 /// launchd file that names its program in the app (`BundleProgram`).
+#[cfg(any(target_os = "macos", test))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Revive {
     /// Register it again.
@@ -29,6 +32,7 @@ pub enum Revive {
 /// What to try for a craked out of reach for `down_for` while macOS says
 /// it's on, `tried` attempts having been made this run: each a
 /// REVIVE_AFTER apart, two at most.
+#[cfg(any(target_os = "macos", test))]
 pub fn revive(down_for: Duration, tried: u32) -> Option<Revive> {
     if down_for < REVIVE_AFTER * (tried + 1) {
         return None;
