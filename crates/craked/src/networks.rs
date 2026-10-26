@@ -11,20 +11,69 @@ use serde::{Deserialize, Serialize};
 
 /// The network the machine is on now ("192.168.1.1 aa:bb:cc:dd:ee:ff"), from
 /// the main table's IPv4 default route and the neighbour table.
+#[cfg(target_os = "linux")]
 pub fn current() -> Option<String> {
     let route = std::fs::read_to_string("/proc/net/route").ok()?;
     let arp = std::fs::read_to_string("/proc/net/arp").ok()?;
     of(&route, &arp)
 }
 
+/// The same on a Mac or a Windows PC: the default gateway as the system
+/// routes, and its hardware address from `arp` (`sys::default_gateway`).
+/// Until 2026-10-26 there was none (/proc is Linux's): a network where UDP
+/// doesn't get through was never remembered there, and each start waited
+/// for DTLS to fail again.
+#[cfg(not(target_os = "linux"))]
+pub fn current() -> Option<String> {
+    let (gateway, arp) = crate::sys::default_gateway()?;
+    Some(named(gateway, arp.as_deref().and_then(hardware_address)))
+}
+
+/// A network's name: its gateway, and that gateway's hardware address
+/// when known.
+fn named(gateway: Ipv4Addr, hw: Option<String>) -> String {
+    match hw {
+        Some(hw) => format!("{gateway} {hw}"),
+        None => gateway.to_string(),
+    }
+}
+
+/// The hardware address in a neighbour table's words, as Linux writes it
+/// ("0a:1b:…"): macOS's `arp` leaves out leading zeros ("a:1b:…"),
+/// Windows' joins with dashes ("0a-1b-…"). None for an incomplete entry.
+fn hardware_address(text: &str) -> Option<String> {
+    const OCTETS: usize = 6;
+    text.split_whitespace().find_map(|word| {
+        let parts: Vec<&str> = word.split([':', '-']).collect();
+        if parts.len() != OCTETS {
+            return None;
+        }
+        let bytes: Vec<u8> = parts
+            .iter()
+            .map(|p| u8::from_str_radix(p, HEX).ok())
+            .collect::<Option<_>>()?;
+        if bytes.iter().all(|b| *b == 0) {
+            return None;
+        }
+        let hex: Vec<String> = bytes.iter().map(|b| format!("{b:02x}")).collect();
+        Some(hex.join(":"))
+    })
+}
+
 /// Columns of /proc/net/route (hex, little-endian) and /proc/net/arp.
+#[cfg(any(target_os = "linux", test))]
 const ROUTE_DESTINATION: usize = 1;
+#[cfg(any(target_os = "linux", test))]
 const ROUTE_GATEWAY: usize = 2;
+#[cfg(any(target_os = "linux", test))]
 const ROUTE_METRIC: usize = 6;
+#[cfg(any(target_os = "linux", test))]
 const ROUTE_MASK: usize = 7;
+#[cfg(any(target_os = "linux", test))]
 const ARP_HW_ADDRESS: usize = 3;
 const HEX: u32 = 16;
 
+#[cfg(any(target_os = "linux", test))]
 fn of(route: &str, arp: &str) -> Option<String> {
     // Iface Destination Gateway Flags RefCnt Use Metric Mask ...; hex, little-endian.
     let (gateway, _) = route
@@ -49,13 +98,11 @@ fn of(route: &str, arp: &str) -> Option<String> {
     let mac = arp.lines().skip(1).find_map(|l| {
         let f: Vec<&str> = l.split_whitespace().collect();
         let hw = *f.get(ARP_HW_ADDRESS)?;
-        (f.first()?.parse::<Ipv4Addr>().ok()? == gateway && hw != "00:00:00:00:00:00")
-            .then(|| hw.to_owned())
+        (f.first()?.parse::<Ipv4Addr>().ok()? == gateway)
+            .then(|| hardware_address(hw))
+            .flatten()
     });
-    Some(match mac {
-        Some(mac) => format!("{gateway} {mac}"),
-        None => gateway.to_string(),
-    })
+    Some(named(gateway, mac))
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -146,6 +193,24 @@ mod tests {
         );
         assert_eq!(of(route, "").as_deref(), Some("192.168.1.1"));
         assert_eq!(of("Iface\tDestination\n", arp), None);
+    }
+
+    #[test]
+    fn a_gateways_hardware_address_reads_the_same_everywhere() {
+        let mac = "? (192.168.1.1) at a4:2b:b0:c:d2:e3 on en0 ifscope [ethernet]";
+        let windows = "Interface: 192.168.1.5 --- 0x7\n  Internet Address      Physical Address      Type\n  192.168.1.1           a4-2b-b0-0c-d2-e3     dynamic\n";
+        let want = Some("a4:2b:b0:0c:d2:e3".to_owned());
+        assert_eq!(hardware_address(mac), want);
+        assert_eq!(hardware_address(windows), want);
+        assert_eq!(
+            hardware_address("? (192.168.1.1) at (incomplete) on en0"),
+            None
+        );
+        assert_eq!(hardware_address("192.168.1.1 00:00:00:00:00:00"), None);
+        assert_eq!(
+            named("192.168.1.1".parse().unwrap(), want),
+            "192.168.1.1 a4:2b:b0:0c:d2:e3"
+        );
     }
 
     #[test]

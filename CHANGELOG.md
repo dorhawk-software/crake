@@ -18,6 +18,17 @@ What's new in each Crake release, for the people using it. The newest is at the 
   until the Mac was restarted or Crake was switched off and on in System Settings. Now Crake
   starts it again itself. If macOS asks for your OK once more, the panel takes you there. Your
   tunnels still switch off during the upgrade.
+- **A network that blocks UDP is remembered on a Mac and on Windows too.** Crake noticed it and
+  carried on over TCP, but forgot the network, so each start there waited again for the UDP
+  channel to fail. Now the next start goes over TCP at once, as on Linux.
+- **No more "Where is use_default?" on a Mac.** The first notification made macOS ask which
+  app "use_default" is. Notifications now come from Crake itself.
+- **⌘W closes a window and ⌘Q quits Crake on a Mac.** Neither did anything. ⌘Q quits the app;
+  your tunnels stay up, as with Quit in the menu.
+- **The sign-in window fits on a second screen on a Mac.** On a screen taller than the Mac's
+  own, its card was cut short and scrolled, Cancel half hidden.
+- **Window titles keep clear of the Mac's window buttons.** Traffic's title touched the green
+  button.
 
 ### Underneath
 

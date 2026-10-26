@@ -226,7 +226,9 @@ impl Render for Settings {
             .line_height(px(20.))
             .on_key_down(crate::focus::tab_moves)
             .on_key_down(cx.listener(|this, e: &gpui_kit::KeyDownEvent, _, cx| {
-                if e.keystroke.key == "escape" {
+                if crate::focus::closes_window(e) {
+                    cx.emit(Close);
+                } else if e.keystroke.key == "escape" {
                     if this.open_select.is_some() || this.adding_never || this.confirm_clear {
                         this.open_select = None;
                         this.adding_never = false;

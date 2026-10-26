@@ -529,6 +529,7 @@ impl Render for ProfileEditor {
             .on_key_down(crate::focus::tab_moves)
             .on_key_down(cx.listener(|this, e: &gpui_kit::KeyDownEvent, _, cx| {
                 match e.keystroke.key.as_str() {
+                    _ if crate::focus::closes_window(e) => this.escape(cx),
                     "escape" => this.escape(cx),
                     // Asking: Enter keeps editing, as Escape does.
                     "enter" if this.leaving => this.keep_editing(cx),

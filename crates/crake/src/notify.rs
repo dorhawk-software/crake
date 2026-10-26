@@ -20,10 +20,25 @@ pub use plain::{also_answered, asked, left_running, no_tray, routed, stopped};
 /// `software.dorhawk.crake`).
 const APP_ID: &str = "software.dorhawk.crake";
 
+/// Crake.app's bundle identifier (packaging/macos/Info.plist).
+#[cfg(target_os = "macos")]
+const BUNDLE_ID: &str = "software.dorhawk.Crake";
+
 /// What every notification starts from: Crake's name and the bird, and,
 /// on Linux, its desktop entry, so the desktop shows them as Crake's
 /// (GNOME showed a generic glyph and no icon without them, 2026-10-19).
 fn crakes() -> Notification {
+    // macOS: notifications are Crake.app's. Unless told, notify-rust's
+    // macOS part asks AppleScript for an app named "use_default", and macOS
+    // opened its "Where is use_default?" chooser in front of the user
+    // (2026-10-26).
+    #[cfg(target_os = "macos")]
+    {
+        static SET: std::sync::Once = std::sync::Once::new();
+        SET.call_once(|| {
+            let _ = notify_rust::set_application(BUNDLE_ID);
+        });
+    }
     let mut n = Notification::new();
     n.appname("Crake").icon(APP_ID);
     #[cfg(target_os = "linux")]

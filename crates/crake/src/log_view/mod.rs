@@ -142,7 +142,9 @@ impl Render for Log {
             .line_height(px(20.))
             .on_key_down(crate::focus::tab_moves)
             .on_key_down(cx.listener(|this, e: &gpui_kit::KeyDownEvent, _, cx| {
-                if e.keystroke.key == "escape" {
+                if crate::focus::closes_window(e) {
+                    cx.emit(Close);
+                } else if e.keystroke.key == "escape" {
                     if this.picking_tunnel {
                         this.picking_tunnel = false;
                         cx.notify();

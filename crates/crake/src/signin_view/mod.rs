@@ -269,7 +269,7 @@ impl Render for SignIn {
             .items_start()
             .on_key_down(crate::focus::tab_moves)
             .on_key_down(cx.listener(|this, event: &gpui_kit::KeyDownEvent, _, cx| {
-                if event.keystroke.key == "escape" {
+                if event.keystroke.key == "escape" || crate::focus::closes_window(event) {
                     this.cancel(cx);
                 }
             }))
@@ -283,7 +283,7 @@ impl Render for SignIn {
                 // (Cancel and Try again had gone below a 768 px screen,
                 // 2026-10-19).
                 card.id("sign-in-card")
-                    .max_h(px(room(window)))
+                    .max_h(px(room(window, cx)))
                     .overflow_y_scroll()
                     .track_scroll(&card_scroll)
                     .child(fit_window())
@@ -300,9 +300,26 @@ impl Render for SignIn {
 const ROOM_LEAST: f32 = 240.;
 const SCREEN_BOTTOM: f32 = 56.;
 
+/// What's kept clear above a Mac screen's visible bottom (the Dock is
+/// already outside it).
+#[cfg(target_os = "macos")]
+const MAC_SCREEN_BOTTOM: f32 = 16.;
+
 /// The card's tallest: from where the window is down to its screen's bottom.
-fn room(window: &Window) -> f32 {
+fn room(window: &Window, cx: &gpui_kit::App) -> f32 {
     let top = f32::from(window.bounds().origin.y);
+    // macOS: GPUI measures a window from the top of the screen it's on,
+    // not from the main one's, so the main screen's height gave a window
+    // on a taller second screen too little room and its card scrolled
+    // (2026-10-26). That screen's visible part, menu bar and Dock left out.
+    #[cfg(target_os = "macos")]
+    if let Some(display) = window.display(cx) {
+        let visible = display.visible_bounds();
+        let bottom = f32::from(visible.origin.y + visible.size.height);
+        return (bottom - top - MAC_SCREEN_BOTTOM).max(ROOM_LEAST);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = cx;
     crate::place::monitors()
         .first()
         .map_or_else(crate::place::max_window_height, |m| {

@@ -41,6 +41,23 @@ pub fn mark(sock: &impl AsRawFd, mark: u32) -> std::io::Result<()> {
     bind_device(sock, &device)
 }
 
+/// The IPv4 default gateway, and what `arp -n` says about it
+/// (`networks::current`).
+pub fn default_gateway() -> Option<(std::net::Ipv4Addr, Option<String>)> {
+    let out = std::process::Command::new("route")
+        .args(["-n", "get", "default"])
+        .output()
+        .ok()?;
+    let (_, gateway) = super::cmd::parse_route_get(&String::from_utf8_lossy(&out.stdout));
+    let gateway: std::net::Ipv4Addr = gateway?.parse().ok()?;
+    let arp = std::process::Command::new("arp")
+        .args(["-n", &gateway.to_string()])
+        .output()
+        .ok()
+        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned());
+    Some((gateway, arp))
+}
+
 /// The default route's interface (`route -n get default`: Crake's own
 /// default routes are scoped to their utuns, a full tunnel's are halves);
 /// none while that's a tunnel of Crake's: nothing goes direct then.

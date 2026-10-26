@@ -103,6 +103,27 @@ pub fn mark(sock: &impl std::os::windows::io::AsRawSocket, mark: u32) -> std::io
     unicast_index(sock.as_raw_socket(), index)
 }
 
+/// The IPv4 default gateway (the best route to 0.0.0.0's next hop), and
+/// what `arp -a` says about it (`networks::current`).
+pub fn default_gateway() -> Option<(Ipv4Addr, Option<String>)> {
+    use std::os::windows::process::CommandExt;
+    use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
+    let (best, _) = super::iphelper::best_route(Ipv4Addr::UNSPECIFIED.into()).ok()?;
+    let IpAddr::V4(gateway) = best.via else {
+        return None;
+    };
+    if gateway.is_unspecified() {
+        return None;
+    }
+    let arp = std::process::Command::new("arp")
+        .args(["-a", &gateway.to_string()])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .ok()
+        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned());
+    Some((gateway, arp))
+}
+
 /// The interface the default route takes (the best route to 0.0.0.0: a
 /// learned host's is more specific, and leaves it alone); none while that's
 /// a tunnel of Crake's (a full tunnel's halves): nothing goes direct then.

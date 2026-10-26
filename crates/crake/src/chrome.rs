@@ -19,14 +19,22 @@ pub fn system_buttons(cx: &App) -> bool {
         .map_or(cfg!(target_os = "macos"), |c| c.system_buttons)
 }
 
-/// The room macOS's three buttons take at a header's left edge.
-pub const BUTTONS_WIDTH: f32 = 76.;
+/// The room macOS's three buttons take at a header's left edge, and the
+/// gap after them: the safe zone every header leaves on a Mac. 88 as in
+/// macos-window-buttons.html's log bar; 76 had left none (Traffic's title
+/// touched the green button, 2026-10-26).
+pub const BUTTONS_WIDTH: f32 = BUTTONS_LEFT + BUTTONS_SPAN + BUTTONS_CLEAR;
 /// A window header's height: the buttons sit centred on it.
 pub const HEADER_HEIGHT: f32 = 56.;
 /// macOS's buttons are this tall.
 const BUTTON: f32 = 14.;
 /// From the window's left edge to the first button.
 const BUTTONS_LEFT: f32 = 18.;
+/// From the first button's left edge to the last one's right (measured on
+/// macOS 26).
+const BUTTONS_SPAN: f32 = 54.;
+/// Kept clear after the last button.
+const BUTTONS_CLEAR: f32 = 16.;
 
 /// Where macOS draws its buttons: centred on a header `HEADER_HEIGHT` tall.
 pub fn traffic_lights() -> Option<Point<Pixels>> {

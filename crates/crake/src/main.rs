@@ -669,6 +669,7 @@ pub(crate) fn start(cx: &mut App, setup: Setup) -> bool {
     // sign-in in this app.
     let model = cx.global::<Shell>().model.clone();
     cx.observe(&model, |_, cx| refresh_tray(cx)).detach();
+    focus::quit_key(cx);
     if openvpn3 {
         watch_openvpn3(cx);
         openvpn::move_from_openvpn3(cx);

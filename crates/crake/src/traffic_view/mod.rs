@@ -517,7 +517,7 @@ impl Render for Traffic {
             .line_height(px(20.))
             .on_key_down(crate::focus::tab_moves)
             .on_key_down(cx.listener(|_, e: &gpui_kit::KeyDownEvent, _, cx| {
-                if e.keystroke.key == "escape" {
+                if e.keystroke.key == "escape" || crate::focus::closes_window(e) {
                     cx.emit(Close);
                 }
             }))

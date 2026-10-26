@@ -287,6 +287,7 @@ one line each:
 - Performance: never measured; measure before claiming numbers.
 - A colleague's requests (Traffic, the split as a whole, "Is it safe?",
   the profile editor): built; the Traffic window's open ends are listed.
+- New tunnel's protocol list folded (the user, on a Mac): a proposal first.
 - The explainers (docs/explainers.md); the website's version number.
 - Untried on real systems: the checklist below.
 

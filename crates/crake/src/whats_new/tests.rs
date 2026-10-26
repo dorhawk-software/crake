@@ -192,6 +192,26 @@ fn the_window_shows_what_changed_since_the_version_you_had(cx: &mut TestAppConte
     assert!(closed.get(), "Escape closes it");
 }
 
+/// ⌘W closes a window on a Mac, as Escape does; elsewhere it's nothing
+/// of Crake's.
+#[gpui_kit::test]
+fn command_w_closes_it_on_a_mac(cx: &mut TestAppContext) {
+    let w = open(cx, None);
+    let closed = std::rc::Rc::new(std::cell::Cell::new(false));
+    let seen = closed.clone();
+    cx.update(|cx| {
+        cx.subscribe(&w.view, move |_, _: &Close, _| seen.set(true))
+            .detach()
+    });
+    cx.update_window(w.window, |_, window, cx| {
+        window.render_frame(cx);
+        window.press("cmd-w", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert_eq!(closed.get(), cfg!(target_os = "macos"));
+}
+
 /// From About: this version, no "since".
 #[gpui_kit::test]
 fn from_about_it_opens_at_this_version(cx: &mut TestAppContext) {

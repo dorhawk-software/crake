@@ -79,6 +79,12 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   without logging them off; the user's call). A cask change reaches only
   upgrades *from* the version that ships it: Homebrew runs the installed
   copy's uninstall.
+- **New tunnel's protocol list, folded (asked for by the user,
+  2026-10-26, on a Mac).** All nine protocols show open below "Detect
+  automatically", as design/screens/new-tunnel.html has it, which the
+  user found unfriendly. A design change: it goes through a proposal
+  (two assessments and a confirmation pass, before/after), not into a
+  bug-fix release.
 - **All unsafe code behind one safe layer (asked for by the user,
   2026-10-14). Done 2026-10-19.** `crates/crake-os` holds every unsafe
   call Crake makes, each behind a safe function whose contract the crate

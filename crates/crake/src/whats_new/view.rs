@@ -235,6 +235,7 @@ impl Render for WhatsNew {
             .on_key_down(crate::focus::tab_moves)
             .on_key_down(cx.listener(|this, e: &gpui_kit::KeyDownEvent, _, cx| {
                 match e.keystroke.key.as_str() {
+                    _ if crate::focus::closes_window(e) => cx.emit(Close),
                     "escape" => cx.emit(Close),
                     key => this.scroll_by_key(key, cx),
                 }

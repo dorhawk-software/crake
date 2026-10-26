@@ -188,6 +188,8 @@ impl Render for NewTunnel {
                 if e.keystroke.key == "tab" {
                     this.tab(e.keystroke.modifiers.shift, window, cx);
                     cx.stop_propagation();
+                } else if crate::focus::closes_window(e) {
+                    cx.emit(Close);
                 } else if e.keystroke.key == "escape" {
                     if this.open_select.is_some() {
                         this.open_select = None;

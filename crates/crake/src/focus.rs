@@ -63,3 +63,27 @@ pub fn tab_moves(e: &KeyDownEvent, window: &mut Window, cx: &mut App) {
         cx.stop_propagation();
     }
 }
+
+/// ⌘W on a Mac: a window's own way of closing (its Escape's last step:
+/// a sign-in cancelled, unsaved edits asked about), popups and all.
+pub fn closes_window(e: &KeyDownEvent) -> bool {
+    let m = &e.keystroke.modifiers;
+    cfg!(target_os = "macos") && m.platform && !m.control && !m.alt && e.keystroke.key == "w"
+}
+
+/// ⌘Q on a Mac quits Crake from any of its windows, as the menu's Quit
+/// does (craked and its tunnels stay). Crake has no menu bar of its own
+/// there, so nothing did (2026-10-26).
+pub fn quit_key(cx: &mut App) {
+    if !cfg!(target_os = "macos") {
+        return;
+    }
+    cx.intercept_keystrokes(|e, _, cx| {
+        let m = &e.keystroke.modifiers;
+        if m.platform && !m.control && !m.alt && e.keystroke.key == "q" {
+            cx.stop_propagation();
+            cx.quit();
+        }
+    })
+    .detach();
+}
