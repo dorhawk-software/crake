@@ -25,10 +25,11 @@ daily.
   there was no craked.log; New tunnel's detection worked (the app runs
   openconnect itself) and the tunnel then never came. With Crake's install
   folder and ProgramData\Crake excepted in Norton, it connected. Open:
-  signing (SignPath); offered, not yet decided: the panel saying why the
-  service isn't running (the service manager knows), craked writing to
-  the Event Log when it can't open craked.log, and New tunnel saying so
-  instead of closing when craked isn't there.
+  signing (SignPath). Built after it: the panel says why the service isn't
+  running (its newest event in the System log, by number and error code:
+  `service::stopped`), and New tunnel stays open and says so when craked
+  isn't there (it had closed on a request nobody answered). Not now:
+  craked writing to the Event Log when it can't open craked.log.
 - [ ] Another VPN client installed (AnyConnect, GlobalProtect, ...): its
   names still resolve with "Keep internal names private" on
   (`served_elsewhere`, built 2026-10-18: other programs' NRPT rules and

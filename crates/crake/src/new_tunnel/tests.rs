@@ -194,6 +194,41 @@ fn a_gateway_with_a_password_and_ask_me_first(cx: &mut TestAppContext) {
     assert_eq!(fields["mode"], "ask");
 }
 
+/// Without Crake's service the window stays and says why, instead of
+/// closing on a request nobody answers; once it's back, it adds.
+#[gpui_kit::test]
+fn without_the_service_it_stays_and_says_why(cx: &mut TestAppContext) {
+    let w = open(cx);
+    let reachable = |r, cx: &mut TestAppContext| {
+        w.view.update(cx, |t, cx| {
+            t.model.update(cx, |m, _| m.reachable = Some(r));
+        });
+    };
+    reachable(false, cx);
+    let closed = std::rc::Rc::new(std::cell::Cell::new(false));
+    let seen = closed.clone();
+    cx.update(|cx| {
+        cx.subscribe(&w.view, move |_, _: &Close, _| seen.set(true))
+            .detach()
+    });
+    w.type_into(|t| t.name.clone(), "ACME", cx);
+    w.click(("protocol", ANYCONNECT), cx);
+    w.type_into(|t| t.gateway.clone(), "vpn.acme.example", cx);
+    w.click("next", cx);
+    w.click("next", cx);
+    w.click("next", cx);
+    assert!(w.requests.try_recv().is_err(), "nothing sent");
+    assert!(!closed.get(), "still open");
+    assert_eq!(
+        w.read(cx, |t| t.problem.clone()).as_deref(),
+        Some(steps::NO_SERVICE)
+    );
+    reachable(true, cx);
+    w.click("next", cx);
+    assert_eq!(w.added()["gateway"], "vpn.acme.example");
+    assert!(closed.get(), "added, and closed");
+}
+
 #[gpui_kit::test]
 fn only_what_i_list_keeps_the_list(cx: &mut TestAppContext) {
     let w = open(cx);

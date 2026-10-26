@@ -245,16 +245,25 @@ impl Render for Panel {
 fn not_running(model: &Model, t: &Theme, cx: &mut Context<Panel>) -> impl IntoElement {
     const APPROVE: &str = "macOS asks once: switch Crake on in System Settings, under Login Items & Extensions. Nothing is routed until then.";
     const SWITCH_ON: &str = "Switch Crake on in System Settings, under Login Items & Extensions. Nothing is routed until then.";
-    let (title, detail) = match (model.reachable, model.service) {
-        (None, _) => ("Looking for Crake's service…", ""),
-        (_, Some(crate::service::Wanted::Approval)) => ("Crake's service needs your OK.", APPROVE),
-        (_, Some(crate::service::Wanted::SwitchedOff)) => {
-            ("Crake's service is switched off.", SWITCH_ON)
+    let said = |(title, detail): (&str, &str)| (title.to_owned(), detail.to_owned());
+    let (title, detail) = match (model.reachable, model.service, &model.stopped) {
+        (None, ..) => said(("Looking for Crake's service…", "")),
+        (_, Some(crate::service::Wanted::Approval), _) => {
+            said(("Crake's service needs your OK.", APPROVE))
         }
-        _ => (
+        (_, Some(crate::service::Wanted::SwitchedOff), _) => {
+            said(("Crake's service is switched off.", SWITCH_ON))
+        }
+        // Windows: why, from its service events (an antivirus, most often).
+        (_, _, Some(stopped)) => {
+            let exe = std::env::current_exe().unwrap_or_default();
+            let program = exe.parent().map(|d| d.display().to_string());
+            crate::service::said(stopped, &program.unwrap_or_default())
+        }
+        _ => said((
             "Crake's service isn't running.",
             "Nothing is routed. This panel fills in by itself once it's back.",
-        ),
+        )),
     };
     let ask = model.reachable.is_some() && model.service.is_some();
     div()
@@ -264,11 +273,14 @@ fn not_running(model: &Model, t: &Theme, cx: &mut Context<Panel>) -> impl IntoEl
         .border_t_1()
         .border_color(t.line)
         .child(
+            // Found by its words in tests.
             div()
+                .id(gpui_kit::ElementId::Name(title.clone().into()))
                 .pt(px(12.))
                 .text_size(px(15.))
                 .font_weight(FontWeight::SEMIBOLD)
-                .child(title),
+                .child(title)
+                .test_support(),
         )
         .child(
             div()

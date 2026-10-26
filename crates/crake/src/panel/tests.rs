@@ -294,6 +294,29 @@ fn the_service_waiting_for_approval_takes_the_user_there(cx: &mut TestAppContext
     ));
 }
 
+/// Windows wouldn't start craked (an antivirus refused it): the panel says
+/// so, and what to do, instead of only "isn't running".
+#[gpui_kit::test]
+fn a_service_windows_wouldnt_start_says_why(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    w.model.update(cx, |m, cx| {
+        m.reachable = Some(false);
+        m.stopped = Some(crate::service::Stopped::Denied);
+        cx.notify();
+    });
+    cx.run_until_parked();
+    let (title, _) = crate::service::said(&crate::service::Stopped::Denied, "");
+    assert!(w.shows_element(gpui_kit::ElementId::Name(title.into()), cx));
+    // Without a reason: as before.
+    w.model.update(cx, |m, cx| {
+        m.stopped = None;
+        cx.notify();
+    });
+    cx.run_until_parked();
+    let plain = gpui_kit::ElementId::Name("Crake's service isn't running.".into());
+    assert!(w.shows_element(plain, cx));
+}
+
 impl Opened {
     fn shows_element(&self, id: impl Into<gpui_kit::ElementId>, cx: &mut TestAppContext) -> bool {
         let id = id.into();

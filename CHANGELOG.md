@@ -17,11 +17,17 @@ What's new in each Crake release, for the people using it. The newest is at the 
   as in the tables below it.
 - **See the password you're typing.** The eye in sign-in's password field shows it, and hides it
   again.
+- **The panel says why Crake's service isn't running on Windows.** When Windows wouldn't start it,
+  most often because an antivirus refused it, the panel only said it wasn't running. Now it says
+  what happened and what to do.
 
 ### Fixed
 
 - **A certificate password that's wrong says so.** Crake asked for it again in the same words,
   so it looked as if nothing had happened. Now it says "That password didn't open it."
+- **New tunnel waits for Crake's service.** Without it, the window closed as if the tunnel had
+  been added, and nothing came. Now it stays open, says why, and adds the tunnel once you try
+  again.
 
 - **No more "Crake quit unexpectedly" when upgrading on a Mac.** The Crake being replaced asked
   macOS about its service after its files were gone, and macOS crashed it.

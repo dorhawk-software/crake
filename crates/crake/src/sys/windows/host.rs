@@ -124,6 +124,24 @@ pub fn no_console(cmd: &mut std::process::Command) {
     cmd.creation_flags(CREATE_NO_WINDOW);
 }
 
+/// craked.exe gone from beside this app (an antivirus took it).
+pub fn craked_missing() -> bool {
+    std::env::current_exe().is_ok_and(|exe| !exe.with_file_name("craked.exe").is_file())
+}
+
+/// The newest of Crake's service events matching `query`, from the System
+/// log (which every signed-in user may read), asked of `wevtutil`. Blocking.
+pub fn service_events(query: &str) -> Option<String> {
+    let mut cmd = std::process::Command::new("wevtutil");
+    no_console(&mut cmd);
+    let out = cmd
+        .args(["qe", "System", "/rd:true", "/c:1", "/f:xml"])
+        .arg(format!("/q:{query}"))
+        .output()
+        .ok()?;
+    Some(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
 /// craked's private socket: Linux's development setup only.
 pub async fn connect_dev(_path: &Path) -> zbus::Result<zbus::Connection> {
     Err(zbus::Error::Unsupported)

@@ -9,6 +9,9 @@ use gpui_kit::{Context, Entity, Focusable, Window};
 use super::{Close, Detect, LAST_STEP, NewTunnel};
 use crate::Request;
 
+/// Adding or saving while craked is out of reach.
+pub(super) const NO_SERVICE: &str = "Crake\u{2019}s service isn\u{2019}t running, so this can\u{2019}t be saved yet. What you entered stays here: try again once it\u{2019}s back.";
+
 impl NewTunnel {
     /// The text fields of the step on screen, in the order Tab goes
     /// through them.
@@ -163,6 +166,14 @@ impl NewTunnel {
         }
         if self.step < LAST_STEP {
             self.step += 1;
+            cx.notify();
+            return;
+        }
+        // Without craked the request would wait unseen and the window close
+        // on nothing (a colleague's Windows, where an antivirus had kept it
+        // from starting, 2026-10-26): it stays, and says why.
+        if self.model.read(cx).reachable == Some(false) {
+            self.problem = Some(NO_SERVICE.into());
             cx.notify();
             return;
         }

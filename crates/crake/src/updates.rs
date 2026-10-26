@@ -12,6 +12,8 @@ const ROUTED_SHOWN: Duration = Duration::from_secs(5);
 const OPENVPN3_LOOK: Duration = Duration::from_secs(3);
 /// How often macOS is asked whether Crake's service may run.
 const SERVICE_LOOK: Duration = Duration::from_secs(2);
+/// How often Windows' service events are read while craked is out of reach.
+const STOPPED_LOOK: Duration = Duration::from_secs(30);
 const FRAME_MS: u64 = 70;
 /// After a change, how long until the bar is told about the icon again
 /// (`tray::Handle::settle`): well past GNOME's tray extension's 30 ms
@@ -111,6 +113,7 @@ pub(super) fn on_update(update: client::Update, cx: &mut App) {
 /// registered again when it's on but craked stays out of reach. Elsewhere
 /// the package runs it.
 pub(super) fn watch_service(cx: &mut App) {
+    watch_stopped(cx);
     if !cfg!(target_os = "macos") || cx.global::<Shell>().demo {
         return;
     }
@@ -136,6 +139,46 @@ pub(super) fn watch_service(cx: &mut App) {
                     }
                 });
             });
+            cx.background_executor().timer(SERVICE_LOOK).await;
+        }
+    })
+    .detach();
+}
+
+/// Windows: why craked is out of reach, from its service events
+/// (`service::stopped`), for the panel: read when it goes out of reach
+/// and every STOPPED_LOOK while it stays so; forgotten once it's back.
+fn watch_stopped(cx: &mut App) {
+    if !cfg!(windows) || cx.global::<Shell>().demo {
+        return;
+    }
+    fn show(stopped: Option<crate::service::Stopped>, cx: &mut App) {
+        let model = cx.global::<Shell>().model.clone();
+        model.update(cx, |m, cx| {
+            if m.stopped != stopped {
+                m.stopped = stopped;
+                cx.notify();
+            }
+        });
+    }
+    cx.spawn(async move |cx| {
+        let mut looked: Option<std::time::Instant> = None;
+        loop {
+            let reachable = cx.update(|cx| cx.global::<Shell>().model.read(cx).reachable);
+            if reachable != Some(false) {
+                looked = None;
+                cx.update(|cx| show(None, cx));
+            } else if looked.is_none_or(|at| at.elapsed() >= STOPPED_LOOK) {
+                looked = Some(std::time::Instant::now());
+                let stopped = cx
+                    .background_executor()
+                    .spawn(async {
+                        let events = crate::sys::service_events(&crate::service::events_query());
+                        crate::service::stopped(crate::sys::craked_missing(), events.as_deref())
+                    })
+                    .await;
+                cx.update(|cx| show(stopped, cx));
+            }
             cx.background_executor().timer(SERVICE_LOOK).await;
         }
     })

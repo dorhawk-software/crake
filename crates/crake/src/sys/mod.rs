@@ -35,6 +35,20 @@ pub use macos::*;
 #[cfg(not(windows))]
 pub fn attach_console() {}
 
+/// The newest of Crake's service events matching `query`, as XML
+/// (`crate::service::stopped`): Windows' System log; elsewhere none.
+#[cfg(not(windows))]
+pub fn service_events(_query: &str) -> Option<String> {
+    None
+}
+
+/// craked's program gone from beside the app (an antivirus took it):
+/// Windows'; elsewhere the package keeps it.
+#[cfg(not(windows))]
+pub fn craked_missing() -> bool {
+    false
+}
+
 // Crake's service as the system runs it (`crate::service`): on a Mac the
 // app registers it (SMAppService, `macos::service`); elsewhere the package
 // runs it, and there's nothing to ask.

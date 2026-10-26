@@ -85,6 +85,8 @@ pub struct Model {
     /// What the user has to do for craked to run (macOS: switch it on in
     /// System Settings), when anything.
     pub service: Option<crate::service::Wanted>,
+    /// Why Windows says craked isn't running, while it's out of reach.
+    pub stopped: Option<crate::service::Stopped>,
     /// craked's version: newer than this app's after a package updated it
     /// (the panel then asks for a restart, `versions`).
     pub service_version: Option<String>,
