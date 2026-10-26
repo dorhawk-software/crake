@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.15.2 (2026-10-26)
+
 ### Fixed
 
 - **Websites open without a pause on a Mac or Windows PC.** While a tunnel was up, every new
