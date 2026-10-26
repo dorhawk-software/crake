@@ -309,6 +309,7 @@ impl Log {
             } else {
                 20.
             }))
+            .when(system, crate::chrome::on_buttons_line)
             .pr(px(12.))
             .border_b_1()
             .border_color(t.line)

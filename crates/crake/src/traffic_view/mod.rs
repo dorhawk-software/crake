@@ -465,15 +465,18 @@ impl Render for Traffic {
             } else {
                 SIDE
             }))
+            .when(system, crate::chrome::on_buttons_line)
             .pr(px(12.))
             .on_mouse_down(gpui_kit::MouseButton::Left, |_, window, _| {
                 window.start_window_move()
             })
             .child(
                 div()
+                    .id("traffic-title")
                     .text_size(px(22.))
                     .font_weight(FontWeight::BOLD)
-                    .child("Traffic"),
+                    .child("Traffic")
+                    .test_support(),
             )
             .child(div().text_size(px(13.)).text_color(t.muted).child("Live"))
             .child(div().flex_1())

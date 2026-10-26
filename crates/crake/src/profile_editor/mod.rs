@@ -459,6 +459,7 @@ impl Render for ProfileEditor {
             } else {
                 SIDE
             }))
+            .when(system, crate::chrome::on_buttons_line)
             .pr(px(12.))
             .border_b_1()
             .border_color(t.line)

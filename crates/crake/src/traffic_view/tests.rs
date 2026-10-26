@@ -207,3 +207,30 @@ fn close_asks_the_app(cx: &mut TestAppContext) {
     w.click("close", cx);
     assert!(closed.get());
 }
+
+/// With macOS's own window buttons: the title starts after them and is
+/// level with them, not taller (the user, 2026-10-26: "the buttons should
+/// be the topmost thing, or level with it").
+#[gpui_kit::test]
+fn the_title_is_level_with_the_systems_buttons(cx: &mut TestAppContext) {
+    let w = open(cx);
+    cx.update(|cx| {
+        cx.set_global(crate::chrome::Chrome {
+            system_buttons: true,
+        })
+    });
+    let title = cx
+        .update_window(w.window, |_, window, cx| {
+            window.refresh();
+            window.render_frame(cx);
+            window.find("traffic-title").bounds()
+        })
+        .unwrap();
+    assert!(f32::from(title.origin.x) >= crate::chrome::BUTTONS_WIDTH);
+    let middle = f32::from(title.origin.y + title.size.height / 2.);
+    let line = crate::chrome::HEADER_HEIGHT / 2. + 1.;
+    assert!(
+        (middle - line).abs() <= 1.,
+        "\"Traffic\" is centred at {middle:.1} px, the buttons at {line:.1}"
+    );
+}

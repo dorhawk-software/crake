@@ -132,6 +132,7 @@ fn start(
 impl Render for SignIn {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let card_scroll = crate::controls::scroll_handle("sign-in-card", window, cx);
+        let room = room(window, cx);
         let t = Theme::current(cx);
         let display = self.spec.display.clone();
         // The card of sign-in.html: 12 px corners, a hairline, 22 px inside.
@@ -283,10 +284,10 @@ impl Render for SignIn {
                 // (Cancel and Try again had gone below a 768 px screen,
                 // 2026-10-19).
                 card.id("sign-in-card")
-                    .max_h(px(room(window, cx)))
+                    .max_h(px(room))
                     .overflow_y_scroll()
                     .track_scroll(&card_scroll)
-                    .child(fit_window())
+                    .child(fit_window(card_scroll.clone(), room))
                     .test_support(),
                 &card_scroll,
                 window,
@@ -328,11 +329,15 @@ fn room(window: &Window, cx: &gpui_kit::App) -> f32 {
 }
 
 /// The window follows the card's height (it grows and shrinks downward).
-fn fit_window() -> impl IntoElement {
+fn fit_window(scroll: gpui_kit::ScrollHandle, room: f32) -> impl IntoElement {
     gpui_kit::canvas(
-        |bounds, window, _| {
-            // Measured inside the card's 1 px border: add it back.
-            let want = gpui_kit::size(px(WIDTH), bounds.size.height + px(2.));
+        move |bounds, window, _| {
+            let height = wanted_height(
+                f32::from(bounds.size.height),
+                f32::from(scroll.max_offset().y),
+                room,
+            );
+            let want = gpui_kit::size(px(WIDTH), px(height));
             let have = window.viewport_size();
             if (f32::from(have.height) - f32::from(want.height)).abs() > crate::windows::FIT_SLACK {
                 window.on_next_frame(move |window, _| window.resize(want));
@@ -342,6 +347,16 @@ fn fit_window() -> impl IntoElement {
     )
     .absolute()
     .inset_0()
+}
+
+/// The window's height for a card drawn `card` tall that could scroll
+/// `overflow` more: all of its content, up to `room`, and the card's 1 px
+/// border (measured inside it). The card scrolls inside a window shorter
+/// than it, so its own height alone is the window's, not what it needs: a
+/// window that opened short only crept up and stopped short on a Mac,
+/// Cancel cut in half (2026-10-26).
+pub(crate) fn wanted_height(card: f32, overflow: f32, room: f32) -> f32 {
+    (card + overflow.max(0.)).min(room) + 2.
 }
 
 impl SignIn {

@@ -394,6 +394,20 @@ fn ipsecs_trust_question_comes_from_craked(cx: &mut TestAppContext) {
     }
 }
 
+/// A window that opened shorter than its card asks for all of the card,
+/// not for the part it shows, and never for more than its screen's room.
+#[test]
+fn the_window_asks_for_the_whole_card() {
+    use super::wanted_height;
+    assert_eq!(wanted_height(266., 34., 900.), 302., "what scrolls counts");
+    assert_eq!(wanted_height(300., 0., 900.), 302.);
+    assert_eq!(
+        wanted_height(400., 600., 700.),
+        702.,
+        "a screen's room at most"
+    );
+}
+
 /// A window shorter than its card (one the window manager didn't grow):
 /// the card stays inside it and scrolls, its buttons still there. (Not
 /// the cause of 2026-10-21's half-cut Cancel after a restart: there the

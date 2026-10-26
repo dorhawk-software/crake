@@ -210,24 +210,43 @@ pub fn read_within(fd: &impl AsRawFd, buf: &mut [u8], wait_ms: libc::c_int) -> O
 /// System Settings lists them under Crake.
 #[cfg(feature = "app")]
 pub mod service {
+    use std::path::{Path, PathBuf};
+
     use objc2::rc::Retained;
     use objc2_foundation::NSString;
     use objc2_service_management::SMAppService;
     pub use objc2_service_management::SMAppServiceStatus as Status;
 
     /// A launchd file in Crake.app: a daemon's (craked) or an agent's
-    /// (start at login).
-    pub struct Service(Retained<SMAppService>);
+    /// (start at login), and where the running app keeps it.
+    pub struct Service(Retained<SMAppService>, PathBuf);
 
     impl Service {
         pub fn daemon(plist: &str) -> Self {
             // SAFETY: a constructor taking a valid string.
-            Self(unsafe { SMAppService::daemonServiceWithPlistName(&NSString::from_str(plist)) })
+            let service =
+                unsafe { SMAppService::daemonServiceWithPlistName(&NSString::from_str(plist)) };
+            Self(service, in_app("LaunchDaemons", plist))
         }
 
         pub fn agent(plist: &str) -> Self {
             // SAFETY: a constructor taking a valid string.
-            Self(unsafe { SMAppService::agentServiceWithPlistName(&NSString::from_str(plist)) })
+            let service =
+                unsafe { SMAppService::agentServiceWithPlistName(&NSString::from_str(plist)) };
+            Self(service, in_app("LaunchAgents", plist))
+        }
+
+        /// SMAppService reads the launchd file from the running app, and
+        /// crashes when the app's files are gone (a null string in
+        /// `_load_plist_from_bundle`): an upgrade deletes the old Crake.app
+        /// while it runs, and it crashed at every Homebrew upgrade until
+        /// 2026-10-26 ("Crake quit unexpectedly").
+        fn there(&self) -> Result<(), String> {
+            if self.1.is_file() {
+                Ok(())
+            } else {
+                Err(format!("{} isn't there", self.1.display()))
+            }
         }
 
         pub fn status(&self) -> Status {
@@ -237,20 +256,57 @@ pub mod service {
 
         /// Register it: what macOS said when it refused, if it did.
         pub fn register(&self) -> Result<(), String> {
-            // SAFETY: a plain call on a valid service object.
+            self.there()?;
+            // SAFETY: a plain call on a valid service object, whose launchd
+            // file is in the app (`there`).
             unsafe { self.0.registerAndReturnError() }.map_err(|e| format!("{e:?}"))
         }
 
         pub fn unregister(&self) -> Result<(), String> {
-            // SAFETY: a plain call on a valid service object.
+            self.there()?;
+            // SAFETY: a plain call on a valid service object, whose launchd
+            // file is in the app (`there`).
             unsafe { self.0.unregisterAndReturnError() }.map_err(|e| format!("{e:?}"))
         }
+    }
+
+    /// `Contents/Library/<folder>/<plist>` of the app this program runs in
+    /// (its program is `Contents/MacOS/<name>`).
+    fn in_app(folder: &str, plist: &str) -> PathBuf {
+        let exe = std::env::current_exe().unwrap_or_default();
+        contents_of(&exe).join("Library").join(folder).join(plist)
+    }
+
+    /// The app's Contents folder, from its program's path.
+    fn contents_of(exe: &Path) -> PathBuf {
+        exe.parent()
+            .and_then(Path::parent)
+            .map(Path::to_path_buf)
+            .unwrap_or_default()
     }
 
     /// System Settings, at Login Items & Extensions.
     pub fn open_login_items() {
         // SAFETY: a class method without arguments.
         unsafe { SMAppService::openSystemSettingsLoginItems() };
+    }
+
+    #[cfg(test)]
+    mod tests {
+        #[test]
+        fn the_launchd_file_is_looked_for_in_the_running_app() {
+            let exe = std::path::Path::new("/Applications/Crake.app/Contents/MacOS/crake");
+            assert_eq!(
+                super::contents_of(exe).join("Library/LaunchDaemons/x.plist"),
+                std::path::Path::new(
+                    "/Applications/Crake.app/Contents/Library/LaunchDaemons/x.plist"
+                )
+            );
+            // A test binary isn't in Crake.app: nothing is asked of SMAppService.
+            let gone = super::Service::daemon("software.dorhawk.crake.daemon.plist");
+            assert!(gone.register().is_err());
+            assert!(gone.unregister().is_err());
+        }
     }
 }
 

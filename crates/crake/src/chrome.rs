@@ -41,6 +41,15 @@ pub fn traffic_lights() -> Option<Point<Pixels>> {
     Some(point(px(BUTTONS_LEFT), px((HEADER_HEIGHT - BUTTON) / 2.)))
 }
 
+/// A window header on the window buttons' line: on a Mac it's
+/// `HEADER_HEIGHT` tall and its row is centred where the buttons are, so
+/// nothing in it starts above them (Traffic's title stood taller than the
+/// buttons, 2026-10-26: "the buttons should be the topmost thing, or level
+/// with it"). Elsewhere a header keeps its own padding.
+pub fn on_buttons_line<E: gpui_kit::Styled>(header: E) -> E {
+    header.h(px(HEADER_HEIGHT)).py(px(0.))
+}
+
 /// A window's round × (design/proposals/hover-close-and-sections.html,
 /// chosen by the user): red while pointed at, the × in the colour that
 /// reads on red. Its clicks aren't the header's, which moves the window;

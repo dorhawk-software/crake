@@ -11,6 +11,15 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### Fixed
+
+- **No more "Crake quit unexpectedly" when upgrading on a Mac.** The Crake being replaced asked
+  macOS about its service after its files were gone, and macOS crashed it.
+- **The sign-in window shows all of itself on a Mac.** It could open shorter than its card and
+  stop growing, so Cancel was cut in half and the card scrolled.
+- **Window titles are level with the Mac's window buttons.** Traffic's and the profile editor's
+  titles stood a few points above them.
+
 ## 0.15.3 (2026-10-26)
 
 ### Fixed
