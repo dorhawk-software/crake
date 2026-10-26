@@ -412,6 +412,13 @@ draws the panel's frame, the native way.** Where Windows rounds windows
 other window there. Don't bring back Crake's own rounding on Windows
 (drawn, or clipped with SetWindowRgn): "If most of Windows is
 rectangular, I will not introduce a rounded concept."
+**Every window, too (2026-10-26):** a colleague's Windows 11 showed the
+other windows (Settings, New tunnel, the log...) as the panel had been:
+transparent, square, with a light fringe where the card rounded itself.
+Now every window is opaque (`chrome::window_background`), its card draws
+no edge there (`chrome::card_edge`), and Windows rounds it and draws its
+hairline (`sys::rounded_frame`); `plain_frame` (square, no DWM border) is
+gone.
 The installer now uses NSIS Modern UI 2 (`packaging/windows/crake.nsi`,
 done 2026-10-12): welcome page, Crake's icon, a finish page that can open
 Crake; it was the classic 90s wizard before.

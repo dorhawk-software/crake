@@ -64,17 +64,11 @@ pub fn executable(path: &Path) -> bool {
     path.is_file() || (path.extension().is_none() && path.with_extension("exe").is_file())
 }
 
-/// Crake's windows draw their own rounded card on a transparent window:
-/// Windows 11 mustn't add its square outline or round the window itself.
-pub fn plain_frame(window: &gpui_kit::Window) {
-    use windows_sys::Win32::Graphics::Dwm::{DWMWA_COLOR_NONE, DWMWCP_DONOTROUND};
-    frame(window, DWMWCP_DONOTROUND, DWMWA_COLOR_NONE);
-}
-
-/// The panel, opaque and the size of its card: Windows rounds it and draws
-/// its hairline (in `border`, the theme's line) and its shadow, which a
-/// transparent window with a card rounding itself didn't get (and DirectX
-/// left a light fringe at its corners).
+/// Each of Crake's windows, opaque and the size of its card (the panel's
+/// since 2026-10-12, every window's since 2026-10-26): Windows rounds it
+/// and draws its hairline (in `border`, the theme's line) and its shadow,
+/// which a transparent window with a card rounding itself didn't get (and
+/// DirectX left a light fringe at its corners, a colleague's Windows 11).
 pub fn rounded_frame(window: &gpui_kit::Window, border: gpui_kit::Rgba) {
     use windows_sys::Win32::Graphics::Dwm::DWMWCP_ROUND;
     let channel = |c: f32| (c.clamp(0., 1.) * f32::from(u8::MAX)).round() as u8;

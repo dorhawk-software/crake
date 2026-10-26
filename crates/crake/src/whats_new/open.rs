@@ -35,14 +35,14 @@ pub fn open(since: Option<String>, cx: &mut App) {
                 traffic_light_position: crate::chrome::traffic_lights(),
             }),
             window_decorations: Some(WindowDecorations::Client),
-            window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
+            window_background: crate::chrome::window_background(),
             kind: WindowKind::Normal,
             app_id: Some("crake".into()),
             is_resizable: false,
             ..Default::default()
         },
         move |window, cx| {
-            crate::sys::plain_frame(window);
+            crate::sys::rounded_frame(window, crate::theme::Theme::current(cx).line);
             window.set_client_inset(px(0.));
             let view = cx.new(|cx| WhatsNew::new(since, window, cx));
             let handle = window.window_handle();

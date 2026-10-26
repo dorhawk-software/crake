@@ -50,6 +50,37 @@ pub fn on_buttons_line<E: gpui_kit::Styled>(header: E) -> E {
     header.h(px(HEADER_HEIGHT)).py(px(0.))
 }
 
+/// What's under a window's card. On Windows it's opaque, and Windows
+/// rounds the window and draws its hairline (`sys::rounded_frame`): a card
+/// rounding itself on a transparent window left square corners with a
+/// light fringe there (DirectX), as the panel's had (platforms.md; a
+/// colleague's Windows 11, 2026-10-26). Elsewhere it's transparent and the
+/// card rounds itself (`card_edge`).
+pub fn window_background() -> gpui_kit::WindowBackgroundAppearance {
+    if cfg!(windows) {
+        gpui_kit::WindowBackgroundAppearance::Opaque
+    } else {
+        gpui_kit::WindowBackgroundAppearance::Transparent
+    }
+}
+
+/// A window card's edge: a hairline in `line` and 12 px corners, except on
+/// Windows, which draws the window's own (`window_background`).
+pub fn card_edge<E: gpui_kit::Styled>(card: E, line: gpui_kit::Rgba) -> E {
+    if cfg!(windows) {
+        card
+    } else {
+        card.border_1().border_color(line).rounded(px(CARD_RADIUS))
+    }
+}
+
+/// A window card's corners where Crake draws them.
+pub const CARD_RADIUS: f32 = 12.;
+
+/// The card's top and bottom hairlines, which a window fitting itself to
+/// the card adds back (measured inside them): none on Windows.
+pub const CARD_BORDERS: f32 = if cfg!(windows) { 0. } else { 2. };
+
 /// A window's round × (design/proposals/hover-close-and-sections.html,
 /// chosen by the user): red while pointed at, the × in the colour that
 /// reads on red. Its clicks aren't the header's, which moves the window;

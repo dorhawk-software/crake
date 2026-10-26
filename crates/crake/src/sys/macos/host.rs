@@ -70,10 +70,8 @@ pub fn private_dir() -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-/// macOS windows need nothing more: Crake's own frame is the frame.
-pub fn plain_frame(_window: &gpui_kit::Window) {}
-
-/// Windows rounds the panel itself; here it rounds its own card.
+/// Windows rounds Crake's windows itself; here each card rounds its own
+/// (`chrome::card_edge`).
 pub fn rounded_frame(_window: &gpui_kit::Window, _border: gpui_kit::Rgba) {}
 
 /// A command-line program started from the app: on macOS it has no window.

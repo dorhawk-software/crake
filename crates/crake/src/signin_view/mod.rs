@@ -145,9 +145,7 @@ impl Render for SignIn {
             .px(px(22.))
             .pb(px(18.))
             .bg(t.panel)
-            .border_1()
-            .border_color(t.line)
-            .rounded(px(12.))
+            .map(|card| crate::chrome::card_edge(card, t.line))
             .text_color(t.ink)
             .font_family(fonts::UI)
             .text_size(px(14.))
@@ -350,13 +348,14 @@ fn fit_window(scroll: gpui_kit::ScrollHandle, room: f32) -> impl IntoElement {
 }
 
 /// The window's height for a card drawn `card` tall that could scroll
-/// `overflow` more: all of its content, up to `room`, and the card's 1 px
-/// border (measured inside it). The card scrolls inside a window shorter
-/// than it, so its own height alone is the window's, not what it needs: a
+/// `overflow` more: all of its content, up to `room`, and the card's
+/// hairlines (measured inside them; `chrome::CARD_BORDERS`). The card
+/// scrolls inside a window shorter than it, so its own height alone is
+/// the window's, not what it needs: a
 /// window that opened short only crept up and stopped short on a Mac,
 /// Cancel cut in half (2026-10-26).
 pub(crate) fn wanted_height(card: f32, overflow: f32, room: f32) -> f32 {
-    (card + overflow.max(0.)).min(room) + 2.
+    (card + overflow.max(0.)).min(room) + crate::chrome::CARD_BORDERS
 }
 
 impl SignIn {

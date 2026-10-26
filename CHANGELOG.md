@@ -19,6 +19,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
   stop growing, so Cancel was cut in half and the card scrolled.
 - **Window titles are level with the Mac's window buttons.** Traffic's and the profile editor's
   titles stood a few points above them.
+- **Crake's windows look like Windows' own on Windows 11.** They were square with a light
+  fringe at the corners; now Windows rounds them and draws their edge, as it does the panel.
 
 ## 0.15.3 (2026-10-26)
 

@@ -59,7 +59,7 @@ crake-os = { path = "../crake-os", features = ["app"] }
 crake-os = { path = "../crake-os", features = ["app"] }
 # Credential Manager, the monitors, the taskbar's theme.
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging", "Win32_Security_Credentials", "Win32_System_Registry", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_Services", "Win32_Graphics_Dwm", "Win32_System_Console"] }
-# The windows' HWND, for DWM (sys::plain_frame).
+# The windows' HWND, for DWM (sys::rounded_frame).
 raw-window-handle = "0.6"
 # The single-instance pipe is read a line at a time.
 tokio = { version = "1", features = ["io-util"] }

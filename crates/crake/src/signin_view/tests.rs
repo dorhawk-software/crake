@@ -399,11 +399,16 @@ fn ipsecs_trust_question_comes_from_craked(cx: &mut TestAppContext) {
 #[test]
 fn the_window_asks_for_the_whole_card() {
     use super::wanted_height;
-    assert_eq!(wanted_height(266., 34., 900.), 302., "what scrolls counts");
-    assert_eq!(wanted_height(300., 0., 900.), 302.);
+    let edges = crate::chrome::CARD_BORDERS;
+    assert_eq!(
+        wanted_height(266., 34., 900.),
+        300. + edges,
+        "what scrolls counts"
+    );
+    assert_eq!(wanted_height(300., 0., 900.), 300. + edges);
     assert_eq!(
         wanted_height(400., 600., 700.),
-        702.,
+        700. + edges,
         "a screen's room at most"
     );
 }

@@ -168,11 +168,7 @@ pub(super) fn open_panel(at: Option<(i32, i32)>, cx: &mut App) {
             titlebar: None,
             window_decorations: Some(WindowDecorations::Client),
             // Windows rounds the panel itself (`sys::rounded_frame`): opaque.
-            window_background: if cfg!(windows) {
-                gpui_kit::WindowBackgroundAppearance::Opaque
-            } else {
-                gpui_kit::WindowBackgroundAppearance::Transparent
-            },
+            window_background: crate::chrome::window_background(),
             // With the patched X11 backend: above other windows, out of the
             // taskbar, focusable (see vendor/gpui-pre-linux/CRAKE-PATCH.md).
             kind: if placed.is_some() {
@@ -186,7 +182,6 @@ pub(super) fn open_panel(at: Option<(i32, i32)>, cx: &mut App) {
             ..Default::default()
         },
         move |window, cx| {
-            crate::sys::plain_frame(window);
             crate::sys::rounded_frame(window, crate::theme::Theme::current(cx).line);
             // The visible panel, without the shadow margin, is the window for the desktop.
             window.set_client_inset(px(panel::MARGIN));
@@ -264,14 +259,14 @@ pub(super) fn open_settings(cx: &mut App) {
                 traffic_light_position: crate::chrome::traffic_lights(),
             }),
             window_decorations: Some(WindowDecorations::Client),
-            window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
+            window_background: crate::chrome::window_background(),
             kind: WindowKind::Normal,
             app_id: Some("crake".into()),
             is_resizable: false,
             ..Default::default()
         },
         move |window, cx| {
-            crate::sys::plain_frame(window);
+            crate::sys::rounded_frame(window, crate::theme::Theme::current(cx).line);
             window.set_client_inset(px(0.));
             let view =
                 cx.new(|cx| settings_view::Settings::new(model, requests, section, window, cx));
@@ -322,14 +317,14 @@ pub(super) fn open_detail(tunnel: String, cx: &mut App) {
                 traffic_light_position: crate::chrome::traffic_lights(),
             }),
             window_decorations: Some(WindowDecorations::Client),
-            window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
+            window_background: crate::chrome::window_background(),
             kind: WindowKind::Normal,
             app_id: Some("crake".into()),
             is_resizable: false,
             ..Default::default()
         },
         move |window, cx| {
-            crate::sys::plain_frame(window);
+            crate::sys::rounded_frame(window, crate::theme::Theme::current(cx).line);
             window.set_client_inset(px(0.));
             let view =
                 cx.new(|cx| tunnel_detail::TunnelDetail::new(name, model, requests, window, cx));
@@ -379,14 +374,14 @@ pub(super) fn open_new_tunnel(editing: Option<String>, cx: &mut App) {
                 traffic_light_position: crate::chrome::traffic_lights(),
             }),
             window_decorations: Some(WindowDecorations::Client),
-            window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
+            window_background: crate::chrome::window_background(),
             kind: WindowKind::Normal,
             app_id: Some("crake".into()),
             is_resizable: false,
             ..Default::default()
         },
         move |window, cx| {
-            crate::sys::plain_frame(window);
+            crate::sys::rounded_frame(window, crate::theme::Theme::current(cx).line);
             window.set_client_inset(px(0.));
             let view = cx.new(|cx| new_tunnel::NewTunnel::new(model, requests, tunnel, window, cx));
             let handle = window.window_handle();
@@ -430,7 +425,7 @@ pub(super) fn open_sign_in(tunnel: client::Tunnel, cx: &mut App) {
     let title = format!("Sign in to {}", tunnel.display);
     let opened = cx.open_window(signin_options(bounds), move |window, cx| {
         window.set_window_title(&title);
-        crate::sys::plain_frame(window);
+        crate::sys::rounded_frame(window, crate::theme::Theme::current(cx).line);
         window.set_client_inset(px(0.));
         let view = cx.new(|cx| signin_view::SignIn::new(spec, model, requests, window, cx));
         let handle = window.window_handle();
@@ -485,14 +480,14 @@ pub(super) fn open_log(cx: &mut App) {
                 traffic_light_position: crate::chrome::traffic_lights(),
             }),
             window_decorations: Some(WindowDecorations::Client),
-            window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
+            window_background: crate::chrome::window_background(),
             kind: WindowKind::Normal,
             app_id: Some("crake".into()),
             is_resizable: false,
             ..Default::default()
         },
         move |window, cx| {
-            crate::sys::plain_frame(window);
+            crate::sys::rounded_frame(window, crate::theme::Theme::current(cx).line);
             window.set_client_inset(px(0.));
             let view = cx.new(|cx| log_view::Log::new(model, window, cx));
             let handle = window.window_handle();
@@ -535,14 +530,14 @@ pub(super) fn open_traffic(cx: &mut App) {
                 traffic_light_position: crate::chrome::traffic_lights(),
             }),
             window_decorations: Some(WindowDecorations::Client),
-            window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
+            window_background: crate::chrome::window_background(),
             kind: WindowKind::Normal,
             app_id: Some("crake".into()),
             is_resizable: false,
             ..Default::default()
         },
         move |window, cx| {
-            crate::sys::plain_frame(window);
+            crate::sys::rounded_frame(window, crate::theme::Theme::current(cx).line);
             window.set_client_inset(px(0.));
             let view = cx.new(|cx| traffic_view::Traffic::new(model, requests, window, cx));
             let handle = window.window_handle();
@@ -604,14 +599,14 @@ pub(super) fn open_profile_editor(tunnel: String, cx: &mut App) {
                 traffic_light_position: crate::chrome::traffic_lights(),
             }),
             window_decorations: Some(WindowDecorations::Client),
-            window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
+            window_background: crate::chrome::window_background(),
             kind: WindowKind::Normal,
             app_id: Some("crake".into()),
             is_resizable: true,
             ..Default::default()
         },
         move |window, cx| {
-            crate::sys::plain_frame(window);
+            crate::sys::rounded_frame(window, crate::theme::Theme::current(cx).line);
             window.set_client_inset(px(0.));
             let view = cx.new(|cx| {
                 profile_editor::ProfileEditor::new(
@@ -650,7 +645,7 @@ fn signin_options(bounds: Bounds<gpui_kit::Pixels>) -> WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(bounds)),
         titlebar: None,
         window_decorations: Some(WindowDecorations::Client),
-        window_background: gpui_kit::WindowBackgroundAppearance::Transparent,
+        window_background: crate::chrome::window_background(),
         kind: WindowKind::Normal,
         app_id: Some("crake".into()),
         is_resizable: false,

@@ -108,7 +108,8 @@ impl Render for TunnelDetail {
         // The window is the card: as tall as it needs, at most the screen.
         let fit = canvas(
             move |bounds, window, _| {
-                let want = (f32::from(bounds.size.height) + 2.).min(max_height);
+                let want =
+                    (f32::from(bounds.size.height) + crate::chrome::CARD_BORDERS).min(max_height);
                 if (f32::from(window.viewport_size().height) - want).abs()
                     > crate::windows::FIT_SLACK
                 {
@@ -217,9 +218,7 @@ impl Render for TunnelDetail {
             .flex()
             .flex_col()
             .bg(t.panel)
-            .border_1()
-            .border_color(t.line)
-            .rounded(px(12.))
+            .map(|card| crate::chrome::card_edge(card, t.line))
             .overflow_hidden()
             .text_color(t.ink)
             .font_family(fonts::UI)

@@ -216,9 +216,7 @@ impl Render for Settings {
             .size_full()
             .flex()
             .bg(t.panel)
-            .border_1()
-            .border_color(t.line)
-            .rounded(px(12.))
+            .map(|card| crate::chrome::card_edge(card, t.line))
             .overflow_hidden()
             .text_color(t.ink)
             .font_family(fonts::UI)
@@ -548,7 +546,7 @@ impl Settings {
             .bg(t.surface)
             // GPUI clips to a rectangle, not the card's rounded corners: the
             // nav rounds its own (the card's 12 px less its 1 px border).
-            .rounded_l(px(11.))
+            .when(!cfg!(windows), |nav| nav.rounded_l(px(11.)))
             .border_r_1()
             .border_color(t.line)
             .child(
