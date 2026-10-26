@@ -11,14 +11,16 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-# Lines covered, in percent.
-declare -A floor=(
-    [crake]=73
-    [craked]=63
-    [crake-os]=70
-    [crake-proto]=98
-    [lint-literals]=82
-)
+# Lines covered, in percent: crate=floor (a list, not bash 4's
+# associative array: macOS has bash 3.2). macOS has floors of its own,
+# first measured there 2026-10-26: its system code runs in no test
+# without root (tests/macos.rs and the journey run as root in CI), and
+# Linux's own code isn't built, so the shares are lower. CI holds
+# Linux's on every push.
+case $(uname -s) in
+    Darwin) floors="crake=67 craked=44 crake-os=34 crake-proto=98 lint-literals=82" ;;
+    *) floors="crake=73 craked=63 crake-os=70 crake-proto=98 lint-literals=82" ;;
+esac
 
 # The tests that need a real gateway (CRAKE_E2E: the scenario suite, the
 # e2e tests, the journeys, the gateway tests and their helpers) are test
@@ -45,7 +47,9 @@ printf '%s\n' "$tests" | grep -E '^(     Running|test result:)'
 summary=$(cargo llvm-cov report --summary-only 2>&1)
 
 fail=0
-for crate in "${!floor[@]}"; do
+for entry in $floors; do
+    crate=${entry%=*}
+    floor=${entry#*=}
     # Columns: file, regions (3), functions (3), lines (total, missed, cover), …
     read -r total missed < <(printf '%s\n' "$summary" | awk -v c="$crate/" -v h="$harness" '
         index($1, c) == 1 && $1 ~ /\.rs$/ && $1 !~ h { t += $8; m += $9 }
@@ -56,8 +60,8 @@ for crate in "${!floor[@]}"; do
         continue
     fi
     pct=$(( (total - missed) * 100 / total ))
-    if [ "$pct" -lt "${floor[$crate]}" ]; then
-        echo "coverage: $crate is at $pct% of lines, its floor is ${floor[$crate]}%."
+    if [ "$pct" -lt "$floor" ]; then
+        echo "coverage: $crate is at $pct% of lines, its floor is $floor%."
         # Where: the lines no test ran, per file.
         cargo llvm-cov report --show-missing-lines 2>/dev/null | grep "/$crate/src/" |
             grep -Ev "/${harness#^}" | sed 's/^/  /'

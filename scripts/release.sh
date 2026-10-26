@@ -59,11 +59,15 @@ else
         /^- / && !ok { print }')
     [ -z "$outside" ] ||
         fail "CHANGELOG.md: a change under \"## Unreleased\" outside ### New, Better, Changed, Fixed or Underneath: $outside"
-    today=$(date +%F)
-    sed -i "s/^## Unreleased\$/## Unreleased\n\n## $V ($today)/" CHANGELOG.md
-    sed -i "0,/^version = \"$current\"/s//version = \"$V\"/" Cargo.toml
-    sed -i "s/^\( *version = \)\"$current\";/\1\"$V\";/" packaging/nix/package.nix
-    sed -i "s/^pkgver=$current\$/pkgver=$V/" packaging/arch/PKGBUILD
+    # perl -pi, not sed -i: GNU's and BSD's (macOS') differ, and only
+    # GNU's has 0,/re/ and \n in a replacement.
+    TODAY=$(date +%F) CUR=$current V=$V
+    export TODAY CUR V
+    perl -pi -e 's/^## Unreleased$/## Unreleased\n\n## $ENV{V} ($ENV{TODAY})/' CHANGELOG.md
+    # Only the first: the workspace's own version, not a dependency's.
+    perl -pi -e '$done ||= s/^version = "\Q$ENV{CUR}\E"/version = "$ENV{V}"/' Cargo.toml
+    perl -pi -e 's/^( *version = )"\Q$ENV{CUR}\E";/$1"$ENV{V}";/' packaging/nix/package.nix
+    perl -pi -e 's/^pkgver=\Q$ENV{CUR}\E$/pkgver=$ENV{V}/' packaging/arch/PKGBUILD
     cargo metadata --format-version 1 >/dev/null
     # The release workflow's own check, before anything is pushed.
     scripts/release-notes.sh "$V" >/dev/null
