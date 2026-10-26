@@ -95,6 +95,17 @@ fn seen_keeps_the_highest_version_and_a_fresh_install_has_seen_this_one() {
     assert_eq!(p.seen_version.as_deref(), Some("99.0.0"));
 }
 
+/// The newest released version's id in the window: always shown in full,
+/// where an older one may be behind "Show earlier versions" (three in
+/// full: an Unreleased with changes in it is one of them).
+fn newest_release() -> String {
+    let newest = changelog::releases()
+        .iter()
+        .find(|r| r.version != changelog::UNRELEASED)
+        .unwrap();
+    format!("release-{}", newest.version)
+}
+
 struct Opened {
     window: AnyWindowHandle,
     view: Entity<WhatsNew>,
@@ -146,7 +157,7 @@ fn the_window_shows_what_changed_since_the_version_you_had(cx: &mut TestAppConte
     let w = open(cx, Some("0.13.1"));
     assert!(w.shows("whats-new-title", cx));
     assert!(w.shows("since", cx), "Since 0.13.1, the version you had");
-    assert!(w.shows("release-0.14.0", cx));
+    assert!(w.shows(&newest_release(), cx));
     assert!(
         !w.shows("release-0.13.1", cx),
         "seen already: behind the button"
@@ -199,7 +210,11 @@ fn pointing_at_the_versions_moves_nothing(cx: &mut TestAppContext) {
     let top = |cx: &mut TestAppContext| {
         cx.update_window(w.window, |_, window, cx| {
             window.render_frame(cx);
-            window.find("release-0.14.0").bounds().origin.y
+            window
+                .find(gpui_kit::ElementId::Name(newest_release().into()))
+                .bounds()
+                .origin
+                .y
         })
         .unwrap()
     };
@@ -233,14 +248,7 @@ fn the_scrollbar_follows_the_pointer_over_what_scrolls(cx: &mut TestAppContext) 
     // Moving on over what scrolls, the bar shown over it: it stays (the
     // bar's own layer once took the pointer away, and it flickered). The
     // newest release, at the top: an older one may be below the fold.
-    let newest = changelog::releases()
-        .iter()
-        .find(|r| r.version != changelog::UNRELEASED)
-        .unwrap();
-    point(
-        Box::leak(format!("release-{}", newest.version).into_boxed_str()),
-        cx,
-    );
+    point(Box::leak(newest_release().into_boxed_str()), cx);
     assert!(
         w.shows("versions-bar", cx),
         "still pointed at: still the bar"

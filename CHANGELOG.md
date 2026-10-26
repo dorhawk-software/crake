@@ -11,6 +11,13 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### Fixed
+
+- **Websites open without a pause on a Mac or Windows PC.** While a tunnel was up, every new
+  website name could take three seconds when the network's first DNS server doesn't answer and
+  its second does: Crake asked the silent one first every time and waited it out. Now it asks
+  the one that answered last first, and the next one too after a moment's quiet.
+
 ## 0.15.1 (2026-10-25)
 
 ### Better

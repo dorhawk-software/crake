@@ -241,6 +241,11 @@ change of network; what was displaced is kept in
 /var/db/crake/system-dns.json until it's given back, so a craked that
 died puts it back when it starts. tests/macos.rs checks macOS really asks
 craked's server for a public name and gets its own servers back.
+Several servers (2026-10-26, the user's Mac: the network's first DNS
+server never answered, its second did, and every new name took
+`WAIT`'s three seconds, so pages loaded slowly): the one that answered
+last is asked first, and the next is asked too after 400 ms of quiet
+or at once when one fails (`dns_ask`, also for a tunnel's servers).
 Windows on macOS (2026-10-13, a colleague's first Mac run): opening one
 makes Crake the active app first (`windows::to_front`; a menu bar app's
 non-activating panel left them behind the app in front); the system draws

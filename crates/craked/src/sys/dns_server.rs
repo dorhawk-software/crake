@@ -185,63 +185,67 @@ fn give_the_system_its_dns_back(mgr: &Arc<Manager>) {
     });
 }
 
-/// Ask DNS servers in turn (IPv4 or IPv6): a tunnel's through the tunnel
+/// Which of the servers asked answered last: asked first next time.
+static ORDER: crate::dns_ask::Order = crate::dns_ask::Order::new();
+
+/// Ask DNS servers (IPv4 or IPv6), the one that answered last first and
+/// the next when it's quiet (`dns_ask`): a tunnel's through the tunnel
 /// (`device`).
 async fn ask(query: &[u8], device: Option<&str>, servers: &[IpAddr]) -> Option<Vec<u8>> {
-    for server in servers {
-        let any: IpAddr = if server.is_ipv6() {
-            Ipv6Addr::UNSPECIFIED.into()
-        } else {
-            Ipv4Addr::UNSPECIFIED.into()
-        };
-        let Ok(sock) = UdpSocket::bind((any, 0)).await else {
-            continue;
-        };
-        if let Some(device) = device
-            && super::bind_device(&sock, device).is_err()
-        {
-            continue;
-        }
-        let to = SocketAddr::from((*server, crate::dns::PORT));
-        if sock.send_to(query, to).await.is_err() {
-            continue;
-        }
-        let mut buf = vec![0u8; crate::dns::BUFFER];
-        if let Ok(Ok(n)) = tokio::time::timeout(WAIT, sock.recv(&mut buf)).await {
-            buf.truncate(n);
-            return Some(buf);
-        }
+    let (query, device) = (Arc::<[u8]>::from(query), device.map(str::to_owned));
+    crate::dns_ask::first_answer(&ORDER, servers, crate::dns_ask::NEXT_AFTER, |server| {
+        ask_one(Arc::clone(&query), device.clone(), server)
+    })
+    .await
+}
+
+async fn ask_one(query: Arc<[u8]>, device: Option<String>, server: IpAddr) -> Option<Vec<u8>> {
+    let any: IpAddr = if server.is_ipv6() {
+        Ipv6Addr::UNSPECIFIED.into()
+    } else {
+        Ipv4Addr::UNSPECIFIED.into()
+    };
+    let sock = UdpSocket::bind((any, 0)).await.ok()?;
+    if let Some(device) = &device {
+        super::bind_device(&sock, device).ok()?;
     }
-    None
+    let to = SocketAddr::from((server, crate::dns::PORT));
+    sock.send_to(&query, to).await.ok()?;
+    let mut buf = vec![0u8; crate::dns::BUFFER];
+    let n = tokio::time::timeout(WAIT, sock.recv(&mut buf))
+        .await
+        .ok()?
+        .ok()?;
+    buf.truncate(n);
+    Some(buf)
 }
 
 /// The same over TCP.
 async fn ask_tcp(query: &[u8], device: Option<&str>, servers: &[IpAddr]) -> Option<Vec<u8>> {
-    for server in servers {
-        let sock = if server.is_ipv6() {
-            TcpSocket::new_v6()
-        } else {
-            TcpSocket::new_v4()
-        };
-        let Ok(sock) = sock else {
-            continue;
-        };
-        if let Some(device) = device
-            && super::bind_device(&sock, device).is_err()
-        {
-            continue;
-        }
-        let exchange = async {
-            let mut stream = sock
-                .connect(SocketAddr::from((*server, crate::dns::PORT)))
-                .await
-                .ok()?;
-            write_message(&mut stream, query).await.ok()?;
-            read_message(&mut stream).await
-        };
-        if let Ok(Some(reply)) = tokio::time::timeout(WAIT, exchange).await {
-            return Some(reply);
-        }
+    let (query, device) = (Arc::<[u8]>::from(query), device.map(str::to_owned));
+    crate::dns_ask::first_answer(&ORDER, servers, crate::dns_ask::NEXT_AFTER, |server| {
+        ask_one_tcp(Arc::clone(&query), device.clone(), server)
+    })
+    .await
+}
+
+async fn ask_one_tcp(query: Arc<[u8]>, device: Option<String>, server: IpAddr) -> Option<Vec<u8>> {
+    let sock = if server.is_ipv6() {
+        TcpSocket::new_v6()
+    } else {
+        TcpSocket::new_v4()
     }
-    None
+    .ok()?;
+    if let Some(device) = &device {
+        super::bind_device(&sock, device).ok()?;
+    }
+    let exchange = async {
+        let mut stream = sock
+            .connect(SocketAddr::from((server, crate::dns::PORT)))
+            .await
+            .ok()?;
+        write_message(&mut stream, &query).await.ok()?;
+        read_message(&mut stream).await
+    };
+    tokio::time::timeout(WAIT, exchange).await.ok()?
 }

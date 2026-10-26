@@ -10,7 +10,9 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 FLOOR_GB=${CRAKE_DISK_FLOOR_GB:-300}
-free_gb() { df -BG --output=avail . | tail -n 1 | tr -dc '0-9'; }
+# POSIX df (-Pk: 1024-byte blocks, "Available" in column 4), as GNU's
+# -BG/--output aren't in macOS' df.
+free_gb() { df -Pk . | awk 'NR == 2 { print int($4 / 1024 / 1024) }'; }
 [ "$(free_gb)" -ge "$FLOOR_GB" ] && exit 0
 rm -rf target/debug/incremental target/llvm-cov-target/debug/incremental \
     target/release/incremental
