@@ -107,17 +107,19 @@ pub(super) fn on_update(update: client::Update, cx: &mut App) {
 
 /// macOS: whether Crake's service is registered and switched on (the app
 /// registers it, SMAppService; macOS asks the user to switch it on once):
-/// looked at every SERVICE_LOOK, and the panel told what to ask of the user.
-/// Elsewhere the package runs it.
+/// looked at every SERVICE_LOOK, and the panel told what to ask of the user;
+/// registered again when it's on but craked stays out of reach. Elsewhere
+/// the package runs it.
 pub(super) fn watch_service(cx: &mut App) {
     if !cfg!(target_os = "macos") || cx.global::<Shell>().demo {
         return;
     }
     cx.spawn(async move |cx| {
         loop {
+            let reachable = cx.update(|cx| cx.global::<Shell>().model.read(cx).reachable);
             let on = cx
                 .background_executor()
-                .spawn(async { crate::sys::service::on() })
+                .spawn(async move { crate::sys::service::on(reachable) })
                 .await;
             cx.update(|cx| {
                 if on == Some(true) && !cx.global::<prefs::Prefs>().service_was_on {

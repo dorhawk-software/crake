@@ -6,7 +6,9 @@
 # - an older Crake's craked (a launchd daemon of its own, in
 #   /Library/LaunchDaemons) hands its tunnels over and goes, with its files;
 # - a craked the app registered, if it runs, hands its tunnels over and
-#   starts again on the new binary;
+#   starts again on the new binary (Homebrew's cask has taken it out of
+#   launchd by now, and root can't load it again: `launchctl bootstrap`
+#   refuses a BundleProgram; the app registers it again, `service::revive`);
 # - Crake opens for whoever is at the screen, so it registers its service
 #   (macOS asks then), quitting an older Crake still running first.
 # The tunnels come back signed in (craked's manager/handover.rs) when the

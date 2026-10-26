@@ -64,7 +64,21 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   user's approval (no runner can click it), so craked under launchd from
   Crake.app, and an upgrade's restart of a registered craked
   (`launchctl kickstart -k`, the tunnels handed over) are tried on a real
-  Mac only: the colleague's, first with 0.7.
+  Mac only: the colleague's, first with 0.7. Homebrew's cask upgrade
+  (found by the user, 2026-10-26) never gets that far: the cask's
+  `uninstall launchctl:` runs on every upgrade (Homebrew skips only
+  `signal`; flight blocks aren't told it's an upgrade), so craked stops
+  without the handover (tunnels logged off) and isn't loaded again;
+  macOS still says "enabled", and `launchctl bootstrap` of the app's
+  launchd file fails (5: Input/output error; `BundleProgram` is
+  SMAppService's to load). The app now registers it again once it stays
+  out of reach (`service::revive`, then unregister and register); whether
+  plain registering reloads it is unproven until the next upgrade. Open:
+  the tunnels kept across a Homebrew upgrade (the cask could leave the
+  handover flag first, but a real uninstall would then drop sessions
+  without logging them off; the user's call). A cask change reaches only
+  upgrades *from* the version that ships it: Homebrew runs the installed
+  copy's uninstall.
 - **All unsafe code behind one safe layer (asked for by the user,
   2026-10-14). Done 2026-10-19.** `crates/crake-os` holds every unsafe
   call Crake makes, each behind a safe function whose contract the crate

@@ -61,7 +61,14 @@ daily.
 **macOS** (beyond what the colleague has tried):
 - [ ] The service approved by the user, craked running under launchd from
   Crake.app, and an upgrade restarting it with tunnels kept (0.7; also in
-  Not now).
+  Not now). 2026-10-26, the user, 0.15.1 → 0.15.2 by `brew upgrade`:
+  approved and running before; after it craked wasn't running at all
+  ("Crake's service isn't running.") and the tunnels were off. Homebrew's
+  cask takes the daemon out of launchd (`launchctl remove`) on upgrades
+  too, macOS still said "enabled", and nothing registered it again; the
+  user switched it off and on in System Settings. Since then the app
+  registers it again (`service::revive`); open until an upgrade shows
+  that works.
 - [ ] The panel under the menu bar, placed at the icon on each display.
 - [ ] The Traffic window: connections listed with their ways and rates.
 

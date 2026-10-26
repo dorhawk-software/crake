@@ -41,7 +41,7 @@ pub fn attach_console() {}
 #[cfg(not(target_os = "macos"))]
 pub mod service {
     /// Whether the system lets craked run: not this system's way.
-    pub fn on() -> Option<bool> {
+    pub fn on(_reachable: Option<bool>) -> Option<bool> {
         None
     }
 

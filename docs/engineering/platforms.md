@@ -286,7 +286,10 @@ login agent in `Contents/Library/LaunchAgents` (with `--autostart`),
 registered the same way. `postinstall`: an older craked (its own daemon,
 0.6 and before) hands its tunnels over and goes with its files; a
 registered one hands over and is restarted (`kickstart -k`); then Crake
-opens for the user at the screen, which registers it. **Labels of their
+opens for the user at the screen, which registers it. Homebrew's cask
+upgrade takes craked out of launchd first, and macOS still says
+"enabled": the app registers it again when it stays out of reach
+(`service::revive`; Not now has the detail). **Labels of their
 own:** `software.dorhawk.crake.daemon` and `software.dorhawk.crake.login`,
 not 0.6's `software.dorhawk.craked` / `software.dorhawk.crake`: macOS keeps
 its record of the old daemon after its file is gone, and SMAppService,

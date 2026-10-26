@@ -11,6 +11,14 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### Fixed
+
+- **Crake's service starts again after `brew upgrade` on a Mac.** Homebrew stops it while
+  upgrading, and macOS didn't start it again: the panel said "Crake's service isn't running."
+  until the Mac was restarted or Crake was switched off and on in System Settings. Now Crake
+  starts it again itself. If macOS asks for your OK once more, the panel takes you there. Your
+  tunnels still switch off during the upgrade.
+
 ### Underneath
 
 - **The libraries Crake is built on are up to date.** tokio 1.54.1, libc 0.2.191, sha2 0.11.1,

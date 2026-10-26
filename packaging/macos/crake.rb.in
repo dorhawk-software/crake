@@ -20,7 +20,9 @@ cask "crake" do
   pkg "Crake-#{version}.pkg"
 
   # craked stops first: switching every tunnel off takes its routes, DNS
-  # settings and pf rules with it.
+  # settings and pf rules with it. Homebrew does this on upgrades too, and
+  # nothing loads craked again but the app (it registers it again,
+  # crates/crake/src/sys/macos/service.rs).
   uninstall launchctl: ["software.dorhawk.crake.daemon", "software.dorhawk.craked"],
             pkgutil:   "software.dorhawk.crake",
             delete:    "/Applications/Crake.app"
