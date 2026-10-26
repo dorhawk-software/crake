@@ -15,7 +15,7 @@ serde.workspace = true
 serde_json.workspace = true
 tokio = { version = "1", features = ["rt", "net", "time", "macros"] }
 # Same GPUI snapshot as tern: everything comes through gpui_kit's re-exports.
-gpui-kit = "0.7"
+gpui-kit = "0.8"
 zbus = { version = "5", default-features = false, features = ["tokio", "p2p"] }
 futures-util = { version = "0.3", default-features = false }
 # A .ovpn file's PKCS#12 bundle, put inline for openvpn3 (ovpn_file.rs).
@@ -73,7 +73,7 @@ embed-resource = "3"
 craked = { path = "../craked" }
 tempfile = "3"
 # Headless windows and simulated clicks for the window tests.
-gpui-kit = { version = "0.7", features = ["test-support"] }
+gpui-kit = { version = "0.8", features = ["test-support"] }
 # craked's and its engines' log lines in the end-to-end tests' output.
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
