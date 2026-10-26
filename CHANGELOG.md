@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.15.3 (2026-10-26)
+
 ### Fixed
 
 - **Crake's service starts again after `brew upgrade` on a Mac.** Homebrew stops it while
