@@ -8,9 +8,13 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Minor and patch updates together; a major version (an API that
+    # changed) gets a pull request of its own, so it can't hold the rest
+    # back (2026-10-26: zbus 6 failed the whole group's build).
     groups:
       crates:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
     ignore:
       - dependency-name: "gpui-kit"
       - dependency-name: "gpui-kit-*"

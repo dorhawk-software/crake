@@ -11,6 +11,12 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### Underneath
+
+- **The libraries Crake is built on are up to date.** tokio 1.54.1, libc 0.2.191, sha2 0.11.1,
+  ksni 0.3.7 (the tray icon on Linux) and syn 3.0.9: fixes and small additions, nothing you'd
+  notice.
+
 ## 0.15.2 (2026-10-26)
 
 ### Fixed
