@@ -88,5 +88,12 @@ daily.
 - [x] OpenVPN run by Crake itself against a real gateway (2026-10-19,
   the user, on 0.11.0: browser sign-in, the company's internal network
   reached).
+- [x] Split-horizon with a public address only the tunnel reaches
+  (2026-10-26, the user, macOS, AnyConnect, a development build): a
+  company site asked for a password through Crake (its public address,
+  for outsiders) and opened through the company's own client; a colleague
+  found it. Crake took only the tunnel DNS's private addresses then. Now
+  any address the tunnel's DNS gives that public DNS didn't counts when
+  only the tunnel reaches it (`naming::route_own`); the site opened.
 - [ ] Each Beta protocol against a real gateway (only AnyConnect and
   OpenVPN 3 have met one; the Beta tag comes off as each is ticked).

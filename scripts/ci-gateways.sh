@@ -53,7 +53,14 @@ case "${1:-}" in
       hung=
       now=$(date +%s)
       for job in "$@"; do
-        line=$(printf '%s\n' "$jobs" | awk -F '\t' -v j="$job" '$1 == j' | head -n 1)
+        # A matrix job skipped before it was expanded (its build failed)
+        # keeps its unexpanded name, "windows-gateways (${{ matrix.half }})":
+        # until 2026-10-26 it was never found, and the gateways waited
+        # 3 hours holding the shared tunnel's lock (a gpui-update run).
+        line=$(printf '%s\n' "$jobs" | awk -F '\t' -v j="$job" '
+          $1 == j { print; found = 1; exit }
+          index(j, " (") && index($1, "${{") && substr($1, 1, index($1, " (")) == substr(j, 1, index(j, " (")) { m = $0 }
+          END { if (!found && m != "") print m }' | head -n 1)
         status=$(printf '%s' "$line" | cut -f 2)
         [ "$status" = completed ] && continue
         left="$left $job"

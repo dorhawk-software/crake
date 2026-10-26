@@ -253,9 +253,9 @@ fn with_the_systems_window_buttons(cx: &mut TestAppContext) {
         f32::from(back.origin.x)
     );
     // Level with the buttons, which macOS centres HEADER_HEIGHT / 2 down
-    // (`chrome::traffic_lights`); the card's 1 px border above the header.
+    // (`chrome::traffic_lights`); the card's top border (none on Windows) above it.
     let middle = f32::from(back.origin.y + back.size.height / 2.);
-    let line = crate::chrome::HEADER_HEIGHT / 2. + 1.;
+    let line = crate::chrome::HEADER_HEIGHT / 2. + crate::chrome::CARD_BORDERS / 2.;
     assert!(
         (middle - line).abs() <= 1.,
         "\"Tunnels\" is centred at {middle:.1} px, the buttons at {line:.1}"

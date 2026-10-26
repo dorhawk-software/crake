@@ -238,7 +238,7 @@ fn the_title_is_level_with_the_systems_buttons(cx: &mut TestAppContext) {
         .unwrap();
     assert!(f32::from(title.origin.x) >= crate::chrome::BUTTONS_WIDTH);
     let middle = f32::from(title.origin.y + title.size.height / 2.);
-    let line = crate::chrome::HEADER_HEIGHT / 2. + 1.;
+    let line = crate::chrome::HEADER_HEIGHT / 2. + crate::chrome::CARD_BORDERS / 2.;
     assert!(
         (middle - line).abs() <= 1.,
         "\"Traffic\" is centred at {middle:.1} px, the buttons at {line:.1}"

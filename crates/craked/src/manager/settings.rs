@@ -74,8 +74,17 @@ impl Manager {
         let domains = self.hush_domains().await;
         // Also when the answerer lost its socket: it's taken again.
         let serving = self.hush_serving.load(std::sync::atomic::Ordering::SeqCst);
-        if self.hush_last.lock().unwrap().as_ref() != Some(&domains)
-            || (!serving && !domains.is_empty())
+        let changed = self.hush_last.lock().unwrap().as_ref() != Some(&domains);
+        // And when the link lost them: Ubuntu 22.04's resolved took a just
+        // made link's domains and then dropped them (CI's VM, 2026-10-26:
+        // ACME's names went public after it was switched off).
+        if changed
+            || (!domains.is_empty()
+                && (!serving
+                    || !self
+                        .resolved
+                        .link_as_set(crate::hush::DEVICE, &domains, false)
+                        .await))
         {
             self.apply_hush(domains).await;
         }

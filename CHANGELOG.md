@@ -32,6 +32,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 - **New tunnel waits for Crake's service.** Without it, the window closed as if the tunnel had
   been added, and nothing came. Now it stays open, says why, and adds the tunnel once you try
   again.
+- **Internal names stay private when Linux forgets them.** If the system's name lookup
+  dropped the names Crake keeps private while a tunnel is off, they went to public DNS
+  until something else changed. Crake now looks every few seconds and puts them back.
 
 - **No more "Crake quit unexpectedly" when upgrading on a Mac.** The Crake being replaced asked
   macOS about its service after its files were gone, and macOS crashed it.
