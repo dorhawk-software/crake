@@ -14,7 +14,7 @@ const LOG_ENTRIES: u32 = 5000;
 use crake_proto::{BUS_NAME, BUS_PATH, LogEntry};
 use futures_util::StreamExt;
 use zbus::Connection;
-use zbus::zvariant::OwnedValue;
+use zbus::OwnedVariant;
 
 /// What the UI asks of craked.
 #[derive(Clone, Debug)]
@@ -241,8 +241,8 @@ pub(crate) struct Api {
 impl Api {
     pub(crate) async fn call<B, R>(&self, method: &str, body: &B) -> zbus::Result<R>
     where
-        B: serde::Serialize + zbus::zvariant::DynamicType,
-        R: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
+        B: serde::Serialize + zbus::DynamicType,
+        R: for<'d> zbus::wire::DynamicDeserialize<'d>,
     {
         let dest = (!self.p2p).then_some(BUS_NAME);
         let reply = self
@@ -253,7 +253,7 @@ impl Api {
     }
 
     async fn tunnels(&self) -> zbus::Result<Vec<Tunnel>> {
-        let raw: Vec<HashMap<String, OwnedValue>> = self.call("ListTunnels", &()).await?;
+        let raw: Vec<HashMap<String, OwnedVariant>> = self.call("ListTunnels", &()).await?;
         Ok(raw.iter().map(tunnel).collect())
     }
 
@@ -270,8 +270,8 @@ impl Api {
                 &(BUS_NAME, "Version"),
             )
             .await?;
-        let value: OwnedValue = reply.body().deserialize()?;
-        String::try_from(value).map_err(zbus::Error::Variant)
+        let value: OwnedVariant = reply.body().deserialize()?;
+        String::try_from(value)
     }
 
     pub(crate) async fn log(&self, count: u32) -> zbus::Result<Vec<LogEntry>> {
@@ -283,7 +283,7 @@ impl Api {
     }
 }
 
-fn tunnel(d: &HashMap<String, OwnedValue>) -> Tunnel {
+fn tunnel(d: &HashMap<String, OwnedVariant>) -> Tunnel {
     let text = |k: &str| {
         d.get(k)
             .and_then(|v| String::try_from(v.clone()).ok())
@@ -379,11 +379,11 @@ async fn send_tunnels(
 async fn owner_changes(conn: &Connection) -> zbus::Result<zbus::MessageStream> {
     let rule = zbus::MatchRule::builder()
         .msg_type(zbus::message::Type::Signal)
-        .sender("org.freedesktop.DBus")?
-        .interface("org.freedesktop.DBus")?
-        .member("NameOwnerChanged")?
-        .add_arg(BUS_NAME)?
-        .build();
+        .sender("org.freedesktop.DBus")
+        .interface("org.freedesktop.DBus")
+        .member("NameOwnerChanged")
+        .add_arg(BUS_NAME)
+        .build()?;
     zbus::MessageStream::for_match_rule(rule, conn, None).await
 }
 
@@ -400,8 +400,8 @@ async fn session(
     };
     let rule = zbus::MatchRule::builder()
         .msg_type(zbus::message::Type::Signal)
-        .interface(BUS_NAME)?
-        .build();
+        .interface(BUS_NAME)
+        .build()?;
     let mut signals = zbus::MessageStream::for_match_rule(rule, &conn, None).await?;
     // On the system bus a craked that restarts (a package update) doesn't
     // end this connection: the session ends instead, so everything is read
@@ -621,7 +621,6 @@ mod tests {
         }
         let on_bus = || async {
             zbus::connection::Builder::address(address.as_str())
-                .unwrap()
                 .build()
                 .await
                 .unwrap()

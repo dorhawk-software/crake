@@ -132,7 +132,7 @@ impl Resolved {
             return Ok((Vec::new(), Vec::new()));
         };
         let index = ifindex(device)?;
-        let path: zbus::zvariant::OwnedObjectPath =
+        let path: zbus::OwnedObjectPath =
             within("GetLink", WAIT, m.call("GetLink", &(index,))).await?;
         let link = zbus::Proxy::new(
             m.connection(),
@@ -175,7 +175,7 @@ impl Resolved {
         let Ok(path) = within(
             "GetLink",
             WAIT,
-            m.call::<_, _, zbus::zvariant::OwnedObjectPath>("GetLink", &(index,)),
+            m.call::<_, _, zbus::OwnedObjectPath>("GetLink", &(index,)),
         )
         .await
         else {

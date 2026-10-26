@@ -11,6 +11,12 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### Underneath
+
+- **Crake talks to its service with zbus 6.** The library that carries everything between Crake
+  and its service (and, on Linux, to the system's name lookup and OpenVPN 3) is a major version
+  newer. Nothing you'd notice; it keeps Crake on the version that gets fixes.
+
 ## 0.15.4 (2026-10-26)
 
 ### Better

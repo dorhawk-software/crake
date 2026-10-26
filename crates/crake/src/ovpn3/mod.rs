@@ -18,7 +18,7 @@ const GONE_AFTER: u32 = 3;
 
 use futures_util::StreamExt;
 use zbus::Connection;
-use zbus::zvariant::OwnedObjectPath;
+use zbus::OwnedObjectPath;
 
 use crate::Request;
 use crate::signin::{Ask, Event, Prompt, Reply};
@@ -424,8 +424,8 @@ async fn subscribe(conn: &Connection, path: &str) -> Result<zbus::MessageStream,
     let rule = zbus::MatchRule::builder()
         .msg_type(zbus::message::Type::Signal)
         .path(path.to_owned())
-        .map_err(|e| e.to_string())?
-        .build();
+        .build()
+        .map_err(|e| e.to_string())?;
     let signals = zbus::MessageStream::for_match_rule(rule, conn, None)
         .await
         .map_err(|e| e.to_string())?;
@@ -691,13 +691,12 @@ mod tests {
         assert_eq!(none, Ok(Vec::new()));
     }
 
-    fn log(body: impl serde::Serialize + zbus::zvariant::DynamicType) -> zbus::Message {
+    fn log(body: impl serde::Serialize + zbus::DynamicType) -> zbus::Message {
         zbus::Message::signal(
             "/net/openvpn/v3/sessions/s1",
             "net.openvpn.v3.backends",
             "Log",
         )
-        .unwrap()
         .build(&body)
         .unwrap()
     }

@@ -5,7 +5,7 @@
 use std::time::Duration;
 
 use zbus::Connection;
-use zbus::zvariant::OwnedValue;
+use zbus::OwnedVariant;
 
 /// openvpn3's configuration service starts when first asked and exits when
 /// idle; just started, it answers before it has read the saved profiles
@@ -41,8 +41,8 @@ pub(super) async fn call<B, R>(
     body: &B,
 ) -> zbus::Result<R>
 where
-    B: serde::Serialize + zbus::zvariant::DynamicType,
-    R: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
+    B: serde::Serialize + zbus::DynamicType,
+    R: for<'d> zbus::wire::DynamicDeserialize<'d>,
 {
     let mut waited = Duration::ZERO;
     loop {
@@ -85,9 +85,9 @@ pub(super) async fn property<T>(
     name: &str,
 ) -> zbus::Result<T>
 where
-    T: TryFrom<OwnedValue>,
+    T: TryFrom<OwnedVariant>,
 {
-    let v: OwnedValue = call(
+    let v: OwnedVariant = call(
         conn,
         dest,
         path,

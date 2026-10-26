@@ -33,7 +33,7 @@ pub fn executable(path: &Path) -> bool {
 /// craked's private socket (development: `craked --dev`).
 pub async fn connect_dev(path: &Path) -> zbus::Result<zbus::Connection> {
     let stream = tokio::net::UnixStream::connect(path).await?;
-    zbus::connection::Builder::unix_stream(stream)
+    zbus::connection::Builder::unix_stream(stream.into_std()?)
         .p2p()
         .build()
         .await

@@ -16,7 +16,7 @@ serde_json.workspace = true
 tokio = { version = "1", features = ["rt", "net", "time", "macros"] }
 # Same GPUI snapshot as tern: everything comes through gpui_kit's re-exports.
 gpui-kit = "0.7"
-zbus = { version = "5", default-features = false, features = ["tokio", "p2p"] }
+zbus = { version = "6", default-features = false, features = ["tokio", "p2p", "proxy", "service"] }
 futures-util = { version = "0.3", default-features = false }
 # A .ovpn file's PKCS#12 bundle, put inline for openvpn3 (ovpn_file.rs).
 base64 = "0.23"

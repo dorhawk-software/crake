@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 
 use zbus::Connection;
-use zbus::zvariant::{OwnedObjectPath, OwnedValue};
+use zbus::{OwnedObjectPath, OwnedVariant};
 
 use super::{CONFIGURATION, call, patiently, property};
 
@@ -116,8 +116,8 @@ pub fn replace(name: &str, text: &str) -> Result<(), String> {
         let conn = Connection::system().await.map_err(|e| e.to_string())?;
         let old = named(&conn, name).await?;
         let first = old.first().map(|p| p.as_str().to_owned());
-        let read = async |what: &str| -> Option<OwnedValue> {
-            property::<OwnedValue>(&conn, CONFIGURATION, first.as_deref()?, CONFIGURATION, what)
+        let read = async |what: &str| -> Option<OwnedVariant> {
+            property::<OwnedVariant>(&conn, CONFIGURATION, first.as_deref()?, CONFIGURATION, what)
                 .await
                 .ok()
         };
@@ -129,9 +129,9 @@ pub fn replace(name: &str, text: &str) -> Result<(), String> {
             .await
             .and_then(|v| Vec::<String>::try_from(v).ok())
             .unwrap_or_default();
-        let overrides: HashMap<String, OwnedValue> = read("overrides")
+        let overrides: HashMap<String, OwnedVariant> = read("overrides")
             .await
-            .and_then(|v| HashMap::<String, OwnedValue>::try_from(v).ok())
+            .and_then(|v| HashMap::<String, OwnedVariant>::try_from(v).ok())
             .unwrap_or_default();
         let new: OwnedObjectPath = call(
             &conn,
@@ -149,7 +149,7 @@ pub fn replace(name: &str, text: &str) -> Result<(), String> {
                 .await;
         }
         for (key, value) in &overrides {
-            let value: &zbus::zvariant::Value = value;
+            let value: &zbus::Variant = value;
             let _ = call::<_, ()>(
                 &conn,
                 CONFIGURATION,
@@ -207,7 +207,7 @@ mod tests {
             )
             .await
             .unwrap();
-            let value = zbus::zvariant::Value::from(true);
+            let value = zbus::Variant::from(true);
             call::<_, ()>(
                 &conn,
                 CONFIGURATION,

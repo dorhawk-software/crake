@@ -165,7 +165,7 @@ pub async fn connect_craked() -> zbus::Result<(zbus::Connection, bool)> {
             )));
         }
     }
-    let conn = zbus::connection::Builder::tcp_stream(stream)
+    let conn = zbus::connection::Builder::tcp_stream(stream.into_std()?)
         .p2p()
         .build()
         .await?;

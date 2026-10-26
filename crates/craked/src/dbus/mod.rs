@@ -10,8 +10,7 @@ const MAX_RECENT: u32 = 10_000;
 
 use zbus::message::Header;
 use zbus::object_server::SignalEmitter;
-use zbus::zvariant::{OwnedValue, Value};
-use zbus::{Connection, fdo, interface};
+use zbus::{Connection, OwnedVariant, Variant, fdo, interface};
 
 use crate::manager::{Manager, Snapshot};
 
@@ -56,7 +55,7 @@ impl Service {
         &self,
         #[zbus(header)] hdr: Header<'_>,
         #[zbus(connection)] conn: &Connection,
-    ) -> fdo::Result<Vec<HashMap<String, OwnedValue>>> {
+    ) -> fdo::Result<Vec<HashMap<String, OwnedVariant>>> {
         self.authorize(&hdr, conn).await?;
         Ok(self.mgr.list().iter().map(to_dict).collect())
     }
@@ -66,7 +65,7 @@ impl Service {
         #[zbus(header)] hdr: Header<'_>,
         #[zbus(connection)] conn: &Connection,
         name: &str,
-    ) -> fdo::Result<HashMap<String, OwnedValue>> {
+    ) -> fdo::Result<HashMap<String, OwnedVariant>> {
         self.authorize(&hdr, conn).await?;
         self.mgr
             .get(name)
@@ -557,10 +556,10 @@ fn failed(e: anyhow::Error) -> fdo::Error {
     fdo::Error::Failed(format!("{e:#}"))
 }
 
-fn to_dict(s: &Snapshot) -> HashMap<String, OwnedValue> {
+fn to_dict(s: &Snapshot) -> HashMap<String, OwnedVariant> {
     let info = s.info.as_ref();
-    let strings = |v: Vec<String>| OwnedValue::try_from(Value::from(v)).unwrap();
-    let text = |v: &str| OwnedValue::try_from(Value::from(v)).unwrap();
+    let strings = |v: Vec<String>| OwnedVariant::try_from(Variant::from(v)).unwrap();
+    let text = |v: &str| OwnedVariant::try_from(Variant::from(v)).unwrap();
     let mut d = HashMap::new();
     d.insert("name".into(), text(&s.config.name));
     d.insert("display_name".into(), text(s.config.display()));
@@ -568,15 +567,15 @@ fn to_dict(s: &Snapshot) -> HashMap<String, OwnedValue> {
     d.insert("interface".into(), text(&s.interface));
     d.insert("gateway".into(), text(&s.config.gateway));
     d.insert("protocol".into(), text(s.config.protocol.as_str()));
-    d.insert("hosts".into(), OwnedValue::from(s.hosts as u32));
-    d.insert("signed_in".into(), OwnedValue::from(s.signed_in));
+    d.insert("hosts".into(), OwnedVariant::from(s.hosts as u32));
+    d.insert("signed_in".into(), OwnedVariant::from(s.signed_in));
     d.insert("user".into(), text(s.config.user.as_deref().unwrap_or("")));
     // What sign-in needs, so the user's session can run it.
     d.insert("auth_args".into(), strings(s.config.auth_args.clone()));
     d.insert("extra_args".into(), strings(s.config.extra_args.clone()));
     // Who decides (Managed profiles): the panel says it in plain words.
     let managed = s.config.managed.as_ref();
-    d.insert("managed".into(), OwnedValue::from(managed.is_some()));
+    d.insert("managed".into(), OwnedVariant::from(managed.is_some()));
     d.insert(
         "policy".into(),
         text(
@@ -587,7 +586,7 @@ fn to_dict(s: &Snapshot) -> HashMap<String, OwnedValue> {
     );
     d.insert(
         "full_tunnel".into(),
-        OwnedValue::from(s.config.learning() == crate::policy::Learning::FullTunnel),
+        OwnedVariant::from(s.config.learning() == crate::policy::Learning::FullTunnel),
     );
     // What a managed tunnel may learn: names and networks (Settings, Managed by IT).
     let learn = match s.config.learning() {
@@ -618,7 +617,7 @@ fn to_dict(s: &Snapshot) -> HashMap<String, OwnedValue> {
         .unwrap_or_default();
     d.insert(
         "own".into(),
-        OwnedValue::try_from(Value::from(own)).unwrap(),
+        OwnedVariant::try_from(Variant::from(own)).unwrap(),
     );
     // Names that go to its DNS: pushed by the gateway, plus the config's.
     let mut dns_domains: Vec<String> = info.map(|i| i.domains.clone()).unwrap_or_default();
@@ -636,12 +635,12 @@ fn to_dict(s: &Snapshot) -> HashMap<String, OwnedValue> {
                 .unwrap_or_default(),
         ),
     );
-    d.insert("since".into(), OwnedValue::from(s.since.unwrap_or(0)));
+    d.insert("since".into(), OwnedVariant::from(s.since.unwrap_or(0)));
     d.insert("clash".into(), text(s.clash.as_deref().unwrap_or("")));
-    d.insert("dns_down".into(), OwnedValue::from(s.dns_down));
+    d.insert("dns_down".into(), OwnedVariant::from(s.dns_down));
     d.insert("why".into(), text(s.why.as_deref().unwrap_or("")));
     // OpenVPN: its sign-in asks the user something (`Asking` says what).
-    d.insert("asking".into(), OwnedValue::from(s.asking.unwrap_or(0)));
+    d.insert("asking".into(), OwnedVariant::from(s.asking.unwrap_or(0)));
     d.insert(
         "transport".into(),
         text(s.transport.as_deref().unwrap_or("")),

@@ -17,9 +17,9 @@ use crate::manager::Manager;
 /// Claim the bus name, publish the object and relay changes as signals.
 pub async fn serve(mgr: Arc<Manager>, system_bus: bool) -> zbus::Result<Connection> {
     if system_bus {
-        serve_on(zbus::connection::Builder::system()?, Guard::Polkit, mgr).await
+        serve_on(zbus::connection::Builder::system(), Guard::Polkit, mgr).await
     } else {
-        serve_on(zbus::connection::Builder::session()?, Guard::Open, mgr).await
+        serve_on(zbus::connection::Builder::session(), Guard::Open, mgr).await
     }
 }
 
@@ -35,8 +35,8 @@ async fn serve_on(
         allowed: Arc::clone(&allowed),
     };
     let conn = builder
-        .name(BUS_NAME)?
-        .serve_at(BUS_PATH, service)?
+        .name(BUS_NAME)
+        .serve_at(BUS_PATH, service)
         .build()
         .await?;
     relay(conn.clone(), mgr, allowed, true);
@@ -70,10 +70,10 @@ pub fn serve_p2p(mgr: Arc<Manager>, path: &std::path::Path, owner: u32) -> anyho
                     allowed: Arc::clone(&allowed),
                 };
                 let built = async {
-                    zbus::connection::Builder::unix_stream(stream)
-                        .server(zbus::Guid::generate())?
+                    zbus::connection::Builder::unix_stream(stream.into_std()?)
+                        .server(zbus::Guid::generate())
                         .p2p()
-                        .serve_at(BUS_PATH, service)?
+                        .serve_at(BUS_PATH, service)
                         .build()
                         .await
                 };
@@ -113,10 +113,10 @@ pub fn serve_console(mgr: Arc<Manager>, path: &std::path::Path) -> anyhow::Resul
                     allowed: Arc::clone(&allowed),
                 };
                 let built = async {
-                    zbus::connection::Builder::unix_stream(stream)
-                        .server(zbus::Guid::generate())?
+                    zbus::connection::Builder::unix_stream(stream.into_std()?)
+                        .server(zbus::Guid::generate())
                         .p2p()
-                        .serve_at(BUS_PATH, service)?
+                        .serve_at(BUS_PATH, service)
                         .build()
                         .await
                 };
@@ -150,10 +150,10 @@ pub async fn serve_local(mgr: Arc<Manager>, address: &str) -> anyhow::Result<()>
                     allowed: Arc::clone(&allowed),
                 };
                 let built = async {
-                    zbus::connection::Builder::tcp_stream(stream)
-                        .server(zbus::Guid::generate())?
+                    zbus::connection::Builder::tcp_stream(stream.into_std()?)
+                        .server(zbus::Guid::generate())
                         .p2p()
-                        .serve_at(BUS_PATH, service)?
+                        .serve_at(BUS_PATH, service)
                         .build()
                         .await
                 };
@@ -276,12 +276,11 @@ mod tests {
         .unwrap();
         let bus = || async {
             zbus::connection::Builder::address(address.as_str())
-                .unwrap()
                 .build()
                 .await
                 .unwrap()
         };
-        let on_bus = zbus::connection::Builder::address(address.as_str()).unwrap();
+        let on_bus = zbus::connection::Builder::address(address.as_str());
         let _craked = serve_on(on_bus, Guard::Open, Arc::clone(&mgr))
             .await
             .unwrap();
@@ -291,8 +290,8 @@ mod tests {
                 let rule = zbus::MatchRule::builder()
                     .msg_type(zbus::message::Type::Signal)
                     .interface(BUS_NAME)
-                    .unwrap()
-                    .build();
+                    .build()
+                    .unwrap();
                 zbus::MessageStream::for_match_rule(rule, &conn, None)
                     .await
                     .unwrap()

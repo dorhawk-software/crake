@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow};
 use zbus::Connection;
-use zbus::zvariant::OwnedObjectPath;
+use zbus::OwnedObjectPath;
 
 /// How long systemd gets to answer.
 const WAIT: Duration = Duration::from_secs(5);
@@ -84,9 +84,9 @@ impl Unit {
         // them all and follow their changes, which craked's AppArmor
         // profile doesn't allow (nor need).
         let unit: zbus::Proxy = zbus::proxy::Builder::new(&self.bus)
-            .destination(SYSTEMD)?
-            .path(path)?
-            .interface(UNIT)?
+            .destination(SYSTEMD)
+            .path(path)
+            .interface(UNIT)
             .cache_properties(zbus::proxy::CacheProperties::No)
             .build()
             .await?;

@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::process::Command;
 
 use zbus::Connection;
-use zbus::zvariant::OwnedValue;
+use zbus::OwnedVariant;
 
 use crate::no_tray::{EXTENSION, Gnome, Known, Remedy, UBUNTU_EXTENSION};
 
@@ -68,8 +68,8 @@ fn run<T>(f: impl Future<Output = Option<T>>) -> Option<T> {
 
 async fn call<B, R>(conn: &Connection, method: &str, body: &B) -> zbus::Result<R>
 where
-    B: serde::Serialize + zbus::zvariant::DynamicType,
-    R: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
+    B: serde::Serialize + zbus::DynamicType,
+    R: for<'d> zbus::wire::DynamicDeserialize<'d>,
 {
     conn.call_method(Some(SHELL), SHELL_PATH, Some(EXTENSIONS), method, body)
         .await?
@@ -84,7 +84,7 @@ async fn gnome() -> Option<Gnome> {
         return None;
     }
     let conn = Connection::session().await.ok()?;
-    let user_extensions: OwnedValue = conn
+    let user_extensions: OwnedVariant = conn
         .call_method(
             Some(SHELL),
             SHELL_PATH,
@@ -99,7 +99,7 @@ async fn gnome() -> Option<Gnome> {
         .ok()?;
     let mut known = None;
     for id in [UBUNTU_EXTENSION, EXTENSION] {
-        let info: HashMap<String, OwnedValue> =
+        let info: HashMap<String, OwnedVariant> =
             call(&conn, "GetExtensionInfo", &(id,)).await.ok()?;
         if let Some(k) = known_of(&info) {
             known = Some((id.to_owned(), k));
@@ -115,7 +115,7 @@ async fn gnome() -> Option<Gnome> {
 }
 
 /// GNOME's answer for an extension it knows (an empty one for others).
-fn known_of(info: &HashMap<String, OwnedValue>) -> Option<Known> {
+fn known_of(info: &HashMap<String, OwnedVariant>) -> Option<Known> {
     let state = f64::try_from(info.get("state")?.try_clone().ok()?).ok()?;
     let enabled = info
         .get("enabled")
@@ -205,8 +205,8 @@ mod tests {
     fn what_gnome_says_of_an_extension() {
         let mut info = HashMap::new();
         assert_eq!(known_of(&info), None, "unknown: an empty answer");
-        info.insert("state".to_owned(), OwnedValue::from(2.0_f64));
-        info.insert("enabled".to_owned(), OwnedValue::from(false));
+        info.insert("state".to_owned(), OwnedVariant::from(2.0_f64));
+        info.insert("enabled".to_owned(), OwnedVariant::from(false));
         assert_eq!(
             known_of(&info),
             Some(Known {

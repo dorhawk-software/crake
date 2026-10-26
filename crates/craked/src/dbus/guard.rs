@@ -11,8 +11,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use zbus::message::Header;
-use zbus::zvariant::Value;
-use zbus::{Connection, fdo};
+use zbus::{Connection, Variant, fdo};
 
 use super::{Guard, POLKIT_ACTION, Service};
 
@@ -154,7 +153,7 @@ async fn check_polkit(conn: &Connection, sender: &str) -> zbus::Result<bool> {
     .await?;
     let subject = (
         "system-bus-name",
-        HashMap::from([("name", Value::from(sender))]),
+        HashMap::from([("name", Variant::from(sender))]),
     );
     let details: HashMap<&str, &str> = HashMap::new();
     // Flags 0: never prompt from the daemon; the action's defaults decide.
