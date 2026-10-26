@@ -19,6 +19,16 @@ daily.
   see Other platforms).
 - [ ] Antivirus and endpoint security: craked's service, Wintun, and the
   routes, NRPT rules and firewall rules it writes, not blocked or flagged.
+  Found 2026-10-26 (a colleague, Windows 11 with Norton): Norton kept the
+  unsigned craked.exe from starting (the System log: "The Crake service
+  failed to start: Access is denied", a second after the install), so
+  there was no craked.log; New tunnel's detection worked (the app runs
+  openconnect itself) and the tunnel then never came. With Crake's install
+  folder and ProgramData\Crake excepted in Norton, it connected. Open:
+  signing (SignPath); offered, not yet decided: the panel saying why the
+  service isn't running (the service manager knows), craked writing to
+  the Event Log when it can't open craked.log, and New tunnel saying so
+  instead of closing when craked isn't there.
 - [ ] Another VPN client installed (AnyConnect, GlobalProtect, ...): its
   names still resolve with "Keep internal names private" on
   (`served_elsewhere`, built 2026-10-18: other programs' NRPT rules and

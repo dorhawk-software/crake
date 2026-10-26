@@ -39,6 +39,8 @@ const HOSTS_EVERY: u32 = 5;
 /// Where a destination's rate ends (right-aligned).
 const RATE_RIGHT: f32 = 900.;
 const RATE_W: f32 = 64.;
+/// A destination's name in the graph (px).
+const HOST_SIZE: f32 = 12.5;
 /// The window's inset: the title row and its columns start where every
 /// other window's do (design/proposals/audit-2026-10-17.html, 10).
 const SIDE: f32 = 20.;
@@ -121,7 +123,13 @@ impl Traffic {
     }
 
     /// The graph: boxes and names over the paths and their dots.
-    fn graph(&mut self, model: &Model, t: &Theme, window: &mut Window) -> Stateful<Div> {
+    fn graph(
+        &mut self,
+        model: &Model,
+        t: &Theme,
+        window: &mut Window,
+        cx: &gpui_kit::App,
+    ) -> Stateful<Div> {
         let ways = graph::ways(model);
         let l = graph::layout(&ways);
         // Every path one grey: a way is told by its name, a decision by the
@@ -241,12 +249,28 @@ impl Traffic {
                             .w(px(RATE_RIGHT - RATE_W - HOST_X - 8.))
                             .h(px(18.))
                             .font_family(fonts::MONO)
-                            .text_size(px(12.5))
+                            .text_size(px(HOST_SIZE))
                             .text_color(if dest.more { t.muted } else { t.ink })
                             .overflow_hidden()
                             .text_ellipsis()
                             .whitespace_nowrap()
-                            .child(dest.label.clone())
+                            // A host's name copies on a click, as in the
+                            // tables below (`full_name`); "and N more" isn't one.
+                            .map(|d| {
+                                if dest.more {
+                                    d.child(dest.label.clone())
+                                } else {
+                                    d.child(crate::full_name::host_name(
+                                        gpui_kit::ElementId::Name(
+                                            format!("copy:{}:{}", way.label, dest.label).into(),
+                                        ),
+                                        dest.label.clone(),
+                                        HOST_SIZE,
+                                        t,
+                                        cx,
+                                    ))
+                                }
+                            })
                             .test_support(),
                     )
                     .child(
@@ -490,7 +514,7 @@ impl Render for Traffic {
                 )
             })
             .when(!system, |h| h.child(close_button(&t, cx)));
-        let graph = self.graph(&model, &t, window);
+        let graph = self.graph(&model, &t, window, cx);
         let body_scroll = crate::controls::scroll_handle("traffic-body", window, cx);
         let body = div()
             .id("body")

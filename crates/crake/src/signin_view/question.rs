@@ -64,20 +64,28 @@ impl SignIn {
                     ),
                 );
             }
-            Ask::CertificatePassword { retry, .. } => {
+            Ask::CertificatePassword { retry, kept, .. } => {
+                // A password that didn't open it says so in ink, as a
+                // refused one does.
+                let (said, colour) = match (retry, kept) {
+                    (true, true) => (
+                        "The password in your keyring didn\u{2019}t open it. Type it again.".into(),
+                        t.ink,
+                    ),
+                    (true, false) => (
+                        "That password didn\u{2019}t open it. Type it again.".into(),
+                        t.ink,
+                    ),
+                    _ => (
+                        format!(
+                            "{display} signs you in with a certificate. Its password opens it."
+                        ),
+                        t.muted,
+                    ),
+                };
                 body = body
                     .child(title("Unlock your certificate".into()))
-                    .child(para(
-                        if *retry {
-                            "The password in your keyring didn\u{2019}t open it. Type it again."
-                                .into()
-                        } else {
-                            format!(
-                                "{display} signs you in with a certificate. Its password opens it."
-                            )
-                        },
-                        t.muted,
-                    ));
+                    .child(para(said, colour));
             }
             Ask::Secret | Ask::Text => {
                 body = body
@@ -119,7 +127,13 @@ impl SignIn {
                     .when(focused, |b| b.border_2().border_color(t.accent))
                     .when(!focused, |b| b.border_1().border_color(t.line_strong))
                     .rounded(px(6.))
-                    .child(Input::new(&self.field).appearance(false)),
+                    .child({
+                        // A password can be shown while typed (the eye).
+                        let input = Input::new(&self.field).appearance(false);
+                        let secret =
+                            matches!(prompt.ask, Ask::Secret | Ask::CertificatePassword { .. });
+                        if secret { input.mask_toggle() } else { input }
+                    }),
             );
         // Every password says whether it's kept (it was kept without a word
         // but a certificate's; design/proposals/ipsec-tunnel.html, 5); a

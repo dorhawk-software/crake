@@ -276,6 +276,9 @@ pub fn prompt(ask: &HashMap<String, String>) -> Option<Prompt> {
             Ask::CertificatePassword {
                 from_file: None,
                 retry,
+                // A kept one is forgotten once refused (`kept`): whose it
+                // was isn't known here.
+                kept: false,
             },
             "Password",
         ),
@@ -597,7 +600,8 @@ mod tests {
             p.ask,
             Ask::CertificatePassword {
                 from_file: None,
-                retry: true
+                retry: true,
+                kept: false,
             }
         );
         // IPsec's trust question: whose certificate, who signed it, and

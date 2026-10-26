@@ -170,6 +170,16 @@ fn a_destination_is_copied_whole(cx: &mut TestAppContext) {
     assert_eq!(copied.as_deref(), Some(rows[0].dest.as_str()));
 }
 
+/// A destination in the graph copies on a click too, as in the tables.
+#[gpui_kit::test]
+fn a_destination_in_the_graph_is_copied(cx: &mut TestAppContext) {
+    let w = open(cx);
+    w.feed(cx);
+    w.click(name("copy:Direct:teams.microsoft.com"), cx);
+    let copied = cx.read_from_clipboard().and_then(|c| c.text());
+    assert_eq!(copied.as_deref(), Some("teams.microsoft.com"));
+}
+
 /// When craked couldn't list the connections, the ways out still show;
 /// the table says why it's empty.
 #[gpui_kit::test]

@@ -11,7 +11,17 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### Better
+
+- **Copy a host from Traffic's picture.** Click a name on the right of the picture to copy it,
+  as in the tables below it.
+- **See the password you're typing.** The eye in sign-in's password field shows it, and hides it
+  again.
+
 ### Fixed
+
+- **A certificate password that's wrong says so.** Crake asked for it again in the same words,
+  so it looked as if nothing had happened. Now it says "That password didn't open it."
 
 - **No more "Crake quit unexpectedly" when upgrading on a Mac.** The Crake being replaced asked
   macOS about its service after its files were gone, and macOS crashed it.

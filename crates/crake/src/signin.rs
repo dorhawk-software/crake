@@ -63,8 +63,10 @@ pub enum Ask {
     CertificatePassword {
         /// The certificate came from a file that could be kept in the keyring.
         from_file: Option<PathBuf>,
-        /// The password from the keyring didn't work.
+        /// The last password tried didn't open it.
         retry: bool,
+        /// ... and it was the keyring's, not one the user typed.
+        kept: bool,
     },
     Secret,
     Text,
@@ -420,6 +422,10 @@ fn attempt(
     let mut lines: Vec<String> = Vec::new();
     let mut pending = String::new();
     let mut reached = false;
+    // openconnect asks for the certificate's password again, in the same
+    // run, only when the last one didn't open it: the window says so (a
+    // typed one that was wrong came back as the same question, 2026-10-26).
+    let (mut cert_answered, mut cert_typed) = (false, false);
     loop {
         match chunks.recv_timeout(OUTPUT_WAIT) {
             Ok(bytes) => {
@@ -462,12 +468,14 @@ fn attempt(
         if let Ask::CertificatePassword { .. } = prompt.ask {
             if let (Some(pw), false) = (state.stored_password, state.tried_stored) {
                 state.tried_stored = true;
+                cert_answered = true;
                 let _ = stdin.write_all(&[pw, b"\n"].concat());
                 continue;
             }
             prompt.ask = Ask::CertificatePassword {
                 from_file: state.from_file.map(Into::into),
-                retry: state.tried_stored,
+                retry: cert_answered,
+                kept: cert_answered && !cert_typed,
             };
         }
         let is_cert = matches!(prompt.ask, Ask::CertificatePassword { .. });
@@ -480,6 +488,9 @@ fn attempt(
             }) => {
                 if is_cert && state.tried_stored && !remember {
                     state.forget_stored = true;
+                }
+                if is_cert {
+                    (cert_answered, cert_typed) = (true, true);
                 }
                 // Kept only when "Remember the password in your keyring" is.
                 if is_login {
@@ -586,6 +597,7 @@ pub fn classify(question: &str, lines: &[String]) -> Prompt {
             ask: Ask::CertificatePassword {
                 from_file: None,
                 retry: false,
+                kept: false,
             },
             label: "Certificate password".into(),
             words: None,
@@ -875,6 +887,70 @@ mod tests {
         spec.protocol = "gp".into();
         assert!(run(&spec, &events, &replies, &rt).is_err());
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A certificate password that didn't open it, typed: openconnect asks
+    /// again in the same run, and the question says the last one failed.
+    #[cfg(unix)]
+    #[test]
+    fn a_certificate_password_asked_again_says_the_last_one_failed() {
+        let dir = tempfile::tempdir().unwrap();
+        let fake = dir.path().join("openconnect");
+        std::fs::write(
+            &fake,
+            "#!/bin/sh\n\
+             while :; do printf 'Enter PKCS#12 pass phrase:' >&2; read pw\n\
+               [ \"$pw\" = right ] && break\n\
+               echo 'Failed to decrypt PKCS#12 certificate file' >&2\n\
+             done\n\
+             echo \"COOKIE='c'\"; echo \"CONNECT_URL='https://gw/'\"\n",
+        )
+        .unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        let (events, shown) = async_channel::unbounded();
+        let (answer, replies) = async_channel::unbounded();
+        let spec = Spec {
+            tunnel: "acme".into(),
+            display: "ACME".into(),
+            gateway: "gw".into(),
+            protocol: "anyconnect".into(),
+            user: String::new(),
+            auth_args: vec![],
+            extra_args: vec![],
+            user_agent: None,
+            keyring: false,
+            openconnect: Some(fake),
+        };
+        let asked = std::thread::spawn(move || {
+            let mut asks = Vec::new();
+            for text in ["wrong", "right"] {
+                loop {
+                    if let Ok(Event::Prompt(p)) = shown.recv_blocking() {
+                        asks.push(p.ask);
+                        break;
+                    }
+                }
+                answer
+                    .send_blocking(Reply::Answer {
+                        text: text.into(),
+                        remember: false,
+                        keep_certificate: false,
+                    })
+                    .unwrap();
+            }
+            asks
+        });
+        assert!(run(&spec, &events, &replies, &rt).is_ok(), "signed in");
+        let ask = |retry| Ask::CertificatePassword {
+            from_file: None,
+            retry,
+            kept: false,
+        };
+        assert_eq!(asked.join().unwrap(), [ask(false), ask(true)]);
     }
 
     #[test]

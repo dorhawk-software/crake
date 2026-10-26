@@ -33,9 +33,13 @@ exit 1
 "#;
 
 fn fake(dir: &Path) -> PathBuf {
+    fake_with(dir, GATEWAY)
+}
+
+fn fake_with(dir: &Path, script: &str) -> PathBuf {
     use std::os::unix::fs::PermissionsExt;
     let path = dir.join("openconnect");
-    std::fs::write(&path, GATEWAY).unwrap();
+    std::fs::write(&path, script).unwrap();
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
     path
 }
@@ -290,6 +294,45 @@ fn a_wrong_password_can_be_tried_again(cx: &mut TestAppContext) {
     w.until("asked again", cx, |s| asked(s, &groups));
     w.click("cancel", cx);
     assert!(w.closed.get(), "Cancel closes the window");
+}
+
+/// openconnect with a certificate whose password is "hunter2": a wrong one
+/// and it asks again, as openconnect does.
+const CERTIFICATE: &str = r#"#!/bin/sh
+echo "Connected to 203.0.113.10:443" >&2
+while :; do
+    printf 'Enter PKCS#12 pass phrase:' >&2
+    read pw
+    [ "$pw" = "hunter2" ] && break
+    echo "Failed to decrypt PKCS#12 certificate file" >&2
+done
+echo "COOKIE='c00kie'"
+echo "CONNECT_URL='https://vpn.acme.example/'"
+"#;
+
+/// A typed certificate password that doesn't open it says so when it's
+/// asked again (it came back as the same question, 2026-10-26).
+#[gpui_kit::test]
+fn a_certificate_password_that_doesnt_open_it_says_so(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open(cx, fake_with(dir.path(), CERTIFICATE));
+    let first = Ask::CertificatePassword {
+        from_file: None,
+        retry: false,
+        kept: false,
+    };
+    w.until("the certificate's password", cx, |s| asked(s, &first));
+    w.type_answer("letmein", cx);
+    w.click("continue", cx);
+    let again = Ask::CertificatePassword {
+        from_file: None,
+        retry: true,
+        kept: false,
+    };
+    w.until("asked again, saying why", cx, |s| asked(s, &again));
+    w.type_answer("hunter2", cx);
+    w.click("continue", cx);
+    w.until("signed in", cx, |s| *s == Stage::Connecting);
 }
 
 /// A gateway's field name in Crake's words; one it doesn't know keeps
