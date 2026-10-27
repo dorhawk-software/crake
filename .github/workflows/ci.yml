@@ -535,26 +535,35 @@ jobs:
             sandbox = true
       # The Nix store, in Cachix (free for open source), not GitHub's 10 GB
       # cache: Crake's crates.io dependencies are a derivation of their own
-      # (crane), rebuilt only when Cargo.lock changes. Every path built here
-      # is pushed; later runs substitute from Cachix. A run without the token
-      # (a fork's) still pulls from the public cache, just pushes nothing.
+      # (crane), rebuilt only when Cargo.lock changes. Later runs substitute
+      # from Cachix. A run without the token (a fork's) still pulls from the
+      # public cache, just pushes nothing.
       - uses: cachix/cachix-action@v17
         with:
           name: crake
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          # Only what the next run can reuse: the crates.io dependencies
-          # (crane's crake-deps, crake-journey-deps, and the base layer
-          # under them, crake-base-deps and crake-journey-base-deps). Crake itself, the
-          # journey binary, the filtered source and the VM test's machines
-          # change with every commit; pushed, they only filled the free
-          # 5 GB (Cachix then evicts the least used, the deps included).
-          pushFilter: '(-source$|-crake-[0-9]|-crake-journey-[0-9]|vm-test-run-|nixos-system-|nixos-vm|-nixos\.qcow2|-etc$|-system-path$|-closure-info$)'
+          # Pushed by name below, not by the action: its daemon pushes each
+          # built path's closure, so its pushFilter let through Crake, the
+          # journey and the VM's machines (the unit files hold Crake). They
+          # filled the free 5 GB, Cachix evicted the dependencies, and
+          # 0.16.0's run rebuilt all four layers (2026-10-27, 54 min).
+          skipPush: true
       # A release bumps the version: the dependency builds mustn't change
       # with it, or every release rebuilds them (~45 min).
       - name: The dependency builds don't depend on Crake's version
         run: scripts/nix-deps-check.sh
       - name: Build Crake with Nix
         run: nix build --print-build-logs .#default
+      # Only what the next run can reuse: the crates.io dependencies (crane's
+      # crake-deps and crake-journey-deps; their closures are the base layer
+      # under each). Before the VM test, so a failing test still keeps them.
+      - name: Keep the dependency builds in Cachix
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: |
+          deps=$(nix build --print-build-logs --no-link --print-out-paths \
+            .#default.cargoArtifacts .#journey.cargoArtifacts)
+          if [ -n "$CACHIX_AUTH_TOKEN" ]; then echo "$deps" | cachix push crake; fi
       - name: The NixOS module, end to end (a gateway and a client VM)
         run: nix build --print-build-logs .#checks.x86_64-linux.vm
 

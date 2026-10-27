@@ -277,8 +277,8 @@ The user doesn't want development builds installed on their machine.
   /dev/null`). Locally the scripts work as before. **GitHub's 10 GB can't be raised** (asked 2026-10-12: same for
   public/OSS and private, no paid tier), so the Nix store (the 3.3 GB
   whale it kept evicting) moved to **Cachix** (free for open source,
-  cache `crake`): the nixos job's `cachix/cachix-action` pushes every path
-  it builds and substitutes from it next time; Cachix has no 10 GB cap, so
+  cache `crake`): the nixos job substitutes from it, and pushes what the
+  next run reuses; Cachix has no 10 GB cap, so
   GitHub's budget now holds only the five Rust caches (~9 GB). **Replaced
   caches are deleted (asked by the user, 2026-10-14):** after a Cargo.lock
   change the Rust caches were saved again under the new key while the old
@@ -301,9 +301,16 @@ The user doesn't want development builds installed on their machine.
   token as the repo secret `CACHIX_AUTH_TOKEN`. Cachix's free plan holds
   5 GB and then evicts the least recently used paths (a warning email at
   85%); it had reached ~3.5 GB by 2026-10-12 because every path a run built
-  was pushed, Crake's own per-commit outputs included. Now `pushFilter`
-  keeps those out: only the dependency derivations (crane's `crake-deps`,
-  `crake-journey-deps`) go up, which is what the next run reuses. The NixOS VM-boot (~6-8
+  was pushed, Crake's own per-commit outputs included. Then `pushFilter`
+  was to keep those out, but it never did (found 2026-10-27): the action's
+  daemon pushes each built path with its closure, and the unit files hold
+  Crake, so Crake, the journey and the VM's machines still went up every
+  run, Cachix evicted the dependency layers within hours, and 0.16.0's
+  nixos job rebuilt all four (54 min). Now the action only pulls
+  (`skipPush`), and a step of its own pushes the dependency builds by name
+  (`.#default.cargoArtifacts`, `.#journey.cargoArtifacts`: crane's
+  `crake-deps` and `crake-journey-deps`, whose closures are the base layer
+  under each), which is what the next run reuses. The NixOS VM-boot (~6-8
   min) is uncacheable, so nixos stays the slowest job even cached.
   When Cargo.lock changes, nixos takes ~50 min (measured on 0.2.0's
   run: crake-deps 17, crake 2½, crake-journey-deps 25, the journey 3,
