@@ -19,7 +19,7 @@ pub fn monitors() -> Vec<Rect> {
     }
     let mut found: Vec<(bool, Rect)> = ui::monitors()
         .into_iter()
-        .map(|m| (m.primary, logical(m.bounds, m.dpi)))
+        .map(|m| (m.primary, in_logical(m.bounds, m.dpi)))
         .collect();
     found.sort_by_key(|(primary, _)| !primary);
     found.into_iter().map(|(_, r)| r).collect()
@@ -32,11 +32,11 @@ pub fn work_area() -> Option<Rect> {
     }
     let all = ui::monitors();
     let m = all.iter().find(|m| m.primary).or(all.first())?;
-    Some(logical(m.work, m.dpi))
+    Some(in_logical(m.work, m.dpi))
 }
 
 /// A monitor's rectangle (pixels) in logical pixels, at its DPI.
-fn logical(r: windows_sys::Win32::Foundation::RECT, dpi: u32) -> Rect {
+fn in_logical(r: windows_sys::Win32::Foundation::RECT, dpi: u32) -> Rect {
     let scale = dpi.max(1) as f32 / BASE_DPI as f32;
     Rect {
         x: r.left as f32 / scale,
