@@ -667,7 +667,9 @@ jobs:
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
       - name: qemu and the tools for the VM's discs
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends qemu-system-x86 qemu-utils xorriso
-        timeout-minutes: 5 # Ubuntu's mirrors can hang (see check's)
+        # Ubuntu's mirrors can hang (see check's); qemu often takes 6-7 min
+        # (5 cut off 26.04's on 2026-10-27).
+        timeout-minutes: 15
       - name: The package test in a VM, AppArmor or SELinux enforcing
         run: scripts/vm-test.sh ${{ matrix.system }}
 
