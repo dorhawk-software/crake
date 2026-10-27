@@ -20,6 +20,8 @@ use crake_proto::Session;
 
 use crate::keyring::{self, Kind};
 
+mod trust;
+
 /// What sign-in needs to know about a tunnel.
 #[derive(Clone, Debug)]
 pub struct Spec {
@@ -36,6 +38,8 @@ pub struct Spec {
     pub keyring: bool,
     /// The openconnect to run (tests: a fake). None: `engines::openconnect`.
     pub openconnect: Option<PathBuf>,
+    /// The gateway's certificate the user trusted before (`trust`).
+    pub trusted: Option<crate::prefs::Trusted>,
 }
 
 /// The engines craked signs in itself (OpenVPN, IPsec), asking the app
@@ -255,6 +259,8 @@ fn run(
         stored_login: stored_login.as_deref(),
         tried_login: false,
         login_to_save: None,
+        servercert: trust::pinned(spec, &auth_args),
+        replaced: None,
     };
     let stdout = loop {
         match attempt(
@@ -273,6 +279,12 @@ fn run(
                     && turned_away(&lines)
                 {
                     user_agent = Some(ANYCONNECT.into());
+                    continue;
+                }
+                // Not the certificate trusted before: asked again, saying so.
+                if state.servercert.is_some() && trust::mismatched(&lines) {
+                    state.servercert = None;
+                    state.replaced = trust::trusted_on(spec);
                     continue;
                 }
                 // Everything openconnect said, on the app's output (a
@@ -356,6 +368,10 @@ struct Attempt<'a> {
     tried_login: bool,
     /// The gateway password typed this time: kept once sign-in worked.
     login_to_save: Option<String>,
+    /// The gateway's certificate trusted before (`trust`), and the day it
+    /// was, once the gateway showed another.
+    servercert: Option<String>,
+    replaced: Option<String>,
 }
 
 /// The gateway asking for the account's password (not a one-time code, not
@@ -390,6 +406,10 @@ fn attempt(
     if let Some(ua) = user_agent {
         cmd.arg(format!("--useragent={ua}"));
     }
+    if let Some(pin) = &state.servercert {
+        cmd.arg(format!("--servercert={pin}"));
+    }
+    crate::engines::trust_users_roots(&mut cmd);
     cmd.args(auth_args)
         .args(&spec.extra_args)
         .arg("--")
@@ -477,6 +497,9 @@ fn attempt(
                 retry: cert_answered,
                 kept: cert_answered && !cert_typed,
             };
+        }
+        if let Ask::TrustServer { trusted_on, .. } = &mut prompt.ask {
+            trusted_on.clone_from(&state.replaced);
         }
         let is_cert = matches!(prompt.ask, Ask::CertificatePassword { .. });
         let _ = events.send_blocking(Event::Prompt(prompt));
@@ -688,6 +711,7 @@ mod tests {
                 user_agent: None,
                 keyring: false,
                 openconnect: None,
+                trusted: None,
             }
             .program()
         };
@@ -876,6 +900,7 @@ mod tests {
             user_agent: None,
             keyring: false,
             openconnect: Some(fake),
+            trusted: None,
         };
         let s = run(&spec, &events, &replies, &rt).unwrap();
         assert_eq!(s.user_agent.as_deref(), Some(ANYCONNECT));
@@ -924,6 +949,7 @@ mod tests {
             user_agent: None,
             keyring: false,
             openconnect: Some(fake),
+            trusted: None,
         };
         let asked = std::thread::spawn(move || {
             let mut asks = Vec::new();

@@ -173,6 +173,7 @@ pub(crate) async fn sign_in_as(
         user_agent: None,
         keyring: false,
         openconnect: None,
+        trusted: None,
     };
     sign_in_with(spec, passwords).await
 }

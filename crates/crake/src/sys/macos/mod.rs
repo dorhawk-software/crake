@@ -9,3 +9,5 @@ pub mod single;
 
 mod host;
 pub use host::*;
+mod trust;
+pub use trust::trusted_cafile;

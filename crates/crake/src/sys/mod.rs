@@ -42,6 +42,14 @@ pub fn service_events(_query: &str) -> Option<String> {
     None
 }
 
+/// A file of the certificates the user trusts beyond what openconnect
+/// reads itself, for its `--cafile`: the Keychain's on a Mac (`macos::trust`);
+/// elsewhere openconnect reads the system's own store.
+#[cfg(not(target_os = "macos"))]
+pub fn trusted_cafile() -> Option<std::path::PathBuf> {
+    None
+}
+
 /// craked's program gone from beside the app (an antivirus took it):
 /// Windows'; elsewhere the package keeps it.
 #[cfg(not(windows))]

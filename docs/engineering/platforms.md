@@ -299,7 +299,12 @@ have carried over too. Universal (Apple Silicon and Intel:
 `CRAKE_UNIVERSAL=1` joins both builds with lipo; releases and CI runs
 started by hand build it, pushes only Apple Silicon); openconnect from
 Homebrew (the app says `brew install openconnect` when it's missing), not
-bundled yet. **Signing (set up with the user, 2026-10-13):** the user's
+bundled yet. Homebrew's GnuTLS reads only its own bundle, never the
+Keychain: the app hands openconnect the certificates the user or an
+administrator trusts there (`sys::trusted_cafile`, `--cafile`; a company
+root trusted in the login Keychain asked "Crake can't vouch for…" at
+every sign-in, the user's Mac, 2026-10-27). Windows' openconnect reads
+Windows' own store; a root only the user trusted there: not yet tried. **Signing (set up with the user, 2026-10-13):** the user's
 personal Apple Developer account (team 5CTH49SXZ6): a Developer ID
 Application certificate (Crake.app, craked, the hook: hardened runtime,
 secure timestamp) and a Developer ID Installer certificate (the .pkg),

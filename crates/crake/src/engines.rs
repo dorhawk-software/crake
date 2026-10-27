@@ -306,6 +306,15 @@ fn runnable(program: &Path) -> bool {
     })
 }
 
+/// openconnect told of the certificates the user trusts that it doesn't
+/// read itself (the Keychain's on a Mac: `sys::trusted_cafile`), so a
+/// company's own root counts as it does on Linux.
+pub fn trust_users_roots(cmd: &mut std::process::Command) {
+    if let Some(file) = crate::sys::trusted_cafile() {
+        cmd.arg(format!("--cafile={}", file.display()));
+    }
+}
+
 /// Start a program. "Text file busy" (another thread had just forked while
 /// the file was being written, as tests write fake engines) passes in a
 /// moment: tried again a few times.

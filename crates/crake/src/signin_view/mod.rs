@@ -568,6 +568,27 @@ impl SignIn {
     }
 
     fn reply(&mut self, text: String, cx: &mut Context<Self>) {
+        // "Trust it" on openconnect's question: remembered for this gateway
+        // (`signin::trust`); craked keeps IPsec's and OpenVPN's itself.
+        if let Stage::Asking(prompt) = &self.stage
+            && let Ask::TrustServer {
+                fingerprint: Some(pin),
+                ..
+            } = &prompt.ask
+            && text == "yes"
+            && self.spec.program() == "openconnect"
+        {
+            let trusted = crate::prefs::Trusted {
+                pin: pin.clone(),
+                on: jiff::Zoned::now().date().to_string(),
+            };
+            self.spec.trusted = Some(trusted.clone());
+            let gateway = self.spec.gateway.clone();
+            cx.update_global::<crate::prefs::Prefs, _>(|prefs, _| {
+                prefs.trusted.insert(gateway, trusted);
+                prefs.save();
+            });
+        }
         let _ = self.replies.send_blocking(Reply::Answer {
             text,
             remember: self.remember,

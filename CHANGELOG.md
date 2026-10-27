@@ -11,6 +11,19 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### Better
+
+- **"Trust it" is remembered.** A gateway whose certificate no authority vouches for asked at every
+  sign-in. Now it asks once; it asks again only if the gateway shows another certificate, and then
+  says when you trusted the one before.
+
+### Fixed
+
+- **Crake trusts what your Mac trusts.** A gateway whose certificate your company's own authority
+  signed asked "Crake can't vouch for…" at every sign-in on a Mac, even with that authority trusted
+  in Keychain Access. Crake now hands openconnect the certificates you trust in the Keychain, as it
+  reads the system's own on Linux.
+
 ### Underneath
 
 - **Crake talks to its service with zbus 6.** The library that carries everything between Crake

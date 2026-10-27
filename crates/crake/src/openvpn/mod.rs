@@ -316,7 +316,7 @@ pub fn prompt(ask: &HashMap<String, String>) -> Option<Prompt> {
 
 /// A day craked gives ("2026-10-21") as the window says it: "21 October",
 /// with its year when it isn't this one's.
-fn said_day(iso: &str) -> Option<String> {
+pub(crate) fn said_day(iso: &str) -> Option<String> {
     let day: jiff::civil::Date = iso.parse().ok()?;
     let this_year = jiff::Zoned::now().year();
     let month = day.strftime("%B");

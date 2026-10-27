@@ -12,6 +12,10 @@ pub struct Prefs {
     /// Gateway → user agent, for gateways that only let Cisco's client in.
     #[serde(default)]
     pub user_agents: BTreeMap<String, String>,
+    /// Gateway → the certificate the user trusted there ("Trust it"), for
+    /// gateways no authority vouches for (`signin::trust`).
+    #[serde(default)]
+    pub trusted: BTreeMap<String, Trusted>,
     /// Notices the user said "Got it" to, e.g. "anyconnect:acme".
     #[serde(default)]
     pub dismissed: BTreeSet<String>,
@@ -58,12 +62,22 @@ pub struct Prefs {
     pub existed: bool,
 }
 
+/// A gateway's certificate the user trusted.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Trusted {
+    /// "pin-sha256:…", as openconnect names it.
+    pub pin: String,
+    /// The day it was trusted ("2026-10-27").
+    pub on: String,
+}
+
 impl gpui_kit::Global for Prefs {}
 
 impl Default for Prefs {
     fn default() -> Self {
         Self {
             user_agents: Default::default(),
+            trusted: Default::default(),
             dismissed: Default::default(),
             hide_hosts: false,
             appearance: system(),

@@ -420,6 +420,11 @@ pub(super) fn open_sign_in(tunnel: client::Tunnel, cx: &mut App) {
             .cloned(),
         keyring: !shell.demo,
         openconnect: None,
+        trusted: cx
+            .global::<prefs::Prefs>()
+            .trusted
+            .get(&tunnel.gateway)
+            .cloned(),
     };
     let bounds = centered(signin_view::WIDTH, SIGNIN_HEIGHT, cx);
     let title = format!("Sign in to {}", tunnel.display);

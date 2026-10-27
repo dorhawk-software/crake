@@ -245,6 +245,7 @@ pub(crate) async fn sign_in(app: &mut App, gateway: Gateway, passwords: &[&str])
             user_agent: None,
             keyring: false,
             openconnect: None,
+            trusted: None,
         };
         let mut session = None;
         for (n, password) in passwords.iter().enumerate() {

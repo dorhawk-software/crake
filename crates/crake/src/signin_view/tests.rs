@@ -79,6 +79,7 @@ fn open_with(cx: &mut TestAppContext, openconnect: PathBuf, protocol: &str) -> O
         user_agent: None,
         keyring: false,
         openconnect: Some(openconnect),
+        trusted: None,
     };
     let shown = model.clone();
     let (window, view) = cx.update(|cx| {

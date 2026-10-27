@@ -89,6 +89,7 @@ fn ask(gateway: &str, servercert: Option<&str>, wait: Duration) -> String {
     if let Some(pin) = servercert {
         cmd.arg(format!("--servercert={pin}"));
     }
+    crate::engines::trust_users_roots(&mut cmd);
     cmd.args(["--", gateway])
         .env("LC_ALL", "C")
         .stdin(Stdio::null())

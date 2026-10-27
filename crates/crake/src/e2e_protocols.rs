@@ -120,6 +120,7 @@ async fn sign_in(
         user_agent: None,
         keyring: false,
         openconnect: None,
+        trusted: None,
     };
     let (tx, events) = async_channel::unbounded();
     let replies = signin::start(spec, tx);
