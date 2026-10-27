@@ -135,21 +135,9 @@ impl Render for SignIn {
         let room = room(window, cx);
         let t = Theme::current(cx);
         let display = self.spec.display.clone();
-        // The card of sign-in.html: 12 px corners, a hairline, 22 px inside.
-        let mut card = div()
-            .relative()
-            .w(px(WIDTH))
-            .flex()
-            .flex_col()
-            .pt(px(22.))
-            .px(px(22.))
-            .pb(px(18.))
-            .bg(t.panel)
-            .map(|card| crate::chrome::card_edge(card, t.line))
-            .text_color(t.ink)
-            .font_family(fonts::UI)
-            .text_size(px(14.))
-            .line_height(px(20.));
+        // What the card holds, all of it, however much of it shows: the
+        // window is measured from it (`fit_window`).
+        let mut card = div().relative().flex().flex_col().flex_shrink_0();
 
         card = match self.stage.clone() {
             Stage::Asking(prompt) => card.child(self.question(&prompt, &t, window, cx)),
@@ -281,11 +269,27 @@ impl Render for SignIn {
                 // groups, or a long error, scrolls inside the card instead
                 // (Cancel and Try again had gone below a 768 px screen,
                 // 2026-10-19).
-                card.id("sign-in-card")
+                // The card of sign-in.html: 12 px corners, a hairline, 22 px
+                // inside.
+                div()
+                    .id("sign-in-card")
+                    .relative()
+                    .w(px(WIDTH))
+                    .flex()
+                    .flex_col()
+                    .pt(px(CARD_TOP))
+                    .px(px(22.))
+                    .pb(px(CARD_BOTTOM))
+                    .bg(t.panel)
+                    .map(|card| crate::chrome::card_edge(card, t.line))
+                    .text_color(t.ink)
+                    .font_family(fonts::UI)
+                    .text_size(px(14.))
+                    .line_height(px(20.))
                     .max_h(px(room))
                     .overflow_y_scroll()
                     .track_scroll(&card_scroll)
-                    .child(fit_window(card_scroll.clone(), room))
+                    .child(card.child(fit_window(room)))
                     .test_support(),
                 &card_scroll,
                 window,
@@ -326,15 +330,16 @@ fn room(window: &Window, cx: &gpui_kit::App) -> f32 {
         })
 }
 
-/// The window follows the card's height (it grows and shrinks downward).
-fn fit_window(scroll: gpui_kit::ScrollHandle, room: f32) -> impl IntoElement {
+/// The card's padding above and below what it holds.
+const CARD_TOP: f32 = 22.;
+const CARD_BOTTOM: f32 = 18.;
+
+/// The window follows the card's height (it grows and shrinks downward),
+/// measured from what the card holds, which never shrinks to the window.
+fn fit_window(room: f32) -> impl IntoElement {
     gpui_kit::canvas(
         move |bounds, window, _| {
-            let height = wanted_height(
-                f32::from(bounds.size.height),
-                f32::from(scroll.max_offset().y),
-                room,
-            );
+            let height = wanted_height(f32::from(bounds.size.height), room);
             let want = gpui_kit::size(px(WIDTH), px(height));
             let have = window.viewport_size();
             if (f32::from(have.height) - f32::from(want.height)).abs() > crate::windows::FIT_SLACK {
@@ -347,15 +352,16 @@ fn fit_window(scroll: gpui_kit::ScrollHandle, room: f32) -> impl IntoElement {
     .inset_0()
 }
 
-/// The window's height for a card drawn `card` tall that could scroll
-/// `overflow` more: all of its content, up to `room`, and the card's
-/// hairlines (measured inside them; `chrome::CARD_BORDERS`). The card
-/// scrolls inside a window shorter than it, so its own height alone is
-/// the window's, not what it needs: a
-/// window that opened short only crept up and stopped short on a Mac,
-/// Cancel cut in half (2026-10-26).
-pub(crate) fn wanted_height(card: f32, overflow: f32, room: f32) -> f32 {
-    (card + overflow.max(0.)).min(room) + crate::chrome::CARD_BORDERS
+/// The window's height for a card holding `content` that tall: all of it
+/// with the card's padding, up to `room`, and the card's hairlines
+/// (`chrome::CARD_BORDERS`). The card itself shrinks to the window, so its
+/// own height was the window's, not what it needs (a window that opened
+/// short only crept up and stopped short on a Mac, Cancel cut in half,
+/// 2026-10-26); and what GPUI says it could scroll counted the padding
+/// once more, as the card's measuring canvas spans it: 38 points too
+/// tall, an empty band under the card (a Mac, 0.15.4, 2026-10-27).
+pub(crate) fn wanted_height(content: f32, room: f32) -> f32 {
+    (content + CARD_TOP + CARD_BOTTOM).min(room) + crate::chrome::CARD_BORDERS
 }
 
 impl SignIn {

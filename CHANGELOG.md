@@ -23,6 +23,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
   signed asked "Crake can't vouch for…" at every sign-in on a Mac, even with that authority trusted
   in Keychain Access. Crake now hands openconnect the certificates you trust in the Keychain, as it
   reads the system's own on Linux.
+- **The sign-in window is as tall as its card.** Since 0.15.4 it stood an empty band taller than
+  the card, and before that the card could scroll though everything showed.
 
 ### Underneath
 

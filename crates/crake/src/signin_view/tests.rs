@@ -438,20 +438,19 @@ fn ipsecs_trust_question_comes_from_craked(cx: &mut TestAppContext) {
     }
 }
 
-/// A window that opened shorter than its card asks for all of the card,
-/// not for the part it shows, and never for more than its screen's room.
+/// The window asks for all the card holds with its padding, however much
+/// of it shows, and never for more than its screen's room.
 #[test]
 fn the_window_asks_for_the_whole_card() {
-    use super::wanted_height;
+    use super::{CARD_BOTTOM, CARD_TOP, wanted_height};
     let edges = crate::chrome::CARD_BORDERS;
     assert_eq!(
-        wanted_height(266., 34., 900.),
-        300. + edges,
-        "what scrolls counts"
+        wanted_height(226., 900.),
+        226. + CARD_TOP + CARD_BOTTOM + edges,
+        "the padding counted once"
     );
-    assert_eq!(wanted_height(300., 0., 900.), 300. + edges);
     assert_eq!(
-        wanted_height(400., 600., 700.),
+        wanted_height(1000., 700.),
         700. + edges,
         "a screen's room at most"
     );
