@@ -34,6 +34,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
   reads the system's own on Linux.
 - **The sign-in window is as tall as its card.** Since 0.15.4 it stood an empty band taller than
   the card, and before that the card could scroll though everything showed.
+- **The bird matches your Mac's menu bar.** On macOS Tahoe the menu bar takes its colour from the
+  wallpaper, and the bird was white or dark from dark mode alone, so it could sit dark on a dark bar.
+  It now follows the menu bar itself.
 - **Traffic and a profile open at their own height.** On a big screen they opened as tall as the
   screen allowed, most of it empty.
 

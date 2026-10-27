@@ -302,16 +302,18 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   notice scrolls sideways under 6 px of padding, where a bar would sit
   over the text. Its Copy is the way to the whole line.
 - **macOS colouring the bird itself (2026-10-25, the menu bar proposal).**
-  A template image would let macOS colour the bird for the bar over any
-  wallpaper and dim it on an inactive display; Crake still draws it white
-  or dark from dark mode (`sys::macos::host::light_bar`), which is wrong
-  where the wallpaper sets the bar's colour (Tahoe). A template only while
-  no coloured mark shows would make the bird change colour when the teal
-  call or a badge comes and goes wherever the two disagree, so it waits
-  for the whole of it: the coloured states drawn by the status button's
-  own appearance (`TrayIcon::ns_status_item`, `effectiveAppearance`), tried
-  on a real Mac (design/proposals/menu-bar-mac.html).
-- **A 1x drawing for the Mac's menu bar (2026-10-25).** The Mac's bird is
+  Done halfway, 2026-10-27: the bird is drawn white or dark from the menu
+  bar's own appearance (its status button's, `sys::tray_on_light_bar`,
+  `crake_os::macos::status_item_on_light_bar`), so on Tahoe, where the
+  wallpaper sets the bar's colour, it no longer follows dark mode alone;
+  a change shows at the tray's next redraw (within 20 s idle: the
+  traffic look). Not yet, and not needed for the colour: a template image
+  (macOS dimming it on an inactive display), which would make the bird
+  change colour when the teal call or a badge comes and goes; to try on a
+  real Mac (design/proposals/menu-bar-mac.html).
+- **A 1x drawing for the Mac's menu bar (2026-10-25; a design task,
+  through a proposal: rasterising today's drawing at 22 px gives what
+  macOS's halving already does).** The Mac's bird is
   one 44 px image (22 pt at 2x, `tray::art::MAC_SIZE`); on a 1x display
   macOS halves it. It sits on even pixels so its snapped details stay on
   whole ones, but a 16 px drawing of its own would be crisper there: an

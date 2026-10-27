@@ -128,6 +128,15 @@ fn logical(x: f64, y: f64) -> (i32, i32) {
     ((x / scale) as i32, (y / scale) as i32)
 }
 
+/// The menu bar under Crake's icon is light: the bar's own appearance, as
+/// macOS draws it over the wallpaper (until 2026-10-27 the system's dark
+/// mode, which on Tahoe can disagree with the bar); else `light_bar`.
+pub fn tray_on_light_bar(tray: &tray_icon::TrayIcon) -> bool {
+    tray.ns_status_item()
+        .and_then(|item| crake_os::macos::status_item_on_light_bar(&item))
+        .unwrap_or_else(light_bar)
+}
+
 /// The menu bar is light unless the system's appearance is dark.
 pub fn light_bar() -> bool {
     std::process::Command::new("defaults")

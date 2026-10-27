@@ -1,7 +1,7 @@
 //! The tray on Windows and macOS (tray-icon): an icon in the notification
 //! area or the menu bar, its menu the same fallback as on Linux. The bar
-//! is light or dark with the system's theme (`light_bar`), so the head is
-//! drawn white or dark to match.
+//! is light or dark (`tray_on_light_bar`: the Mac's menu bar's own
+//! appearance, Windows' theme), so the head is drawn white or dark to match.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -13,7 +13,7 @@ const DARK: [u8; 3] = [0x1f; 3];
 use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
-use super::{light_bar, tray_click, tray_icon_size};
+use super::{tray_click, tray_icon_size, tray_on_light_bar};
 use crate::Request;
 use crate::tray::{Icon, MenuTunnel, State};
 
@@ -51,7 +51,7 @@ impl Shown {
         // head looked choppy.
         let icon = self.state.icon();
         let (size, data) = drawn_at(&icon, tray_icon_size());
-        if let Some(icon) = rgba(size, data, light_bar()) {
+        if let Some(icon) = rgba(size, data, tray_on_light_bar(&self.tray)) {
             let _ = self.tray.set_icon(Some(icon));
         }
         let _ = self.tray.set_tooltip(Some(&self.state.summary));

@@ -214,6 +214,11 @@ fn logical(x: f64, y: f64) -> (i32, i32) {
     ((x / scale) as i32, (y / scale) as i32)
 }
 
+/// The taskbar under Crake's icon is light: Windows' own setting says.
+pub fn tray_on_light_bar(_tray: &tray_icon::TrayIcon) -> bool {
+    light_bar()
+}
+
 /// Windows' own setting for the taskbar: "Choose your Windows mode".
 pub fn light_bar() -> bool {
     use crake_os::windows::registry::{Root, dword};

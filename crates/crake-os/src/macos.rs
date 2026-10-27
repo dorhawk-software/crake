@@ -330,3 +330,23 @@ pub fn active_displays(max: usize) -> Vec<objc2_core_graphics::CGDirectDisplayID
     ids.truncate(usize::try_from(count).unwrap_or_default());
     ids
 }
+
+/// Whether the menu bar under a status item (the tray icon) is light: its
+/// button's appearance, which follows the bar (light over a light
+/// wallpaper on Tahoe even in dark mode), not the system's dark mode.
+/// None off the main thread, or with no button.
+#[cfg(feature = "app")]
+pub fn status_item_on_light_bar(item: &objc2_app_kit::NSStatusItem) -> Option<bool> {
+    use objc2_app_kit::{
+        NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
+    };
+    let mtm = objc2::MainThreadMarker::new()?;
+    let button = item.button(mtm)?;
+    let appearance = button.effectiveAppearance();
+    // SAFETY: AppKit's constant appearance names, set before any code of
+    // ours runs and never changed.
+    let (light, dark) = unsafe { (NSAppearanceNameAqua, NSAppearanceNameDarkAqua) };
+    let names = objc2_foundation::NSArray::from_slice(&[light, dark]);
+    let best = appearance.bestMatchFromAppearancesWithNames(&names)?;
+    Some(best.isEqualToString(light))
+}
