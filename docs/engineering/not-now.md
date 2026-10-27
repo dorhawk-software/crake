@@ -111,6 +111,18 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   `_NET_WORKAREA` cut to the monitor and believed only when it leaves room
   for some bar, else the 120 px kept before), and Traffic and the profile
   editor at their own height (`place::window_height`).
+- **Ubuntu 22.04's resolved dropping the hush's domains (CI's VM,
+  2026-10-26, once).** Right after ACME was switched off, craked made
+  crake-hush and gave it acme.internal; resolved then listed the link with
+  no domains for 20 s and more, so ACME's names went public (the package
+  test's "ACME's names are refused at once"). Not seen on 24.04 or newer,
+  nor since. craked now checks the link every 2 s and sets the domains
+  again (`refresh_hush`, a warning in its journal: "resolved dropped
+  crake-hush's domains"); the package test notes each time it happened and,
+  on a failure, prints resolved's journal. Cause unknown: likely resolved
+  249 re-reading a fresh link's settings (networkd's state, or its own
+  saved file) after craked's D-Bus calls. Next time the note shows, the
+  two journals' timings say which.
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with

@@ -94,6 +94,8 @@ hush_said() {
     echo "resolved's domains:"; resolvectl domain
     echo "craked's settings:"; busctl --system call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 Settings
     echo "port 53:"; ss -lunp | grep ':53 '
+    echo "resolved's journal:"; journalctl -b -u systemd-resolved --no-pager -o short-monotonic | tail -n 20
+    echo "craked on the hush:"; journalctl -b -u craked --no-pager -o short-monotonic | grep -i hush | tail -n 10
 }
 # Kept private, or what resolved and craked say.
 refused_or_said() { refused_at_once "$1" || { hush_said; return 1; }; }
@@ -173,6 +175,10 @@ tunnel() {
     check "the other client goes" ip link del other0
     for _ in $(seq 1 20); do resolvectl domain crake-hush 2>/dev/null | grep -q acme.internal && break; sleep 0.5; done
     check "acme.internal is kept private again" private_or_said acme.internal
+    # Ubuntu 22.04's resolved once dropped the hush's domains (2026-10-26;
+    # craked now sets them again): how often, while its cause is unknown.
+    dropped=$(journalctl -b -u craked --no-pager -o cat | grep -c "resolved dropped crake-hush" || true)
+    [ "$dropped" = 0 ] || echo "  note  resolved dropped crake-hush's domains $dropped time(s); craked set them again"
     openvpn_tunnel
     ipsec_tunnel
     check "nothing went wrong in craked's journal" sh -c '! journalctl -b -u craked --no-pager -o cat | grep -E "ERROR|panicked"'

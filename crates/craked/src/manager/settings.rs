@@ -77,15 +77,23 @@ impl Manager {
         let changed = self.hush_last.lock().unwrap().as_ref() != Some(&domains);
         // And when the link lost them: Ubuntu 22.04's resolved took a just
         // made link's domains and then dropped them (CI's VM, 2026-10-26:
-        // ACME's names went public after it was switched off).
-        if changed
-            || (!domains.is_empty()
-                && (!serving
-                    || !self
-                        .resolved
-                        .link_as_set(crate::hush::DEVICE, &domains, false)
-                        .await))
-        {
+        // ACME's names went public after it was switched off). Why is
+        // still unknown: said in the journal, for the package test to show.
+        let lost = !changed
+            && !domains.is_empty()
+            && serving
+            && !self
+                .resolved
+                .link_as_set(crate::hush::DEVICE, &domains, false)
+                .await;
+        if lost {
+            tracing::warn!(
+                "resolved dropped {}'s domains ({}); setting them again",
+                crate::hush::DEVICE,
+                domains.join(", ")
+            );
+        }
+        if changed || lost || (!domains.is_empty() && !serving) {
             self.apply_hush(domains).await;
         }
     }
