@@ -73,12 +73,17 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   launchd file fails (5: Input/output error; `BundleProgram` is
   SMAppService's to load). The app now registers it again once it stays
   out of reach (`service::revive`, then unregister and register); whether
-  plain registering reloads it is unproven until the next upgrade. Open:
-  the tunnels kept across a Homebrew upgrade (the cask could leave the
-  handover flag first, but a real uninstall would then drop sessions
-  without logging them off; the user's call). A cask change reaches only
-  upgrades *from* the version that ships it: Homebrew runs the installed
-  copy's uninstall.
+  plain registering reloads it is unproven until the next upgrade. The
+  tunnels kept across a Homebrew upgrade (decided by the user, 2026-10-27):
+  the cask's `uninstall_preflight_steps` leaves the handover flag before
+  `launchctl` stops craked, on every uninstall, since Homebrew doesn't tell
+  a cask it's upgrading; a real `brew uninstall` then leaves the sessions
+  to time out on the gateways instead of logging them off (routes, DNS
+  and pf rules still go). Telling the two apart (the brew process's own
+  command line) was offered and declined as too fragile. A cask change
+  reaches only upgrades *from* the version that ships it: Homebrew runs
+  the installed copy's uninstall, so 0.15.5 → the next is the first kept
+  upgrade; still to be seen on a real Mac then.
 - **New tunnel's protocol list, folded (asked for by the user,
   2026-10-26, on a Mac).** All nine protocols show open below "Detect
   automatically", as design/screens/new-tunnel.html has it, which the

@@ -16,6 +16,10 @@ What's new in each Crake release, for the people using it. The newest is at the 
 - **"Trust it" is remembered.** A gateway whose certificate no authority vouches for asked at every
   sign-in. Now it asks once; it asks again only if the gateway shows another certificate, and then
   says when you trusted the one before.
+- **Tunnels stay connected through a Homebrew upgrade on a Mac.** `brew upgrade` stopped Crake's
+  service the way an uninstall does, signing every tunnel out; now they come back signed in, as on
+  Linux. Homebrew runs the installed version's steps, so this starts with the upgrade after this
+  one.
 
 ### Fixed
 

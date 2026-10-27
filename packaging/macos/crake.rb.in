@@ -19,6 +19,19 @@ cask "crake" do
 
   pkg "Crake-#{version}.pkg"
 
+  # The tunnels stay signed in across an upgrade: craked, stopping, finds
+  # the handover flag (as postinstall leaves it) and hangs up without
+  # logging off; the new craked brings them back (manager/handover.rs).
+  # Homebrew doesn't tell a cask whether it's upgrading, so the flag is
+  # left on every uninstall too: a real uninstall leaves the sessions to
+  # time out on the gateways (the user's choice, 2026-10-27).
+  uninstall_preflight_steps do
+    run "/bin/sh",
+        args:         ["-c", "mkdir -p /var/run/crake && touch /var/run/crake/handover"],
+        sudo:         true,
+        must_succeed: false
+  end
+
   # craked stops first: switching every tunnel off takes its routes, DNS
   # settings and pf rules with it. Homebrew does this on upgrades too, and
   # nothing loads craked again but the app (it registers it again,
