@@ -82,38 +82,7 @@ impl TunnelDetail {
 
         let (bar, confirm) = self.forget_all(bar, rows, &display, t, cx);
 
-        let shown: Vec<AnyElement> = match self.tab {
-            Tab::Learned => learned
-                .iter()
-                .enumerate()
-                .map(|(i, r)| self.host_row(i, r, t, cx).into_any_element())
-                .collect(),
-            Tab::Pinned => pinned
-                .iter()
-                .enumerate()
-                .map(|(i, r)| self.host_row(i, r, t, cx).into_any_element())
-                .collect(),
-            Tab::Gateway => gateway
-                .iter()
-                .enumerate()
-                .map(|(i, (host, how, used))| {
-                    row_frame(t)
-                        .child(icon("crake/mark-gateway.svg", t.muted))
-                        .child(host_text(i, host.clone(), how.clone(), t, cx))
-                        .child(used_text(used.clone(), t))
-                        .child(
-                            div()
-                                .flex()
-                                .justify_end()
-                                .text_size(px(13.))
-                                .text_color(t.muted)
-                                .child("Set by the gateway"),
-                        )
-                        .into_any_element()
-                })
-                .collect(),
-        };
-        let empty = shown.is_empty();
+        let (list, empty) = self.rows_list(&learned, &pinned, &gateway, t, window, cx);
 
         // The form's hint: a name under its domain, an address in its network.
         let domain = tunnel
@@ -148,7 +117,7 @@ impl TunnelDetail {
             .px(px(28.))
             .child(bar)
             .children(confirm)
-            .children(shown)
+            .child(list)
             .when(empty, |d| {
                 d.child(
                     div()
@@ -216,6 +185,99 @@ impl TunnelDetail {
             }))
     }
 
+    /// A tab's rows: only those in view built, spacers for the rest
+    /// (hundreds of hosts took 20 ms or more a frame, every frame, until
+    /// 2026-10-27); and whether the tab has none.
+    fn rows_list(
+        &self,
+        learned: &[&HostRow],
+        pinned: &[&HostRow],
+        gateway: &[(String, String, String)],
+        t: &Theme,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> (Div, bool) {
+        let count = match self.tab {
+            Tab::Learned => learned.len(),
+            Tab::Pinned => pinned.len(),
+            Tab::Gateway => gateway.len(),
+        };
+        let body = crate::controls::scroll_handle(super::BODY, window, cx);
+        let range = self
+            .rows_top
+            .get()
+            .map_or(0..count.min(FIRST_DRAWN), |top| {
+                rows_in_view(
+                    count,
+                    -f32::from(body.offset().y) - top,
+                    f32::from(body.bounds().size.height),
+                )
+            });
+        let (first, after) = (range.start, count - range.end);
+        let shown: Vec<AnyElement> = match self.tab {
+            Tab::Learned => learned[range.clone()]
+                .iter()
+                .zip(range.clone())
+                .map(|(r, i)| self.host_row(i, r, t, cx).into_any_element())
+                .collect(),
+            Tab::Pinned => pinned[range.clone()]
+                .iter()
+                .zip(range.clone())
+                .map(|(r, i)| self.host_row(i, r, t, cx).into_any_element())
+                .collect(),
+            Tab::Gateway => gateway[range.clone()]
+                .iter()
+                .zip(range.clone())
+                .map(|((host, how, used), i)| {
+                    row_frame(t)
+                        .child(icon("crake/mark-gateway.svg", t.muted))
+                        .child(host_text(i, host.clone(), how.clone(), t, cx))
+                        .child(used_text(used.clone(), t))
+                        .child(
+                            div()
+                                .flex()
+                                .justify_end()
+                                .text_size(px(13.))
+                                .text_color(t.muted)
+                                .child("Set by the gateway"),
+                        )
+                        .into_any_element()
+                })
+                .collect(),
+        };
+        let empty = shown.is_empty();
+
+        // Where the rows start, for the next frame's; drawn again at once
+        // when the rows in view aren't the ones built.
+        let (top, built) = (self.rows_top.clone(), range);
+        let measure = canvas(
+            move |bounds, window, _| {
+                let at = f32::from(bounds.top())
+                    - f32::from(body.bounds().top())
+                    - f32::from(body.offset().y);
+                top.set(Some(at));
+                let wanted = rows_in_view(
+                    count,
+                    -f32::from(body.offset().y) - at,
+                    f32::from(body.bounds().size.height),
+                );
+                if wanted != built {
+                    window.refresh();
+                }
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .inset_0();
+        let list = div()
+            .relative()
+            .child(div().h(px(first as f32 * ROW_HEIGHT)))
+            .children(shown)
+            .child(div().h(px(after as f32 * ROW_HEIGHT)))
+            .child(measure);
+        (list, empty)
+    }
+
     pub(super) fn host_row(&self, i: usize, r: &HostRow, t: &Theme, cx: &mut Context<Self>) -> Div {
         let pinned = r.kind == "pinned";
         let (icon_path, color) = if pinned {
@@ -280,6 +342,26 @@ impl TunnelDetail {
 /// Learned, Pinned, From the gateway.
 const TABS: usize = 3;
 
+/// A host row's height: its two lines, 11 px above and below, its border.
+pub(super) const ROW_HEIGHT: f32 = 63.;
+/// Rows built beyond those in view, each way (a fast scroll's next frame
+/// still finds rows there).
+const OVERSCAN: usize = 20;
+/// Rows built before the list was first drawn: more than a screen's.
+const FIRST_DRAWN: usize = 40;
+
+/// Of `count` rows, the ones to build when the view starts `view_top`
+/// below the first row and is `view_height` tall.
+pub(super) fn rows_in_view(
+    count: usize,
+    view_top: f32,
+    view_height: f32,
+) -> std::ops::Range<usize> {
+    let first = (view_top / ROW_HEIGHT).floor().max(0.) as usize;
+    let last = ((view_top + view_height) / ROW_HEIGHT).ceil().max(0.) as usize;
+    first.saturating_sub(OVERSCAN).min(count)..last.saturating_add(OVERSCAN).min(count)
+}
+
 /// Each tab's count: learned hosts, pinned ones, the gateway's. A learned
 /// host since pinned shows in Learned too, but counts once, under Pinned
 /// (design/proposals/critique-2026-10-15, 5).
@@ -321,7 +403,14 @@ pub(super) fn host_text(
             t,
             cx,
         ))
-        .child(div().text_size(px(13.)).text_color(t.muted).child(how))
+        // One line, so every row is ROW_HEIGHT.
+        .child(
+            div()
+                .text_size(px(13.))
+                .text_color(t.muted)
+                .truncate()
+                .child(how),
+        )
 }
 
 /// When the host was last used, right-aligned to one edge; a pinned host

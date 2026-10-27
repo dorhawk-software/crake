@@ -311,3 +311,100 @@ fn the_keyboard_reaches_the_controls(cx: &mut TestAppContext) {
     press("enter", cx);
     assert!(w.next().is_some(), "Enter acts on it");
 }
+
+/// `count` learned hosts in place of the sample's.
+fn many(w: &Opened, count: usize, cx: &mut TestAppContext) {
+    let one = w
+        .rows(cx)
+        .into_iter()
+        .find(|r| r.kind == "learned")
+        .expect("a learned host in the sample");
+    w.model.update(cx, |m, _| {
+        let rows = (0..count)
+            .map(|i| HostRow {
+                name: Some(format!("host-{i}.acme.internal")),
+                target: format!("10.40.{}.{}", i / 250, i % 250),
+                ..one.clone()
+            })
+            .collect();
+        m.host_rows.insert("acme".into(), rows);
+    });
+    cx.run_until_parked();
+}
+
+/// What `id` is, drawn afresh: None when it isn't built.
+fn found(
+    w: &Opened,
+    id: impl Into<ElementId>,
+    cx: &mut TestAppContext,
+) -> Option<gpui_kit::test::ElementSnapshot> {
+    let id = id.into();
+    cx.update_window(w.window, |_, window, cx| {
+        window.render_frame(cx);
+        window.render_frame(cx);
+        window.try_find(id)
+    })
+    .unwrap()
+}
+
+/// The rows in view are counted ROW_HEIGHT apart: a row drawn any other
+/// height would leave the spacers wrong and rows out of place.
+#[gpui_kit::test]
+fn a_host_row_is_as_tall_as_counted(cx: &mut TestAppContext) {
+    let w = open(cx);
+    many(&w, 3, cx);
+    let top = |i: usize, cx: &mut TestAppContext| {
+        f32::from(found(&w, ("pin", i), cx).expect("its Pin").bounds().top())
+    };
+    assert_eq!(top(1, cx) - top(0, cx), super::hosts::ROW_HEIGHT);
+    assert_eq!(top(2, cx) - top(1, cx), super::hosts::ROW_HEIGHT);
+}
+
+/// Hundreds of hosts: only the rows in view are built (each frame took
+/// 20 ms at 500 rows, 89 ms at 2000), and scrolling down brings the last.
+#[gpui_kit::test]
+fn hundreds_of_hosts_are_built_as_they_come_into_view(cx: &mut TestAppContext) {
+    let w = open(cx);
+    many(&w, 500, cx);
+    assert!(found(&w, ("pin", 0usize), cx).is_some(), "the first");
+    assert!(
+        found(&w, ("pin", 499usize), cx).is_none(),
+        "not the last yet"
+    );
+    for _ in 0..40 {
+        cx.update_window(w.window, |_, window, cx| {
+            let down = gpui_kit::ScrollDelta::Pixels(gpui_kit::point(
+                gpui_kit::px(0.),
+                gpui_kit::px(-2000.),
+            ));
+            window.scroll("body", down, cx);
+        })
+        .unwrap();
+        cx.run_until_parked();
+    }
+    let last = found(&w, ("pin", 499usize), cx).expect("the last, scrolled to");
+    assert!(last.visible(), "and in view");
+    assert!(
+        found(&w, ("pin", 0usize), cx).is_none(),
+        "the first no longer built"
+    );
+}
+
+#[test]
+fn the_rows_in_view_and_a_margin_are_built() {
+    use super::hosts::{ROW_HEIGHT, rows_in_view};
+    // At the top, ten rows tall: those and the margin below.
+    assert_eq!(rows_in_view(500, 0., 10. * ROW_HEIGHT), 0..30);
+    // Halfway down.
+    assert_eq!(
+        rows_in_view(500, 200. * ROW_HEIGHT, 10. * ROW_HEIGHT),
+        180..230
+    );
+    // At the end, and above the list (the chart in view).
+    assert_eq!(
+        rows_in_view(500, 495. * ROW_HEIGHT, 10. * ROW_HEIGHT),
+        475..500
+    );
+    assert_eq!(rows_in_view(500, -900., 600.), 0..20);
+    assert_eq!(rows_in_view(0, 0., 600.), 0..0);
+}

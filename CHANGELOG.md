@@ -23,6 +23,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 - **Windows open between your bars.** Crake's windows are sized and centred in the room your
   system leaves beside its bars (GNOME's top bar and a bottom dock, the menu bar and Dock on a
   Mac, the taskbar), not a guess at it, so a tall window no longer runs under a dock.
+- **A tunnel with hundreds of hosts scrolls smoothly.** Its window drew every host on every
+  frame (over 20 ms each with 500 hosts); now only those in view, under 2 ms however many.
 
 ### Fixed
 

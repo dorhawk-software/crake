@@ -34,6 +34,9 @@ use crate::focus::Keys as _;
 
 pub const WIDTH: f32 = 900.;
 
+/// The scrolling body's scroll (`controls::scroll_handle`).
+const BODY: &str = "tunnel-detail-body";
+
 /// How often the hosts and the chart are asked for again while open.
 const REFRESH: Duration = Duration::from_secs(5);
 
@@ -62,6 +65,9 @@ pub struct TunnelDetail {
     /// An OpenVPN 3 tunnel's profile is locked in openvpn3 (no "Edit…"),
     /// once known.
     profile_locked: Option<bool>,
+    /// Where the host rows start in the body's scrolled content, as last
+    /// drawn: only the rows in view are built (`hosts::rows_in_view`).
+    rows_top: std::rc::Rc<std::cell::Cell<Option<f32>>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -198,13 +204,14 @@ impl Render for TunnelDetail {
             .child(policy(&tunnel, &t))
             .child(self.chart(&tunnel, marks, &traffic, &t, cx));
 
-        let body_scroll = crate::controls::scroll_handle("tunnel-detail-body", window, cx);
+        let body_scroll = crate::controls::scroll_handle(BODY, window, cx);
         let body = div()
             .id("body")
             .flex_none()
             .max_h(px(max_height - 60.))
             .overflow_y_scroll()
             .track_scroll(&body_scroll)
+            .test_support()
             .child(top)
             .child(self.hosts(&tunnel, &rows, failed, &t, window, cx));
         let body = crate::controls::over("body", body, &body_scroll, window, cx);
@@ -338,6 +345,7 @@ impl TunnelDetail {
             chart_hover: crate::timeline::Hover::default(),
             confirm_forget_all: false,
             profile_locked: None,
+            rows_top: std::rc::Rc::default(),
             _subscriptions: subscriptions,
         }
     }

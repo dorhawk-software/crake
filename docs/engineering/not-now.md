@@ -97,9 +97,11 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   header and footer fixed, the sign-in card stops at its screen's bottom
   and scrolls, New tunnel's dropdowns scroll; `panel::tests::
   many_tunnels_keep_the_panel_on_its_screen`).** Not yet: tunnel detail
-  builds every host row at once and puts "Add a host" after them (fine
-  on screen, slow and far down with hundreds of hosts: `uniform_list`,
-  and "Add a host" above the list, a design question); no window but the
+  puts "Add a host" after its rows, far down with hundreds of hosts
+  ("Add a host" above the list: a design question, through a proposal;
+  the rows themselves are built only in view since 2026-10-27,
+  `tunnel_detail::hosts::rows_in_view`: 500 rows took 20 ms a frame, 2000
+  took 89, now under 2 ms either way); no window but the
   profile editor can be resized (`is_resizable: false`); the panel's
   scrolling middle showed
   no sign it scrolls but its cut-off last row (done 2026-10-21: every
