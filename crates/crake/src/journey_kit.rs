@@ -180,8 +180,10 @@ pub(crate) fn sign_in_of(
     find(cx).unwrap()
 }
 
-/// Not signed in after all: "Don't connect" to the gateway's certificate,
-/// then the window closed, as a person would.
+/// Not signed in after all, on a gateway trusted before: asked for the
+/// password straight away (its certificate is remembered, never asked
+/// about again), then Cancel, as a person would. Until 2026-10-27 every
+/// sign-in asked about the certificate, and this step said "Don't connect".
 #[cfg(any(target_os = "linux", windows))]
 pub(crate) fn decline(
     cx: &mut TestAppContext,
@@ -189,37 +191,22 @@ pub(crate) fn decline(
     view: &Entity<signin_view::SignIn>,
 ) {
     use crate::signin::Ask;
-    until(
-        cx,
-        "asked to trust the gateway",
-        Duration::from_secs(20),
-        |cx| {
-            view.read_with(cx, |v, _| {
-            matches!(v.stage(), signin_view::Stage::Asking(p) if matches!(p.ask, Ask::TrustServer { .. }))
-        })
-        },
-    );
-    click(cx, w, "no");
-    until(cx, "sign-in ended", Duration::from_secs(20), |cx| {
-        view.read_with(cx, |v, _| {
-            matches!(v.stage(), signin_view::Stage::Failed { .. })
-        })
-    });
-    // The window grows to its card on a next frame, which the test
-    // platform never sends: the height it would have grown to.
-    cx.simulate_window_resize(
-        w,
-        gpui_kit::size(
-            gpui_kit::px(signin_view::WIDTH),
-            gpui_kit::px(FAILED_HEIGHT),
-        ),
-    );
-    click(cx, w, "close");
+    let end = Instant::now() + Duration::from_secs(20);
+    loop {
+        let stage = view.read_with(cx, |v, _| v.stage().clone());
+        if let signin_view::Stage::Asking(p) = &stage {
+            assert_eq!(p.ask, Ask::Secret, "asked before the password");
+            break;
+        }
+        assert!(
+            Instant::now() < end && !matches!(stage, signin_view::Stage::Failed { .. }),
+            "never asked for the password: {stage:?}"
+        );
+        cx.run_until_parked();
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    click(cx, w, "cancel");
 }
-
-/// A failed sign-in's window, grown to its card (more than any question's).
-#[cfg(any(target_os = "linux", windows))]
-const FAILED_HEIGHT: f32 = 700.;
 
 /// Sign in as the window asks: trust the gateway, give the password.
 pub(crate) fn sign_in(cx: &mut TestAppContext) {
