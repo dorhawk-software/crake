@@ -3,11 +3,11 @@
     "crake-base": {
       "flake": false,
       "locked": {
-        "lastModified": 1792004810,
-        "narHash": "sha256-WCKBVco0uRzhyIxCxDM8F2W5dqRyzAC3ozxO2pDLgNw=",
+        "lastModified": 1793096173,
+        "narHash": "sha256-b/ST6Sa+PmWcJ2ThpGK8NKHQHywIpDawLSQaVDvHwUg=",
         "owner": "dorhawk-software",
         "repo": "crake",
-        "rev": "6e8149c5887e40b19133cf8c3d35a54dd96a6698",
+        "rev": "d6ba57bd2c546e4f3754a878229c6301896cd434",
         "type": "github"
       },
       "original": {
