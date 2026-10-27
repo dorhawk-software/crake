@@ -46,7 +46,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      # Ubuntu's mirrors: ~20 s, but one hung 52 min on 2026-10-27; a limit
+      # fails it fast for a re-run (the job's default limit is 6 hours).
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $APT
+        timeout-minutes: 5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt, llvm-tools-preview
@@ -73,6 +76,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends mingw-w64
+        timeout-minutes: 5 # Ubuntu's mirrors can hang (see check's)
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-gnu
@@ -663,6 +667,7 @@ jobs:
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
       - name: qemu and the tools for the VM's discs
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends qemu-system-x86 qemu-utils xorriso
+        timeout-minutes: 5 # Ubuntu's mirrors can hang (see check's)
       - name: The package test in a VM, AppArmor or SELinux enforcing
         run: scripts/vm-test.sh ${{ matrix.system }}
 
