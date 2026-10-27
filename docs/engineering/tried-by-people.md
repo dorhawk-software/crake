@@ -82,6 +82,13 @@ daily.
   that works.
 - [ ] The panel under the menu bar, placed at the icon on each display.
 - [ ] The Traffic window: connections listed with their ways and rates.
+- [x] Out of the Dock but while a window of Crake's own is open
+  (2026-10-27, the user, 0.16.0 from Homebrew): in the Dock with Settings
+  or the log open, gone once they closed (`windows/dock.rs`; until then
+  it sat in the Dock all the time).
+- [x] The bird crisp on a display that isn't Retina (2026-10-27, the
+  user, 0.16.0): the 1x drawing macOS picks there (`tray::Icon::mac`;
+  until then it halved the 2x one into a blur).
 
 **Everywhere:**
 - [ ] Importing a real .ovpn file (New tunnel's Import .ovpn…).
