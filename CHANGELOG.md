@@ -31,6 +31,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ### Fixed
 
+- **Crake stays out of the Dock on a Mac.** It's a menu bar app, yet it sat in the Dock all the
+  time. Now it shows there only while one of its windows is open, such as Settings or the log.
 - **Crake trusts what your Mac trusts.** A gateway whose certificate your company's own authority
   signed asked "Crake can't vouch for…" at every sign-in on a Mac, even with that authority trusted
   in Keychain Access. Crake now hands openconnect the certificates you trust in the Keychain, as it

@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- Crake.app (scripts/build-macos-pkg.sh fills in the version). A menu
-     bar app: no Dock icon (LSUIElement), its windows open from the bird. -->
+     bar app: no Dock icon (LSUIElement), its windows open from the bird;
+     in the Dock while one is open (crates/crake/src/windows/dock.rs). -->
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>

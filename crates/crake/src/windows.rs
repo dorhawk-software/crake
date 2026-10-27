@@ -3,6 +3,8 @@
 
 use super::*;
 
+pub(crate) mod dock;
+
 /// A window refits to its content only when it's off by more than this
 /// (half a pixel: rounding is not a change).
 pub const FIT_SLACK: f32 = 0.5;
@@ -213,10 +215,12 @@ fn refresh_browsers(cx: &mut App) {
 
 /// macOS: Crake is a menu bar app (LSUIElement) and its panel doesn't
 /// activate it, so a window it opens would land behind the app in front.
-/// Make Crake the active app first, as menu bar apps do. (GPUI's
-/// `activate_window` only orders the window front.)
+/// Make Crake the active app first, as menu bar apps do, in the Dock while
+/// the window is open (`dock`). (GPUI's `activate_window` only orders the
+/// window front.)
 pub(super) fn to_front(cx: &mut App) {
     cx.global_mut::<Shell>().activations += 1;
+    dock::window_opens(cx);
     if cfg!(target_os = "macos") {
         cx.activate(true);
     }
@@ -724,5 +728,49 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// On a Mac, Crake is in the Dock while a window of its own is open,
+    /// and only then: not for the panel, and out again once the last
+    /// window closes, whichever closes last.
+    #[gpui_kit::test]
+    fn in_the_dock_only_while_a_window_is_open(cx: &mut TestAppContext) {
+        start_app(cx);
+        let in_dock = |cx: &mut TestAppContext| cx.update(|cx| cx.global::<dock::InDock>().0);
+        assert!(!in_dock(cx), "a menu bar app starts out of the Dock");
+        cx.update(|cx| {
+            cx.set_global(crate::prefs::Prefs {
+                scratch: true,
+                ..Default::default()
+            });
+            open_panel(None, cx);
+        });
+        cx.run_until_parked();
+        assert!(!in_dock(cx), "the panel alone keeps it out");
+        cx.update(open_settings);
+        cx.update(open_log);
+        cx.run_until_parked();
+        assert!(in_dock(cx), "Settings brings it into the Dock");
+        let close = |cx: &mut TestAppContext, handle: Option<AnyWindowHandle>| {
+            handle
+                .expect("the window is open")
+                .update(cx, |_, window, _| window.remove_window())
+                .unwrap();
+            cx.run_until_parked();
+        };
+        let settings = cx.update(|cx| cx.global::<Shell>().settings);
+        close(cx, settings);
+        assert!(in_dock(cx), "the log is still open");
+        // The panel opened again over the log (Settings took the focus it
+        // closes without): the log closing leaves only the panel.
+        cx.update(|cx| open_panel(None, cx));
+        cx.run_until_parked();
+        let log = cx.update(|cx| cx.global::<Shell>().log);
+        close(cx, log);
+        assert!(
+            cx.update(|cx| cx.global::<Shell>().panel.is_some()),
+            "the panel is open"
+        );
+        assert!(!in_dock(cx), "only the panel is left");
     }
 }

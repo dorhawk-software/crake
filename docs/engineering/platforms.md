@@ -266,7 +266,9 @@ pop-up window there is a non-activating NSPanel above other windows on
 every Space. Not yet seen on a real Mac.
 The installer (2026-10-13): `scripts/build-macos-pkg.sh` makes
 target/macos/Crake-<version>.pkg on a Mac: Crake.app in /Applications
-(packaging/macos/Info.plist: a menu bar app, LSUIElement; the icon
+(packaging/macos/Info.plist: a menu bar app, LSUIElement, which GPUI
+overrides once launched: the app keeps itself out of the Dock but while
+a window of its own is open, `windows/dock.rs`, 2026-10-27; the icon
 `assets/icons/app/crake.icns`, from `scripts/make-icons.sh` at 824 of
 1024 points as macOS' icons are), the hook and the uninstaller
 (`sudo /usr/local/libexec/crake/uninstall`) in /usr/local/libexec/crake.

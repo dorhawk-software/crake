@@ -393,7 +393,7 @@ fn main() {
             sys::keep_root_cursor();
         }
     }
-    gpui_kit::application()
+    windows::dock::application()
         .with_assets(Assets)
         .run(move |cx: &mut App| {
             gpui_kit::init(cx);
@@ -633,11 +633,7 @@ pub(crate) fn start(cx: &mut App, setup: Setup) -> bool {
         Some(connect) => connect(updates),
         None => async_channel::unbounded().0,
     };
-    let tray = if tray {
-        tray::start(requests.clone())
-    } else {
-        None
-    };
+    let tray = tray.then(|| tray::start(requests.clone())).flatten();
     cx.set_global(Shell {
         model,
         commands,
@@ -670,6 +666,7 @@ pub(crate) fn start(cx: &mut App, setup: Setup) -> bool {
     let model = cx.global::<Shell>().model.clone();
     cx.observe(&model, |_, cx| refresh_tray(cx)).detach();
     focus::quit_key(cx);
+    windows::dock::follow_windows(cx);
     if openvpn3 {
         watch_openvpn3(cx);
         openvpn::move_from_openvpn3(cx);
