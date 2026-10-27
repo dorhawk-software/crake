@@ -393,19 +393,7 @@ impl SignIn {
             m.signing_in(&tunnel, true, false);
             cx.notify();
         });
-        let ended = model.clone();
-        cx.on_release(move |this: &mut Self, cx| {
-            if this.handed_over {
-                return;
-            }
-            ended.update(cx, |m, cx| {
-                if m.signing_in.contains(&tunnel) {
-                    m.signing_in(&tunnel, false, false);
-                    cx.notify();
-                }
-            });
-        })
-        .detach();
+        cx.on_release(|this: &mut Self, cx| this.ended(cx)).detach();
         let subscriptions = vec![
             cx.subscribe_in(&field, window, |this, _, event: &InputEvent, _, cx| {
                 if let InputEvent::PressEnter { .. } = event {
@@ -651,7 +639,25 @@ impl SignIn {
 
     fn cancel(&mut self, cx: &mut Context<Self>) {
         let _ = self.replies.send_blocking(Reply::Cancel);
+        // Not connecting from now on, whenever the view itself goes
+        // (whoever still holds it: the journey kept Globex "connecting").
+        self.ended(cx);
         cx.emit(Close);
+    }
+
+    /// The window's sign-in is over: the tunnel no longer shows as
+    /// connecting, unless its session was handed over.
+    fn ended(&self, cx: &mut gpui_kit::App) {
+        if self.handed_over {
+            return;
+        }
+        let tunnel = self.spec.tunnel.clone();
+        self.model.update(cx, |m, cx| {
+            if m.signing_in.contains(&tunnel) {
+                m.signing_in(&tunnel, false, false);
+                cx.notify();
+            }
+        });
     }
 
     /// The tunnel's Edit, where its key is changed; this window goes.
