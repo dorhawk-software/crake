@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.16.0 (2026-10-27)
+
 ### Better
 
 - **"Trust it" is remembered.** A gateway whose certificate no authority vouches for asked at every
