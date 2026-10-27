@@ -13,7 +13,7 @@ const DARK: [u8; 3] = [0x1f; 3];
 use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
-use super::{tray_click, tray_icon_size, tray_on_light_bar};
+use super::{set_tray_image, tray_click, tray_icon_size, tray_on_light_bar};
 use crate::Request;
 use crate::tray::{Icon, MenuTunnel, State};
 
@@ -50,9 +50,17 @@ impl Shown {
         // Drawn at the size the bar shows it: shrunk by the system, the
         // head looked choppy.
         let icon = self.state.icon();
-        let (size, data) = drawn_at(&icon, tray_icon_size());
-        if let Some(icon) = rgba(size, data, tray_on_light_bar(&self.tray)) {
-            let _ = self.tray.set_icon(Some(icon));
+        let light = tray_on_light_bar(&self.tray);
+        let drawings: Vec<_> = icon
+            .mac
+            .iter()
+            .map(|(size, data)| (*size, rgba(data, light)))
+            .collect();
+        if !set_tray_image(&self.tray, &drawings) {
+            let (size, data) = drawn_at(&icon, tray_icon_size());
+            if let Ok(icon) = tray_icon::Icon::from_rgba(rgba(data, light), size, size) {
+                let _ = self.tray.set_icon(Some(icon));
+            }
         }
         let _ = self.tray.set_tooltip(Some(&self.state.summary));
         let now = (self.state.summary.clone(), self.state.tunnels.clone());
@@ -148,11 +156,11 @@ fn drawn_at(icon: &Icon, size: u32) -> (u32, &[u8]) {
         .map_or((icon.width, &icon.data), |(s, d)| (*s, d))
 }
 
-/// ARGB (the tray art's order) as the RGBA tray-icon takes; for a light
-/// bar, the white head drawn dark (the coloured marks as they are).
-fn rgba(size: u32, argb: &[u8], light: bool) -> Option<tray_icon::Icon> {
-    let data = argb
-        .as_chunks::<ARGB>()
+/// ARGB (the tray art's order) as RGBA, what tray-icon and macOS take;
+/// for a light bar, the white head drawn dark (the coloured marks as they
+/// are).
+fn rgba(argb: &[u8], light: bool) -> Vec<u8> {
+    argb.as_chunks::<ARGB>()
         .0
         .iter()
         .flat_map(|&[a, r, g, b]| {
@@ -163,6 +171,5 @@ fn rgba(size: u32, argb: &[u8], light: bool) -> Option<tray_icon::Icon> {
             };
             [r, g, b, a]
         })
-        .collect();
-    tray_icon::Icon::from_rgba(data, size, size).ok()
+        .collect()
 }

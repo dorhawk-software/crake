@@ -144,6 +144,9 @@ pub struct Icon {
     pub data: Vec<u8>,
     /// (size, ARGB) at each of `SMALL`.
     pub small: Vec<(u32, Vec<u8>)>,
+    /// The Mac's menu bar's own drawings, (size, ARGB) at 1x and 2x
+    /// (`art::MAC_POINTS`, `art::MAC_SIZE`); none elsewhere.
+    pub mac: Vec<(u32, Vec<u8>)>,
 }
 
 /// The largest image sent to the tray.
@@ -213,6 +216,7 @@ fn render(svg: &str) -> Icon {
         height: SIZE,
         data: argb(&tree, SIZE),
         small: SMALL.iter().map(|s| (*s, argb(&tree, *s))).collect(),
+        mac: Vec::new(),
     }
 }
 

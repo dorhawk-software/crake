@@ -137,10 +137,20 @@ const MAC: Look = Look {
     round_eye: Some(2.1),
     asleep: 0.7,
 };
+/// The Mac's drawing on a 1x display (16 px): a round eye can't be drawn
+/// in so few pixels (it came out a grey blob), so the square one on whole
+/// pixels, as every other bar's 16 px drawing has.
+const MAC_1X: Look = Look {
+    round_eye: None,
+    asleep: MAC.asleep,
+};
 /// The Mac's image: tray-icon shows N pixels as N points, at most the bar's
 /// 22, so 44 px is 22 pt at 2 px a point (a 36 px bird was stretched to
 /// 44 px, larger and softer than its neighbours).
 pub const MAC_SIZE: u32 = 44;
+/// The menu bar's slot in points: `MAC_SIZE` at 2x, and the size of the
+/// 1x drawing.
+pub const MAC_POINTS: u32 = MAC_SIZE / 2;
 /// The bird's square in it: the 32 px drawing as it is (31 px of ink awake,
 /// from 1Password's top), and where it sits, on even pixels so every snapped
 /// detail stays on whole ones at 2x and at 1x too (a 1x display halves the
@@ -421,25 +431,25 @@ pub(super) fn badge_at(
         String::new()
     };
     if warning {
-        let triangle = format!(
-            "M{x:.2} {:.2}L{:.2} {:.2}H{:.2}Z",
-            y - r,
-            x + r,
-            if place.snapped {
-                (y + r * 0.9).round()
-            } else {
-                y + r * 0.9
-            },
-            x - r
-        );
+        let base = if place.snapped {
+            (y + r * 0.9).round()
+        } else {
+            y + r * 0.9
+        };
+        let triangle = format!("M{x:.2} {:.2}L{:.2} {base:.2}H{:.2}Z", y - r, x + r, x - r);
         (
             format!(
                 r##"<path d="{triangle}" fill="#000" stroke="#000" stroke-width="{:.2}" stroke-linejoin="round"{grow}/>"##,
                 2. * gap
             ),
-            format!(
-                r##"<path d="{triangle}" fill="{colour}" stroke="{colour}" stroke-width="{s:.2}" stroke-linejoin="round"{grow}/>"##
-            ),
+            if place.snapped {
+                let outline = outset_triangle((x, y - r), r, base, s / 2.);
+                format!(r##"<path d="{outline}" fill="{colour}"{grow}/>"##)
+            } else {
+                format!(
+                    r##"<path d="{triangle}" fill="{colour}" stroke="{colour}" stroke-width="{s:.2}" stroke-linejoin="round"{grow}/>"##
+                )
+            },
             mark,
         )
     } else {
@@ -455,6 +465,29 @@ pub(super) fn badge_at(
             mark,
         )
     }
+}
+
+/// Half a pixel: where a snapped edge rounds to.
+const HALF_PIXEL: f32 = 0.5;
+
+/// The warning triangle (apex `top`, reaching `r` either side at `base`)
+/// grown by `by` on every side, its base on a whole pixel: what its stroke
+/// drew, filled instead. The stroke's edge spilled into the row under it
+/// (half a pixel where it ended mid-pixel, and tiny-skia's eighth where it
+/// didn't): a faint line under the triangle at 16 px, found on the Mac's
+/// 1x bird (2026-10-27).
+fn outset_triangle((x, top): P, r: f32, base: f32, by: f32) -> String {
+    let height = base - top;
+    let slant = r.hypot(height) / r;
+    // The nearest whole pixel, ties kept inside (a half pixel of stroke
+    // would otherwise grow it a row).
+    let (top, base) = (top - by * slant, (base + by - HALF_PIXEL).ceil());
+    let half = (base - top) * r / height;
+    format!(
+        "M{x:.2} {top:.2}L{:.2} {base:.2}H{:.2}Z",
+        x + half,
+        x - half
+    )
 }
 
 /// The parts of the bird as SVG at `n` px: what goes in `<defs>`, the ink
@@ -491,8 +524,20 @@ impl Art {
     /// The bird for the Mac's menu bar, white: `MAC_SIZE` px, the bird
     /// drawn the Mac's way (`MAC`) in its square inside.
     pub fn svg_mac(&self) -> String {
-        let Parts { defs, ink, over } = self.parts_look(MAC_BIRD, "#ffffff", BADGE, MAC);
-        let (n, (x, y)) = (MAC_SIZE, MAC_AT);
+        self.svg_mac_over(1, MAC)
+    }
+
+    /// The same for a 1x display: half the size, drawn for its own pixels
+    /// (the eye, the cuts and the badge snapped to them) rather than the
+    /// 2x image halved by macOS, which blurred them.
+    pub fn svg_mac_1x(&self) -> String {
+        self.svg_mac_over(2, MAC_1X)
+    }
+
+    /// The Mac's image at `MAC_SIZE / down` px, drawn as `look` says.
+    fn svg_mac_over(&self, down: u32, look: Look) -> String {
+        let Parts { defs, ink, over } = self.parts_look(MAC_BIRD / down, "#ffffff", BADGE, look);
+        let (n, (x, y)) = (MAC_SIZE / down, (MAC_AT.0 / down, MAC_AT.1 / down));
         format!(
             r##"<svg xmlns="http://www.w3.org/2000/svg" width="{n}" height="{n}" viewBox="0 0 {n} {n}"><defs>{defs}</defs><g transform="translate({x} {y})">{ink}{over}</g></svg>"##
         )
@@ -607,12 +652,16 @@ impl Art {
             small: SMALL
                 .iter()
                 .map(|&n| (n, raster(&self.svg_at(n), n)))
-                // The Mac's menu bar has its own drawing (`MAC`).
-                .chain(
-                    cfg!(target_os = "macos")
-                        .then(|| (MAC_SIZE, raster(&self.svg_mac(), MAC_SIZE))),
-                )
                 .collect(),
+            // The Mac's menu bar has drawings of its own (`MAC`, `MAC_1X`).
+            mac: if cfg!(target_os = "macos") {
+                vec![
+                    (MAC_POINTS, raster(&self.svg_mac_1x(), MAC_POINTS)),
+                    (MAC_SIZE, raster(&self.svg_mac(), MAC_SIZE)),
+                ]
+            } else {
+                Vec::new()
+            },
         }
     }
 }

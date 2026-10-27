@@ -25,6 +25,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
   Mac, the taskbar), not a guess at it, so a tall window no longer runs under a dock.
 - **A tunnel with hundreds of hosts scrolls smoothly.** Its window drew every host on every
   frame (over 20 ms each with 500 hosts); now only those in view, under 2 ms however many.
+- **The bird is crisp on a Mac display that isn't Retina.** The menu bar halved the drawing made
+  for Retina, and the bird's eye came out a grey smudge. It now has a drawing for those pixels too.
+  The warning's triangle also ends cleanly in every tray, without a faint line under it.
 
 ### Fixed
 

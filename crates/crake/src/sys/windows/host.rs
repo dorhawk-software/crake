@@ -219,6 +219,12 @@ pub fn tray_on_light_bar(_tray: &tray_icon::TrayIcon) -> bool {
     light_bar()
 }
 
+/// The Mac sets its menu bar's drawings itself (`tray::Icon::mac`, none
+/// here); the notification area takes tray-icon's one image.
+pub fn set_tray_image(_tray: &tray_icon::TrayIcon, _drawings: &[(u32, Vec<u8>)]) -> bool {
+    false
+}
+
 /// Windows' own setting for the taskbar: "Choose your Windows mode".
 pub fn light_bar() -> bool {
     use crake_os::windows::registry::{Root, dword};

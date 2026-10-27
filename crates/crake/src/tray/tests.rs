@@ -277,6 +277,76 @@ fn the_macs_bird_has_its_eye_and_dims_less_asleep() {
 }
 
 #[test]
+fn the_macs_1x_bird_is_drawn_for_its_pixels() {
+    // A 1x display gets a drawing of its own, not the 2x one halved: the
+    // eye a square hole on whole pixels (2 px, at 9, 5), solid around it,
+    // where the halved round eye was a grey smudge.
+    let n = art::MAC_POINTS as usize;
+    let one_x = raster(&rest(Shape::Listening).svg_mac_1x(), art::MAC_POINTS);
+    let at = |x: usize, y: usize| one_x[(y * n + x) * 4];
+    for (x, y) in [(9, 5), (10, 5), (9, 6), (10, 6)] {
+        assert_eq!(at(x, y), 0, "the eye is see-through at {x}, {y}");
+    }
+    for (x, y) in [(8, 5), (11, 5), (8, 6), (11, 6), (9, 7), (10, 7)] {
+        assert_eq!(at(x, y), 255, "solid next to the eye at {x}, {y}");
+    }
+    // The Mac's menu bar is handed both; other bars, none of them.
+    let sizes: Vec<u32> = rest(Shape::Routed)
+        .icon()
+        .mac
+        .iter()
+        .map(|(n, _)| *n)
+        .collect();
+    if cfg!(target_os = "macos") {
+        assert_eq!(sizes, [art::MAC_POINTS, art::MAC_SIZE]);
+    } else {
+        assert!(sizes.is_empty());
+    }
+}
+
+#[test]
+fn the_warning_triangle_ends_on_a_whole_row() {
+    // Its lowest row is solid amber: no faint row under it (the stroke's
+    // edge spilled into one, a line under the triangle at 16 px).
+    let amber = u32::from_str_radix(&art::WARNING[1..], 16)
+        .unwrap()
+        .to_be_bytes();
+    let drawings = SMALL
+        .iter()
+        .map(|&n| (n, raster(&rest(Shape::Warning).svg_at(n), n)))
+        .chain([
+            (
+                art::MAC_SIZE,
+                raster(&rest(Shape::Warning).svg_mac(), art::MAC_SIZE),
+            ),
+            (
+                art::MAC_POINTS,
+                raster(&rest(Shape::Warning).svg_mac_1x(), art::MAC_POINTS),
+            ),
+        ]);
+    for (n, data) in drawings {
+        let n = n as usize;
+        let is_amber = |p: &[u8]| p[0] > 0 && p[1..] == amber[1..];
+        let rows: Vec<Vec<u8>> = (0..n)
+            .map(|y| {
+                (0..n)
+                    .map(|x| &data[(y * n + x) * 4..][..4])
+                    .filter(|p| is_amber(p))
+                    .map(|p| p[0])
+                    .collect()
+            })
+            .filter(|row: &Vec<u8>| !row.is_empty())
+            .collect();
+        let last = rows.last().expect("an amber triangle");
+        assert_eq!(
+            last.iter().max(),
+            Some(&255),
+            "at {n} px the triangle's last row is faint: {last:?}"
+        );
+    }
+}
+
+#[test]
 fn a_light_bar_leaves_no_dark_bar_mark() {
     // Windows and the Mac recolour the drawn image pixel by pixel: the
     // anti-aliased edges of the call marks and the badges too, not only
@@ -292,6 +362,10 @@ fn a_light_bar_leaves_no_dark_bar_mark() {
         for (n, data) in [
             (32, raster(&rest(shape).svg_at(32), 32)),
             (art::MAC_SIZE, raster(&rest(shape).svg_mac(), art::MAC_SIZE)),
+            (
+                art::MAC_POINTS,
+                raster(&rest(shape).svg_mac_1x(), art::MAC_POINTS),
+            ),
         ] {
             for p in data.chunks(4).filter(|p| p[0] > 0) {
                 let light = light_bar_pixel([p[1], p[2], p[3]], [0x1f, 0x1f, 0x1f]);

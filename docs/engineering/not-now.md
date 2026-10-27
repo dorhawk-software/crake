@@ -310,12 +310,6 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   traffic look). Not yet, and not needed for the colour: a template image
   (macOS dimming it on an inactive display), which would make the bird
   change colour when the teal call or a badge comes and goes; to try on a
-  real Mac (design/proposals/menu-bar-mac.html).
-- **A 1x drawing for the Mac's menu bar (2026-10-25; a design task,
-  through a proposal: rasterising today's drawing at 22 px gives what
-  macOS's halving already does).** The Mac's bird is
-  one 44 px image (22 pt at 2x, `tray::art::MAC_SIZE`); on a 1x display
-  macOS halves it. It sits on even pixels so its snapped details stay on
-  whole ones, but a 16 px drawing of its own would be crisper there: an
-  NSImage with both, set through `TrayIcon::ns_status_item` (tray-icon
-  makes one image of N pixels at N points). With the template item above.
+  real Mac (design/proposals/menu-bar-mac.html). Crake sets the menu
+  bar's NSImage itself since 2026-10-27 (`sys::set_tray_image`: a 1x and
+  a 2x drawing, `tray::Icon::mac`), so a template would be set there.

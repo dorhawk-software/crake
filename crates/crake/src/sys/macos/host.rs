@@ -137,6 +137,58 @@ pub fn tray_on_light_bar(tray: &tray_icon::TrayIcon) -> bool {
         .unwrap_or_else(light_bar)
 }
 
+/// The menu bar's image from the Mac's drawings (RGBA, `tray::Icon::mac`):
+/// one image of `MAC_POINTS` points holding both, so macOS shows the one
+/// drawn for the display's pixels. tray-icon takes a single image, and a
+/// 1x display halved the 2x one: its eye a grey smudge, its badge soft
+/// (until 2026-10-27).
+pub fn set_tray_image(tray: &tray_icon::TrayIcon, drawings: &[(u32, Vec<u8>)]) -> bool {
+    let Some(mtm) = objc2::MainThreadMarker::new() else {
+        return false;
+    };
+    let Some(button) = tray.ns_status_item().and_then(|item| item.button(mtm)) else {
+        return false;
+    };
+    let Some(image) = menu_bar_image(drawings) else {
+        return false;
+    };
+    button.setImage(Some(&image));
+    true
+}
+
+/// One image of `MAC_POINTS` points with a representation per drawing.
+fn menu_bar_image(
+    drawings: &[(u32, Vec<u8>)],
+) -> Option<objc2::rc::Retained<objc2_app_kit::NSImage>> {
+    use objc2::AnyThread;
+    use objc2_app_kit::{NSBitmapImageRep, NSImage};
+    use objc2_foundation::{NSData, NSSize};
+    if drawings.is_empty() {
+        return None;
+    }
+    let points = f64::from(crate::tray::art::MAC_POINTS);
+    let size = NSSize::new(points, points);
+    let image = NSImage::initWithSize(NSImage::alloc(), size);
+    for (n, rgba) in drawings {
+        let rep = NSBitmapImageRep::imageRepWithData(&NSData::from_vec(png(*n, rgba)?))?;
+        rep.setSize(size);
+        image.addRepresentation(&rep);
+    }
+    Some(image)
+}
+
+/// A square RGBA image as PNG, which AppKit reads into an image.
+fn png(size: u32, rgba: &[u8]) -> Option<Vec<u8>> {
+    let mut out = Vec::new();
+    let mut encoder = png::Encoder::new(&mut out, size, size);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header().ok()?;
+    writer.write_image_data(rgba).ok()?;
+    writer.finish().ok()?;
+    Some(out)
+}
+
 /// The menu bar is light unless the system's appearance is dark.
 pub fn light_bar() -> bool {
     std::process::Command::new("defaults")
@@ -159,4 +211,23 @@ pub fn tray_icon_size() -> u32 {
 /// a plain resize keeps its top.
 pub fn resize_upward(_window: &gpui_kit::Window, _height: f32) -> bool {
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::tray::art::{MAC_POINTS, MAC_SIZE};
+
+    #[test]
+    fn the_menu_bar_image_holds_the_1x_and_2x_drawings() {
+        // macOS picks the representation for the display's pixels: both
+        // are there, each the menu bar's 22 points, at 1 and 2 px a point.
+        let drawings = crate::tray::Art::default().icon().mac;
+        let image = super::menu_bar_image(&drawings).expect("an image");
+        assert_eq!(image.size().width, f64::from(MAC_POINTS));
+        let reps = image.representations();
+        let pixels: Vec<isize> = reps.iter().map(|r| r.pixelsWide()).collect();
+        assert_eq!(pixels, [MAC_POINTS as isize, MAC_SIZE as isize]);
+        assert!(reps.iter().all(|r| r.size().width == f64::from(MAC_POINTS)));
+        assert!(super::menu_bar_image(&[]).is_none(), "nothing to show");
+    }
 }
