@@ -70,9 +70,16 @@ daily.
 - [ ] Native Wayland (`CRAKE_WAYLAND=1`).
 
 **macOS** (beyond what the colleague has tried):
-- [ ] The service approved by the user, craked running under launchd from
-  Crake.app, and an upgrade restarting it with tunnels kept (0.7; also in
-  Not now). 2026-10-26, the user, 0.15.1 → 0.15.2 by `brew upgrade`:
+- [x] The service approved by the user, craked running under launchd from
+  Crake.app, and running again after an upgrade (2026-10-27, the user,
+  0.15.4 → 0.16.0 by `brew upgrade`: craked's log says the tunnel switched off at
+  11:32:09 UTC as Homebrew stopped it, the new craked was up 23 s later
+  with no "isn't running", and it was on again at 11:33:06).
+- [ ] An upgrade keeping the tunnels up: 0.16.0's change, so first the
+  upgrade from 0.16.0 (Homebrew runs the installed version's steps; the
+  one above, from 0.15.4, still switched them off, as expected).
+- History of the service item (0.7; also in Not now). 2026-10-26, the
+  user, 0.15.1 → 0.15.2 by `brew upgrade`:
   approved and running before; after it craked wasn't running at all
   ("Crake's service isn't running.") and the tunnels were off. Homebrew's
   cask takes the daemon out of launchd (`launchctl remove`) on upgrades
