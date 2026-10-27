@@ -17,6 +17,25 @@ pub fn monitors() -> Vec<Rect> {
     displays().into_iter().map(|(r, _)| r).collect()
 }
 
+/// The main display's work area (less the menu bar and the Dock), in the
+/// same points as `monitors`: AppKit's visible frame, which counts up from
+/// the bottom of the menu bar's screen, turned to count down from its top.
+pub fn work_area() -> Option<Rect> {
+    if cfg!(test) {
+        return None;
+    }
+    let mtm = objc2::MainThreadMarker::new()?;
+    let screens = objc2_app_kit::NSScreen::screens(mtm);
+    let main = screens.iter().next()?;
+    let (frame, visible) = (main.frame(), main.visibleFrame());
+    Some(Rect {
+        x: visible.origin.x as f32,
+        y: (frame.origin.y + frame.size.height - (visible.origin.y + visible.size.height)) as f32,
+        w: visible.size.width as f32,
+        h: visible.size.height as f32,
+    })
+}
+
 /// Each active display, the main one first, with its scale (pixels per
 /// point).
 fn displays() -> Vec<(Rect, f64)> {

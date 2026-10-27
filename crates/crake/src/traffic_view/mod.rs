@@ -111,7 +111,7 @@ impl Traffic {
             tab: Tab::Now,
             flows: Flows::default(),
             settled: false,
-            max_height: crate::place::max_window_height_or(HEIGHT),
+            max_height: crate::place::window_height(HEIGHT),
             // Focused as it opens: the keyboard reaches it (Tab, Escape).
             focus: {
                 let focus = cx.focus_handle();

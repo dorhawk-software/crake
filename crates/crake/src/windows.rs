@@ -451,9 +451,9 @@ pub(super) fn open_sign_in(tunnel: client::Tunnel, cx: &mut App) {
 /// A window of this size in the middle of the primary monitor. (GPUI's own
 /// centering uses one screen spanning all monitors under X11.)
 pub(super) fn centered(w: f32, h: f32, cx: &App) -> Bounds<gpui_kit::Pixels> {
-    match place::monitors().first() {
-        Some(m) => Bounds::new(
-            gpui_kit::point(px(m.x + (m.w - w) / 2.), px(m.y + ((m.h - h) / 2.).max(0.))),
+    match place::window_area() {
+        Some(a) => Bounds::new(
+            gpui_kit::point(px(a.x + (a.w - w) / 2.), px(a.y + ((a.h - h) / 2.).max(0.))),
             size(px(w), px(h)),
         ),
         None => Bounds::centered(None, size(px(w), px(h)), cx),
@@ -524,7 +524,7 @@ pub(super) fn open_traffic(cx: &mut App) {
     }
     let shell = cx.global::<Shell>();
     let (model, requests) = (shell.model.clone(), shell.requests.clone());
-    let height = place::max_window_height_or(traffic_view::HEIGHT);
+    let height = place::window_height(traffic_view::HEIGHT);
     let bounds = centered(traffic_view::WIDTH, height, cx);
     let opened = cx.open_window(
         WindowOptions {
@@ -593,7 +593,7 @@ pub(super) fn open_profile_editor(tunnel: String, cx: &mut App) {
     else {
         return;
     };
-    let height = place::max_window_height_or(profile_editor::HEIGHT);
+    let height = place::window_height(profile_editor::HEIGHT);
     let bounds = centered(profile_editor::WIDTH, height, cx);
     let opened = cx.open_window(
         WindowOptions {

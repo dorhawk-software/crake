@@ -17,8 +17,8 @@ const MENU_BAR: f32 = 24.;
 const BAR_SIZES: std::ops::RangeInclusive<f32> = 16. ..=128.;
 const TRAY_FROM_RIGHT: f32 = 200.;
 
-/// A window's tallest: its screen less room for the bars (or, with no
-/// screen known, a laptop's).
+/// A window's tallest: the room windows have (`window_area`), or, with no
+/// screen known, a laptop's.
 pub fn max_window_height() -> f32 {
     const UNKNOWN_SCREEN: f32 = 1000.;
     max_window_height_or(UNKNOWN_SCREEN)
@@ -26,8 +26,55 @@ pub fn max_window_height() -> f32 {
 
 /// The same, with `fallback` when no screen is known.
 pub fn max_window_height_or(fallback: f32) -> f32 {
-    const SCREEN_ROOM: f32 = 120.;
-    monitors().first().map_or(fallback, |m| m.h - SCREEN_ROOM)
+    window_area().map_or(fallback, |a| a.h)
+}
+
+/// A window `wanted` tall, or as tall as its screen allows (Traffic and the
+/// profile editor opened as tall as the screen until 2026-10-27).
+pub fn window_height(wanted: f32) -> f32 {
+    max_window_height_or(wanted).min(wanted)
+}
+
+/// Where windows open: the primary monitor's work area (the screen less
+/// the bars its system reports: GNOME's top bar and Dash to Panel, the
+/// menu bar and Dock, the taskbar), WORK_MARGIN kept from them.
+pub fn window_area() -> Option<Rect> {
+    Some(area(*monitors().first()?, crate::sys::work_area()))
+}
+
+/// Kept between a window and the bars, above and below together.
+const WORK_MARGIN: f32 = 24.;
+/// Taken off a screen whose work area isn't known or believable (until
+/// 2026-10-27, every screen's): room for a top bar and a bottom one.
+const SCREEN_ROOM: f32 = 120.;
+
+/// The room windows have on `monitor`, given the work area its system
+/// reported. A work area outside the monitor, under half of it, or the
+/// whole of it isn't believed: X11's spans every monitor (cut to this one
+/// here, it may miss a bar on another), and a bar that hides still counts
+/// on the safe side.
+fn area(monitor: Rect, work: Option<Rect>) -> Rect {
+    let believable = |w: &Rect| {
+        w.x >= monitor.x
+            && w.y >= monitor.y
+            && w.x + w.w <= monitor.x + monitor.w
+            && w.y + w.h <= monitor.y + monitor.h
+            && w.w >= monitor.w / 2.
+            && w.h >= monitor.h / 2.
+            && w.h < monitor.h
+    };
+    match work.filter(believable) {
+        Some(w) => Rect {
+            y: w.y + WORK_MARGIN / 2.,
+            h: w.h - WORK_MARGIN,
+            ..w
+        },
+        None => Rect {
+            y: monitor.y + SCREEN_ROOM / 2.,
+            h: monitor.h - SCREEN_ROOM,
+            ..monitor
+        },
+    }
 }
 
 /// A rectangle in screen pixels.
@@ -222,6 +269,51 @@ pub fn top_keeping_bottom(top: i32, height: u32, new_height: u32) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    const HD: super::Rect = super::Rect {
+        x: 0.,
+        y: 0.,
+        w: 1920.,
+        h: 1080.,
+    };
+
+    /// Windows open inside the bars the system reports: below GNOME's top
+    /// bar, above Dash to Panel at the bottom.
+    #[test]
+    fn windows_open_between_the_bars() {
+        let work = super::Rect {
+            y: 32.,
+            h: 1080. - 32. - 48.,
+            ..HD
+        };
+        let a = super::area(HD, Some(work));
+        assert_eq!(a.y, 32. + super::WORK_MARGIN / 2.);
+        assert_eq!(a.y + a.h, 1080. - 48. - super::WORK_MARGIN / 2.);
+        // A Dock on the left: centred in what's left of the screen.
+        let docked = super::Rect {
+            x: 80.,
+            w: 1840.,
+            ..work
+        };
+        assert_eq!(super::area(HD, Some(docked)).x, 80.);
+    }
+
+    /// A work area that can't be this screen's (X11's spans all of them),
+    /// or that reports no bar at all: the room kept before.
+    #[test]
+    fn a_work_area_not_believed_keeps_room_for_bars() {
+        let before = super::area(HD, None);
+        assert_eq!(before.h, 1080. - super::SCREEN_ROOM);
+        let spanning = super::Rect {
+            w: 3840.,
+            h: 1000.,
+            ..HD
+        };
+        let tiny = super::Rect { h: 400., ..HD };
+        for w in [spanning, tiny, HD] {
+            assert_eq!(super::area(HD, Some(w)), before, "{w:?}");
+        }
+    }
+
     /// Undo or Redo adds a row to "What Crake did": the panel grows, and
     /// opening upward it grows up, its bottom staying at the bar (it was
     /// closed and opened again at the new size, which blinked and jumped).

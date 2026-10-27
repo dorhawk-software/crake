@@ -16,22 +16,6 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   commit); the user files the issue and opens the PR in their own words
   (Zed's AI policy: no agent-written PRs or descriptions). Related, not a
   duplicate: zed-industries/zed#21851. See CRAKE-PATCH.md.
-- **Two sign-in tabs, and sessions stopped before sign-in (2026-10-14).**
-  Likely openvpn3-indicator, which acted on every session (Ready,
-  Connect, the sign-in page): the user removed it the same day, and a
-  session Crake 0.6.1 started then stayed up when the app quit (the
-  morning's "quitting ends the session" was probably the indicator too;
-  7g's note that sessions outlive the app holds). Left here until a
-  web sign-in without the indicator shows one tab and no early stop.
-  Signing in to an OpenVPN 3 web sign-in profile often opens two browser
-  tabs; probably Crake and openvpn3-indicator each opening the same
-  session's page (7g). One morning four sessions in a row were stopped
-  5 to 50 s after starting, before the sign-in finished, so the browser
-  said "login success" with no session left to take it; the logs don't
-  say who stopped them. To do with the user: watch one sign-in live
-  (sessions, their sign-in pages, who calls Disconnect), and try once
-  with openvpn3-indicator quit. If the indicator opens the page too,
-  Crake could leave it to the indicator while it runs.
 - **openvpn3 leaves a session's process running (2026-10-14/15, v27.1).**
   Cause found: openvpn3's session manager gives a new session's process
   5 s to answer Connect; when two front-ends told the same new session to
@@ -116,14 +100,15 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   builds every host row at once and puts "Add a host" after them (fine
   on screen, slow and far down with hundreds of hosts: `uniform_list`,
   and "Add a host" above the list, a design question); no window but the
-  profile editor can be resized (`is_resizable: false`); the room left
-  for bars is a fixed 120 px off the primary monitor, not the work area
-  of the monitor the window opens on (X11's work area was unreliable
-  across monitors, place.rs); Traffic and the profile editor open as
-  tall as a big screen allows (`max_window_height_or` ignores its
-  fallback when a monitor is known); the panel's scrolling middle showed
+  profile editor can be resized (`is_resizable: false`); the panel's
+  scrolling middle showed
   no sign it scrolls but its cut-off last row (done 2026-10-21: every
-  scrolling area has a scrollbar while the pointer is over it).
+  scrolling area has a scrollbar while the pointer is over it). Done
+  2026-10-27: windows open in the primary monitor's work area
+  (`place::window_area`: Windows' rcWork, the Mac's visible frame, X11's
+  `_NET_WORKAREA` cut to the monitor and believed only when it leaves room
+  for some bar, else the 120 px kept before), and Traffic and the profile
+  editor at their own height (`place::window_height`).
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with

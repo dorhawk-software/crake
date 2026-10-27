@@ -19,22 +19,31 @@ pub fn monitors() -> Vec<Rect> {
     }
     let mut found: Vec<(bool, Rect)> = ui::monitors()
         .into_iter()
-        .map(|m| {
-            let scale = m.dpi.max(1) as f32 / BASE_DPI as f32;
-            let r = m.bounds;
-            (
-                m.primary,
-                Rect {
-                    x: r.left as f32 / scale,
-                    y: r.top as f32 / scale,
-                    w: (r.right - r.left) as f32 / scale,
-                    h: (r.bottom - r.top) as f32 / scale,
-                },
-            )
-        })
+        .map(|m| (m.primary, logical(m.bounds, m.dpi)))
         .collect();
     found.sort_by_key(|(primary, _)| !primary);
     found.into_iter().map(|(_, r)| r).collect()
+}
+
+/// The primary monitor's work area (less the taskbar), in the same pixels.
+pub fn work_area() -> Option<Rect> {
+    if cfg!(test) {
+        return None;
+    }
+    let all = ui::monitors();
+    let m = all.iter().find(|m| m.primary).or(all.first())?;
+    Some(logical(m.work, m.dpi))
+}
+
+/// A monitor's rectangle (pixels) in logical pixels, at its DPI.
+fn logical(r: windows_sys::Win32::Foundation::RECT, dpi: u32) -> Rect {
+    let scale = dpi.max(1) as f32 / BASE_DPI as f32;
+    Rect {
+        x: r.left as f32 / scale,
+        y: r.top as f32 / scale,
+        w: (r.right - r.left) as f32 / scale,
+        h: (r.bottom - r.top) as f32 / scale,
+    }
 }
 
 /// A folder only this user can read, for files that live as long as a

@@ -29,6 +29,8 @@ pub const BASE_DPI: u32 = 96;
 pub struct Monitor {
     pub primary: bool,
     pub bounds: RECT,
+    /// The monitor less the taskbar and other app bars.
+    pub work: RECT,
     pub dpi: u32,
 }
 
@@ -71,6 +73,7 @@ unsafe extern "system" fn each_monitor(
     found.push(Monitor {
         primary: info.dwFlags & MONITORINFOF_PRIMARY != 0,
         bounds: info.rcMonitor,
+        work: info.rcWork,
         dpi,
     });
     1

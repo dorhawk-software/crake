@@ -20,6 +20,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
   service the way an uninstall does, signing every tunnel out; now they come back signed in, as on
   Linux. Homebrew runs the installed version's steps, so this starts with the upgrade after this
   one.
+- **Windows open between your bars.** Crake's windows are sized and centred in the room your
+  system leaves beside its bars (GNOME's top bar and a bottom dock, the menu bar and Dock on a
+  Mac, the taskbar), not a guess at it, so a tall window no longer runs under a dock.
 
 ### Fixed
 
@@ -29,6 +32,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
   reads the system's own on Linux.
 - **The sign-in window is as tall as its card.** Since 0.15.4 it stood an empty band taller than
   the card, and before that the card could scroll though everything showed.
+- **Traffic and a profile open at their own height.** On a big screen they opened as tall as the
+  screen allowed, most of it empty.
 
 ### Underneath
 

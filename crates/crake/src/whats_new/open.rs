@@ -24,7 +24,7 @@ pub fn open(since: Option<String>, cx: &mut App) {
     {
         cx.set_global(Open(None));
     }
-    let height = crate::place::max_window_height_or(HEIGHT).min(HEIGHT);
+    let height = crate::place::window_height(HEIGHT);
     let bounds = crate::windows::centered(WIDTH, height, cx);
     let opened = cx.open_window(
         WindowOptions {

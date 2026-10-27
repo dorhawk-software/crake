@@ -261,8 +261,6 @@ one line each:
 
 - Zed upstream, GPUI change 3 (Xft.dpi at runtime): the branch is ready;
   the user files the issue and PR in their own words (Zed's AI policy).
-- Two sign-in tabs, and OpenVPN 3 sessions stopped before sign-in: likely
-  openvpn3-indicator; to watch one sign-in live with the user.
 - openvpn3 leaves a session's process running: detected and shown (built);
   not a process left from before the app started.
 - macOS: craked registered by the app (approval, launchd, an upgrade's

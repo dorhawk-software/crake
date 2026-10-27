@@ -41,6 +41,65 @@ pub fn monitors() -> Vec<Rect> {
     in_logical_pixels(list, scale(&conn))
 }
 
+/// The primary monitor's work area, in GPUI's logical pixels: the window
+/// manager's `_NET_WORKAREA` for the current desktop (the screen less the
+/// bars' struts) cut to that monitor. It spans every monitor, so on several
+/// it may miss a bar of this one's; `place::area` decides whether to
+/// believe it.
+pub fn work_area() -> Option<Rect> {
+    if cfg!(test) {
+        return None;
+    }
+    use x11rb::connection::Connection;
+    use x11rb::protocol::randr::ConnectionExt as _;
+    use x11rb::protocol::xproto::{AtomEnum, ConnectionExt as _};
+    /// x, y, width and height: one desktop's work area.
+    const PER_DESKTOP: u32 = 4;
+    let (conn, screen) = x11rb::connect(None).ok()?;
+    let root = conn.setup().roots.get(screen)?.root;
+    let monitors = conn
+        .randr_get_monitors(root, true)
+        .ok()?
+        .reply()
+        .ok()?
+        .monitors;
+    let m = monitors.iter().find(|m| m.primary).or(monitors.first())?;
+    let atom = |name: &[u8]| -> Option<u32> {
+        let found = conn.intern_atom(true, name).ok()?.reply().ok()?.atom;
+        (found != x11rb::NONE).then_some(found)
+    };
+    let cardinals = |name: &[u8], offset: u32, length: u32| -> Option<Vec<u32>> {
+        let reply = conn
+            .get_property(false, root, atom(name)?, AtomEnum::CARDINAL, offset, length)
+            .ok()?
+            .reply()
+            .ok()?;
+        Some(reply.value32()?.collect())
+    };
+    let desktop = cardinals(b"_NET_CURRENT_DESKTOP", 0, 1)
+        .and_then(|d| d.first().copied())
+        .unwrap_or(0);
+    let area = cardinals(b"_NET_WORKAREA", desktop * PER_DESKTOP, PER_DESKTOP)?;
+    let &[x, y, w, h] = area.as_slice() else {
+        return None;
+    };
+    // Cut to the monitor, in X pixels.
+    let (mx, my) = (f32::from(m.x), f32::from(m.y));
+    let (left, top) = (mx.max(x as f32), my.max(y as f32));
+    let right = (mx + f32::from(m.width)).min(x.saturating_add(w) as f32);
+    let bottom = (my + f32::from(m.height)).min(y.saturating_add(h) as f32);
+    if right <= left || bottom <= top {
+        return None;
+    }
+    let cut = Rect {
+        x: left,
+        y: top,
+        w: right - left,
+        h: bottom - top,
+    };
+    in_logical_pixels(vec![(true, cut)], scale(&conn)).pop()
+}
+
 /// The scale GPUI's X11 backend draws at, read as it reads it:
 /// GPUI_X11_SCALE_FACTOR, else Xft.dpi over 96 (GNOME publishes XWayland's
 /// scale there: 192 at 200%), else 1.
