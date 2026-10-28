@@ -773,4 +773,61 @@ mod tests {
         );
         assert!(!in_dock(cx), "only the panel is left");
     }
+
+    /// A sign-in kept from before had run out (2026-10-28: switched off
+    /// overnight, the gateway forgot it): switched on a moment ago, the
+    /// tunnel's sign-in opens at once, rather than "Ended by the gateway"
+    /// and a second switch-on. Not just switched on (a reconnect by
+    /// itself), nothing opens unasked. (Which sign-in opens is checked, not
+    /// the window: it would start a real sign-in, on the network.)
+    #[gpui_kit::test]
+    fn a_sign_in_that_ran_out_opens_again_when_just_switched_on(cx: &mut TestAppContext) {
+        start_app(cx);
+        let (name, display) = cx.update(|cx| {
+            cx.set_global(crate::prefs::Prefs {
+                scratch: true,
+                notify: "none".into(),
+                ..Default::default()
+            });
+            let model = cx.global::<Shell>().model.clone();
+            model.update(cx, |m, _| {
+                // Off, signed in from before.
+                m.tunnels = vec![client::Tunnel {
+                    name: "acme".into(),
+                    display: "ACME".into(),
+                    gateway: "vpn.acme.example".into(),
+                    state: "off".into(),
+                    protocol: "anyconnect".into(),
+                    signed_in: true,
+                    ..Default::default()
+                }];
+                ("acme".to_owned(), "ACME".to_owned())
+            })
+        });
+        let ran_out = crake_proto::LogEntry {
+            ts: String::new(),
+            kind: crake_proto::LogKind::System,
+            tunnel: Some(name.clone()),
+            message: crake_proto::needs_sign_in(&display),
+            reason: None,
+            hosts: Vec::new(),
+            others: Vec::new(),
+        };
+        // As craked says it, not switched on just now: no window.
+        let windows = |cx: &mut TestAppContext| cx.update(|cx| cx.windows().len());
+        let before = windows(cx);
+        let said = client::Update::Appended(ran_out.clone());
+        cx.update(|cx| crate::updates::on_update(said, cx));
+        cx.run_until_parked();
+        assert_eq!(windows(cx), before, "nothing opens unasked");
+
+        // Switched on by the user a moment ago: its sign-in, once.
+        cx.update(|cx| crate::requests::on_request(Request::Switch(name.clone(), true), cx));
+        let opens = |cx: &mut TestAppContext| {
+            cx.update(|cx| crate::requests::sign_in_to_open(&ran_out, cx))
+                .map(|t| t.name)
+        };
+        assert_eq!(opens(cx), Some(name), "the sign-in opens");
+        assert_eq!(opens(cx), None, "once");
+    }
 }

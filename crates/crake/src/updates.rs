@@ -73,6 +73,15 @@ pub(super) fn on_update(update: client::Update, cx: &mut App) {
         if entry.is_unexpected_stop() && how != "none" {
             notify::stopped(&entry, requests.clone());
         }
+        // Its sign-in from before had run out: signed in again at once if
+        // the user just switched it on, or offered like a tunnel that stopped.
+        if entry.is_sign_in_needed() {
+            match crate::requests::sign_in_to_open(&entry, cx) {
+                Some(tunnel) => open_sign_in(tunnel, cx),
+                None if how != "none" => notify::stopped(&entry, requests.clone()),
+                None => {}
+            }
+        }
         // An OpenVPN 3 process left running: it needs the user (sudo).
         if entry.is_left_running() && how != "none" {
             notify::left_running(&entry);

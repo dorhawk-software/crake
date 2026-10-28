@@ -124,6 +124,15 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   249 re-reading a fresh link's settings (networkd's state, or its own
   saved file) after craked's D-Bus calls. Next time the note shows, the
   two journals' timings say which.
+- **A kept sign-in that ran out, as a scenario (2026-10-28).** Built and
+  tested with craked's fake openconnect (`lifecycle.rs`,
+  `a_kept_sign_in_that_ran_out_asks_for_a_new_one`) and in the app
+  (`windows.rs`, `a_sign_in_that_ran_out_opens_again_when_just_switched_on`),
+  not against a real gateway: none of the test gateways forgets a session
+  soon enough (ocserv keeps a cookie 300 s, `cookie-timeout`, and the other
+  scenarios switch on again within that). An ocserv of its own with a
+  `cookie-timeout` of a few seconds (extras.sh, like the groups' one, and
+  on CI's gateway VM) would let a scenario wait it out.
 - **Display scale changes on Windows and macOS: not tried.** GPUI follows
   them natively there (WM_DPICHANGED, backing scale), and Crake's monitor
   lists are logical; no one has docked a running Crake to a monitor with

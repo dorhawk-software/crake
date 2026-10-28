@@ -17,7 +17,7 @@ impl Manager {
 
     /// Connect with a session from a separate sign-in ([`crate::auth`]).
     pub fn connect_with(self: &Arc<Self>, name: &str, session: Option<Session>) -> Result<()> {
-        let (config, stop_rx, session, quiet) = {
+        let (config, stop_rx, session, kept, quiet) = {
             let mut map = self.tunnels.lock().unwrap();
             let e = map
                 .get_mut(name)
@@ -39,6 +39,7 @@ impl Manager {
             e.why = None;
             e.info = None;
             // A new sign-in replaces the kept one; none given, resume the kept one.
+            let kept = session.is_none() && e.session.is_some();
             if session.is_some() {
                 e.session = session.clone();
             }
@@ -47,6 +48,7 @@ impl Manager {
                 e.config.clone(),
                 rx,
                 session,
+                kept,
                 std::mem::take(&mut e.handover),
             )
         };
@@ -77,7 +79,7 @@ impl Manager {
                 bail!("IPsec tunnels aren\u{2019}t built for this system yet.");
             }
         }
-        tokio::spawn(async move { this.supervise(config, session, stop_rx).await });
+        tokio::spawn(async move { this.supervise(config, session, kept, stop_rx).await });
         Ok(())
     }
 
@@ -275,10 +277,13 @@ impl Manager {
         Ok(())
     }
 
+    /// `kept`: the session is one kept from before (the tunnel was switched
+    /// off without logging off), not a sign-in just made.
     pub(super) async fn supervise(
         self: Arc<Self>,
         config: TunnelConfig,
         session: Option<Session>,
+        kept: bool,
         mut stop_rx: oneshot::Receiver<Stop>,
     ) {
         let name = config.name.clone();
@@ -328,7 +333,19 @@ impl Manager {
                         Ok(s) if s.success() => (TunnelState::Off, None),
                         Ok(s) => {
                             let tail = last_line.lock().unwrap().clone();
-                            let why = crake_proto::trouble::from_openconnect(&tail)
+                            // Turned down before it ever came up, on a sign-in
+                            // kept from before: it had run out (2026-10-28,
+                            // switched off overnight).
+                            let never_up = self
+                                .tunnels
+                                .lock()
+                                .unwrap()
+                                .get(&name)
+                                .is_some_and(|e| e.up_since.is_none());
+                            let why = (kept && never_up)
+                                .then(|| crake_proto::trouble::kept_sign_in_refused(&tail))
+                                .flatten()
+                                .or_else(|| crake_proto::trouble::from_openconnect(&tail))
                                 .unwrap_or_else(|| format!("openconnect exited with {s}. {tail}").trim().to_owned());
                             (TunnelState::Trouble, Some(why))
                         }
@@ -456,7 +473,11 @@ impl Manager {
         } else {
             self.set_state(name, state, true);
         }
+        let ran_out = reason
+            .as_deref()
+            .is_some_and(|r| r.starts_with(crake_proto::trouble::SIGN_IN_RAN_OUT));
         let msg = match state {
+            TunnelState::Trouble if ran_out => crake_proto::needs_sign_in(label),
             TunnelState::Trouble => crake_proto::stopped_unexpectedly(label),
             _ => format!("Switched {label} off."),
         };

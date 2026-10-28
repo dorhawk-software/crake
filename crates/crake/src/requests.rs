@@ -3,6 +3,17 @@
 
 use super::*;
 
+/// How long after the user switches a tunnel on its sign-in may open by
+/// itself, should the sign-in kept from before have run out: they're
+/// waiting for the tunnel (a kept sign-in is turned down within a second).
+const JUST_SWITCHED_ON: Duration = Duration::from_secs(30);
+
+/// Tunnels the user switched on with a sign-in kept from before, and when.
+#[derive(Default)]
+pub(crate) struct SwitchedOn(std::collections::HashMap<String, std::time::Instant>);
+
+impl Global for SwitchedOn {}
+
 /// A certificate chosen in New tunnel goes to the keyring (7e): the file
 /// can then be deleted; sign-in writes a private copy for each use.
 pub(super) fn keep_certificate(
@@ -137,16 +148,46 @@ fn switch_on(t: String, cx: &mut App) {
         .iter()
         .find(|x| x.name == t)
         .cloned();
+    let kept = tunnel.as_ref().is_some_and(|x| x.signed_in);
     // An OpenVPN or IPsec tunnel just connects: craked asks if it must.
     match tunnel {
         Some(tunnel) if !tunnel.signed_in && !crate::signin::craked_asks(&tunnel.protocol) => {
             open_sign_in(tunnel, cx)
         }
         _ => {
+            if kept {
+                let at = std::time::Instant::now();
+                cx.default_global::<SwitchedOn>().0.insert(t.clone(), at);
+            }
             let commands = cx.global::<Shell>().commands.clone();
             commands.send_blocking(Command::Connect(t)).ok();
         }
     }
+}
+
+/// A tunnel's sign-in kept from before had run out
+/// (`LogEntry::is_sign_in_needed`): if the user switched it on a moment
+/// ago, its sign-in opens at once, as if nothing had been kept: that
+/// tunnel (otherwise a notification offers to switch it on).
+pub(super) fn sign_in_to_open(
+    entry: &crake_proto::LogEntry,
+    cx: &mut App,
+) -> Option<client::Tunnel> {
+    let t = entry.tunnel.as_deref()?;
+    let just = cx
+        .default_global::<SwitchedOn>()
+        .0
+        .remove(t)
+        .is_some_and(|at| at.elapsed() < JUST_SWITCHED_ON);
+    let tunnel = cx
+        .global::<Shell>()
+        .model
+        .read(cx)
+        .tunnels
+        .iter()
+        .find(|x| x.name == t)
+        .cloned();
+    tunnel.filter(|_| just)
 }
 
 pub(super) fn on_request(request: Request, cx: &mut App) {

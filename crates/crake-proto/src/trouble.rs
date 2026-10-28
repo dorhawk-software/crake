@@ -32,6 +32,10 @@ pub const YOUR_CERT_RAN_OUT: &str = "Your certificate ran out on";
 pub const YOUR_CERT_NOT_YET: &str = "Your certificate is valid only from";
 /// IPsec: the app has no copy of the user's certificate to give.
 pub const NO_CERTIFICATE: &str = "Crake has no copy of your certificate";
+/// craked: a sign-in kept while the tunnel was off, turned down before the
+/// tunnel came up. Not trouble: the gateway forgets an unused session (in
+/// half an hour, often), so a sign-in kept overnight has run out.
+pub const SIGN_IN_RAN_OUT: &str = "Its sign-in from before had run out";
 /// What to do about it.
 pub const SIGN_IN_AGAIN: &str = "Switch it on to sign in again.";
 
@@ -40,6 +44,7 @@ pub fn label(why: &str) -> Option<&'static str> {
     [
         (EXPIRED, "Session expired"),
         (GATEWAY_ENDED, "Ended by the gateway"),
+        (SIGN_IN_RAN_OUT, "Sign in again"),
         (SIGN_IN_REFUSED, "Sign-in refused"),
         (OPENVPN3_ENDED, "Ended by OpenVPN 3"),
         (KEY_MISMATCH, "Key doesn\u{2019}t match"),
@@ -85,6 +90,12 @@ pub fn from_openconnect(last: &str) -> Option<String> {
     }
 }
 
+/// openconnect's words for a session it resumed from a kept sign-in, and
+/// that ended before the tunnel came up: the sign-in had run out.
+pub fn kept_sign_in_refused(last: &str) -> Option<String> {
+    from_openconnect(last).map(|_| format!("{SIGN_IN_RAN_OUT}. {SIGN_IN_AGAIN}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -116,6 +127,20 @@ mod tests {
             assert!(why.ends_with(SIGN_IN_AGAIN), "{why}");
         }
         assert_eq!(from_openconnect("SSL negotiation failed"), None);
+    }
+
+    #[test]
+    fn a_kept_sign_in_that_ran_out_asks_for_a_new_one() {
+        for line in [
+            "Cookie was rejected by server; exiting.",
+            "Session terminated by server; exiting.",
+            "VPN session expired",
+        ] {
+            let why = kept_sign_in_refused(line).unwrap_or_default();
+            assert_eq!(label(&why), Some("Sign in again"), "{line}: {why}");
+            assert!(why.ends_with(SIGN_IN_AGAIN), "{why}");
+        }
+        assert_eq!(kept_sign_in_refused("SSL negotiation failed"), None);
     }
 
     #[test]

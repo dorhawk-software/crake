@@ -273,6 +273,8 @@ one line each:
   reproduced; what to capture next time.
 - Ubuntu 22.04's resolved once dropped the hush's domains: set again,
   logged; its cause still unknown.
+- A kept sign-in that ran out: built and tested; not yet a scenario
+  (no test gateway forgets a session soon enough).
 - Display scale changes on Windows and macOS: not tried.
 - winget for Windows; Undo in macOS notifications.
 - macOS colouring the menu bar's bird itself: its colour follows the bar

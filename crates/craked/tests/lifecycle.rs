@@ -113,6 +113,64 @@ async fn a_session_the_gateway_ended_says_so() {
     assert_eq!(mgr.get("acme").unwrap().why, None);
 }
 
+/// A sign-in kept while the tunnel was off, turned down as it's switched on
+/// again (overnight, the gateway had forgotten it; 2026-10-28): not trouble,
+/// a new sign-in. A sign-in just made and turned down stays the gateway's
+/// doing.
+#[tokio::test]
+async fn a_kept_sign_in_that_ran_out_asks_for_a_new_one() {
+    let dir = tempfile::tempdir().unwrap();
+    // Up the first time; turned down every time after.
+    let cfg = setup(
+        dir.path(),
+        r#"#!/bin/sh
+if [ -e "$0.ran" ]; then echo 'Cookie was rejected by server; exiting.' >&2; exit 1; fi
+touch "$0.ran"
+trap 'exit 0' TERM HUP
+export TUNDEV=crake-acme INTERNAL_IP4_ADDRESS=10.40.1.7
+reason=connect "$CRAKE_TEST_HOOK" || exit 1
+while :; do sleep 0.1; done
+"#,
+    );
+    let socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    let _srv = hook_server::serve(mgr.clone(), &socket).unwrap();
+    let session = || {
+        craked::auth::parse("COOKIE='s3cret'\nCONNECT_URL='https://vpn.acme.example/'\n").unwrap()
+    };
+
+    mgr.connect_with("acme", Some(session())).unwrap();
+    wait_for(&mgr, "acme", TunnelState::Connected).await;
+    mgr.disconnect("acme").unwrap();
+    wait_for(&mgr, "acme", TunnelState::Off).await;
+    assert!(mgr.get("acme").unwrap().signed_in, "the sign-in is kept");
+
+    // Switched on again, on the kept sign-in.
+    mgr.connect("acme").unwrap();
+    wait_for(&mgr, "acme", TunnelState::Trouble).await;
+    let t = mgr.get("acme").unwrap();
+    let why = t.why.unwrap_or_default();
+    assert_eq!(
+        crake_proto::trouble::label(&why),
+        Some("Sign in again"),
+        "{why:?}"
+    );
+    assert!(!t.signed_in, "the next switch-on signs in");
+    let log = std::fs::read_to_string(dir.path().join("log")).unwrap();
+    assert!(log.contains("ACME needs a new sign-in."), "{log}");
+    assert!(!log.contains("stopped unexpectedly"), "{log}");
+
+    // A sign-in just made, turned down: the gateway's doing, as before.
+    mgr.connect_with("acme", Some(session())).unwrap();
+    wait_for(&mgr, "acme", TunnelState::Trouble).await;
+    let why = mgr.get("acme").unwrap().why.unwrap_or_default();
+    assert_eq!(
+        crake_proto::trouble::label(&why),
+        Some("Ended by the gateway"),
+        "{why:?}"
+    );
+}
+
 #[tokio::test]
 async fn hook_from_a_stopped_tunnel_is_refused() {
     let dir = tempfile::tempdir().unwrap();

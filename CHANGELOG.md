@@ -17,6 +17,14 @@ What's new in each Crake release, for the people using it. The newest is at the 
   every line carried terminal colour codes around its level; now they're plain text, as they are
   on Windows.
 
+### Fixed
+
+- **A sign-in that ran out opens again by itself.** Switched off for a while, a tunnel keeps its
+  sign-in so switching it on needs none, but the gateway forgets an unused one: switched on the
+  next morning, the panel said "Ended by the gateway" and it took a second switch-on to sign in.
+  Now the sign-in opens straight away; a tunnel that comes back on by itself says "Sign in again"
+  and offers it.
+
 ## 0.16.0 (2026-10-27)
 
 ### Better

@@ -222,6 +222,15 @@ pub fn stopped_unexpectedly(label: &str) -> String {
 
 const STOPPED: &str = " stopped unexpectedly.";
 
+/// How the log says a tunnel's kept sign-in had run out as it was switched
+/// on (`trouble::SIGN_IN_RAN_OUT`): "{label} needs a new sign-in." The app
+/// opens the sign-in if the user has just switched it on, or offers to.
+pub fn needs_sign_in(label: &str) -> String {
+    format!("{label}{NEEDS_SIGN_IN}")
+}
+
+const NEEDS_SIGN_IN: &str = " needs a new sign-in.";
+
 /// How the log says an OpenVPN 3 session's process outlived its session
 /// (the app finds it, craked logs it; the app notifies on it). openvpn3
 /// has kept such a process reconnecting on its own for days, and each
@@ -264,6 +273,13 @@ impl LogEntry {
     /// A tunnel stopped without being asked to (`stopped_unexpectedly`).
     pub fn is_unexpected_stop(&self) -> bool {
         self.kind == LogKind::System && self.tunnel.is_some() && self.message.ends_with(STOPPED)
+    }
+
+    /// A tunnel's kept sign-in had run out (`needs_sign_in`).
+    pub fn is_sign_in_needed(&self) -> bool {
+        self.kind == LogKind::System
+            && self.tunnel.is_some()
+            && self.message.ends_with(NEEDS_SIGN_IN)
     }
 
     /// An OpenVPN 3 session's process outlived its session (`LEFT_RUNNING`).
@@ -561,5 +577,9 @@ mod tests {
         assert!(entry(stopped_unexpectedly("Initech"), Some("initech")).is_unexpected_stop());
         assert!(!entry("Switched Initech off.".into(), Some("initech")).is_unexpected_stop());
         assert!(!entry(stopped_unexpectedly("Initech"), None).is_unexpected_stop());
+        // A kept sign-in that ran out isn't trouble, and is told apart too.
+        let ran_out = entry(needs_sign_in("Initech"), Some("initech"));
+        assert!(ran_out.is_sign_in_needed() && !ran_out.is_unexpected_stop());
+        assert!(!entry(needs_sign_in("Initech"), None).is_sign_in_needed());
     }
 }
