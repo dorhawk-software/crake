@@ -16,12 +16,13 @@ What's new in each Crake release, for the people using it. The newest is at the 
 - **The bird dims with its neighbours on a Mac.** On a display you're not using, macOS dims the
   menu bar's icons, and Crake's bird stayed bright among them. Now macOS draws it like its own
   icons; while it shows a badge or the call, it keeps its colours.
-- **Crake's service log reads cleanly.** On a Mac (`/var/log/craked.log`) and in Linux's journal,
-  every line carried terminal colour codes around its level; now they're plain text, as they are
-  on Windows.
 
 ### Fixed
 
+- **Crake's service keeps its log on a Mac.** `/var/log/craked.log`, where it says what it did and
+  what openconnect told it (what a helpdesk asks for), stayed empty: the service wrote to where
+  macOS keeps nothing. Now it's there, as plain text; Linux's journal also loses the colour codes
+  it had around every line.
 - **A sign-in that ran out opens again by itself.** Switched off for a while, a tunnel keeps its
   sign-in so switching it on needs none, but the gateway forgets an unused one: switched on the
   next morning, the panel said "Ended by the gateway" and it took a second switch-on to sign in.

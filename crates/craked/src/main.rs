@@ -73,11 +73,17 @@ fn log_to(file: Option<std::fs::File>) {
             ),
             None,
         ),
-        // Colours only for a terminal: launchd's file and the journal got
-        // escape codes around every level and target.
+        // Stderr, said: fmt's own default is stdout, which launchd drops (it
+        // keeps stderr, in /var/log/craked.log: empty on every Mac until
+        // 2026-10-28; the journal takes both). Colours only for a terminal:
+        // launchd's file and the journal got escape codes around each level.
         None => (
             None,
-            Some(fmt::layer().with_ansi(std::io::IsTerminal::is_terminal(&std::io::stderr()))),
+            Some(
+                fmt::layer()
+                    .with_writer(std::io::stderr)
+                    .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stderr())),
+            ),
         ),
     };
     tracing_subscriber::registry()
