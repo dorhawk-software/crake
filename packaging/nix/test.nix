@@ -281,6 +281,12 @@ in {
     with subtest("nothing went wrong in craked's journal"):
         client.fail("journalctl -u craked -o cat | grep -E 'ERROR|panicked'")
 
+    # What the service writes reaches the log people read (asked by the
+    # user, 2026-10-28: on a Mac, launchd's file had stayed empty for days).
+    with subtest("craked's journal is written, openconnect's lines too"):
+        client.succeed("journalctl -u craked -o cat | grep -q 'craked .* ready'")
+        client.succeed("journalctl -u craked -o cat | grep -q 'tunnel=acme'")
+
     with subtest("the journey (the app and its own craked)"):
         client.succeed("systemctl stop craked")
         client.succeed("mkdir -p /tmp/journey && env CRAKE_E2E=1 TMPDIR=/tmp/journey "

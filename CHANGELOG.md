@@ -11,6 +11,12 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### Better
+
+- **Crake's service log reads cleanly.** On a Mac (`/var/log/craked.log`) and in Linux's journal,
+  every line carried terminal colour codes around its level; now they're plain text, as they are
+  on Windows.
+
 ## 0.16.0 (2026-10-27)
 
 ### Better

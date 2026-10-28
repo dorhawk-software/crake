@@ -160,6 +160,12 @@ else
     CRAKE_INSTALLER="$2" \
     "$3" $FILTER --test-threads=1 --nocapture || status=$?
   [ "$status" = 0 ] || tail -n 60 "C:/ProgramData/Crake/craked.log"
+  # What the service writes reaches its log, the engines' lines too (asked
+  # by the user, 2026-10-28: on a Mac, launchd's file had stayed empty).
+  for line in "craked .* ready" "tunnel="; do
+    grep -q "$line" "C:/ProgramData/Crake/craked.log" ||
+      { echo "craked's log has no line matching \"$line\"" >&2; status=1; }
+  done
 fi
 [ "$status" = 0 ] || tail -n 30 "$WORK"/access-*.log
 exit "$status"

@@ -73,7 +73,12 @@ fn log_to(file: Option<std::fs::File>) {
             ),
             None,
         ),
-        None => (None, Some(fmt::layer())),
+        // Colours only for a terminal: launchd's file and the journal got
+        // escape codes around every level and target.
+        None => (
+            None,
+            Some(fmt::layer().with_ansi(std::io::IsTerminal::is_terminal(&std::io::stderr()))),
+        ),
     };
     tracing_subscriber::registry()
         .with(filter)

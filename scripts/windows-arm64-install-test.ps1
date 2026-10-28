@@ -37,6 +37,11 @@ foreach ($f in 'crake.exe', 'craked.exe', 'crake-hook.exe', 'openconnect\opencon
 Wait-Until { (Get-Service craked -ErrorAction SilentlyContinue).Status -eq 'Running' } 'the craked service isn''t running'
 Wait-Until { (Test-NetConnection 127.0.0.1 -Port $appPort -WarningAction SilentlyContinue).TcpTestSucceeded } "craked doesn't serve the app on 127.0.0.1:$appPort"
 Write-Host 'craked runs and serves the app'
+# What the service writes reaches its log (asked by the user, 2026-10-28:
+# on a Mac, launchd's file had stayed empty).
+$log = Join-Path $env:ProgramData 'Crake\craked.log'
+Wait-Until { (Test-Path $log) -and (Select-String -Path $log -Pattern 'craked .* ready' -Quiet) } "craked's log ($log) has no ready line"
+Write-Host 'craked''s log is written'
 
 $oc = & (Join-Path $dir 'openconnect\openconnect.exe') --version 2>&1 | Out-String
 if ($oc -notmatch 'OpenConnect version') { throw "openconnect didn't start: $oc" }

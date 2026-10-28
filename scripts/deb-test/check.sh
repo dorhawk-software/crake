@@ -55,6 +55,10 @@ install() {
         check "craked runs confined by AppArmor" sh -c 'grep -Eq "^craked \((enforce|complain)\)" /proc/$(systemctl show -p MainPID --value craked)/attr/current'
     fi
     check "craked answers on the system bus" call Settings
+    # And its log says so: what a service writes reaches the log people
+    # read (asked by the user, 2026-10-28: on a Mac, launchd's file had
+    # stayed empty for days).
+    check "craked's journal is written" sh -c 'journalctl -b -u craked --no-pager -o cat | grep -q "craked .* ready"'
     check "root may add a tunnel" call AddTunnel 'a{ss}' 3 display_name Globex gateway vpn.globex.example protocol anyconnect
     check "it is listed" sh -c "busctl --system call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 ListTunnels | grep -q globex"
     check "kept in craked's state directory" test -s /var/lib/crake/tunnels.json
@@ -121,6 +125,7 @@ tunnel() {
         fingerprint "$(session_arg FINGERPRINT)" resolve "$(session_arg RESOLVE)"
     for _ in $(seq 1 40); do call GetTunnel s acme | grep -q '"connected"' && break; sleep 0.5; done
     check "connected" sh -c "busctl --system call software.dorhawk.Crake1 /software/dorhawk/Crake1 software.dorhawk.Crake1 GetTunnel s acme | grep -q '\"connected\"'"
+    check "openconnect's lines reach craked's journal" sh -c 'journalctl -b -u craked --no-pager -o cat | grep -q "tunnel=acme"'
     if aa-enabled --quiet 2>/dev/null; then
         check "openconnect runs confined too" sh -c 'ps -eo label,comm | grep -Eq "^craked \((enforce|complain)\) +openconnect"'
     fi

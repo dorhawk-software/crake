@@ -111,9 +111,20 @@ fi
 pid() {
     sudo launchctl print "system/$LABEL" 2>/dev/null | sed -n 's/^[[:space:]]*pid = //p'
 }
+# What launchd's craked writes reaches its log, after an upgrade too (asked
+# by the user, 2026-10-28: on their Mac /var/log/craked.log had stayed
+# empty for days).
+readies() { n=$(sudo grep -c "craked .* ready" /var/log/craked.log 2>/dev/null); echo "${n:-0}"; }
+# More "ready" lines than $1, within a few seconds (it's said just after
+# the socket serves).
+logged() {
+    for _ in $(seq 10); do [ "$(readies)" -gt "$1" ] && return 0; sleep 1; done
+    return 1
+}
 if serving && [ -n "$(pid)" ]; then
     echo "craked runs under launchd from Crake.app"
-    first=$(pid)
+    logged 0 || fail "craked's log (/var/log/craked.log) is empty under launchd"
+    first=$(pid) before=$(readies)
     sudo installer -pkg "$PKG" -target /
     for _ in $(seq 30); do
         [ -n "$(pid)" ] && [ "$(pid)" != "$first" ] && break
@@ -121,6 +132,7 @@ if serving && [ -n "$(pid)" ]; then
     done
     [ -n "$(pid)" ] && [ "$(pid)" != "$first" ] || fail "an upgrade didn't restart craked"
     serving || fail "craked isn't serving after the upgrade"
+    logged "$before" || fail "the upgraded craked's log didn't reach /var/log/craked.log"
 else
     echo "craked isn't switched on here: started by hand"
     grep -i "smappservice" /tmp/crake-app.log | tail -3
