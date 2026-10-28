@@ -138,6 +138,9 @@ else
     grep -i "smappservice" /tmp/crake-app.log | tail -3
     sudo "$APP/Contents/MacOS/craked" 2>/tmp/craked-test.log &
     serving || { cat /tmp/craked-test.log >&2; fail "craked from Crake.app isn't serving /var/run/crake.sock"; }
+    # Its output reaches the file it's given (launchd's isn't tried here).
+    for _ in $(seq 10); do grep -q "craked .* ready" /tmp/craked-test.log && break; sleep 1; done
+    grep -q "craked .* ready" /tmp/craked-test.log || fail "craked's output (/tmp/craked-test.log) is empty"
     sudo pkill -TERM -x craked
     for _ in $(seq 10); do pgrep -x craked >/dev/null || break; sleep 1; done
     sudo installer -pkg "$PKG" -target /
