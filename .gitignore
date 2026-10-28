@@ -11,3 +11,5 @@
 .impeccable/
 scripts/spikes/*/work/
 scripts/spikes/*/__pycache__/
+# Coverage left by an instrumented run (cargo-llvm-cov)
+*.profraw
