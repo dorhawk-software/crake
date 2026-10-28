@@ -285,6 +285,7 @@ one line each:
 - Windows on ARM64: built; not yet a real Windows on ARM.
 - Browser sign-in on Windows (openconnect without `--external-browser`).
 - Performance: never measured; measure before claiming numbers.
+- A bigger Nix cache (Cloudflare R2), if Cachix's free 5 GB runs out.
 - A colleague's requests (Traffic, the split as a whole, "Is it safe?",
   the profile editor): built; the Traffic window's open ends are listed.
 - New tunnel's protocol list folded (the user, on a Mac): a proposal first.

@@ -311,3 +311,18 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   (`controls::over`); the one-line install command in the no-tray
   notice scrolls sideways under 6 px of padding, where a bar would sit
   over the text. Its Copy is the way to the whole line.
+- **A bigger Nix cache, if Cachix's free 5 GB runs out (2026-10-28).**
+  Since 2026-10-27 the nixos job pushes only the dependency builds
+  (testing.md), which may fit; watch the cache's size on Cachix first. If
+  it doesn't, the user's choice is **Cloudflare R2** as a plain Nix binary
+  cache: a public bucket, `nix copy --to 's3://…?endpoint=…&region=auto'`
+  signed with Crake's own key (a repo secret), CI substituting over
+  `https://` with the public key, so forks still pull. $0.015/GB-month
+  past 10 GB free (100 GB ≈ $1.35/month), downloads free, which matters
+  since every nixos run pulls a few GB. Nothing evicts on its own: a
+  lifecycle rule (e.g. 30 days) does, and the dependency layers are
+  pushed again after it. Also weighed: Hetzner Object Storage (the same
+  setup, ~€6.49/month for 1 TB), a Hetzner VPS with Attic (least recently
+  used eviction like Cachix's, but a server to keep), Cachix Starter
+  (50 GiB, the dearest). Moving means the nixos job's substituter, key
+  and push step, testing.md and CLAUDE.md's "Nix goes to Cachix".
