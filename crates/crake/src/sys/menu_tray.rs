@@ -51,12 +51,19 @@ impl Shown {
         // head looked choppy.
         let icon = self.state.icon();
         let light = tray_on_light_bar(&self.tray);
-        let drawings: Vec<_> = icon
-            .mac
-            .iter()
-            .map(|(size, data)| (*size, rgba(data, light)))
-            .collect();
-        if !set_tray_image(&self.tray, &drawings) {
+        // The bird alone, a template macOS colours (and dims on a display
+        // not in use); with a coloured mark, coloured here for the bar.
+        let templates = mac_templates(&icon.mac);
+        let template = templates.as_ref().is_some_and(|t| !t.is_empty());
+        let drawings: Vec<_> = match templates {
+            Some(t) if template => t,
+            _ => icon
+                .mac
+                .iter()
+                .map(|(size, data)| (*size, rgba(data, light)))
+                .collect(),
+        };
+        if !set_tray_image(&self.tray, &drawings, template) {
             let (size, data) = drawn_at(&icon, tray_icon_size());
             if let Ok(icon) = tray_icon::Icon::from_rgba(rgba(data, light), size, size) {
                 let _ = self.tray.set_icon(Some(icon));
@@ -154,6 +161,23 @@ fn drawn_at(icon: &Icon, size: u32) -> (u32, &[u8]) {
         .filter(|(s, _)| *s >= size)
         .min_by_key(|(s, _)| *s)
         .map_or((icon.width, &icon.data), |(s, d)| (*s, d))
+}
+
+/// Each of the Mac's drawings as a template image, if every one of them
+/// can be (`tray::template`); none elsewhere.
+fn mac_templates(drawings: &[(u32, Vec<u8>)]) -> Option<Vec<(u32, Vec<u8>)>> {
+    #[cfg(target_os = "macos")]
+    {
+        drawings
+            .iter()
+            .map(|(size, data)| Some((*size, crate::tray::template(data)?)))
+            .collect()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = drawings;
+        None
+    }
 }
 
 /// ARGB (the tray art's order) as RGBA, what tray-icon and macOS take;

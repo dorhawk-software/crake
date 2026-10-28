@@ -221,7 +221,11 @@ pub fn tray_on_light_bar(_tray: &tray_icon::TrayIcon) -> bool {
 
 /// The Mac sets its menu bar's drawings itself (`tray::Icon::mac`, none
 /// here); the notification area takes tray-icon's one image.
-pub fn set_tray_image(_tray: &tray_icon::TrayIcon, _drawings: &[(u32, Vec<u8>)]) -> bool {
+pub fn set_tray_image(
+    _tray: &tray_icon::TrayIcon,
+    _drawings: &[(u32, Vec<u8>)],
+    _template: bool,
+) -> bool {
     false
 }
 

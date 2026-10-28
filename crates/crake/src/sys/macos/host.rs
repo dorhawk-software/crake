@@ -142,14 +142,20 @@ pub fn tray_on_light_bar(tray: &tray_icon::TrayIcon) -> bool {
 /// drawn for the display's pixels. tray-icon takes a single image, and a
 /// 1x display halved the 2x one: its eye a grey smudge, its badge soft
 /// (until 2026-10-27).
-pub fn set_tray_image(tray: &tray_icon::TrayIcon, drawings: &[(u32, Vec<u8>)]) -> bool {
+/// A `template` is the bird's ink alone (black, its shape the alpha):
+/// macOS colours it for the bar and dims it on a display not in use.
+pub fn set_tray_image(
+    tray: &tray_icon::TrayIcon,
+    drawings: &[(u32, Vec<u8>)],
+    template: bool,
+) -> bool {
     let Some(mtm) = objc2::MainThreadMarker::new() else {
         return false;
     };
     let Some(button) = tray.ns_status_item().and_then(|item| item.button(mtm)) else {
         return false;
     };
-    let Some(image) = menu_bar_image(drawings) else {
+    let Some(image) = menu_bar_image(drawings, template) else {
         return false;
     };
     button.setImage(Some(&image));
@@ -159,6 +165,7 @@ pub fn set_tray_image(tray: &tray_icon::TrayIcon, drawings: &[(u32, Vec<u8>)]) -
 /// One image of `MAC_POINTS` points with a representation per drawing.
 fn menu_bar_image(
     drawings: &[(u32, Vec<u8>)],
+    template: bool,
 ) -> Option<objc2::rc::Retained<objc2_app_kit::NSImage>> {
     use objc2::AnyThread;
     use objc2_app_kit::{NSBitmapImageRep, NSImage};
@@ -174,6 +181,7 @@ fn menu_bar_image(
         rep.setSize(size);
         image.addRepresentation(&rep);
     }
+    image.setTemplate(template);
     Some(image)
 }
 
@@ -222,12 +230,19 @@ mod tests {
         // macOS picks the representation for the display's pixels: both
         // are there, each the menu bar's 22 points, at 1 and 2 px a point.
         let drawings = crate::tray::Art::default().icon().mac;
-        let image = super::menu_bar_image(&drawings).expect("an image");
+        let image = super::menu_bar_image(&drawings, false).expect("an image");
+        assert!(!image.isTemplate(), "a coloured bird as it is");
         assert_eq!(image.size().width, f64::from(MAC_POINTS));
         let reps = image.representations();
         let pixels: Vec<isize> = reps.iter().map(|r| r.pixelsWide()).collect();
         assert_eq!(pixels, [MAC_POINTS as isize, MAC_SIZE as isize]);
         assert!(reps.iter().all(|r| r.size().width == f64::from(MAC_POINTS)));
-        assert!(super::menu_bar_image(&[]).is_none(), "nothing to show");
+        assert!(
+            super::menu_bar_image(&[], false).is_none(),
+            "nothing to show"
+        );
+        // The bird alone: a template, which macOS colours and dims.
+        let template = super::menu_bar_image(&drawings, true).expect("an image");
+        assert!(template.isTemplate());
     }
 }

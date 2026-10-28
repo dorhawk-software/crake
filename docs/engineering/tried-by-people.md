@@ -93,6 +93,10 @@ daily.
   (2026-10-27, the user, 0.16.0 from Homebrew): in the Dock with Settings
   or the log open, gone once they closed (`windows/dock.rs`; until then
   it sat in the Dock all the time).
+- [ ] The bird dimmed with its neighbours on a display not in use: a
+  template image since 2026-10-28 (`tray::template`), the plain bird
+  only; with a badge or the call it stays coloured (the user saw it
+  bright there, 2026-10-28).
 - [x] The bird crisp on a display that isn't Retina (2026-10-27, the
   user, 0.16.0): the 1x drawing macOS picks there (`tray::Icon::mac`;
   until then it halved the 2x one into a blur).

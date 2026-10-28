@@ -13,6 +13,9 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ### Better
 
+- **The bird dims with its neighbours on a Mac.** On a display you're not using, macOS dims the
+  menu bar's icons, and Crake's bird stayed bright among them. Now macOS draws it like its own
+  icons; while it shows a badge or the call, it keeps its colours.
 - **Crake's service log reads cleanly.** On a Mac (`/var/log/craked.log`) and in Linux's journal,
   every line carried terminal colour codes around its level; now they're plain text, as they are
   on Windows.

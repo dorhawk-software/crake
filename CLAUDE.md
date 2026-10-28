@@ -277,9 +277,6 @@ one line each:
   (no test gateway forgets a session soon enough).
 - Display scale changes on Windows and macOS: not tried.
 - winget for Windows; Undo in macOS notifications.
-- macOS colouring the menu bar's bird itself: its colour follows the bar
-  (built); a template image (dimmed on inactive displays) waits for a
-  real Mac.
 - No-tray's one-line command: no scrollbar (it would cover the text).
 - OpenVPN 3 sessions whose device openvpn3 doesn't name, under the package.
 - A shared practices repository for dorhawk.software (the user's idea, once

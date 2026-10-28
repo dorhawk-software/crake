@@ -542,3 +542,43 @@ fn write_mac_proposal() {
         .unwrap();
     }
 }
+
+#[test]
+fn the_plain_bird_is_a_template_on_a_mac_and_a_coloured_one_isnt() {
+    // macOS colours a template for its bar and dims it on a display not in
+    // use: the bird's ink alone is one, its shape kept in the alpha. The
+    // call's teal and the badges can't be: those drawings stay coloured.
+    for shape in SHAPES {
+        for (svg, n) in [
+            (rest(shape).svg_mac(), art::MAC_SIZE),
+            (rest(shape).svg_mac_1x(), art::MAC_POINTS),
+        ] {
+            let drawing = raster(&svg, n);
+            let coloured = drawing
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|&[a, r, g, b]| a > 0 && !(r == g && g == b));
+            match template(&drawing) {
+                Some(rgba) => {
+                    assert!(!coloured, "{shape:?}");
+                    let rgba_alpha = rgba.iter().skip(3).step_by(4);
+                    let argb_alpha = drawing.iter().step_by(4);
+                    assert!(rgba_alpha.eq(argb_alpha), "{shape:?}: the shape kept");
+                    assert!(
+                        rgba.chunks(4).all(|p| p[..3] == [0, 0, 0]),
+                        "{shape:?}: black"
+                    );
+                }
+                None => assert!(coloured, "{shape:?}"),
+            }
+        }
+        let (bare, badge) = shape.badged();
+        let plain = badge.is_none() && bare != Shape::Routed;
+        assert_eq!(
+            template(&raster(&rest(shape).svg_mac(), art::MAC_SIZE)).is_some(),
+            plain,
+            "{shape:?}"
+        );
+    }
+}

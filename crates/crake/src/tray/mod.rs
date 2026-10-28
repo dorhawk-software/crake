@@ -281,6 +281,23 @@ pub fn for_light_bar(svg: &str, ink: &str) -> String {
 #[cfg(any(windows, target_os = "macos", test))]
 const NEAR: i16 = 24;
 
+/// The Mac's menu bar drawing (ARGB) as a template image's RGBA, if it's
+/// the bird's ink alone (grey: its shape is its alpha): macOS then colours
+/// it for the bar, as it does its own icons, and dims it on a display not
+/// in use (the user, 2026-10-28: it stood out there, brighter than its
+/// neighbours). A coloured mark (the call's teal, a badge) can't be a
+/// template, so that drawing stays as it is, coloured for the bar by Crake.
+#[cfg(any(target_os = "macos", test))]
+pub fn template(argb: &[u8]) -> Option<Vec<u8>> {
+    /// Bytes to a pixel, ARGB or RGBA.
+    const PIXEL: usize = 4;
+    let pixels = argb.as_chunks::<PIXEL>().0;
+    pixels
+        .iter()
+        .all(|&[a, r, g, b]| a == 0 || (r == g && g == b))
+        .then(|| pixels.iter().flat_map(|&[a, ..]| [0, 0, 0, a]).collect())
+}
+
 /// A pixel of the tray's image for a light bar: the grey bird drawn
 /// `ink`, a mark's colour (or one near it, an edge's) its light-bar one.
 #[cfg(any(windows, target_os = "macos", test))]

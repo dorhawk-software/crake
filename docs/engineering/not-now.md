@@ -311,15 +311,3 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   (`controls::over`); the one-line install command in the no-tray
   notice scrolls sideways under 6 px of padding, where a bar would sit
   over the text. Its Copy is the way to the whole line.
-- **macOS colouring the bird itself (2026-10-25, the menu bar proposal).**
-  Done halfway, 2026-10-27: the bird is drawn white or dark from the menu
-  bar's own appearance (its status button's, `sys::tray_on_light_bar`,
-  `crake_os::macos::status_item_on_light_bar`), so on Tahoe, where the
-  wallpaper sets the bar's colour, it no longer follows dark mode alone;
-  a change shows at the tray's next redraw (within 20 s idle: the
-  traffic look). Not yet, and not needed for the colour: a template image
-  (macOS dimming it on an inactive display), which would make the bird
-  change colour when the teal call or a badge comes and goes; to try on a
-  real Mac (design/proposals/menu-bar-mac.html). Crake sets the menu
-  bar's NSImage itself since 2026-10-27 (`sys::set_tray_image`: a 1x and
-  a 2x drawing, `tray::Icon::mac`), so a template would be set there.
