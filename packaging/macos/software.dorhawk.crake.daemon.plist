@@ -3,7 +3,9 @@
 <!-- craked as a launchd daemon, registered by Crake.app itself
      (SMAppService; Crake.app/Contents/Library/LaunchDaemons): root,
      started at boot, started again if it stops; launchd's SIGTERM switches
-     every tunnel off. Its log is craked's stderr. Its program is named by
+     every tunnel off. Its log is craked's own, /var/db/crake/craked.log
+     (root's alone, started again past 8 MB); stderr here holds only what
+     comes before that opens, or a crash. Its program is named by
      its place in the app (BundleProgram), so System Settings lists it
      under Crake, where the user switches it on once, not under the signing
      certificate's name (a daemon a package puts in /Library/LaunchDaemons

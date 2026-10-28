@@ -111,10 +111,11 @@ fi
 pid() {
     sudo launchctl print "system/$LABEL" 2>/dev/null | sed -n 's/^[[:space:]]*pid = //p'
 }
-# What launchd's craked writes reaches its log, after an upgrade too (asked
-# by the user, 2026-10-28: on their Mac /var/log/craked.log had stayed
-# empty for days).
-readies() { n=$(sudo grep -c "craked .* ready" /var/log/craked.log 2>/dev/null); echo "${n:-0}"; }
+# craked's log reaches its own file, root's alone, after an upgrade too
+# (asked by the user, 2026-10-28: launchd's /var/log/craked.log had stayed
+# empty, craked wrote its log to stdout, which launchd drops).
+SERVICE_LOG=/var/db/crake/craked.log
+readies() { n=$(sudo grep -c "craked .* ready" "$SERVICE_LOG" 2>/dev/null); echo "${n:-0}"; }
 # More "ready" lines than $1, within a few seconds (it's said just after
 # the socket serves).
 logged() {
@@ -123,7 +124,7 @@ logged() {
 }
 if serving && [ -n "$(pid)" ]; then
     echo "craked runs under launchd from Crake.app"
-    logged 0 || fail "craked's log (/var/log/craked.log) is empty under launchd"
+    logged 0 || fail "craked's log ($SERVICE_LOG) is empty under launchd"
     first=$(pid) before=$(readies)
     sudo installer -pkg "$PKG" -target /
     for _ in $(seq 30); do
@@ -132,15 +133,14 @@ if serving && [ -n "$(pid)" ]; then
     done
     [ -n "$(pid)" ] && [ "$(pid)" != "$first" ] || fail "an upgrade didn't restart craked"
     serving || fail "craked isn't serving after the upgrade"
-    logged "$before" || fail "the upgraded craked's log didn't reach /var/log/craked.log"
+    logged "$before" || fail "the upgraded craked's log didn't reach $SERVICE_LOG"
 else
     echo "craked isn't switched on here: started by hand"
     grep -i "smappservice" /tmp/crake-app.log | tail -3
     sudo "$APP/Contents/MacOS/craked" 2>/tmp/craked-test.log &
     serving || { cat /tmp/craked-test.log >&2; fail "craked from Crake.app isn't serving /var/run/crake.sock"; }
-    # Its output reaches the file it's given (launchd's isn't tried here).
-    for _ in $(seq 10); do grep -q "craked .* ready" /tmp/craked-test.log && break; sleep 1; done
-    grep -q "craked .* ready" /tmp/craked-test.log || fail "craked's output (/tmp/craked-test.log) is empty"
+    logged 0 || { cat /tmp/craked-test.log >&2; fail "craked's log ($SERVICE_LOG) is empty"; }
+    [ "$(sudo stat -f %Lp "$SERVICE_LOG")" = 600 ] || fail "craked's log isn't root's alone"
     sudo pkill -TERM -x craked
     for _ in $(seq 10); do pgrep -x craked >/dev/null || break; sleep 1; done
     sudo installer -pkg "$PKG" -target /

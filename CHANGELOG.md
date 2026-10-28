@@ -19,10 +19,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ### Fixed
 
-- **Crake's service keeps its log on a Mac.** `/var/log/craked.log`, where it says what it did and
-  what openconnect told it (what a helpdesk asks for), stayed empty: the service wrote to where
-  macOS keeps nothing. Now it's there, as plain text; Linux's journal also loses the colour codes
-  it had around every line.
+- **Crake's service keeps its log on a Mac.** What it did and what openconnect told it (what a
+  helpdesk asks for) went nowhere: `/var/log/craked.log` stayed empty. It's now in
+  `/var/db/crake/craked.log`, readable by root alone like the rest of what the service keeps, and
+  it starts again once it passes 8 MB (on Windows too, where it only grew). Linux's journal also
+  loses the colour codes it had around every line.
 - **A sign-in that ran out opens again by itself.** Switched off for a while, a tunnel keeps its
   sign-in so switching it on needs none, but the gateway forgets an unused one: switched on the
   next morning, the panel said "Ended by the gateway" and it took a second switch-on to sign in.

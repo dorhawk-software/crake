@@ -53,8 +53,33 @@ fn main() -> Result<()> {
     if !args.console && args.connect.is_none() {
         return service::run(args);
     }
-    log_to(None);
+    // A Mac's service keeps its own file (`service_log`); from a terminal
+    // (--dev, --connect) the log stays there.
+    let file = (cfg!(target_os = "macos") && !args.dev && args.connect.is_none())
+        .then(craked::service_log::path)
+        .flatten();
+    start_log(file.as_deref());
     run(args, None)
+}
+
+/// Logging as craked starts: to its own file at `path`, in its folder
+/// closed to others (a service where the system keeps nothing,
+/// `service_log`), or to stderr, where also a file that can't be opened
+/// says so.
+fn start_log(path: Option<&std::path::Path>) {
+    let Some(path) = path else {
+        return log_to(None);
+    };
+    let locked = craked::service_log::lock_folder(path);
+    let file = craked::service_log::open(path);
+    let unopened = file.as_ref().err().map(ToString::to_string);
+    log_to(file.ok());
+    if let Err(e) = locked {
+        tracing::error!("craked's folder isn't locked: {e}");
+    }
+    if let Some(e) = unopened {
+        tracing::error!("can't keep the log in {}: {e}", path.display());
+    }
 }
 
 /// Log to stderr, or to `file` (a service has no console); and the last
@@ -444,22 +469,11 @@ mod service {
     }
 
     fn service_main(_: Vec<OsString>) {
-        let log = std::path::Path::new(super::DEFAULT_CONFIG).with_file_name("craked.log");
         // ProgramData lets every user read what's in it: craked's folder
         // (its log, the hosts each tunnel learned, its settings) is
         // SYSTEM's and administrators' alone, and what an older Crake
-        // left there with it.
-        let locked = log.parent().map(craked::sys::create_private_dir);
-        super::log_to(
-            std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&log)
-                .ok(),
-        );
-        if let Some(Err(e)) = locked {
-            tracing::error!("craked's folder isn't locked: {e}");
-        }
+        // left there with it (`service_log::open` locks it).
+        super::start_log(craked::service_log::path().as_deref());
         if let Err(e) = serve() {
             tracing::error!("craked: {e:#}");
         }

@@ -23,6 +23,7 @@ pub mod packet;
 pub mod plan;
 pub mod policy;
 pub mod probe;
+pub mod service_log;
 pub mod settings;
 pub mod stand_in;
 pub mod sys;

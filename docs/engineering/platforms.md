@@ -74,7 +74,8 @@ build machine at run time). Not yet tried on a real Windows.
 
 **Phase 3: in progress** (tried in the Windows 11 VM against the test
 gateway VM, see below). Built: craked as the service `craked` (logs to
-ProgramData\Crake\craked.log; `--console` to run by hand); the hook over
+ProgramData\Crake\craked.log, started again past 8 MB, `service_log`;
+`--console` to run by hand); the hook over
 a named pipe through `packaging/windows/crake-hook.js` (openconnect runs
 scripts with cscript.exe, 10 s at most); the app on 127.0.0.1:47366
 (craked lets the console session change things; the app checks the port
@@ -218,7 +219,12 @@ masquerades: the first connection can work, as on Linux. craked serves
 the app on /var/run/crake.sock (peer to peer; changes need the user at
 the console or root, `Guard::ConsoleUser`); paths: hook socket in
 /var/run/crake, hook in /usr/local/libexec/crake (the system's /usr is
-sealed), state in /var/db/crake; openconnect from Homebrew
+sealed), state in /var/db/crake, craked's own log in it too
+(`craked.log`, root's alone, `service_log`; until 2026-10-28 craked
+logged to stdout, which launchd drops, so /var/log/craked.log stayed
+empty; that file, launchd's stderr, now holds only a crash or what
+comes before the log opens; the system log was decided against: every
+admin reads it); openconnect from Homebrew
 (/opt/homebrew/bin, /usr/local/bin: launchd's and Finder apps' PATH
 lack it); `packaging/macos/software.dorhawk.crake.daemon.plist` runs craked as
 a launchd daemon. IPv6 (2026-10-12, as on Windows): `route`/`ifconfig`
