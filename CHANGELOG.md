@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.17.0 (2026-10-29)
+
 ### New
 
 - **Crake's first route says what just happened.** The first time Crake sends a host through a
