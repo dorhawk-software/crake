@@ -282,15 +282,28 @@ pub(crate) fn save_a_report(cx: &mut TestAppContext) -> String {
 }
 
 /// Crake's first route says so under it in the panel, once
-/// (tray-panel.html?moment=first): it's `host`'s, and Got it puts it away.
+/// (tray-panel.html?moment=first): `host`'s, if it's the first this
+/// system's craked knows of, and Got it puts it away. Where craked's log
+/// already held routes (Windows' service keeps its log across the
+/// scenarios run before the journey, 2026-10-29), nothing is said.
 pub(crate) fn first_route_got_it(cx: &mut TestAppContext, host: &str) {
     let first = model(cx).first_route().map(|e| e.hosts.clone());
+    let p = panel(cx);
+    if first.is_none() {
+        let shown = cx
+            .update_window(p, |_, window, cx| {
+                window.render_frame(cx);
+                window.try_find("first-route-got-it").is_some()
+            })
+            .unwrap();
+        assert!(!shown, "a first route said where there were others");
+        return;
+    }
     assert_eq!(
         first.as_deref(),
         Some(&[host.to_owned()][..]),
         "the first route"
     );
-    let p = panel(cx);
     click(cx, p, "first-route-got-it");
     until(
         cx,
@@ -312,6 +325,8 @@ pub(crate) fn show_in(cx: &mut TestAppContext, log: AnyWindowHandle, host: &str)
     let key = model(cx)
         .log_days(crate::model::Show::Everything, None, "")
         .into_iter()
+        // Today's rows: earlier days may be folded away.
+        .filter(|d| d.title == "Today")
         .find_map(|d| {
             d.rows.into_iter().find_map(|r| {
                 let shown = r.show_in.as_ref().is_some_and(|(_, h)| h == host);
