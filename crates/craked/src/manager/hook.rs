@@ -111,11 +111,12 @@ impl Manager {
                 self.set_state(name, TunnelState::Connecting, false);
                 if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
                     e.ups += 1;
+                    e.lost_at.get_or_insert_with(hosts::now);
                 }
                 self.log.system(
                     Some(name),
                     format!("{display} lost the gateway. Trying again."),
-                    None,
+                    Some(self.while_lost(name)),
                 );
                 Ok(())
             }

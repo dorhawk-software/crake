@@ -11,11 +11,52 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### New
+
+- **Crake's first route says what just happened.** The first time Crake sends a host through a
+  tunnel, the panel says so under it: only that host goes through, everything else still goes
+  direct, and Undo puts it back. Got it, and it isn't said again.
+- **Show in ACME, from the log.** Point at a routed row in the log (or reach it with Tab) and its
+  tunnel's badge becomes "Show in ACME": tunnel detail opens on that host, its row lit.
+- **A question about a route stays in the panel.** With "When two tunnels answer: Ask me", the
+  notification about a host another tunnel answered for too went away on its own. Now the route
+  in the panel keeps the question, "Nordbank answers for it too.", with Use Nordbank and Keep
+  ACME, until you choose.
+
+- **When a gateway doesn't answer, sign-in checks why.** It tries the internet, the gateway's
+  name and its port, one at a time, and says where it stopped: "Internet is up", "Name found",
+  "No answer on port 443". It says which of your other tunnels are still connected, and Copy for
+  helpdesk includes what it found.
+
 ### Better
+
+- **Routed hosts show on GNOME.** With "Quiet notification", GNOME put Crake's notification only
+  in the list under the clock, so nothing showed on screen. It now shows briefly, as GNOME shows
+  any app's.
+- **A tunnel that lost its gateway says so.** While openconnect reaches its gateway again, the
+  panel says "Lost the gateway · trying again…" instead of "Connecting…", and the log says which
+  hosts can't be reached until it's back, then how long it was gone.
+- **Tunnel detail says how long hosts are kept.** Each tab has one line on it: how long Crake
+  keeps a learned host unused, that pinned hosts stay until you forget them, or that the gateway
+  sent these when it connected. An empty Learned tab says nothing was learned through it yet.
+- **Your own tunnels say how they learn.** In the panel, "Your profile" goes on with the mode you
+  chose for it, as IT's tunnels say theirs.
+- **The menu's first line says more.** "Listening · ACME, Nordbank · last route 13:21": which
+  tunnels are on and when Crake last sent a host through one today.
+- **Copy for helpdesk explains itself.** It starts with what Crake does in one sentence, and says
+  how each tunnel is connected: since when, to which gateway, with which engine and on which
+  address (gateway and address left out when you hide host names).
+- **Settings' Names says what an address means.** Its help adds that Crake routes addresses, so
+  another name on the same address goes through too.
 
 - **The bird dims with its neighbours on a Mac.** On a display you're not using, macOS dims the
   menu bar's icons, and Crake's bird stayed bright among them. Now macOS draws it like its own
   icons; while it shows a badge or the call, it keeps its colours.
+
+### Changed
+
+- **Sign-in's finished steps wear a plain check.** Teal is for what Crake decided; a step done is
+  just done.
 
 ### Fixed
 

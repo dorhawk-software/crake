@@ -22,6 +22,10 @@ mod chart;
 mod decisions;
 mod first_run;
 mod leftover;
+mod moments;
+
+#[cfg(test)]
+pub(crate) use self::moments::FIRST_ROUTE;
 mod no_tray;
 mod staying;
 mod tunnels;

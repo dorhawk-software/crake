@@ -38,7 +38,8 @@ pub(super) fn lower_first(s: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Reached the gateway, signed in, tunnel up: done (two-stroke tick), now
+/// Reached the gateway, signed in, tunnel up: done (a plain check, ink:
+/// a confirmation, not a decision of Crake's), now
 /// (dots, bold), later (empty circle); or failed there (a red cross, bold).
 /// The gateway's name is a machine fact: mono.
 /// `signing`: the sign-in step's words while it's under way ("Waiting for
@@ -89,7 +90,7 @@ pub(super) fn steps(
                 t.danger,
             )
         } else if i < at {
-            ("crake/mark-routed.svg", done, false, t.accent)
+            ("crake/check.svg", done, false, t.ink)
         } else if i == at {
             // Under way: ink (DESIGN.md, Colour: teal is for decisions).
             ("crake/dots.svg", doing, true, t.ink)

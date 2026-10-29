@@ -31,6 +31,8 @@ pub(super) struct Entry {
     /// reconnecting, restarted over TCP): a probe that spans a change says
     /// nothing about the host.
     pub(super) ups: u64,
+    /// When it lost its gateway (seconds since the epoch), until it's back.
+    pub(super) lost_at: Option<u64>,
     /// Refused because it clashes with a tunnel that's up: it's stopping,
     /// already said why, and goes Off quietly.
     pub(super) refused: bool,
@@ -65,6 +67,7 @@ impl Entry {
             replacing: false,
             up_since: None,
             ups: 0,
+            lost_at: None,
             refused: false,
             handover: false,
             attached: None,

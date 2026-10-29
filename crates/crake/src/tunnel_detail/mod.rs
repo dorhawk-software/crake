@@ -68,6 +68,10 @@ pub struct TunnelDetail {
     /// Where the host rows start in the body's scrolled content, as last
     /// drawn: only the rows in view are built (`hosts::rows_in_view`).
     rows_top: std::rc::Rc<std::cell::Cell<Option<f32>>>,
+    /// The host it was opened on (the log's "Show in ACME"): its row is
+    /// tinted, and scrolled into view once it's there.
+    shown_host: Option<String>,
+    scroll_to_host: std::cell::Cell<bool>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -346,8 +350,34 @@ impl TunnelDetail {
             confirm_forget_all: false,
             profile_locked: None,
             rows_top: std::rc::Rc::default(),
+            shown_host: None,
+            scroll_to_host: std::cell::Cell::new(false),
             _subscriptions: subscriptions,
         }
+    }
+
+    /// Show a host's row (the log's "Show in ACME"): its tab, the row
+    /// tinted and scrolled into view (once its rows have come).
+    pub fn show_host(&mut self, host: String, cx: &mut Context<Self>) {
+        let model = self.model.read(cx);
+        let only_pinned = model.host_rows.get(&self.tunnel).is_some_and(|rows| {
+            rows.iter()
+                .any(|r| r.target == host && r.kind == "pinned" && r.learned.is_none())
+        });
+        self.tab = if only_pinned {
+            Tab::Pinned
+        } else {
+            Tab::Learned
+        };
+        self.shown_host = Some(host);
+        self.scroll_to_host.set(true);
+        cx.notify();
+    }
+
+    /// The host shown from the log, for the journeys.
+    #[cfg(test)]
+    pub fn shown_host(&self) -> Option<&str> {
+        self.shown_host.as_deref()
     }
 
     /// Ask the app for something that changes nothing here.

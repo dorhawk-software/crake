@@ -9,12 +9,10 @@ use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
 use crake_proto::TunnelState;
-use crake_proto::report::{Computer, Part};
+use crake_proto::report::{Computer, PUBLIC_NAME, Part};
 
 use super::Manager;
 
-/// A public name every network can look up: Cloudflare's resolver.
-const PUBLIC_NAME: &str = "one.one.one.one";
 /// The ports a check connects to, the first that answers.
 const PORTS: [u16; 2] = [443, 80];
 /// How long a lookup, or a connection, may take.

@@ -20,7 +20,6 @@ mod rows;
 #[cfg(test)]
 mod tests;
 
-use self::rows::rows;
 use crate::focus::Keys as _;
 
 pub const WIDTH: f32 = 980.;
@@ -51,6 +50,12 @@ pub struct Log {
     /// The chart's left edge and width (window pixels), from its last paint.
     chart_geometry: std::rc::Rc<std::cell::Cell<(f32, f32)>>,
     focus: FocusHandle,
+    /// The routed row under the pointer (`rows::key`): it shows "Show in
+    /// ACME" in its badge's place.
+    pointed: Option<String>,
+    /// The routed rows' focus, kept by row: a row the keyboard is on shows
+    /// "Show in ACME" too.
+    row_focus: std::collections::HashMap<String, FocusHandle>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -58,6 +63,12 @@ pub struct Log {
 pub struct Close;
 
 impl gpui_kit::EventEmitter<Close> for Log {}
+
+/// Asks the app to open tunnel detail on a host (tunnel, host): a routed
+/// row's "Show in ACME".
+pub struct ShowIn(pub String, pub String);
+
+impl gpui_kit::EventEmitter<ShowIn> for Log {}
 
 impl Render for Log {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -83,10 +94,13 @@ impl Render for Log {
                     .child(self.today_head(&model, &t, cx))
                     .child(self.day_chart(&model, &t, cx)),
             )
-            .child(rows(
+            .child(self.rows(
+                "Today",
                 today_rows,
                 "Nothing to tell today. No host needed a decision.",
                 &t,
+                window,
+                cx,
             ));
 
         let mut rest: Vec<Day> = days.collect();
@@ -104,9 +118,9 @@ impl Render for Log {
                         .pb(px(6.))
                         .text_size(px(18.))
                         .font_weight(FontWeight::BOLD)
-                        .child(day.title),
+                        .child(day.title.clone()),
                 )
-                .child(rows(day.rows, "", &t));
+                .child(self.rows(&day.title, day.rows, "", &t, window, cx));
             if i + 1 == count && more && !self.earlier_days {
                 body = body.child(
                     div().px(px(20.)).child(
@@ -241,6 +255,8 @@ impl Log {
             drag: None,
             chart_geometry: Default::default(),
             focus,
+            pointed: None,
+            row_focus: std::collections::HashMap::new(),
             _subscriptions: subscriptions,
         }
     }

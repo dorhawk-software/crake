@@ -563,3 +563,86 @@ fn many_tunnels_keep_the_panel_on_its_screen() {
     let few = crate::model::demo();
     assert!(Panel::height(&few) < Panel::height(&m));
 }
+
+/// Crake's first route says so under it, once (tray-panel.html?moment=first):
+/// Got it puts it away for good; a second route was never the first.
+#[gpui_kit::test]
+fn the_first_route_is_said_once(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    assert!(
+        !w.shows("first-route-got-it", cx),
+        "the sample has routed before"
+    );
+    w.model.update(cx, |m, cx| {
+        *m = crate::model::demo_moment(m.clone(), "first");
+        cx.notify();
+    });
+    assert!(w.shows("first-route-got-it", cx));
+    match w.click("first-route-got-it", cx) {
+        Request::Dismiss(key) => assert_eq!(key, moments::FIRST_ROUTE),
+        other => panic!("{other:?}"),
+    }
+    cx.update(|cx| {
+        cx.global_mut::<Prefs>()
+            .dismissed
+            .insert(moments::FIRST_ROUTE.into());
+    });
+    assert!(!w.shows("first-route-got-it", cx));
+}
+
+/// Another tunnel answered for a routed host too (tray-panel.html?moment=ask):
+/// the question stays under the route; Use Nordbank moves the host, Keep
+/// ACME puts the question away.
+#[gpui_kit::test]
+fn a_question_stays_under_its_route(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    w.model.update(cx, |m, cx| {
+        *m = crate::model::demo_moment(m.clone(), "ask");
+        cx.notify();
+    });
+    let i = w.model.read_with(cx, |m, _| {
+        m.decisions(DECISIONS)
+            .iter()
+            .position(|d| d.entry.message == "Sent git.acme.internal through ACME.")
+            .unwrap()
+    });
+    match w.click(("use", i * 8), cx) {
+        Request::Move(from, to, hosts) => {
+            assert_eq!((from.as_str(), to.as_str()), ("acme", "nord"));
+            assert_eq!(hosts, ["10.40.1.20"]);
+        }
+        other => panic!("{other:?}"),
+    }
+    let key = match w.click(("keep", i), cx) {
+        Request::Dismiss(key) => key,
+        other => panic!("{other:?}"),
+    };
+    assert!(key.starts_with("keep:"), "{key}");
+    cx.update(|cx| {
+        cx.global_mut::<Prefs>().dismissed.insert(key);
+    });
+    assert!(!w.shows_element(("keep", i), cx));
+}
+
+/// A tunnel that lost its gateway says so, with the dashed head
+/// (tray-panel.html?moment=back).
+#[gpui_kit::test]
+fn a_tunnel_that_lost_its_gateway_says_so(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    w.model.update(cx, |m, cx| {
+        *m = crate::model::demo_moment(m.clone(), "back");
+        cx.notify();
+    });
+    let acme = w
+        .model
+        .read_with(cx, |m, _| {
+            m.tunnels.iter().find(|t| t.name == "acme").cloned()
+        })
+        .unwrap();
+    assert_eq!(tunnel_state(&acme), "Lost the gateway \u{b7} trying again…");
+    // Its switch stays on.
+    match w.click(("switch", 0usize), cx) {
+        Request::Switch(name, to) => assert_eq!((name.as_str(), to), ("acme", false)),
+        other => panic!("{other:?}"),
+    }
+}

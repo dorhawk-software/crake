@@ -360,7 +360,7 @@ fn help(label: &str) -> Option<&'static str> {
             "Crake remembers what needs a VPN. If you don't use something for this long, Crake forgets it, and next time tries it the normal way first.\n\nExample: with 7 days, a server you used for one project is forgotten a week later."
         }
         "Ask a tunnel\u{2019}s DNS for these names" => {
-            "DNS is the internet's phone book: it turns a name like wiki.acme.internal into an address.\n\nYour VPNs bring their own phone book for company names. Names ending like these are looked up in that VPN's book."
+            "DNS is the internet's phone book: it turns a name like wiki.acme.internal into an address.\n\nYour VPNs bring their own phone book for company names. Names ending like these are looked up in that VPN's book.\n\nCrake routes addresses. Another name on the same address goes through too."
         }
         "Keep internal names private" => {
             "When a VPN is off, your internet provider doesn't get to see your company's internal names.\n\nExample: with ACME off, looking up git.acme.internal simply fails at once instead of asking your provider."

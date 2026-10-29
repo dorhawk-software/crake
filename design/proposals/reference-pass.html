@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crake reference pass</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --ink: #1A1C1E; --muted: #5A5F64; --accent: #0F766E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF;
+    }
+    :root:not([data-theme="light"]) .l { display: none; }
+    :root:not([data-theme="light"]) .d { display: block; }
+  }
+  :root[data-theme="dark"] {
+    --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF;
+  }
+  :root[data-theme="dark"] .l { display: none; }
+  :root[data-theme="dark"] .d { display: block; }
+  .d { display: none; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--panel); color: var(--ink);
+    font: 14px/1.5 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+  }
+  ::selection { background: #0F766E; color: #fff; }
+  main { max-width: 1240px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 48px 0 4px; padding-top: 16px; border-top: 1px solid var(--line); }
+  h3 { font-size: 15px; margin: 28px 0 2px; }
+  p, li { max-width: 78ch; }
+  p { margin: 6px 0; }
+  ul { margin: 6px 0; padding-left: 20px; }
+  .muted { color: var(--muted); }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', monospace; font-size: 13px; }
+  .ref { font-size: 13px; color: var(--muted); }
+  .theme { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-top: 12px; }
+  .theme button { font: inherit; font-size: 13px; font-weight: 600; height: 32px; padding: 0 12px; border: none; background: var(--panel); color: var(--ink); cursor: pointer; }
+  .theme button + button { border-left: 1px solid var(--line); }
+  .theme button[aria-pressed="true"] { background: var(--surface); }
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; margin-top: 10px; }
+  .pair.one { grid-template-columns: minmax(0, 1fr); max-width: 980px; }
+  .pair.tall { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); max-width: 820px; }
+  figure { margin: 0; min-width: 0; }
+  figcaption { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  figcaption b { color: var(--ink); }
+  img { display: block; max-width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line); }
+  a:has(> img) { display: contents; }
+  .text { border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; font-size: 14px; }
+  .text .muted { font-size: 13px; }
+  .num { display: inline-block; min-width: 26px; font-family: 'Atkinson Hyperlegible Mono', monospace; color: var(--muted); }
+  .entry { margin-top: 28px; }
+  .entry > p:first-of-type { font-weight: 600; }
+  .note { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Crake reference pass</h1>
+  <p class="muted">2026-10-29. Crake's approved screens next to nine tray and network tools, GNOME's and Windows'
+    conventions, and apps known for their craft (Flighty, Little Snitch, Things, Panic). The research is in
+    <span class="mono">design/research/</span>; the ranked comparison is
+    <span class="mono">crake-vs-references.md</span>. Every sentence drawn was checked against what craked
+    and the app actually write. Nothing here is decided: <span class="mono">design/screens/</span> and
+    DESIGN.md are untouched.</p>
+  <div class="note">Twelve gaps, numbered as in the comparison. Each entry shows the section before and after, in one sentence,
+    with the reference it came from. Pick by number. Whole screens follow, then three new moments, then what stays as it is
+    and what was dropped.</div>
+  <div class="theme" role="group" aria-label="Pictures in">
+    <button type="button" data-t="" aria-pressed="true">System</button>
+    <button type="button" data-t="light" aria-pressed="false">Light</button>
+    <button type="button" data-t="dark" aria-pressed="false">Dark</button>
+  </div>
+
+  <h2>Tray panel</h2>
+
+  <div class="entry">
+    <p><span class="num">1</span>The policy line names the mode New tunnel and tunnel detail call it: "Your profile · Learn as it goes".</p>
+    <p class="ref">Gap 1 · Proton VPN (a mode's name that drifts across places reads as two modes) · ★ · App: one string (<span class="mono">panel/tunnels.rs</span>).</p>
+    <div class="pair">
+      <figure><figcaption><b>Before</b></figcaption><img width="450" class="l" src="reference-pass/crops/01-policy-before-light.webp" alt="Before: Your profile · learning on"><img width="450" class="d" src="reference-pass/crops/01-policy-before-dark.webp" alt="Before, dark"></figure>
+      <figure><figcaption><b>After</b></figcaption><img width="450" class="l" src="reference-pass/crops/01-policy-after-light.webp" alt="After: Your profile · Learn as it goes"><img width="450" class="d" src="reference-pass/crops/01-policy-after-dark.webp" alt="After, dark"></figure>
+    </div>
+  </div>
+
+  <div class="entry">
+    <p><span class="num">2</span>The dot beside "Listening" stands still; the mockup still had the breathing animation DESIGN.md rejected.</p>
+    <p class="ref">Gap 2 · DESIGN.md's rejected list · ★ · Not visible in a still: the mockup's <span class="mono">breath</span> keyframes are gone. The app already draws it still.</p>
+  </div>
+
+  <h2>Log</h2>
+
+  <div class="entry">
+    <p><span class="num">3</span>Every reason reads as craked writes it ("It didn't answer directly. Through ACME it answered in 38 ms."), not the mockup's shorthand.</p>
+    <p class="ref">Gap 3 · Flighty ("the exact reason behind delays") · ★ · The screen had drifted from the app; mockup only.</p>
+    <div class="pair one">
+      <figure><figcaption><b>Before</b></figcaption><img width="960" class="l" src="reference-pass/crops/03-reasons-before-light.webp" alt="Before: the log's reasons"><img width="960" class="d" src="reference-pass/crops/03-reasons-before-dark.webp" alt="Before, dark"></figure>
+      <figure><figcaption><b>After</b></figcaption><img width="960" class="l" src="reference-pass/crops/03-reasons-after-light.webp" alt="After: the reasons in craked's words"><img width="960" class="d" src="reference-pass/crops/03-reasons-after-dark.webp" alt="After, dark"></figure>
+    </div>
+  </div>
+
+  <div class="entry">
+    <p><span class="num">4</span>The routed row under the pointer or the keyboard offers "Show in ACME" where its tunnel's badge was, leading to that host in tunnel detail.</p>
+    <p class="ref">Gap 4 · Little Snitch's "Show Corresponding Rule" · App: new work (a link from the log into tunnel detail with the row selected).</p>
+    <div class="pair one">
+      <figure><figcaption><b>Before</b></figcaption><img width="960" class="l" src="reference-pass/crops/04-show-in-before-light.webp" alt="Before: the row with an ACME badge"><img width="960" class="d" src="reference-pass/crops/04-show-in-before-dark.webp" alt="Before, dark"></figure>
+      <figure><figcaption><b>After</b>, pointed at (the tint runs to the window's edges)</figcaption><img width="960" class="l" src="reference-pass/crops/04-show-in-after-light.webp" alt="After: the row tinted, with Show in ACME"><img width="960" class="d" src="reference-pass/crops/04-show-in-after-dark.webp" alt="After, dark"></figure>
+    </div>
+  </div>
+
+  <h2>Tunnel detail</h2>
+
+  <div class="entry">
+    <p><span class="num">5</span>One muted line over each list says how its hosts are kept: "Crake forgets a learned host after 7 days unused." (from Settings' "Forget hosts unused for"), with a line of the same height on Pinned and From the gateway so the list doesn't move between tabs.</p>
+    <p class="ref">Gap 5 · Little Snitch (a rule's lifetime is part of it), LuLu's "Rule Duration" · ★ · App: small.</p>
+    <div class="pair">
+      <figure><figcaption><b>Before</b></figcaption><img width="872" class="l" src="reference-pass/crops/05-lifetime-before-light.webp" alt="Before: the tabs, then the rows"><img width="872" class="d" src="reference-pass/crops/05-lifetime-before-dark.webp" alt="Before, dark"></figure>
+      <figure><figcaption><b>After</b></figcaption><img width="872" class="l" src="reference-pass/crops/05-lifetime-after-light.webp" alt="After: a line on how long hosts are kept"><img width="872" class="d" src="reference-pass/crops/05-lifetime-after-dark.webp" alt="After, dark"></figure>
+    </div>
+  </div>
+
+  <div class="entry">
+    <p><span class="num">6</span>Copy for helpdesk opens with what Crake does, and each tunnel's line adds since when, to which gateway and with which engine.</p>
+    <p class="ref">Gap 6 · Flighty's "one line", WireGuard's state in words · ★ · Drawn as the pasted text; tunnel detail itself is unchanged (a sentence there repeated its own facts). With "Hide names and addresses when sharing" on, the gateway and the address are left out. App: small (<span class="mono">model::helpdesk</span>; the facts are in the model).</p>
+    <div class="pair">
+      <figure><figcaption><b>Before</b></figcaption><img width="760" class="l" src="reference-pass/crops/helpdesk-light-before.webp" alt="The helpdesk copy as today"><img width="760" class="d" src="reference-pass/crops/helpdesk-dark-before.webp" alt="The same, dark"></figure>
+      <figure><figcaption><b>After</b></figcaption><img width="760" class="l" src="reference-pass/crops/helpdesk-light-after.webp" alt="The helpdesk copy with each tunnel's facts"><img width="760" class="d" src="reference-pass/crops/helpdesk-dark-after.webp" alt="The same, dark"></figure>
+    </div>
+  </div>
+
+  <div class="entry">
+    <p><span class="num">7</span>An empty Learned tab names its tunnel.</p>
+    <p class="ref">Gap 7 · GNOME HIG placeholders · Copy only; the sample has no empty tab, so it isn't drawn.</p>
+    <div class="pair">
+      <div class="text"><div class="muted">Before</div>Nothing here.</div>
+      <div class="text"><div class="muted">After</div>Nothing learned through ACME yet.</div>
+    </div>
+  </div>
+
+  <h2>New tunnel</h2>
+
+  <div class="entry">
+    <p><span class="num">8</span>"Found a Cisco AnyConnect gateway" wears a plain check instead of the teal routed tick.</p>
+    <p class="ref">Gap 8 · DESIGN.md, Colour ("a confirmation wears a plain check") · ★ · The screen had drifted.</p>
+    <div class="pair">
+      <figure><figcaption><b>Before</b></figcaption><img width="672" class="l" src="reference-pass/crops/08-found-before-light.webp" alt="Before: a teal tick"><img width="672" class="d" src="reference-pass/crops/08-found-before-dark.webp" alt="Before, dark"></figure>
+      <figure><figcaption><b>After</b></figcaption><img width="672" class="l" src="reference-pass/crops/08-found-after-light.webp" alt="After: an ink check"><img width="672" class="d" src="reference-pass/crops/08-found-after-dark.webp" alt="After, dark"></figure>
+    </div>
+  </div>
+
+  <h2>Settings</h2>
+
+  <div class="entry">
+    <p><span class="num">9</span>Tunnels comes first in the sidebar, and Learning loses "Try tunnels in this order", as the app already has it.</p>
+    <p class="ref">Gap 9 · DESIGN.md's Screens table and the chosen <span class="mono">settings-tunnels.html</span> · ★ · The screen had drifted; the app is already like this.</p>
+    <div class="pair">
+      <figure><figcaption><b>Before</b></figcaption><img width="896" class="l" src="reference-pass/crops/09-settings-before-light.webp" alt="Before: Settings, Learning"><img width="896" class="d" src="reference-pass/crops/09-settings-before-dark.webp" alt="Before, dark"></figure>
+      <figure><figcaption><b>After</b></figcaption><img width="896" class="l" src="reference-pass/crops/09-settings-after-light.webp" alt="After: Tunnels first, no try order in Learning"><img width="896" class="d" src="reference-pass/crops/09-settings-after-dark.webp" alt="After, dark"></figure>
+    </div>
+  </div>
+
+  <div class="entry">
+    <p><span class="num">10</span>The "?" card on "Ask a tunnel's DNS for these names" adds that Crake routes addresses, so another name on the same address goes through too.</p>
+    <p class="ref">Gap 10 · Cloudflare One's split-tunnel docs · Copy only; Names isn't the screen's default view.</p>
+    <div class="pair">
+      <div class="text"><div class="muted">Before</div>DNS is the internet's phone book: it turns a name like wiki.acme.internal into an address. Your VPNs bring their own phone book for company names. Names ending like these are looked up in that VPN's book.</div>
+      <div class="text"><div class="muted">After</div>…Names ending like these are looked up in that VPN's book. Crake routes addresses. Another name on the same address goes through too.</div>
+    </div>
+  </div>
+
+  <h2>Sign-in</h2>
+
+  <div class="entry">
+    <p><span class="num">11</span>"Reached gw.nordbank.example", "Internet is up" and "Name found" wear plain checks; the red failure mark stays.</p>
+    <p class="ref">Gap 11 · DESIGN.md, Colour (teal is never a confirmation) · ★ · The mockup was light only; the copy has DESIGN.md's dark tokens so both can be compared, so its "before" in dark is the light drawing.</p>
+    <div class="pair">
+      <figure><figcaption><b>Before</b>, single sign-on</figcaption><img width="300" class="l" src="reference-pass/crops/11a-sso-before-light.webp" alt="Before: a teal tick"><img width="300" class="d" src="reference-pass/crops/11a-sso-before-dark.webp" alt="Before, light only"></figure>
+      <figure><figcaption><b>After</b></figcaption><img width="300" class="l" src="reference-pass/crops/11a-sso-after-light.webp" alt="After: an ink check"><img width="300" class="d" src="reference-pass/crops/11a-sso-after-dark.webp" alt="After, dark"></figure>
+      <figure><figcaption><b>Before</b>, when it can't connect</figcaption><img width="300" class="l" src="reference-pass/crops/11b-cant-before-light.webp" alt="Before: teal ticks"><img width="300" class="d" src="reference-pass/crops/11b-cant-before-dark.webp" alt="Before, light only"></figure>
+      <figure><figcaption><b>After</b></figcaption><img width="300" class="l" src="reference-pass/crops/11b-cant-after-light.webp" alt="After: ink checks"><img width="300" class="d" src="reference-pass/crops/11b-cant-after-dark.webp" alt="After, dark"></figure>
+    </div>
+  </div>
+
+  <h2>The tray's menu</h2>
+
+  <div class="entry">
+    <p><span class="num">12</span>The menu's first line says when Crake last routed something: "Listening · ACME, Nordbank · last route 13:21".</p>
+    <p class="ref">Gap 12 · Time Machine's "Latest backup", Backblaze's "backed up as of" · ★ · On GNOME this line is the only place the bird's state is in words (the AppIndicator extension shows no tooltips). "· nothing routed today" when there was none; past three tunnels, "Listening · 4 tunnels". App: small (<span class="mono">model::summary</span>). The menu is the desktop's own; drawn neutral. The Mac's menu takes the same line.</p>
+    <div class="pair">
+      <figure><figcaption><b>Before</b></figcaption><img width="760" class="l" src="reference-pass/crops/menu-light-before.webp" alt="Before: Listening · ACME, Nordbank"><img width="760" class="d" src="reference-pass/crops/menu-dark-before.webp" alt="Before, dark"></figure>
+      <figure><figcaption><b>After</b></figcaption><img width="760" class="l" src="reference-pass/crops/menu-light-after.webp" alt="After: Listening · ACME, Nordbank · last route 13:21"><img width="760" class="d" src="reference-pass/crops/menu-dark-after.webp" alt="After, dark"></figure>
+    </div>
+  </div>
+
+  <h2>Whole screens</h2>
+  <p class="muted">Each changed screen whole, same sample data before and after.</p>
+
+  <h3>Tray panel (1, 2)</h3>
+  <div class="pair tall">
+    <figure><figcaption><b>Before</b></figcaption><a href="reference-pass/crops/tray-panel-light-before.webp"><img width="760" class="l" src="reference-pass/crops/tray-panel-light-before.webp" alt="Tray panel before"></a><a href="reference-pass/crops/tray-panel-dark-before.webp"><img width="760" class="d" src="reference-pass/crops/tray-panel-dark-before.webp" alt="Tray panel before, dark"></a></figure>
+    <figure><figcaption><b>After</b></figcaption><a href="reference-pass/crops/tray-panel-light-after.webp"><img width="760" class="l" src="reference-pass/crops/tray-panel-light-after.webp" alt="Tray panel after"></a><a href="reference-pass/crops/tray-panel-dark-after.webp"><img width="760" class="d" src="reference-pass/crops/tray-panel-dark-after.webp" alt="Tray panel after, dark"></a></figure>
+  </div>
+  <h3>Log (3, 4)</h3>
+  <div class="pair">
+    <figure><figcaption><b>Before</b></figcaption><a href="reference-pass/crops/log-light-before.webp"><img width="1600" class="l" src="reference-pass/crops/log-light-before.webp" alt="Log before"></a><a href="reference-pass/crops/log-dark-before.webp"><img width="1600" class="d" src="reference-pass/crops/log-dark-before.webp" alt="Log before, dark"></a></figure>
+    <figure><figcaption><b>After</b></figcaption><a href="reference-pass/crops/log-light-after.webp"><img width="1600" class="l" src="reference-pass/crops/log-light-after.webp" alt="Log after"></a><a href="reference-pass/crops/log-dark-after.webp"><img width="1600" class="d" src="reference-pass/crops/log-dark-after.webp" alt="Log after, dark"></a></figure>
+  </div>
+  <h3>Tunnel detail (5)</h3>
+  <div class="pair">
+    <figure><figcaption><b>Before</b></figcaption><a href="reference-pass/crops/tunnel-detail-light-before.webp"><img width="1600" class="l" src="reference-pass/crops/tunnel-detail-light-before.webp" alt="Tunnel detail before"></a><a href="reference-pass/crops/tunnel-detail-dark-before.webp"><img width="1600" class="d" src="reference-pass/crops/tunnel-detail-dark-before.webp" alt="Tunnel detail before, dark"></a></figure>
+    <figure><figcaption><b>After</b></figcaption><a href="reference-pass/crops/tunnel-detail-light-after.webp"><img width="1600" class="l" src="reference-pass/crops/tunnel-detail-light-after.webp" alt="Tunnel detail after"></a><a href="reference-pass/crops/tunnel-detail-dark-after.webp"><img width="1600" class="d" src="reference-pass/crops/tunnel-detail-dark-after.webp" alt="Tunnel detail after, dark"></a></figure>
+  </div>
+  <h3>New tunnel (8)</h3>
+  <div class="pair">
+    <figure><figcaption><b>Before</b></figcaption><a href="reference-pass/crops/new-tunnel-light-before.webp"><img width="1600" class="l" src="reference-pass/crops/new-tunnel-light-before.webp" alt="New tunnel before"></a><a href="reference-pass/crops/new-tunnel-dark-before.webp"><img width="1600" class="d" src="reference-pass/crops/new-tunnel-dark-before.webp" alt="New tunnel before, dark"></a></figure>
+    <figure><figcaption><b>After</b></figcaption><a href="reference-pass/crops/new-tunnel-light-after.webp"><img width="1600" class="l" src="reference-pass/crops/new-tunnel-light-after.webp" alt="New tunnel after"></a><a href="reference-pass/crops/new-tunnel-dark-after.webp"><img width="1600" class="d" src="reference-pass/crops/new-tunnel-dark-after.webp" alt="New tunnel after, dark"></a></figure>
+  </div>
+  <h3>Settings (9)</h3>
+  <div class="pair">
+    <figure><figcaption><b>Before</b></figcaption><a href="reference-pass/crops/settings-light-before.webp"><img width="1600" class="l" src="reference-pass/crops/settings-light-before.webp" alt="Settings before"></a><a href="reference-pass/crops/settings-dark-before.webp"><img width="1600" class="d" src="reference-pass/crops/settings-dark-before.webp" alt="Settings before, dark"></a></figure>
+    <figure><figcaption><b>After</b></figcaption><a href="reference-pass/crops/settings-light-after.webp"><img width="1600" class="l" src="reference-pass/crops/settings-light-after.webp" alt="Settings after"></a><a href="reference-pass/crops/settings-dark-after.webp"><img width="1600" class="d" src="reference-pass/crops/settings-dark-after.webp" alt="Settings after, dark"></a></figure>
+  </div>
+  <h3>Sign-in (11)</h3>
+  <div class="pair">
+    <figure><figcaption><b>Before</b></figcaption><a href="reference-pass/crops/sign-in-light-before.webp"><img width="1160" class="l" src="reference-pass/crops/sign-in-light-before.webp" alt="Sign-in before"></a><a href="reference-pass/crops/sign-in-dark-before.webp"><img width="1160" class="d" src="reference-pass/crops/sign-in-dark-before.webp" alt="Sign-in before, light only"></a></figure>
+    <figure><figcaption><b>After</b></figcaption><a href="reference-pass/crops/sign-in-light-after.webp"><img width="1160" class="l" src="reference-pass/crops/sign-in-light-after.webp" alt="Sign-in after"></a><a href="reference-pass/crops/sign-in-dark-after.webp"><img width="1160" class="d" src="reference-pass/crops/sign-in-dark-after.webp" alt="Sign-in after, dark"></a></figure>
+  </div>
+  <p class="muted">The menu (12) is shown whole above. Click a picture to open it at full size.</p>
+
+  <h2>New moments</h2>
+  <p class="muted">Surfaces the screens don't draw yet. Same sample world; each is new work in the app unless it says otherwise.</p>
+
+  <div class="entry">
+    <p><span class="num">A</span>The first route, once per install: a notice under the new row says what just happened and that Undo puts it back, until Got it.</p>
+    <p class="ref">Things (motion, then rest), Flighty (say what happened) · DESIGN.md's notice shape, no teal, no amber; the bird, sound and notification stay as for any route. App: new work (a "seen" flag, like <span class="mono">seen_version</span>).</p>
+    <div class="pair tall">
+      <figure><figcaption><b>Today</b></figcaption><img width="760" class="l" src="reference-pass/crops/moment-first-light-before.webp" alt="As the app shows it today"><img width="760" class="d" src="reference-pass/crops/moment-first-dark-before.webp" alt="The same, dark"></figure>
+      <figure><figcaption><b>Moment A</b></figcaption><img width="760" class="l" src="reference-pass/crops/moment-first-light-after.webp" alt="The first route notice"><img width="760" class="d" src="reference-pass/crops/moment-first-dark-after.webp" alt="The same, dark"></figure>
+    </div>
+  </div>
+
+  <div class="entry">
+    <p><span class="num">B</span>A tunnel coming back: the switch stays on, and the row says "Lost the gateway · trying again…" beside the dashed head, not "Connecting…" as at a first connection.</p>
+    <p class="ref">Flighty ("shine when things go awry"), Cloudflare One (the switch is what you asked for, the words are what is) · The dashed head is Crake's sign for "under way", ink. The bird doesn't call: a reconnect isn't Crake's decision. Row words: small; "Gone for 42 s" is new work (craked keeps the time of the drop).</p>
+    <div class="pair tall">
+      <figure><figcaption><b>Today</b></figcaption><img width="760" class="l" src="reference-pass/crops/moment-back-light-before.webp" alt="As the app shows it today"><img width="760" class="d" src="reference-pass/crops/moment-back-dark-before.webp" alt="The same, dark"></figure>
+      <figure><figcaption><b>Moment B</b></figcaption><img width="760" class="l" src="reference-pass/crops/moment-back-light-after.webp" alt="ACME: Lost the gateway, trying again"><img width="760" class="d" src="reference-pass/crops/moment-back-dark-after.webp" alt="The same, dark"></figure>
+    </div>
+    <div class="text" style="margin-top: 12px; max-width: 820px"><div class="muted">The log's lines get reasons (today they have none)</div>
+      <p><b>ACME lost the gateway. Trying again.</b><br><span class="muted">Its 5 hosts can't be reached until it's back. Everything else goes direct as usual.</span></p>
+      <p><b>ACME is back.</b><br><span class="muted">Gone for 42 s. Its 5 hosts go through it again.</span></p></div>
+  </div>
+
+  <div class="entry">
+    <p><span class="num">C</span>With "When two tunnels answer: Ask me", the question stays under the routed row, in craked's words, with both answers: Use Nordbank, Keep ACME.</p>
+    <p class="ref">Little Snitch's Silent mode (a pending decision stays on the connection) · Today the question lives only in a notification ("Keep it" there too); once answered, the line goes. App: new work (the entry exists as a System entry the panel leaves out).</p>
+    <div class="pair tall">
+      <figure><figcaption><b>Today</b></figcaption><img width="760" class="l" src="reference-pass/crops/moment-ask-light-before.webp" alt="As the app shows it today"><img width="760" class="d" src="reference-pass/crops/moment-ask-dark-before.webp" alt="The same, dark"></figure>
+      <figure><figcaption><b>Moment C</b></figcaption><img width="760" class="l" src="reference-pass/crops/moment-ask-light-after.webp" alt="The routed row with the question under it"><img width="760" class="d" src="reference-pass/crops/moment-ask-dark-after.webp" alt="The same, dark"></figure>
+    </div>
+  </div>
+
+  <h2>Kept as is</h2>
+  <ul>
+    <li><b>The reason under every decision</b>, with one number: Flighty's identity, Little Snitch's corresponding rule.</li>
+    <li><b>One mark, one meaning.</b> The two-stroke tick is Things' checkbox: the mark of the act is the identity. Teal stays rare because it marks only decisions.</li>
+    <li><b>The switch is the state; the row's second line says it in words.</b> GNOME's VPN rows have only the switch.</li>
+    <li><b>The panel's shape</b>: a Windows flyout's (summary, tasks, one link) without tiles; notices in the GNOME HIG's banner shape.</li>
+    <li><b>The fallback menu, one level deep</b>, like Tailscale's Linux tray and WireGuard's menu.</li>
+    <li><b>The sign-in window</b>: one state per view, each with its next step, including "Open the page again".</li>
+    <li><b>New tunnel says the consequence where the choice is made</b> ("Full tunnel. Crake won't learn anything.").</li>
+    <li><b>Sentence case and periods</b>, against GNOME's header capitals.</li>
+    <li><b>Motion, then rest</b>; <b>one sound for one moment</b>.</li>
+  </ul>
+
+  <h2>Dropped</h2>
+  <ul>
+    <li><b>A map of connections</b> (Little Snitch, Mullvad, Proton): "The internet is never drawn."</li>
+    <li><b>State told by colour</b>, and <b>marks that need a legend</b> (Mullvad, Little Snitch, Tailscale's dot grid): the bird changes shape, not colour; buttons name the action.</li>
+    <li><b>Blinking, flashing, shimmer or a pulsing "trying again"</b>: the rejected breathing dot in another form.</li>
+    <li><b>Counters and charts as reassurance</b> (Proton's NetShield counts, Flighty's lifetime stats): numbers that answer no question.</li>
+    <li><b>A modal alert that holds the connection</b> (Little Snitch, LuLu), <b>a three-pane monitor</b>, <b>per-app routing</b>.</li>
+    <li><b>"Expires in" on a hand-added host</b> and <b>"Today / Earlier" headings in Learned</b>: a second decision in a row that has one; a heading that splits nothing.</li>
+    <li><b>Teenage Engineering's hardware look, Flighty's split-flap board, Panic's jokes, Things' pop on every act, Linear's themes, confetti for the first route</b>: all on DESIGN.md's rejected list.</li>
+    <li><b>"Last heard from the gateway 6 s ago"</b> (WireGuard) and <b>other names on a routed address, per row</b> (Cloudflare): claims the app can't make today; written down for later.</li>
+  </ul>
+  <p class="muted">Platform findings (GNOME hides Low-urgency banners, the AppIndicator click, Windows toasts' sender and the tray overflow,
+    Win11's 8 px corners, the Mac's notch) are in <span class="mono">crake-vs-references.md</span>, for docs/engineering.</p>
+</main>
+<script>
+  (function () {
+    var root = document.documentElement;
+    var buttons = document.querySelectorAll('.theme button');
+    function set(t) {
+      if (t) root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
+      buttons.forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-t') === t)); });
+      try { localStorage.setItem('crake-ref-theme', t); } catch (e) { /* storage blocked */ }
+    }
+    var saved = '';
+    try { saved = localStorage.getItem('crake-ref-theme') || ''; } catch (e) { /* storage blocked */ }
+    set(saved);
+    buttons.forEach(function (b) { b.addEventListener('click', function () { set(b.getAttribute('data-t')); }); });
+  })();
+</script>
+</body>
+</html>

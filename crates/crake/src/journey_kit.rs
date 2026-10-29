@@ -280,3 +280,53 @@ pub(crate) fn save_a_report(cx: &mut TestAppContext) -> String {
     });
     std::fs::read_to_string(&file).unwrap()
 }
+
+/// Crake's first route says so under it in the panel, once
+/// (tray-panel.html?moment=first): it's `host`'s, and Got it puts it away.
+pub(crate) fn first_route_got_it(cx: &mut TestAppContext, host: &str) {
+    let first = model(cx).first_route().map(|e| e.hosts.clone());
+    assert_eq!(
+        first.as_deref(),
+        Some(&[host.to_owned()][..]),
+        "the first route"
+    );
+    let p = panel(cx);
+    click(cx, p, "first-route-got-it");
+    until(
+        cx,
+        "the first route's notice put away",
+        Duration::from_secs(10),
+        |cx| {
+            cx.read(|cx| {
+                cx.global::<crate::prefs::Prefs>()
+                    .dismissed
+                    .contains(panel::FIRST_ROUTE)
+            })
+        },
+    );
+}
+
+/// The log's "Show in ACME" on a routed host's row: tunnel detail opens on
+/// that host (log.html?pointed=13:21).
+pub(crate) fn show_in(cx: &mut TestAppContext, log: AnyWindowHandle, host: &str) {
+    let key = model(cx)
+        .log_days(crate::model::Show::Everything, None, "")
+        .into_iter()
+        .find_map(|d| {
+            d.rows.into_iter().find_map(|r| {
+                let shown = r.show_in.as_ref().is_some_and(|(_, h)| h == host);
+                shown.then(|| format!("{}|{}|{}", d.title, r.time, r.text))
+            })
+        })
+        .expect("a routed row for the host");
+    click(
+        cx,
+        log,
+        gpui_kit::SharedString::from(format!("show-in:{key}")),
+    );
+    let (_, view) =
+        wait_window::<crate::tunnel_detail::TunnelDetail>(cx, "tunnel detail opens on the host");
+    until(cx, "the host's row shown", Duration::from_secs(10), |cx| {
+        view.read_with(cx, |v, _| v.shown_host() == Some(host))
+    });
+}

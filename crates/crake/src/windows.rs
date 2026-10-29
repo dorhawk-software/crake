@@ -292,7 +292,7 @@ pub(super) fn open_settings(cx: &mut App) {
 
 /// Tunnel detail (design/screens/tunnel-detail.html). One at a time: asked
 /// for another tunnel, it shows that one instead.
-pub(super) fn open_detail(tunnel: String, cx: &mut App) {
+pub(super) fn open_detail(tunnel: String, host: Option<String>, cx: &mut App) {
     to_front(cx);
     if let Some((shown, handle)) = cx.global_mut::<Shell>().detail.take() {
         if shown == tunnel
@@ -300,6 +300,7 @@ pub(super) fn open_detail(tunnel: String, cx: &mut App) {
                 .update(cx, |_, window, _| window.activate_window())
                 .is_ok()
         {
+            show_host(handle, host, cx);
             cx.global_mut::<Shell>().detail = Some((shown, handle));
             return;
         }
@@ -344,7 +345,15 @@ pub(super) fn open_detail(tunnel: String, cx: &mut App) {
     if let Ok(handle) = opened {
         let handle: AnyWindowHandle = handle.into();
         let _ = handle.update(cx, |_, window, _| window.activate_window());
+        show_host(handle, host, cx);
         cx.global_mut::<Shell>().detail = Some((tunnel, handle));
+    }
+}
+
+/// Tunnel detail on a host's row (the log's "Show in ACME").
+fn show_host(handle: AnyWindowHandle, host: Option<String>, cx: &mut App) {
+    if let (Some(host), Some(detail)) = (host, handle.downcast::<tunnel_detail::TunnelDetail>()) {
+        let _ = detail.update(cx, |view, _, cx| view.show_host(host, cx));
     }
 }
 
@@ -503,6 +512,12 @@ pub(super) fn open_log(cx: &mut App) {
             cx.subscribe(&view, move |_, _: &log_view::Close, cx| {
                 let _ = handle.update(cx, |_, window, _| window.remove_window());
                 cx.global_mut::<Shell>().log = None;
+            })
+            .detach();
+            // A routed row's "Show in ACME": tunnel detail on that host.
+            cx.subscribe(&view, |_, e: &log_view::ShowIn, cx| {
+                let (tunnel, host) = (e.0.clone(), e.1.clone());
+                cx.defer(move |cx| open_detail(tunnel, Some(host), cx));
             })
             .detach();
             view
@@ -715,7 +730,7 @@ mod tests {
             ("Settings", open_settings),
             ("the log", open_log),
             ("New tunnel", |cx| open_new_tunnel(None, cx)),
-            ("tunnel detail", |cx| open_detail("acme".into(), cx)),
+            ("tunnel detail", |cx| open_detail("acme".into(), None, cx)),
         ];
         for (name, open) in opens {
             for time in ["opening", "opening again"] {

@@ -498,3 +498,43 @@ fn a_window_left_short_keeps_its_card_inside(cx: &mut TestAppContext) {
     );
     assert!(cancel, "Cancel is still there, a scroll away");
 }
+
+/// openconnect that can't reach its gateway.
+const UNREACHABLE: &str = r#"#!/bin/sh
+echo "Failed to connect to host vpn.acme.example" >&2
+echo "Failed to open HTTPS connection to vpn.acme.example" >&2
+exit 1
+"#;
+
+/// A gateway that didn't answer: Crake checks why, one step at a time
+/// (design/screens/sign-in.html, "When it can't connect"), and Copy for
+/// helpdesk says what it found; Try again starts afresh.
+#[gpui_kit::test]
+fn a_gateway_that_didnt_answer_is_checked(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open(cx, fake_with(dir.path(), UNREACHABLE));
+    w.until("the failure", cx, |s| {
+        matches!(s, Stage::Failed { at: 0, .. })
+    });
+    assert!(w.view.read_with(cx, |s, _| s.checks.is_some()), "checking");
+    // The internet tried for real: answered or not (CI's containers have
+    // no network), it's said within the checks' wait.
+    let end = Instant::now() + Duration::from_secs(15);
+    while w.view.read_with(cx, |s, _| {
+        s.checks.as_ref().is_some_and(|c| c.internet.is_none())
+    }) {
+        assert!(Instant::now() < end, "the internet never checked");
+        std::thread::sleep(Duration::from_millis(50));
+        cx.run_until_parked();
+    }
+    w.click("helpdesk", cx);
+    let copied = cx
+        .read_from_clipboard()
+        .and_then(|c| c.text())
+        .unwrap_or_default();
+    assert!(copied.contains("\nChecked:\n  "), "{copied}");
+    w.click("retry", cx);
+    w.until("it failed again", cx, |s| matches!(s, Stage::Failed { .. }));
+    w.click("close", cx);
+    assert!(w.closed.get());
+}

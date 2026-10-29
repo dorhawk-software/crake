@@ -83,6 +83,21 @@ impl TunnelDetail {
         let (bar, confirm) = self.forget_all(bar, rows, &display, t, cx);
 
         let (list, empty) = self.rows_list(&learned, &pinned, &gateway, t, window, cx);
+        let forget = self.model.read(cx).setting("forget_after_days").to_owned();
+        // How long the tab's hosts stay: said once, over the list, the same
+        // height on every tab so the list doesn't move between them.
+        let kept = div()
+            .py(px(10.))
+            .text_size(px(13.))
+            .text_color(t.muted)
+            .border_b_1()
+            .border_color(t.line)
+            .child(kept_line(self.tab, &display, &forget));
+        let nothing = if self.tab == Tab::Learned {
+            format!("Nothing learned through {display} yet.")
+        } else {
+            "Nothing here.".to_owned()
+        };
 
         // The form's hint: a name under its domain, an address in its network.
         let domain = tunnel
@@ -117,6 +132,7 @@ impl TunnelDetail {
             .px(px(28.))
             .child(bar)
             .children(confirm)
+            .child(kept)
             .child(list)
             .when(empty, |d| {
                 d.child(
@@ -125,7 +141,7 @@ impl TunnelDetail {
                         .text_color(t.muted)
                         .border_b_1()
                         .border_color(t.line)
-                        .child("Nothing here."),
+                        .child(nothing),
                 )
             })
             .when(!tunnel.full_tunnel, |d| {
@@ -203,6 +219,24 @@ impl TunnelDetail {
             Tab::Gateway => gateway.len(),
         };
         let body = crate::controls::scroll_handle(super::BODY, window, cx);
+        // Opened on a host: scroll its row into view, a row's height below
+        // the top, once the rows and where they start are known.
+        if let (true, Some(top), Some(host)) = (
+            self.scroll_to_host.get(),
+            self.rows_top.get(),
+            self.shown_host.as_deref(),
+        ) {
+            let list = if self.tab == Tab::Pinned {
+                pinned
+            } else {
+                learned
+            };
+            if let Some(i) = list.iter().position(|r| r.target == host) {
+                let to = top + i as f32 * ROW_HEIGHT - ROW_HEIGHT;
+                body.set_offset(gpui_kit::point(px(0.), px(-to.max(0.))));
+                self.scroll_to_host.set(false);
+            }
+        }
         let range = self
             .rows_top
             .get()
@@ -303,7 +337,9 @@ impl TunnelDetail {
         };
         let (target, pin_target) = (r.target.clone(), r.target.clone());
         let (danger, surface) = (t.danger, t.surface);
+        let shown = self.shown_host.as_deref() == Some(r.target.as_str());
         row_frame(t)
+            .when(shown, |row| row.bg(t.nav_hover))
             .child(icon(icon_path, color))
             .child(host_text(i, host, how, t, cx))
             .child(used_text(used, t))
@@ -365,6 +401,20 @@ pub(super) fn rows_in_view(
 /// Each tab's count: learned hosts, pinned ones, the gateway's. A learned
 /// host since pinned shows in Learned too, but counts once, under Pinned
 /// (design/proposals/critique-2026-10-15, 5).
+/// The line over a tab's list: how long its hosts are kept
+/// (`forget_after_days`, Settings → Learning: a number of days or "never").
+pub(super) fn kept_line(tab: Tab, display: &str, forget: &str) -> String {
+    match tab {
+        Tab::Learned => match forget.parse::<u32>() {
+            Ok(1) => "Crake forgets a learned host after a day unused.".into(),
+            Ok(days) => format!("Crake forgets a learned host after {days} days unused."),
+            Err(_) => "Crake keeps a learned host until you forget it.".into(),
+        },
+        Tab::Pinned => "Pinned hosts are kept until you forget them.".into(),
+        Tab::Gateway => format!("{display}\u{2019}s gateway sent these when it connected."),
+    }
+}
+
 pub(super) fn tab_counts(rows: &[HostRow], gateway: usize) -> [usize; TABS] {
     let of = |kind: &str| rows.iter().filter(|r| r.kind == kind).count();
     [of("learned"), of("pinned"), gateway]

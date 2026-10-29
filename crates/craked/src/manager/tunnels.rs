@@ -231,7 +231,9 @@ impl Manager {
         }
         let routed = self.apply_routing(name, &display, &info).await?;
         let mut first = first;
+        let mut lost_at = None;
         if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
+            lost_at = e.lost_at.take();
             e.info = Some(info.clone());
             first &= !std::mem::take(&mut e.resumed);
             if first || e.up_since.is_none() {
@@ -273,7 +275,14 @@ impl Manager {
                 format!("{display} is up. Sending {n} known destinations through it.")
             }
         };
-        self.log.system(Some(name), text, Some(summary));
+        // Back: for how long it was gone and its hosts, as the panel's
+        // "Lost the gateway" left them (design/screens/tray-panel.html).
+        let why = if first {
+            summary
+        } else {
+            self.back_after(name, lost_at)
+        };
+        self.log.system(Some(name), text, Some(why));
         Ok(())
     }
 

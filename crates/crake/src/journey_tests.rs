@@ -128,6 +128,7 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
         Duration::from_secs(10),
         |cx| decided(cx, crate::model::Action::Undo).is_some(),
     );
+    crate::journey_kit::first_route_got_it(cx, "10.40.1.10");
     let p = panel(cx);
     let i = decided(cx, crate::model::Action::Undo).unwrap();
     click(cx, p, ("act", i));
@@ -161,7 +162,7 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
     whats_new(cx);
 
     // 4. Tunnel detail: "Add a host" sends one through ACME.
-    request(cx, Request::OpenDetail("acme".into()));
+    request(cx, Request::OpenDetail("acme".into(), None));
     let (d, view) = wait_window::<tunnel_detail::TunnelDetail>(cx, "tunnel detail opens");
     let field = view.read_with(cx, |v, _| v.add_field());
     type_into(cx, d, field, "10.40.1.11");
@@ -302,6 +303,8 @@ fn the_log(cx: &mut TestAppContext) {
         .and_then(|c| c.text())
         .unwrap_or_default();
     assert!(copied.contains("Sent 10.40.1.10 through ACME."), "{copied}");
+    // A routed row's "Show in ACME": tunnel detail, on that host.
+    crate::journey_kit::show_in(cx, l, "10.40.1.10");
     // Settings → Diagnostics → Save a report…: the same decisions, and
     // craked's side of the computer, ACME's name tried through ACME.
     let report = crate::journey_kit::save_a_report(cx);

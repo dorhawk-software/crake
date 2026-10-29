@@ -218,3 +218,36 @@ fn with_the_systems_window_buttons(cx: &mut TestAppContext) {
         "\"Log\" is centred at {middle:.1} px, the buttons at {line:.1}"
     );
 }
+
+/// A routed row's badge, or "Show in ACME" in its place, asks for the
+/// tunnel's detail on that host (design/screens/log.html?pointed=13:21);
+/// pointed at, the row is lit.
+#[gpui_kit::test]
+fn a_routed_row_shows_its_host_in_its_tunnel(cx: &mut TestAppContext) {
+    let w = open(cx);
+    let (key, want) = w.view.update(cx, |log, cx| {
+        log.days(cx)
+            .into_iter()
+            .find_map(|d| {
+                d.rows.into_iter().find_map(|r| {
+                    let key = format!("{}|{}|{}", d.title, r.time, r.text);
+                    r.show_in.map(|s| (key, s))
+                })
+            })
+            .expect("the sample routed a host")
+    });
+    let asked = std::rc::Rc::new(std::cell::RefCell::new(None));
+    let seen = asked.clone();
+    cx.update(|cx| {
+        cx.subscribe(&w.view, move |_, e: &ShowIn, _| {
+            *seen.borrow_mut() = Some((e.0.clone(), e.1.clone()));
+        })
+        .detach()
+    });
+    w.view.update(cx, |log, cx| {
+        log.pointed = Some(key.clone());
+        cx.notify();
+    });
+    w.click(gpui_kit::SharedString::from(format!("show-in:{key}")), cx);
+    assert_eq!(asked.borrow().clone(), Some(want));
+}

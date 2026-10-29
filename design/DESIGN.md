@@ -100,6 +100,26 @@ Don't drift back into these. Each was tried and dropped for a reason.
   for machine facts. Chosen (2026-10-21): the notices' shape in the panel
   ("Crake is now 0.15.0: 9 changes since 0.13.1.", What's new, Not now), and
   the kinds as small muted headings in the window.
+- **What the reference pass left out** (design/proposals/reference-pass.html,
+  research in design/research/; the user took all twelve gaps and three
+  moments, 2026-10-29): a map of connections ("the internet is never
+  drawn"); state told by colour (Mullvad's green and red padlock, Windows'
+  accent shield); marks that need a legend (Tailscale's dot grid, Little
+  Snitch's coloured buttons); blinking, flashing, a shimmer or a pulsing
+  "trying again" (the breathing dot in another form); counters and charts
+  as reassurance (Proton's NetShield counts, lifetime stats); a modal
+  alert that holds the connection (Little Snitch, LuLu); a three-pane
+  monitor; per-app routing; "Expires in" on a hand-added host; "Today /
+  Earlier" headings in Learned; GNOME's header capitals, a bottom toast in
+  the panel, an illustrated empty state, a summary notification ("3 hosts
+  routed"); confetti or a louder call for the first route. Also, from its
+  review: **a sentence for the helpdesk under tunnel detail's facts** (it
+  repeated the four facts right above it; the helpdesk copy carries it),
+  and **a two-tunnel question that replaces the route's reason** (the
+  reason stays; the question is a line of its own, with both answers).
+  Written down for later, not drawn: "Last heard from the gateway 6 s ago"
+  (openconnect's keepalives don't reach craked) and the other names on a
+  routed address per row (craked doesn't keep names per address).
 
 ## Principles
 
@@ -432,6 +452,39 @@ mark as dorhawk.software/crake's.
   hand, the panel opens near the top of the screen with a neutral note
   (surface, no amber: the tray is optional; no teal: a bordered action and
   a muted "Not now"); at login, one notification instead of a window.
+- How long hosts are kept is said once, over the list, not on every row:
+  tunnel detail's tabs each carry one muted line of the same height
+  ("Crake forgets a learned host after 7 days unused.", "Pinned hosts are
+  kept until you forget them.", "ACME's gateway sent these when it
+  connected."), so the list doesn't move between tabs. An empty tab names
+  its tunnel: "Nothing learned through ACME yet."
+- The log's routed row, pointed at or focused, shows **Show in ACME** in its
+  badge's place (a small action), tinted `navHover` to the window's edges;
+  it opens tunnel detail on that host's row.
+- The panel's moments (`tray-panel.html?moment=…`): Crake's **first route**
+  gets a notice under its row, once per install ("Crake's first route." /
+  "Only git.acme.internal goes through ACME. Everything else still goes
+  direct. Each time Crake sends a host through a tunnel, it shows here, and
+  Undo puts it back.", Got it); a tunnel that **lost its gateway** keeps
+  its switch on and says "Lost the gateway · trying again…" after the
+  dashed head (ink), and the log says "ACME lost the gateway. Trying
+  again." / "Its 5 hosts can't be reached until it's back. Everything else
+  goes direct as usual.", then "ACME is back." / "Gone for 42 s. Its 5
+  hosts go through it again."; **two tunnels answered** with "When two
+  tunnels answer: Ask me": under the route's reason, "Nordbank answers for
+  it too." with Use Nordbank (small action) and Keep ACME (muted dismiss),
+  until one is chosen.
+- The tray's menu (and the tooltip, the Mac's menu) opens with what the
+  bird would say: "Listening · ACME, Nordbank · last route 13:21", "· nothing
+  routed today" without one, "Listening · 4 tunnels" past three. On GNOME
+  it's the only place the bird's state is in words: the AppIndicator
+  extension shows no tooltips.
+- Copy for helpdesk opens with "Crake sends only the hosts that need a
+  tunnel through one. Everything else goes direct." and each tunnel's line
+  says since when, to which gateway, with which engine and from which
+  address ("ACME: Connected · 5 hosts, since 08:31 to vpn.acme.example with
+  openconnect, address 10.40.12.7"); hiding names leaves the gateway and
+  the address out.
 - Segmented controls frame the chosen segment in its own colour (each
   segment draws its own edges): a grey rim around dark teal reads as blur
   in light mode, as it did in settings.html and log.html.
@@ -440,11 +493,13 @@ mark as dorhawk.software/crake's.
 
 | File | What it shows |
 | --- | --- |
-| `tray-panel.html` | The main surface: last hour, what Crake did, tunnels with policy, full log / copy for helpdesk |
+| `tray-panel.html` | The main surface: last hour, what Crake did, tunnels with policy ("Your profile · Learn as it goes"), full log / copy for helpdesk. `?moment=first` (the first route's notice), `back` (a tunnel that lost its gateway), `ask` (two tunnels answered) |
+| `tray-menu.html` | The desktop's own menu, the fallback and the Mac's: the summary line, tunnels with checks, Open Crake, New tunnel…, Settings…, Quit |
+| `helpdesk-copy.html` | What Copy for helpdesk puts on the clipboard |
 | `new-tunnel.html` | Three steps: server and protocol (auto-detect, AnyConnect/ocserv, GlobalProtect, Ivanti/Pulse, Juniper NC, Fortinet, F5, Array), sign-in method, routing mode |
 | `settings.html` | General, Learning, Names (DNS), Privacy & log, Managed by IT, Diagnostics (the report), About; plus Tunnels, first (`proposals/settings-tunnels.html`): the tunnels in traffic order, Edit / Remove…, + New tunnel |
-| `log.html` | Day chart and decisions as sentences, filters, search, Copy for helpdesk |
-| `tunnel-detail.html` | Facts, policy, today's chart, learned / pinned / gateway hosts, add a host |
+| `log.html` | Day chart and decisions as sentences (craked's own), filters, search, Copy for helpdesk. `?pointed=13:21`: the routed row pointed at, with Show in ACME |
+| `tunnel-detail.html` | Facts, policy, today's chart, learned / pinned / gateway hosts with how long each is kept, add a host |
 | `sign-in.html` | Browser sign-on waiting, one-time code, couldn't reach gateway |
 
 Open any of them directly in a browser. Add `?dark=true` or `?dark=false` to
@@ -454,8 +509,9 @@ force a theme.
 
 - The tray uses StatusNotifierItem/AppIndicator. Its native menu can't be
   styled, so the rich panel is Crake's own popover window anchored under the
-  icon. Keep a plain native menu as a fallback (tunnels with check marks, Open
-  Crake, Quit).
+  icon. Keep a plain native menu as a fallback (the summary line, tunnels
+  with check marks, Open Crake, New tunnel…, Settings…, Quit:
+  `tray-menu.html`).
 - Notifications use the system's. Default: a quiet notification per routed
   host with an Undo action. Optional "crex crex" sound, off by default.
 - Passwords live in the system keyring (Secret Service), never in Crake's files.

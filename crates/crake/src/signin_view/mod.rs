@@ -18,7 +18,9 @@ use crate::model::Model;
 use crate::signin::{Ask, Event, Prompt, Reply, Spec};
 use crate::theme::{Theme, fonts};
 
+mod checks;
 mod explain;
+mod failed;
 mod question;
 mod widgets;
 
@@ -87,6 +89,10 @@ pub struct SignIn {
     handed_over: bool,
     /// Copy for helpdesk was used, and when ("Copied" shows for a while).
     copied: Option<std::time::Instant>,
+    /// When it began to reach the gateway (this try).
+    reaching_since: std::time::Instant,
+    /// Why the gateway couldn't be reached, as checked (`checks`).
+    checks: Option<checks::Checks>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -141,67 +147,8 @@ impl Render for SignIn {
 
         card = match self.stage.clone() {
             Stage::Asking(prompt) => card.child(self.question(&prompt, &t, window, cx)),
-            // "When it can't connect": what happened, the steps up to where it
-            // stopped, Copy for helpdesk and Try again.
-            Stage::Failed { reason, at } => {
-                let why = explain(&reason, at, &self.spec);
-                card.child(title(why.title))
-                    .child(para(why.sentence, t.ink))
-                    .child(steps(at, Some((at, why.row)), None, &self.spec, &t))
-                    // openconnect's (or openvpn3's) own words, for whoever helps.
-                    .child(
-                        div()
-                            .mt(px(12.))
-                            .text_size(px(13.))
-                            .text_color(t.muted)
-                            .child(format!("{} said: {reason}", self.spec.program())),
-                    )
-                    // Beside the words it copies: the buttons' row has room
-                    // for two (design/proposals/signin-error-buttons.html, A).
-                    .child(
-                        div()
-                            .mt(px(6.))
-                            .flex()
-                            .items_center()
-                            .child(
-                                link("helpdesk", "Copy for helpdesk", &t)
-                                    .keys()
-                                    .on_click(
-                                        cx.listener(|this, _, _, cx| this.copy_for_helpdesk(cx)),
-                                    )
-                                    .test_support(),
-                            )
-                            .when(self.copied.is_some_and(|c| c.elapsed() < COPIED_FOR), |d| {
-                                d.child(crate::controls::copied(&t))
-                            }),
-                    )
-                    .child(
-                        buttons()
-                            .child(div().flex_1())
-                            .child(
-                                button("close", "Close", Look::Text, &t)
-                                    .keys()
-                                    .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
-                                    .test_support(),
-                            )
-                            .child(if reason.starts_with(crake_proto::trouble::KEY_MISMATCH) {
-                                // A key the gateway turns down only IT can fix:
-                                // trying again can't help, changing it can
-                                // (design/proposals/ipsec-tunnel.html).
-                                button("change-key", "Change the key\u{2026}", Look::Primary, &t)
-                                    .keys()
-                                    .on_click(cx.listener(|this, _, _, cx| this.change_key(cx)))
-                                    .test_support()
-                            } else {
-                                button("retry", "Try again", Look::Primary, &t)
-                                    .keys()
-                                    .on_click(
-                                        cx.listener(|this, _, window, cx| this.retry(window, cx)),
-                                    )
-                                    .test_support()
-                            }),
-                    )
-            }
+            // "When it can't connect" (failed.rs).
+            Stage::Failed { reason, at } => card.child(self.failed(&reason, at, &t, cx)),
             // design/screens/sign-in.html, "Single sign-on".
             Stage::Browser { url, browser } => card
                 .child(title(format!("Sign in to {display}")))
@@ -467,6 +414,8 @@ impl SignIn {
             model,
             handed_over: false,
             copied: None,
+            reaching_since: std::time::Instant::now(),
+            checks: None,
             requests,
             replies,
             stage: Stage::Reaching,
@@ -549,6 +498,13 @@ impl SignIn {
                 }
                 self.signing(false, false, cx);
                 let at = self.stage.step().min(2);
+                // A gateway that didn't answer: check why (openconnect's;
+                // craked reaches OpenVPN's and IPsec's itself).
+                if explain(&reason, at, &self.spec).unreachable
+                    && self.spec.program() == "openconnect"
+                {
+                    self.check_why(self.reaching_since, cx);
+                }
                 self.stage = Stage::Failed { reason, at };
                 window.focus(&self.focus, cx);
             }
@@ -605,6 +561,8 @@ impl SignIn {
         self.signing(true, false, cx);
         self.replies = start(self.spec.clone(), self.requests.clone(), window, cx);
         self.stage = Stage::Reaching;
+        self.reaching_since = std::time::Instant::now();
+        self.checks = None;
         // OpenVPN, IPsec: craked runs the sign-in; switched on again, it
         // asks.
         if crate::signin::craked_asks(&self.spec.protocol) {
@@ -622,10 +580,13 @@ impl SignIn {
             _ => return,
         };
         let now = jiff::Zoned::now().strftime("%Y-%m-%d %H:%M %Z").to_string();
-        let text = format!(
+        let mut text = format!(
             "Crake, {now}\nCouldn\u{2019}t sign in to {} ({}, {}).\n{reason}\n",
             self.spec.display, self.spec.gateway, self.spec.protocol
         );
+        if let Some(checks) = &self.checks {
+            text += &format!("Checked:\n{}", checks.as_text(&self.spec.gateway));
+        }
         cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(text));
         // Said, then gone: it copied (it used to copy and say nothing).
         self.copied = Some(std::time::Instant::now());

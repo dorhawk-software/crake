@@ -98,7 +98,11 @@ pub fn routed(entry: &LogEntry, requests: async_channel::Sender<Request>) {
     let (Some(tunnel), hosts) = (entry.tunnel.clone(), entry.hosts.clone()) else {
         return;
     };
-    let mut n = note(entry, Urgency::Low, ROUTED_SHOWN);
+    // Normal, not Low: GNOME shows a Low notification only in the list
+    // under the clock, with no banner, so "Quiet notification" showed
+    // nothing on screen there (gnome-shell's messageTray; decided with the
+    // user, 2026-10-29). GNOME keeps its own 4 s, not ROUTED_SHOWN.
+    let mut n = note(entry, Urgency::Normal, ROUTED_SHOWN);
     n.action("undo", "Undo").action("default", "Open Crake");
     std::thread::spawn(move || {
         let Ok(handle) = n.show() else { return };

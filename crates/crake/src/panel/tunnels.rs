@@ -38,21 +38,7 @@ impl Panel {
                                             .text_color(if on { t.ink } else { t.muted })
                                             .child(tunnel.display.clone()),
                                     )
-                                    .child(
-                                        div()
-                                            .text_size(px(13.))
-                                            .text_color(
-                                                if tunnel.state == "trouble"
-                                                    || (tunnel.state == "connected"
-                                                        && tunnel.dns_down)
-                                                {
-                                                    t.danger
-                                                } else {
-                                                    t.muted
-                                                },
-                                            )
-                                            .child(tunnel_state(tunnel)),
-                                    )
+                                    .child(self.state_line(tunnel, t))
                                     // Stopped on its own: seen, it's plain Off
                                     // (design/proposals/dismiss-trouble.html, A).
                                     .when(tunnel.state == "trouble", |row| {
@@ -93,9 +79,15 @@ impl Panel {
                                     let color = if tunnel.full_tunnel { t.ink } else { t.muted };
                                     (icon, tunnel.policy.clone(), color)
                                 } else {
+                                    // The mode as New tunnel names it.
+                                    let mode =
+                                        tunnel.own.get("mode").map_or("learn", String::as_str);
                                     (
                                         "crake/person.svg",
-                                        "Your profile · learning on".to_owned(),
+                                        format!(
+                                            "Your profile · {}",
+                                            crate::new_tunnel::mode_name(mode)
+                                        ),
                                         t.muted,
                                     )
                                 };
@@ -243,6 +235,25 @@ fn dismiss(i: usize, name: String, t: &Theme, cx: &mut Context<Panel>) -> impl I
             this.send(Request::DismissTrouble(name.clone()));
         }))
         .test_support()
+}
+
+impl Panel {
+    /// A tunnel's state beside its name; a tunnel that lost its gateway
+    /// wears the dashed head, under way (ink, not teal: a reconnect isn't
+    /// Crake's decision).
+    fn state_line(&self, tunnel: &crate::client::Tunnel, t: &Theme) -> Div {
+        let alarm = tunnel.state == "trouble" || (tunnel.state == "connected" && tunnel.dns_down);
+        div()
+            .flex()
+            .items_center()
+            .gap(px(6.))
+            .when(crate::model::reconnecting(tunnel), |d| {
+                d.child(crate::head::under_way(t.ink, self.motion.opened))
+            })
+            .text_size(px(13.))
+            .text_color(if alarm { t.danger } else { t.muted })
+            .child(tunnel_state(tunnel))
+    }
 }
 
 /// What "Got it" remembers for a browser's notice.

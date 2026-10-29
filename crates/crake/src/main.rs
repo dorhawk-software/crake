@@ -214,8 +214,8 @@ pub enum Request {
     /// OpenVPN 3: the session (its openvpn3 path) ended (why, if it
     /// dropped).
     Detached(String, String, Option<String>),
-    /// Open tunnel detail for this tunnel (or bring it to the front).
-    OpenDetail(String),
+    /// Open tunnel detail for this tunnel (or bring it to the front), on a host's row if given.
+    OpenDetail(String, Option<String>),
     /// Tunnel detail: ask craked for the tunnel's hosts and traffic again.
     Detail(String),
     Unpin(String, String),
@@ -450,6 +450,8 @@ fn main() {
                 Ok("staying") => model::demo_staying(model),
                 // CRAKE_DEMO=long: names that take two lines in the panel.
                 Ok("long") => model::demo_long_names(model),
+                // CRAKE_DEMO=first, back or ask: the panel's moments.
+                Ok(m @ ("first" | "back" | "ask")) => model::demo_moment(model, m),
                 _ => model,
             };
             let mut model = model;
@@ -482,7 +484,7 @@ fn main() {
                 .ok()
                 .and_then(|v| v.strip_prefix("detail:").map(str::to_owned))
             {
-                open_detail(t, cx);
+                open_detail(t, None, cx);
             }
             // CRAKE_SHOW=profile:<tunnel> (development): its profile editor.
             if let Some(t) = std::env::var("CRAKE_SHOW")

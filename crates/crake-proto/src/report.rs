@@ -4,6 +4,10 @@
 
 use serde::{Deserialize, Serialize};
 
+/// A public name every network can look up (Cloudflare's resolver): the
+/// report's internet check, and sign-in's when a gateway didn't answer.
+pub const PUBLIC_NAME: &str = "one.one.one.one";
+
 /// craked's own log in a report: the last hour, at most this many lines.
 pub const OWN_LOG_LINES: usize = 200;
 /// A part of the computer's view longer than this is cut, saying so.

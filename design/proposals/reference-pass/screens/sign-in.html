@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Crake connecting and sign-in</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit;font-weight:600;text-decoration:underline}
+button,input{font:inherit}
+.mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}
+@keyframes crakewait{0%,100%{opacity:.25}50%{opacity:1}}
+.w1{animation:crakewait 1.2s ease-in-out infinite}
+.w2{animation:crakewait 1.2s ease-in-out .2s infinite}
+.w3{animation:crakewait 1.2s ease-in-out .4s infinite}
+</style>
+</helmet>
+<div style="width: 1160px; height: 760px; color-scheme: {{scheme}}; box-sizing: border-box; padding: 48px 40px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45; display: flex; gap: 28px; align-items: flex-start">
+
+<div style="flex: 1 1 0; min-width: 0">
+<div style="font-size: 13px; font-weight: 600; color: {{c.muted}}; margin-bottom: 10px">Single sign-on</div>
+<div style="background: {{c.panel}}; border: 1px solid {{c.line}}; border-radius: 12px; box-shadow: 0 24px 50px -24px rgba(0,0,0,0.35); padding: 22px 22px 18px">
+<h2 style="margin: 0; font-size: 19px; font-weight: 700">Sign in to Nordbank</h2>
+<p style="margin: 6px 0 0; color: {{c.muted}}">Finish in the browser tab Crake opened. This window updates by itself.</p>
+<ol style="list-style: none; margin: 18px 0 0; padding: 0; border: 1px solid {{c.line}}; border-radius: 8px">
+<li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; align-items: center; padding: 11px 12px"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 9.5l3.2 3.2L14 6" stroke="{{c.ink}}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg><span>Reached <span class="mono" style="font-size: 13px">gw.nordbank.example</span></span></li>
+<li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; align-items: center; padding: 11px 12px; border-top: 1px solid {{c.line}}; font-weight: 700"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle class="w1" cx="3" cy="9" r="2" fill="{{c.ink}}"></circle><circle class="w2" cx="9" cy="9" r="2" fill="{{c.ink}}"></circle><circle class="w3" cx="15" cy="9" r="2" fill="{{c.ink}}"></circle></svg><span>Waiting for you in Firefox</span></li>
+<li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; align-items: center; padding: 11px 12px; border-top: 1px solid {{c.line}}; color: {{c.muted}}"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="6" fill="none" stroke="{{c.lineStrong}}" stroke-width="1.6"></circle></svg><span>Tunnel up</span></li>
+</ol>
+<div style="display: flex; gap: 8px; margin-top: 18px">
+<button type="button" style="height: 40px; padding: 0 14px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Open the page again</button>
+<span style="flex: 1 1 auto"></span>
+<button type="button" style="height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">Cancel</button>
+</div>
+</div>
+</div>
+
+<div style="flex: 1 1 0; min-width: 0">
+<div style="font-size: 13px; font-weight: 600; color: {{c.muted}}; margin-bottom: 10px">Code from the gateway</div>
+<div style="background: {{c.panel}}; border: 1px solid {{c.line}}; border-radius: 12px; box-shadow: 0 24px 50px -24px rgba(0,0,0,0.35); padding: 22px 22px 18px">
+<h2 style="margin: 0; font-size: 19px; font-weight: 700">Nordbank asks for a code</h2>
+<p style="margin: 6px 0 0; color: {{c.muted}}">From your authenticator app. The gateway’s own words: “Enter your 6-digit OTP.”</p>
+<fieldset style="margin: 18px 0 0; padding: 0; border: none">
+<legend style="font-weight: 600; margin-bottom: 8px">Code</legend>
+<div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px">
+<input aria-label="Digit 1" value="4" class="mono" style="height: 50px; width: 100%; box-sizing: border-box; text-align: center; font-size: 20px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; color: {{c.ink}}; background: {{c.panel}}">
+<input aria-label="Digit 2" value="1" class="mono" style="height: 50px; width: 100%; box-sizing: border-box; text-align: center; font-size: 20px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; color: {{c.ink}}; background: {{c.panel}}">
+<input aria-label="Digit 3" value="8" class="mono" style="height: 50px; width: 100%; box-sizing: border-box; text-align: center; font-size: 20px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; color: {{c.ink}}; background: {{c.panel}}">
+<input aria-label="Digit 4" value="" class="mono" style="height: 50px; width: 100%; box-sizing: border-box; text-align: center; font-size: 20px; border: 2px solid {{c.accent}}; border-radius: 6px; color: {{c.ink}}; background: {{c.panel}}">
+<input aria-label="Digit 5" value="" class="mono" style="height: 50px; width: 100%; box-sizing: border-box; text-align: center; font-size: 20px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; color: {{c.ink}}; background: {{c.panel}}">
+<input aria-label="Digit 6" value="" class="mono" style="height: 50px; width: 100%; box-sizing: border-box; text-align: center; font-size: 20px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; color: {{c.ink}}; background: {{c.panel}}">
+</div>
+</fieldset>
+<label style="display: flex; align-items: center; gap: 10px; margin-top: 14px"><input type="checkbox" style="width: 18px; height: 18px; accent-color: {{c.accent}}">Don’t ask on this computer for 12 hours</label>
+<div style="display: flex; gap: 8px; margin-top: 18px">
+<span style="flex: 1 1 auto"></span>
+<button type="button" style="height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">Cancel</button>
+<button type="button" style="height: 40px; padding: 0 18px; border: none; border-radius: 6px; background: {{c.accent}}; color: {{c.accentInk}}; font-weight: 700; cursor: pointer">Continue</button>
+</div>
+</div>
+</div>
+
+<div style="flex: 1 1 0; min-width: 0">
+<div style="font-size: 13px; font-weight: 600; color: {{c.muted}}; margin-bottom: 10px">When it can’t connect</div>
+<div style="background: {{c.panel}}; border: 1px solid {{c.line}}; border-radius: 12px; box-shadow: 0 24px 50px -24px rgba(0,0,0,0.35); padding: 22px 22px 18px">
+<h2 style="margin: 0; font-size: 19px; font-weight: 700">Couldn’t reach Nordbank</h2>
+<p style="margin: 6px 0 0">The gateway didn’t answer for 20 seconds. Your internet works, so it’s either down or blocked on this network.</p>
+<ol style="list-style: none; margin: 18px 0 0; padding: 0; border: 1px solid {{c.line}}; border-radius: 8px">
+<li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; align-items: center; padding: 11px 12px"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 9.5l3.2 3.2L14 6" stroke="{{c.ink}}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg><span>Internet is up</span></li>
+<li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; align-items: center; padding: 11px 12px; border-top: 1px solid {{c.line}}"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 9.5l3.2 3.2L14 6" stroke="{{c.ink}}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg><span>Name found: <span class="mono" style="font-size: 13px">203.0.113.40</span></span></li>
+<li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; align-items: center; padding: 11px 12px; border-top: 1px solid {{c.line}}; font-weight: 700"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7" fill="none" stroke="{{c.danger}}" stroke-width="1.6"></circle><path d="M6.5 6.5l5 5M11.5 6.5l-5 5" stroke="{{c.danger}}" stroke-width="1.6" stroke-linecap="round"></path></svg><span>No answer on port 443</span></li>
+</ol>
+<div style="margin-top: 12px; font-size: 13px; color: {{c.muted}}">Other tunnels are unaffected. ACME is still connected.</div>
+<div style="margin-top: 6px; font-size: 13px"><a href="#" style="font-weight: 600">Copy for helpdesk</a></div>
+<div style="display: flex; gap: 8px; margin-top: 18px">
+<span style="flex: 1 1 auto"></span>
+<button type="button" style="height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">Close</button>
+<button type="button" style="height: 40px; padding: 0 18px; border: none; border-radius: 6px; background: {{c.accent}}; color: {{c.accentInk}}; font-weight: 700; cursor: pointer">Try again</button>
+</div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1160,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = this.props.dark ?? false;
+    const c = dark ? {
+      desk: '#121314', panel: '#1E2022', line: '#33363A', lineStrong: '#4A4E53',
+      ink: '#ECEDEE', muted: '#A9AEB4', accent: '#2DD4BF', accentInk: '#0B1514', danger: '#F97066'
+    } : {
+      desk: '#DCDCD8', panel: '#FFFFFF', line: '#E2E2DE', lineStrong: '#BDBDB8',
+      ink: '#1A1C1E', muted: '#5A5F64', accent: '#0F766E', accentInk: '#FFFFFF', danger: '#B42318'
+    };
+    return { c, scheme: dark ? 'dark' : 'light' };
+  }
+}
+</script>
+</body>
+</html>

@@ -14,8 +14,6 @@ body{margin:0}
 a{color:#0F766E}a:hover{text-decoration:underline}
 button{font:inherit}
 .mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}
-@keyframes crakebreath{0%,100%{opacity:1}50%{opacity:.45}}
-.breath{animation:crakebreath 3s ease-in-out infinite}
 </style>
 </helmet>
 <div style="width: 760px; height: 1000px; position: relative; overflow: hidden; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
@@ -33,7 +31,7 @@ button{font:inherit}
 <div style="display: flex; align-items: center; gap: 10px; padding: 14px 14px 12px 18px">
 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{{c.ink}}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><defs><mask id="m-n4" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/><rect x="10" y="4" width="2" height="2.00" fill="{{c.ink}}"/><path d="M5.25 15.00L6.75 15.00L11.25 24.00L9.75 24.00Z" fill="{{c.ink}}"/></mask><mask id="c-n4" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/></mask></defs><g stroke="none" mask="url(#m-n4)" fill="{{c.ink}}" opacity="1.00"><path d="M4.82 15.30L3.09 12.73C1.16 7.45 2.73 4.08 6.61 2.67L9.78 1.52C11.19 1.00 12.77 1.63 13.52 3.03L19.35 2.58L15.00 4.89L15.25 5.59L19.81 4.73L15.32 7.96L14.81 9.42L14.94 12.41L14.62 16.88C14.62 19.88 19.50 21.38 21.75 24.00L1.50 24.00L3.38 16.50Z"/></g><path d="M20.85 3.30L22.80 1.35" fill="none" stroke="{{c.accent}}" stroke-width="1.6" stroke-linecap="round"/><path d="M21.15 6.30L22.80 5.81" fill="none" stroke="{{c.accent}}" stroke-width="1.6" stroke-linecap="round"/></svg>
 <span style="font-size: 17px; font-weight: 700">Crake</span>
-<span style="display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; font-size: 13px; color: {{c.muted}}"><span class="breath" style="width: 8px; height: 8px; border-radius: 50%; background: {{c.accent}}"></span>Listening</span>
+<span style="display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; font-size: 13px; color: {{c.muted}}"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{c.accent}}"></span>Listening</span>
 <span style="flex: 1 1 auto"></span>
 <button type="button" aria-label="Settings" style="width: 36px; height: 36px; border: none; border-radius: 6px; background: transparent; color: {{c.muted}}; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"></path><circle cx="15" cy="8" r="2"></circle><circle cx="9" cy="16" r="2"></circle></svg></button>
 </div>
@@ -62,6 +60,13 @@ button{font:inherit}
 <div style="min-width: 0">
 <div style="font-size: 14px; line-height: 1.4">{{l.text}}</div>
 <div style="font-size: 13px; color: {{c.muted}}; margin-top: 2px">{{l.why}}</div>
+<sc-if value="{{l.ask}}" hint-placeholder-val="{{false}}">
+<div style="font-size: 13px; margin-top: 6px">Nordbank answers for it too.</div>
+<div style="display: flex; align-items: center; gap: 16px; margin-top: 4px">
+<button type="button" style="padding: 0; border: none; background: none; color: {{c.ink}}; font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer">Use Nordbank</button>
+<button type="button" style="padding: 0; border: none; background: none; color: {{c.muted}}; font-size: 13px; cursor: pointer">Keep ACME</button>
+</div>
+</sc-if>
 </div>
 <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px">
 <span class="mono" style="font-size: 12px; color: {{c.muted}}">{{l.t}}</span>
@@ -70,6 +75,13 @@ button{font:inherit}
 </sc-if>
 </div>
 </div>
+<sc-if value="{{l.notice}}" hint-placeholder-val="{{false}}">
+<div role="status" style="margin: 0 18px 10px; padding: 12px 14px; border-radius: 8px; background: {{c.surface}}">
+<div style="font-size: 14px; font-weight: 600">Crake’s first route.</div>
+<div style="font-size: 13px; color: {{c.muted}}; margin-top: 2px">Only git.acme.internal goes through ACME. Everything else still goes direct. Each time Crake sends a host through a tunnel, it shows here, and Undo puts it back.</div>
+<div style="display: flex; margin-top: 10px"><button type="button" style="height: 30px; padding: 0 12px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-size: 13px; font-weight: 600; cursor: pointer">Got it</button></div>
+</div>
+</sc-if>
 </sc-for>
 </div>
 
@@ -80,7 +92,7 @@ button{font:inherit}
 <div style="min-width: 0">
 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
 <span style="font-size: 15px; font-weight: 700; color: {{t.nameColor}}">{{t.name}}</span>
-<span style="font-size: 13px; color: {{c.muted}}">{{t.state}}</span>
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: {{c.muted}}"><sc-if value="{{t.underway}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><path d="M6.42 20.39L4.11 16.98C1.55 9.93 3.64 5.44 8.81 3.56L13.04 2.02C14.92 1.34 17.03 2.17 18.03 4.04L26.27 4.76L20.42 10.62L19.75 12.56L19.92 16.55L19.50 22.50C19.50 26.50 26.00 28.50 29.00 32.00L2.00 32.00L4.50 22.00Z" fill="none" stroke="{{c.ink}}" stroke-width="2.4" stroke-linejoin="round" stroke-dasharray="4 3"></path></svg></sc-if>{{t.state}}</span>
 <sc-if value="{{t.managed}}" hint-placeholder-val="{{false}}">
 <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 1px 7px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="1.5"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>Managed</span>
 </sc-if>
@@ -103,11 +115,12 @@ button{font:inherit}
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false},&quot;$preview&quot;:{&quot;width&quot;:760,&quot;height&quot;:1000}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false},&quot;moment&quot;:{&quot;editor&quot;:&quot;string&quot;,&quot;default&quot;:&quot;none&quot;},&quot;$preview&quot;:{&quot;width&quot;:760,&quot;height&quot;:1000}}">
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { on: { acme: true, nord: true, globex: false, home: false }, undone: false };
+    const m = props.moment || 'none';
+    this.state = { on: { acme: true, nord: m !== 'first', globex: false, home: false }, undone: false };
   }
   renderVals() {
     const dark = this.props.dark ?? false;
@@ -136,27 +149,38 @@ class Component extends DCLogic {
     const evB = { x: X(38).toFixed(1) };
     const tick = 'M6 15V4M12 15V8';
     const dash = 'M4 9.5h10';
-    const log = [
+    // ?moment=first: Crake's first route (its notice); back: a tunnel that lost its gateway;
+    // ask: two tunnels answered, with "When two tunnels answer: Ask me".
+    const m = this.props.moment || 'none';
+    let log = [
       u ? { t: '13:21', icon: dash, iconColor: c.muted, text: 'git.acme.internal goes direct again.', why: 'You undid the route. Crake won’t learn this host again on its own.', canUndo: true, undoLabel: 'Redo', undo: () => this.setState({ undone: false }) }
         : { t: '13:21', icon: tick, iconColor: c.accent, text: 'Sent git.acme.internal through ACME.', why: 'It didn’t answer directly. Through ACME it answered in 38 ms.', canUndo: true, undoLabel: 'Undo', undo: () => this.setState({ undone: true }) },
       { t: '13:02', icon: dash, iconColor: c.muted, text: 'Left 10.62.0.77 alone.', why: 'No answer just then, directly or through ACME. Nothing was changed.', canUndo: false, undoLabel: '', undo: null },
       { t: '11:04', icon: tick, iconColor: c.accent, text: 'Sent sftp.nordbank.example through Nordbank.', why: 'Refused directly. Through Nordbank it answered in 61 ms.', canUndo: false, undoLabel: '', undo: null }
     ];
+    log.forEach(l => { l.ask = false; l.notice = false; });
+    if (m === 'first') {
+      log = log.slice(0, 2);
+      log[0].notice = true;
+    }
+    if (m === 'ask' && !u) log[0].ask = true;
     const on = this.state.on;
     const shield = 'M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z';
     const block = 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM5.6 5.6l12.8 12.8';
     const person = 'M12 12a4 4 0 1 0 0-8a4 4 0 1 0 0 8zM4 21c1.5-4 4.5-6 8-6s6.5 2 8 6';
     const defs = [
-      { id: 'acme', name: 'ACME', managed: true, hosts: 5, policyIcon: shield, policy: 'ACME IT allows learning for *.acme.internal', strong: false },
-      { id: 'nord', name: 'Nordbank', managed: false, hosts: 2, policyIcon: person, policy: 'Your profile · learning on', strong: false },
+      { id: 'acme', name: 'ACME', managed: true, hosts: m === 'first' ? 1 : 5, policyIcon: shield, policy: 'ACME IT allows learning for *.acme.internal', strong: false },
+      { id: 'nord', name: 'Nordbank', managed: false, hosts: m === 'first' ? 0 : 2, policyIcon: person, policy: 'Your profile · Learn as it goes', strong: false },
       { id: 'globex', name: 'Globex', managed: true, hosts: 0, policyIcon: block, policy: 'Full tunnel required by Globex IT. Crake won’t learn here.', strong: true },
-      { id: 'home', name: 'Home lab', managed: false, hosts: 3, policyIcon: person, policy: 'Your profile · learning on', strong: false }
+      { id: 'home', name: 'Home lab', managed: false, hosts: 3, policyIcon: person, policy: 'Your profile · Learn as it goes', strong: false }
     ];
     const tunnels = defs.map(d => {
       const isOn = !!on[d.id];
+      const back = m === 'back' && d.id === 'acme';
       return {
         name: d.name, managed: d.managed,
-        state: isOn ? (d.id === 'globex' ? 'Connected · everything goes through' : 'Connected · ' + d.hosts + ' hosts') : 'Off',
+        state: isOn ? (d.id === 'globex' ? 'Connected · everything goes through' : back ? 'Lost the gateway · trying again…' : 'Connected · ' + d.hosts + (d.hosts === 1 ? ' host' : ' hosts')) : 'Off',
+        underway: back,
         nameColor: isOn ? c.ink : c.muted,
         policy: d.policy, policyIcon: d.policyIcon, policyColor: d.strong ? c.ink : c.muted,
         aria: isOn ? 'true' : 'false', label: d.name + ' connected',

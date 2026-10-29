@@ -10,8 +10,10 @@ use crate::tray::{Badge, MenuTunnel, Shape};
 
 mod days;
 mod demo;
+mod helpdesk;
 mod kept;
 pub mod live;
+mod moments;
 mod scrub;
 // Which decisions still stand (undo, redo), for the charts.
 mod standing;
@@ -25,6 +27,7 @@ pub use self::demo::{
     demo, demo_detail, demo_expired, demo_leftover, demo_log, demo_long_names, demo_openvpn3,
     demo_staying,
 };
+pub use self::moments::{AlsoAnswered, demo_moment};
 pub use self::scrub::{Keep, scrub, scrub_keeping};
 
 /// How long the tray shows the "routed" shape after a decision.
@@ -37,8 +40,9 @@ const KEEP: usize = 500;
 const KB: f64 = 1e3;
 const MB: f64 = 1e6;
 const GB: f64 = 1e9;
-/// Decisions in a helpdesk copy.
-const HELPDESK_DECISIONS: usize = 20;
+/// The menu's first line names the tunnels that are up, up to this many;
+/// past it, their count ("Listening · 4 tunnels").
+const MENU_NAMES: usize = 3;
 
 /// How long a failed command's sentence stays on screen.
 pub const FAILURE_SHOWN: Duration = Duration::from_secs(8);
@@ -309,11 +313,18 @@ pub fn trouble_words(t: &Tunnel) -> &'static str {
 }
 
 /// "Connected · 4 hosts", "Off", ...
+/// Coming up again after it lost its gateway (craked keeps `since` across
+/// a reconnect), not coming up for the first time.
+pub fn reconnecting(t: &Tunnel) -> bool {
+    t.state == "connecting" && t.since > 0
+}
+
 pub fn tunnel_state(t: &Tunnel) -> String {
     match t.state.as_str() {
         "connected" if t.dns_down => "Connected · its DNS doesn\u{2019}t answer".into(),
         "connected" if t.hosts == 1 => "Connected · 1 host".into(),
         "connected" => format!("Connected · {} hosts", t.hosts),
+        "connecting" if reconnecting(t) => "Lost the gateway \u{b7} trying again…".into(),
         "connecting" => "Connecting…".into(),
         "trouble" => trouble_words(t).into(),
         _ => "Off".into(),
@@ -532,12 +543,34 @@ impl Model {
                 if on.is_empty() {
                     "No tunnel is on".into()
                 } else {
-                    format!("Listening · {}", on.join(", "))
+                    let names = if on.len() > MENU_NAMES {
+                        format!("{} tunnels", on.len())
+                    } else {
+                        on.join(", ")
+                    };
+                    format!("Listening · {names} · {}", self.last_route_today())
                 }
             }
             Some(false) => "Crake isn't running".into(),
             None => "Crake".into(),
         }
+    }
+
+    /// When Crake last sent a host through a tunnel today, for the menu's
+    /// first line: "last route 13:21", or "nothing routed today". Crake's
+    /// own decisions only (a host pinned by hand isn't one).
+    fn last_route_today(&self) -> String {
+        let today = jiff::Zoned::now().date();
+        self.log
+            .iter()
+            .rev()
+            .filter(|e| e.kind == LogKind::Routed && !e.message.starts_with("Pinned"))
+            .find_map(|e| {
+                let at = e.ts.parse::<jiff::Timestamp>().ok()?;
+                let at = at.to_zoned(jiff::tz::TimeZone::system());
+                (at.date() == today).then(|| format!("last route {}", at.strftime("%H:%M")))
+            })
+            .unwrap_or_else(|| "nothing routed today".into())
     }
 
     pub fn menu_tunnels(&self) -> Vec<MenuTunnel> {
@@ -647,55 +680,6 @@ impl Model {
             })
             .collect()
     }
-
-    /// "Copy for helpdesk": a plain-text summary anyone can read.
-    /// With `hide_hosts`, host names and addresses become "a host": tunnels
-    /// and timing only (Settings, "Hide names and addresses when sharing").
-    pub fn helpdesk(&self, hide_hosts: bool) -> String {
-        let say = |t: &str| if hide_hosts { scrub(t) } else { t.to_owned() };
-        let now = jiff::Zoned::now();
-        let mut s = format!("Crake, {}\n\nTunnels\n", now.strftime("%Y-%m-%d %H:%M %Z"));
-        if self.tunnels.is_empty() {
-            s += "  (none)\n";
-        }
-        for t in &self.tunnels {
-            s += &format!("  {}: {}", t.display, tunnel_state(t));
-            if !t.address.is_empty() && !hide_hosts {
-                s += &format!(", address {}", t.address);
-            }
-            s += "\n";
-        }
-        s += "\nRecent decisions (newest first)\n";
-        let recent = self.decisions(HELPDESK_DECISIONS);
-        if recent.is_empty() {
-            s += "  (none)\n";
-        }
-        for d in recent {
-            s += &format!("  {}  {}\n", d.time, say(&d.entry.message));
-            if let Some(r) = &d.entry.reason {
-                s += &format!("         {}\n", say(r));
-            }
-        }
-        // What only craked sees: saves asking the user to run commands.
-        if !self.diagnostics.is_empty() || !self.own_dns_browsers.is_empty() {
-            s += "\nCrake's view of this computer\n";
-            for line in &self.diagnostics {
-                s += &format!("  {}\n", say(line));
-            }
-            if !self.own_dns_browsers.is_empty() {
-                let names = crate::browser_dns::and_list(&self.own_dns_browsers);
-                let verb = if self.own_dns_browsers.len() == 1 {
-                    "looks"
-                } else {
-                    "look"
-                };
-                s += &format!(
-                    "  {names} {verb} names up themselves (DNS over HTTPS): Crake can't route a company's names there before the first packet.\n"
-                );
-            }
-        }
-        s
-    }
 }
 
 #[cfg(test)]
@@ -799,6 +783,25 @@ mod tests {
             "Couldn\u{2019}t stay connected"
         );
         assert_eq!(tunnel_state(&trouble("")), "Couldn\u{2019}t stay connected");
+    }
+
+    /// A tunnel coming up again after it lost its gateway says so; one
+    /// coming up for the first time is just connecting
+    /// (design/screens/tray-panel.html?moment=back).
+    #[test]
+    fn a_reconnect_says_it_lost_the_gateway() {
+        let connecting = |since| Tunnel {
+            state: "connecting".into(),
+            since,
+            ..Default::default()
+        };
+        assert_eq!(tunnel_state(&connecting(0)), "Connecting…");
+        assert!(!reconnecting(&connecting(0)));
+        assert_eq!(
+            tunnel_state(&connecting(1_790_000_000)),
+            "Lost the gateway \u{b7} trying again…"
+        );
+        assert!(reconnecting(&connecting(1_790_000_000)));
     }
 
     /// Seen after a session expired: switching the tunnel on to sign in
@@ -1058,6 +1061,86 @@ mod tests {
         for host in ["10.8.0.6", "10.8.0.1", "initech.internal", "192.168.1.1"] {
             assert!(!hidden.contains(host), "{host} in: {hidden}");
         }
+    }
+
+    /// The helpdesk copy says what Crake does, and since when each tunnel
+    /// is up, to which gateway and with what; hiding names leaves the
+    /// gateway and the address out.
+    /// The menu's first line: listening, through which tunnels, and when
+    /// Crake last routed a host today (design/screens/tray-menu.html).
+    #[test]
+    fn the_menus_summary_says_when_crake_last_routed() {
+        let now = jiff::Timestamp::now();
+        let routed = |ts: jiff::Timestamp, message: &str| LogEntry {
+            ts: ts.to_string(),
+            kind: LogKind::Routed,
+            tunnel: Some("acme".into()),
+            message: message.into(),
+            reason: None,
+            hosts: vec!["10.40.1.20".into()],
+            others: Vec::new(),
+        };
+        let mut m = demo();
+        m.log.clear();
+        assert_eq!(
+            m.summary(),
+            "Listening · ACME, Nordbank · nothing routed today"
+        );
+        m.log.push(routed(now, "Pinned 10.40.0.0/16 to ACME."));
+        assert_eq!(
+            m.summary(),
+            "Listening · ACME, Nordbank · nothing routed today"
+        );
+        m.log
+            .push(routed(now, "Sent git.acme.internal through ACME."));
+        let at = now
+            .to_zoned(jiff::tz::TimeZone::system())
+            .strftime("%H:%M")
+            .to_string();
+        assert_eq!(
+            m.summary(),
+            format!("Listening · ACME, Nordbank · last route {at}")
+        );
+        for t in &mut m.tunnels {
+            t.state = "connected".into();
+        }
+        assert!(m.summary().starts_with("Listening · 4 tunnels · "));
+    }
+
+    #[test]
+    fn helpdesk_copies_say_how_each_tunnel_is_connected() {
+        let at = jiff::civil::date(2026, 10, 9)
+            .at(8, 31, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::system())
+            .unwrap();
+        let m = Model {
+            reachable: Some(true),
+            tunnels: vec![Tunnel {
+                name: "acme".into(),
+                display: "ACME".into(),
+                state: "connected".into(),
+                hosts: 5,
+                address: "10.40.12.7".into(),
+                gateway: "vpn.acme.example".into(),
+                protocol: "anyconnect".into(),
+                since: at.timestamp().as_second() as u64,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let shown = m.helpdesk(false);
+        assert!(shown.contains(helpdesk::OPENER), "{shown}");
+        assert!(
+            shown.contains(
+                "  ACME: Connected · 5 hosts, since 08:31 to vpn.acme.example with openconnect, address 10.40.12.7\n"
+            ),
+            "{shown}"
+        );
+        let hidden = m.helpdesk(true);
+        assert!(
+            hidden.contains("  ACME: Connected · 5 hosts, since 08:31 with openconnect\n"),
+            "{hidden}"
+        );
     }
 
     /// A browser that looks names up itself is in the helpdesk copy: why

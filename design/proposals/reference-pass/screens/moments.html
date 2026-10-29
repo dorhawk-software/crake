@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Crake moments</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0F766E}a:hover{text-decoration:underline}
+button{font:inherit}
+.mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}
+</style>
+</helmet>
+<div style="width: 760px; height: 1000px; position: relative; overflow: hidden; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
+
+<div style="height: 30px; background: {{c.bar}}; color: {{c.barInk}}; display: flex; align-items: center; justify-content: flex-end; gap: 2px; padding: 0 10px; font-family: system-ui, sans-serif; font-size: 13px">
+<span style="position: absolute; left: 50%; transform: translateX(-50%); font-weight: 600">Fri 9 Oct  13:24</span>
+<span style="width: 34px; height: 24px; border-radius: 12px; background: {{c.barActive}}; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><defs><mask id="m-n3" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/><rect x="10" y="4" width="2" height="2.00" fill="currentColor"/><path d="M5.25 15.00L6.75 15.00L11.25 24.00L9.75 24.00Z" fill="currentColor"/></mask><mask id="c-n3" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/></mask></defs><g stroke="none" mask="url(#m-n3)" fill="currentColor" opacity="1.00"><path d="M4.82 15.30L3.09 12.73C1.16 7.45 2.73 4.08 6.61 2.67L9.78 1.52C11.19 1.00 12.77 1.63 13.52 3.03L19.35 2.58L15.00 4.89L15.25 5.59L19.81 4.73L15.32 7.96L14.81 9.42L14.94 12.41L14.62 16.88C14.62 19.88 19.50 21.38 21.75 24.00L1.50 24.00L3.38 16.50Z"/></g></svg></span>
+<span style="width: 30px; height: 24px; display: flex; align-items: center; justify-content: center; opacity: 0.85"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M3 9a13 13 0 0 1 18 0"></path><path d="M6.5 12.5a8 8 0 0 1 11 0"></path><path d="M10 16a3 3 0 0 1 4 0"></path></svg></span>
+<span style="width: 30px; height: 24px; display: flex; align-items: center; justify-content: center; opacity: 0.85"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path><path d="M16 9a4 4 0 0 1 0 6"></path></svg></span>
+<span style="width: 30px; height: 24px; display: flex; align-items: center; justify-content: center; opacity: 0.85"><svg width="18" height="16" viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="2"></rect><path d="M23.5 10.5v3"></path></svg></span>
+</div>
+
+<div style="position: absolute; top: 40px; right: 24px; width: 452px; box-sizing: border-box; background: {{c.panel}}; border: 1px solid {{c.line}}; border-radius: 10px; box-shadow: 0 24px 50px -20px rgba(0,0,0,0.35)">
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 14px 14px 12px 18px">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{{c.ink}}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><defs><mask id="m-n4" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/><rect x="10" y="4" width="2" height="2.00" fill="{{c.ink}}"/><path d="M5.25 15.00L6.75 15.00L11.25 24.00L9.75 24.00Z" fill="{{c.ink}}"/></mask><mask id="c-n4" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/></mask></defs><g stroke="none" mask="url(#m-n4)" fill="{{c.ink}}" opacity="1.00"><path d="M4.82 15.30L3.09 12.73C1.16 7.45 2.73 4.08 6.61 2.67L9.78 1.52C11.19 1.00 12.77 1.63 13.52 3.03L19.35 2.58L15.00 4.89L15.25 5.59L19.81 4.73L15.32 7.96L14.81 9.42L14.94 12.41L14.62 16.88C14.62 19.88 19.50 21.38 21.75 24.00L1.50 24.00L3.38 16.50Z"/></g><path d="M20.85 3.30L22.80 1.35" fill="none" stroke="{{c.accent}}" stroke-width="1.6" stroke-linecap="round"/><path d="M21.15 6.30L22.80 5.81" fill="none" stroke="{{c.accent}}" stroke-width="1.6" stroke-linecap="round"/></svg>
+<span style="font-size: 17px; font-weight: 700">Crake</span>
+<span style="display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; font-size: 13px; color: {{c.muted}}"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{c.accent}}"></span>Listening</span>
+<span style="flex: 1 1 auto"></span>
+<button type="button" aria-label="Settings" style="width: 36px; height: 36px; border: none; border-radius: 6px; background: transparent; color: {{c.muted}}; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"></path><circle cx="15" cy="8" r="2"></circle><circle cx="9" cy="16" r="2"></circle></svg></button>
+</div>
+
+<div style="padding: 0 18px">
+<div style="display: flex; justify-content: space-between; align-items: baseline">
+<span style="font-size: 13px; font-weight: 600">Last hour</span>
+<span style="font-size: 12px; color: {{c.muted}}"><span style="display: inline-block; width: 10px; height: 10px; background: {{c.bars}}; vertical-align: -1px; margin-right: 5px"></span>direct   <span style="display: inline-block; width: 3px; height: 11px; background: {{c.accent}}; vertical-align: -1px; margin-right: 2px"></span><span style="display: inline-block; width: 3px; height: 8px; background: {{c.accent}}; vertical-align: -1px; margin-right: 5px"></span>routed</span>
+</div>
+<svg viewBox="0 0 416 96" role="img" aria-label="Last hour: steady direct traffic, one host routed through ACME at 13:21, one unreachable host at 13:02" style="display: block; width: 100%; height: auto; margin-top: 8px">
+<path d="{{bars}}" stroke="{{c.bars}}" stroke-width="3.6"></path>
+<line x1="0" y1="72" x2="416" y2="72" stroke="{{c.lineStrong}}" stroke-width="1"></line>
+<path d="{{evA.d}}" fill="{{evA.color}}"></path>
+<circle cx="{{evB.x}}" cy="62" r="4.5" fill="{{c.panel}}" stroke="{{c.muted}}" stroke-width="1.6"></circle>
+<g font-family="Atkinson Hyperlegible Mono, monospace" font-size="11" fill="{{c.muted}}">
+<text x="0" y="90">12:24</text><text x="208" y="90" text-anchor="middle">12:54</text><text x="416" y="90" text-anchor="end">now</text>
+</g>
+</svg>
+</div>
+
+<div style="margin-top: 14px; border-top: 1px solid {{c.line}}">
+<div style="padding: 12px 18px 4px; font-size: 13px; font-weight: 600">What Crake did</div>
+<sc-for list="{{log}}" as="l" hint-placeholder-count="3">
+<div style="display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 18px 10px">
+<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="margin-top: 2px"><path d="{{l.icon}}" stroke="{{l.iconColor}}" stroke-width="2.4" stroke-linecap="round" fill="none"></path></svg>
+<div style="min-width: 0">
+<div style="font-size: 14px; line-height: 1.4">{{l.text}}</div>
+<div style="font-size: 13px; color: {{c.muted}}; margin-top: 2px">{{l.why}}</div>
+<sc-if value="{{l.ask}}" hint-placeholder-val="{{false}}">
+<div style="font-size: 13px; margin-top: 6px">Nordbank answers for it too.</div>
+<div style="display: flex; align-items: center; gap: 16px; margin-top: 4px">
+<button type="button" style="padding: 0; border: none; background: none; color: {{c.ink}}; font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer">Use Nordbank</button>
+<button type="button" style="padding: 0; border: none; background: none; color: {{c.muted}}; font-size: 13px; cursor: pointer">Keep ACME</button>
+</div>
+</sc-if>
+</div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px">
+<span class="mono" style="font-size: 12px; color: {{c.muted}}">{{l.t}}</span>
+<sc-if value="{{l.canUndo}}" hint-placeholder-val="{{false}}">
+<button type="button" onClick="{{l.undo}}" style="height: 30px; padding: 0 10px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-size: 13px; font-weight: 600; cursor: pointer">{{l.undoLabel}}</button>
+</sc-if>
+</div>
+</div>
+<sc-if value="{{l.notice}}" hint-placeholder-val="{{false}}">
+<div role="status" style="margin: 0 18px 10px; padding: 12px 14px; border-radius: 8px; background: {{c.surface}}">
+<div style="font-size: 14px; font-weight: 600">Crake’s first route.</div>
+<div style="font-size: 13px; color: {{c.muted}}; margin-top: 2px">Only git.acme.internal goes through ACME. Everything else still goes direct. Each time Crake sends a host through a tunnel, it shows here, and Undo puts it back.</div>
+<div style="display: flex; margin-top: 10px"><button type="button" style="height: 30px; padding: 0 12px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-size: 13px; font-weight: 600; cursor: pointer">Got it</button></div>
+</div>
+</sc-if>
+</sc-for>
+</div>
+
+<div style="margin-top: 6px; border-top: 1px solid {{c.line}}">
+<div style="padding: 12px 18px 4px; font-size: 13px; font-weight: 600">Tunnels</div>
+<sc-for list="{{tunnels}}" as="t" hint-placeholder-count="4">
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 9px 18px">
+<div style="min-width: 0">
+<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+<span style="font-size: 15px; font-weight: 700; color: {{t.nameColor}}">{{t.name}}</span>
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: {{c.muted}}"><sc-if value="{{t.underway}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><path d="M6.42 20.39L4.11 16.98C1.55 9.93 3.64 5.44 8.81 3.56L13.04 2.02C14.92 1.34 17.03 2.17 18.03 4.04L26.27 4.76L20.42 10.62L19.75 12.56L19.92 16.55L19.50 22.50C19.50 26.50 26.00 28.50 29.00 32.00L2.00 32.00L4.50 22.00Z" fill="none" stroke="{{c.ink}}" stroke-width="2.4" stroke-linejoin="round" stroke-dasharray="4 3"></path></svg></sc-if>{{t.state}}</span>
+<sc-if value="{{t.managed}}" hint-placeholder-val="{{false}}">
+<span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 1px 7px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="1.5"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>Managed</span>
+</sc-if>
+</div>
+<div style="display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 13px; color: {{t.policyColor}}">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 auto"><path d="{{t.policyIcon}}"></path></svg>
+<span>{{t.policy}}</span>
+</div>
+</div>
+<button type="button" role="switch" aria-checked="{{t.aria}}" aria-label="{{t.label}}" onClick="{{t.toggle}}" style="width: 46px; height: 26px; border: none; border-radius: 13px; padding: 3px; background: {{t.track}}; display: flex; justify-content: {{t.justify}}; cursor: pointer"><span style="width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,0.3)"></span></button>
+</div>
+</sc-for>
+</div>
+
+<div style="display: flex; gap: 8px; padding: 12px 14px 14px; margin-top: 6px; border-top: 1px solid {{c.line}}">
+<button type="button" style="flex: 1 1 0; height: 40px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-size: 14px; font-weight: 600; cursor: pointer">Full log</button>
+<button type="button" style="flex: 1 1 0; height: 40px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-size: 14px; font-weight: 600; cursor: pointer">Copy for helpdesk</button>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false},&quot;moment&quot;:{&quot;editor&quot;:&quot;string&quot;,&quot;default&quot;:&quot;first&quot;},&quot;today&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false},&quot;$preview&quot;:{&quot;width&quot;:760,&quot;height&quot;:1000}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const m = props.moment || 'first';
+    this.state = { on: { acme: true, nord: m !== 'first', globex: false, home: false }, undone: false };
+  }
+  renderVals() {
+    const dark = this.props.dark ?? false;
+    const c = dark ? {
+      desk: '#121314', bar: '#000000', barInk: '#EDEDED', barActive: '#3A3A3A',
+      panel: '#1E2022', surface: '#2A2D30', line: '#33363A', lineStrong: '#4A4E53',
+      ink: '#ECEDEE', muted: '#A9AEB4', bars: '#3E4246', accent: '#2DD4BF', track: '#4A4E53'
+    } : {
+      desk: '#DCDCD8', bar: '#1A1A1A', barInk: '#EDEDED', barActive: '#3C3C3C',
+      panel: '#FFFFFF', surface: '#F1F1EE', line: '#E2E2DE', lineStrong: '#BDBDB8',
+      ink: '#1A1C1E', muted: '#5A5F64', bars: '#D2D3CF', accent: '#0F766E', track: '#BDBDB8'
+    };
+    let s = 5;
+    const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+    let bars = '';
+    for (let i = 0; i <= 60; i++) {
+      const x = 2 + i * 6.8;
+      const busy = (i > 8 && i < 22) || (i > 40 && i < 52);
+      const h = 3 + rnd() * (busy ? 22 : 9);
+      bars += 'M' + x.toFixed(1) + ' 72V' + (72 - h).toFixed(1);
+    }
+    const X = i => 2 + i * 6.8;
+    const u = this.state.undone;
+    const bar = (x, top, base, w) => 'M' + (x - w / 2).toFixed(2) + ' ' + base + 'V' + (top + w / 2).toFixed(2) + 'a' + (w / 2) + ' ' + (w / 2) + ' 0 0 1 ' + w + ' 0V' + base + 'Z';
+    const evA = { d: bar(X(57), 30, 72, 3.2) + bar(X(57) + 5, 40, 72, 3.2), color: u ? c.muted : c.accent };
+    const evB = { x: X(38).toFixed(1) };
+    const tick = 'M6 15V4M12 15V8';
+    const dash = 'M4 9.5h10';
+    const m = this.props.moment || 'first';
+    let log = [
+      u ? { t: '13:21', icon: dash, iconColor: c.muted, text: 'git.acme.internal goes direct again.', why: 'You undid the route. Crake won’t learn this host again on its own.', canUndo: true, undoLabel: 'Redo', undo: () => this.setState({ undone: false }) }
+        : { t: '13:21', icon: tick, iconColor: c.accent, text: 'Sent git.acme.internal through ACME.', why: 'It didn’t answer directly. Through ACME it answered in 38 ms.', canUndo: true, undoLabel: 'Undo', undo: () => this.setState({ undone: true }) },
+      { t: '13:02', icon: dash, iconColor: c.muted, text: 'Left 10.62.0.77 alone.', why: 'No answer just then, directly or through ACME. Nothing was changed.', canUndo: false, undoLabel: '', undo: null },
+      { t: '11:04', icon: tick, iconColor: c.accent, text: 'Sent sftp.nordbank.example through Nordbank.', why: 'Refused directly. Through Nordbank it answered in 61 ms.', canUndo: false, undoLabel: '', undo: null }
+    ];
+    // ?today=true draws the same moment as the app shows it now: the same data, without the change.
+    const now = !this.props.today;
+    log.forEach(l => { l.ask = false; l.notice = false; });
+    if (m === 'first') {
+      log = log.slice(0, 2);
+      log[0].notice = now;
+    }
+    if (m === 'ask' && !u) log[0].ask = now;
+    const on = this.state.on;
+    const shield = 'M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z';
+    const block = 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM5.6 5.6l12.8 12.8';
+    const person = 'M12 12a4 4 0 1 0 0-8a4 4 0 1 0 0 8zM4 21c1.5-4 4.5-6 8-6s6.5 2 8 6';
+    const defs = [
+      { id: 'acme', name: 'ACME', managed: true, hosts: m === 'first' ? 1 : 5, policyIcon: shield, policy: 'ACME IT allows learning for *.acme.internal', strong: false },
+      { id: 'nord', name: 'Nordbank', managed: false, hosts: m === 'first' ? 0 : 2, policyIcon: person, policy: 'Your profile · Learn as it goes', strong: false },
+      { id: 'globex', name: 'Globex', managed: true, hosts: 0, policyIcon: block, policy: 'Full tunnel required by Globex IT. Crake won’t learn here.', strong: true },
+      { id: 'home', name: 'Home lab', managed: false, hosts: 3, policyIcon: person, policy: 'Your profile · Learn as it goes', strong: false }
+    ];
+    const tunnels = defs.map(d => {
+      const isOn = !!on[d.id];
+      const back = m === 'back' && d.id === 'acme';
+      return {
+        name: d.name, managed: d.managed,
+        state: isOn ? (d.id === 'globex' ? 'Connected · everything goes through' : back ? (now ? 'Lost the gateway · trying again…' : 'Connecting…') : 'Connected · ' + d.hosts + (d.hosts === 1 ? ' host' : ' hosts')) : 'Off',
+        underway: back && now,
+        nameColor: isOn ? c.ink : c.muted,
+        policy: d.policy, policyIcon: d.policyIcon, policyColor: d.strong ? c.ink : c.muted,
+        aria: isOn ? 'true' : 'false', label: d.name + ' connected',
+        track: isOn ? c.accent : c.track, justify: isOn ? 'flex-end' : 'flex-start',
+        toggle: () => this.setState({ on: Object.assign({}, this.state.on, { [d.id]: !this.state.on[d.id] }) })
+      };
+    });
+    return { c, bars, evA, evB, log, tunnels };
+  }
+}
+</script>
+</body>
+</html>

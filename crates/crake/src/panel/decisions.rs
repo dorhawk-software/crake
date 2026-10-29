@@ -32,7 +32,22 @@ impl Panel {
         for (i, d) in rows.into_iter().enumerate() {
             // A decision made while the panel is open slides in from above.
             let arrived = self.motion.arrival(&d.entry.ts);
-            let row = self.decision(i, d, t, cx);
+            // Crake's first route says so, once; a route another tunnel
+            // answered for too keeps its question (moments A and C).
+            let notice = self.first_route_notice(&d, model, t, cx);
+            let asked = (d.action == Some(Action::Undo))
+                .then(|| model.also_answered(&d.entry))
+                .flatten()
+                .filter(|a| {
+                    !cx.global::<crate::prefs::Prefs>()
+                        .dismissed
+                        .contains(&a.keep_key)
+                });
+            let row = self.decision(i, d, asked, t, cx);
+            let row = match notice {
+                Some(notice) => div().child(row).child(notice).into_any_element(),
+                None => row,
+            };
             list = list.child(match arrived {
                 Some(at) => {
                     let p = phase(at, 0, SLIDES_IN, window);
@@ -127,9 +142,11 @@ impl Panel {
         &self,
         i: usize,
         d: Decision,
+        asked: Option<crate::model::AlsoAnswered>,
         t: &Theme,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let asked = asked.map(|a| self.also_answered(i, &d, a, t, cx));
         use crake_proto::LogKind;
         let (mark, color) = match d.entry.kind {
             LogKind::Routed if d.entry.message.starts_with("Pinned") => {
@@ -212,7 +229,8 @@ impl Panel {
                             .child(crate::theme::breakable(
                                 d.entry.reason.as_deref().unwrap_or_default(),
                             )),
-                    ),
+                    )
+                    .children(asked),
             )
             .child(right)
             .into_any_element()

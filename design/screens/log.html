@@ -60,11 +60,11 @@ button,input,select{font:inherit}
 
 <div style="padding: 0 20px">
 <sc-for list="{{today}}" as="e" hint-placeholder-count="8">
-<div style="display: grid; grid-template-columns: 52px 20px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 11px 0; border-top: 1px solid {{c.line}}">
+<div style="display: grid; grid-template-columns: 52px 20px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 11px 0; border-top: 1px solid {{c.line}}; background: {{e.rowBg}}; box-shadow: -20px 0 0 {{e.rowBg}}, 20px 0 0 {{e.rowBg}}">
 <span class="mono" style="font-size: 13px; color: {{c.muted}}; padding-top: 1px">{{e.t}}</span>
 <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="margin-top: 1px"><path d="{{e.icon}}" stroke="{{e.iconColor}}" stroke-width="2.4" stroke-linecap="round" fill="none"></path></svg>
 <div style="min-width: 0"><div>{{e.text}}</div><div style="font-size: 13px; color: {{c.muted}}">{{e.why}}</div></div>
-<sc-if value="{{e.chip}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}; white-space: nowrap">{{e.tunnel}}</span></sc-if><sc-if value="{{e.noChip}}" hint-placeholder-val="{{false}}"><span></span></sc-if>
+<sc-if value="{{e.chip}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}; white-space: nowrap">{{e.tunnel}}</span></sc-if><sc-if value="{{e.show}}" hint-placeholder-val="{{false}}"><button type="button" style="padding: 1px 0 0; border: none; background: none; font-size: 13px; font-weight: 600; color: {{c.ink}}; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; cursor: pointer">Show in {{e.tunnel}}</button></sc-if><sc-if value="{{e.noChip}}" hint-placeholder-val="{{false}}"><span></span></sc-if>
 </div>
 </sc-for>
 <sc-if value="{{emptyToday}}" hint-placeholder-val="{{false}}">
@@ -77,11 +77,11 @@ button,input,select{font:inherit}
 </div>
 <div style="padding: 0 20px 20px">
 <sc-for list="{{yesterday}}" as="e" hint-placeholder-count="3">
-<div style="display: grid; grid-template-columns: 52px 20px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 11px 0; border-top: 1px solid {{c.line}}">
+<div style="display: grid; grid-template-columns: 52px 20px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 11px 0; border-top: 1px solid {{c.line}}; background: {{e.rowBg}}; box-shadow: -20px 0 0 {{e.rowBg}}, 20px 0 0 {{e.rowBg}}">
 <span class="mono" style="font-size: 13px; color: {{c.muted}}; padding-top: 1px">{{e.t}}</span>
 <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style="margin-top: 1px"><path d="{{e.icon}}" stroke="{{e.iconColor}}" stroke-width="2.4" stroke-linecap="round" fill="none"></path></svg>
 <div style="min-width: 0"><div>{{e.text}}</div><div style="font-size: 13px; color: {{c.muted}}">{{e.why}}</div></div>
-<sc-if value="{{e.chip}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}; white-space: nowrap">{{e.tunnel}}</span></sc-if><sc-if value="{{e.noChip}}" hint-placeholder-val="{{false}}"><span></span></sc-if>
+<sc-if value="{{e.chip}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}; white-space: nowrap">{{e.tunnel}}</span></sc-if><sc-if value="{{e.show}}" hint-placeholder-val="{{false}}"><button type="button" style="padding: 1px 0 0; border: none; background: none; font-size: 13px; font-weight: 600; color: {{c.ink}}; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; cursor: pointer">Show in {{e.tunnel}}</button></sc-if><sc-if value="{{e.noChip}}" hint-placeholder-val="{{false}}"><span></span></sc-if>
 </div>
 </sc-for>
 <button type="button" style="margin-top: 8px; height: 38px; padding: 0 14px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Show earlier days</button>
@@ -100,35 +100,37 @@ class Component extends DCLogic {
     const dark = this.props.dark ?? false;
     const c = dark ? {
       desk: '#121314', panel: '#1E2022', surface: '#2A2D30', line: '#33363A', lineStrong: '#4A4E53',
-      ink: '#ECEDEE', muted: '#A9AEB4', bars: '#3E4246', accent: '#2DD4BF', accentInk: '#0B1514'
+      ink: '#ECEDEE', muted: '#A9AEB4', bars: '#3E4246', accent: '#2DD4BF', accentInk: '#0B1514', navHover: '#242729'
     } : {
       desk: '#DCDCD8', panel: '#FFFFFF', surface: '#F1F1EE', line: '#E2E2DE', lineStrong: '#BDBDB8',
-      ink: '#1A1C1E', muted: '#5A5F64', bars: '#D8D9D5', accent: '#0F766E', accentInk: '#FFFFFF'
+      ink: '#1A1C1E', muted: '#5A5F64', bars: '#D8D9D5', accent: '#0F766E', accentInk: '#FFFFFF', navHover: '#F9F9F7'
     };
     const tick = 'M6 15V4M12 15V8', dash = 'M4 9.5h10', undo = 'M7 5L3.5 8.5L7 12M3.5 8.5H11a3.5 3.5 0 0 1 0 7H9', sys = 'M9 3v6M5.5 5.5a5 5 0 1 0 7 0';
     const col = { routed: c.accent, left: c.muted, undone: c.muted, sys: c.muted };
     const ic = { routed: tick, left: dash, undone: undo, sys: sys };
     const T = [
-      ['13:21', 'routed', 'Sent git.acme.internal through ACME.', 'No answer directly. ACME answered in 38 ms.', 'ACME', 13.35],
+      ['13:21', 'routed', 'Sent git.acme.internal through ACME.', 'It didn’t answer directly. Through ACME it answered in 38 ms.', 'ACME', 13.35],
       ['13:02', 'left', 'Left 10.62.0.77 alone.', 'No answer just then, directly or through ACME. Nothing was changed.', '—', 13.03],
-      ['11:30', 'routed', 'Sent 172.22.8.4 through Nordbank.', 'No answer directly. Nordbank answered in 70 ms.', 'Nordbank', 11.5],
-      ['11:04', 'routed', 'Sent sftp.nordbank.example through Nordbank.', 'Refused directly. Nordbank answered in 61 ms.', 'Nordbank', 11.07],
-      ['10:47', 'routed', 'Sent 10.62.0.18 through ACME.', 'No answer directly. ACME answered in 52 ms.', 'ACME', 10.78],
-      ['10:12', 'undone', 'You sent cdn.acme.example direct again.', 'It was public after all. Crake won’t relearn it on its own.', 'ACME', 10.2],
-      ['09:14', 'routed', 'Sent wiki.acme.internal through ACME.', 'Only ACME’s DNS knows the name. Routed before the first packet.', 'ACME', 9.23],
-      ['09:12', 'routed', 'Sent jira.acme.internal through ACME.', 'Only ACME’s DNS knows the name. Routed before the first packet.', 'ACME', 9.2],
-      ['08:40', 'routed', 'Sent builds.acme.example through ACME.', 'Public name, private address. ACME answered in 47 ms.', 'ACME', 8.67],
+      ['11:30', 'routed', 'Sent 172.22.8.4 through Nordbank.', 'It didn’t answer directly. Through Nordbank it answered in 70 ms.', 'Nordbank', 11.5],
+      ['11:04', 'routed', 'Sent sftp.nordbank.example through Nordbank.', 'Refused directly. Through Nordbank it answered in 61 ms.', 'Nordbank', 11.07],
+      ['10:47', 'routed', 'Sent 10.62.0.18 through ACME.', 'It didn’t answer directly. Through ACME it answered in 52 ms.', 'ACME', 10.78],
+      ['10:12', 'undone', 'cdn.acme.example goes direct again.', 'You undid the route. Crake won’t learn this host again on its own.', 'ACME', 10.2],
+      ['09:14', 'routed', 'Sent wiki.acme.internal through ACME.', 'Only ACME’s DNS knows it (10.40.1.20). Routed before the first packet.', 'ACME', 9.23],
+      ['09:12', 'routed', 'Sent jira.acme.internal through ACME.', 'Only ACME’s DNS knows it (10.40.1.24). Routed before the first packet.', 'ACME', 9.2],
+      ['08:40', 'routed', 'Sent builds.acme.example through ACME.', 'Public name, private address: ACME’s DNS knows it as 10.40.7.12. Routed before the first packet.', 'ACME', 8.67],
       ['08:31', 'sys', 'ACME and Nordbank connected.', 'Started with your session.', 'System', 8.52]
     ];
     const Y = [
       ['17:55', 'sys', 'Nordbank disconnected.', 'You switched it off.', 'System'],
-      ['16:20', 'left', 'Left status.nordbank.example alone.', 'No answer anywhere. It was down for 4 minutes.', '—'],
-      ['14:03', 'routed', 'Sent 172.22.8.4 through Nordbank.', 'No answer directly. Nordbank answered in 66 ms.', 'Nordbank']
+      ['16:20', 'left', 'Left status.nordbank.example alone.', 'No answer just then, directly or through Nordbank. Nothing was changed.', '—'],
+      ['14:03', 'routed', 'Sent 172.22.8.4 through Nordbank.', 'It didn’t answer directly. Through Nordbank it answered in 66 ms.', 'Nordbank']
     ];
     const st = this.state;
     const q = (st.q || '').toLowerCase().trim();
     const keep = (k, text, tunnel) => (st.kind === 'all' || st.kind === k) && (!q || (text + ' ' + tunnel).toLowerCase().includes(q));
-    const mk = r => ({ t: r[0], icon: ic[r[1]], iconColor: col[r[1]], text: r[2], why: r[3], tunnel: r[4], chip: r[4] !== '—', noChip: r[4] === '—' });
+    // The row pointed at or focused (?pointed=13:21): a routed row offers "Show in <tunnel>" in its badge's place.
+    const pointed = st.pointed === undefined ? (this.props.pointed ?? 'none') : st.pointed;
+    const mk = r => { const show = r[1] === 'routed' && r[0] === pointed; return { t: r[0], icon: ic[r[1]], iconColor: col[r[1]], text: r[2], why: r[3], tunnel: r[4], chip: r[4] !== '—' && !show, show, noChip: r[4] === '—', rowBg: show ? c.navHover : 'transparent' }; };
     const today = T.filter(r => keep(r[1], r[2], r[4])).map(mk);
     const yesterday = Y.filter(r => keep(r[1], r[2], r[4])).map(mk);
     const X = h => h / 14 * 940 * (14 / 13.4) * (13.4 / 14);

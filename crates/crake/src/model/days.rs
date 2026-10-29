@@ -55,6 +55,10 @@ impl Model {
                 text: e.message.clone(),
                 why,
                 badge,
+                show_in: match (e.kind, e.tunnel.as_ref(), e.hosts.first()) {
+                    (LogKind::Routed, Some(t), Some(h)) => Some((t.clone(), h.clone())),
+                    _ => None,
+                },
             };
             let date = at.date();
             match days.last_mut() {
@@ -171,6 +175,9 @@ pub struct Row {
     pub why: String,
     /// The tunnel's name; "—" when it was left alone, "System" for system events.
     pub badge: String,
+    /// A routed row's tunnel (its name) and host: "Show in ACME" opens
+    /// tunnel detail there.
+    pub show_in: Option<(String, String)>,
 }
 
 /// The log's rows for one day, newest first.

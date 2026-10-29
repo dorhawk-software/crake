@@ -290,6 +290,9 @@ one line each:
   the profile editor): built; the Traffic window's open ends are listed.
 - New tunnel's protocol list folded (the user, on a Mac): a proposal first.
 - The explainers (docs/explainers.md); the website's version number.
+- The reference pass's open ends: the panel on a single click under GNOME's
+  AppIndicator extension (it opens its menu; needs Crake's own extension),
+  platform notes to try (Windows' AUMID, side bars, the Mac's notch…).
 - Untried on real systems: the checklist below.
 
 ## Tried by real people (a checklist, ticked one by one)

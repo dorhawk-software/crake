@@ -106,6 +106,17 @@ fn newest_release() -> String {
     format!("release-{}", newest.version)
 }
 
+/// The first version in the window, at its top: Unreleased in a
+/// development build with changes in it (a long one put the newest release
+/// below the fold, 2026-10-29), the newest release otherwise.
+fn top_release() -> String {
+    let top = changelog::releases()
+        .iter()
+        .find(|r| r.groups.iter().any(|g| !g.changes.is_empty()))
+        .unwrap();
+    format!("release-{}", top.version)
+}
+
 struct Opened {
     window: AnyWindowHandle,
     view: Entity<WhatsNew>,
@@ -267,8 +278,8 @@ fn the_scrollbar_follows_the_pointer_over_what_scrolls(cx: &mut TestAppContext) 
     assert!(w.shows("versions-bar", cx), "pointed at: the bar");
     // Moving on over what scrolls, the bar shown over it: it stays (the
     // bar's own layer once took the pointer away, and it flickered). The
-    // newest release, at the top: an older one may be below the fold.
-    point(Box::leak(newest_release().into_boxed_str()), cx);
+    // version at the top: a later one may be below the fold.
+    point(Box::leak(top_release().into_boxed_str()), cx);
     assert!(
         w.shows("versions-bar", cx),
         "still pointed at: still the bar"

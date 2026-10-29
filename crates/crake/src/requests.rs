@@ -303,7 +303,7 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
         Request::Move(from, to, hosts) => send(Command::Move(from, to, hosts)),
         Request::Send(t, hosts) => send(Command::AddHosts(t, hosts)),
         Request::Pin(t, targets) => send(Command::Pin(t, targets)),
-        Request::OpenDetail(t) => open_detail(t, cx),
+        Request::OpenDetail(t, host) => open_detail(t, host, cx),
         Request::Detail(t) => {
             if !cx.global::<Shell>().demo {
                 send(Command::Hosts(t.clone()));

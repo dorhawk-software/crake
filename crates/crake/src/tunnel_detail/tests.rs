@@ -408,3 +408,57 @@ fn the_rows_in_view_and_a_margin_are_built() {
     assert_eq!(rows_in_view(500, -900., 600.), 0..20);
     assert_eq!(rows_in_view(0, 0., 600.), 0..0);
 }
+
+/// Each tab says how long its hosts are kept, in one line of one height
+/// (design/screens/tunnel-detail.html).
+#[test]
+fn each_tab_says_how_long_its_hosts_are_kept() {
+    use super::hosts::kept_line;
+    assert_eq!(
+        kept_line(Tab::Learned, "ACME", "7"),
+        "Crake forgets a learned host after 7 days unused."
+    );
+    assert_eq!(
+        kept_line(Tab::Learned, "ACME", "1"),
+        "Crake forgets a learned host after a day unused."
+    );
+    assert_eq!(
+        kept_line(Tab::Learned, "ACME", "never"),
+        "Crake keeps a learned host until you forget it."
+    );
+    assert_eq!(
+        kept_line(Tab::Pinned, "ACME", "7"),
+        "Pinned hosts are kept until you forget them."
+    );
+    assert_eq!(
+        kept_line(Tab::Gateway, "ACME", "7"),
+        "ACME\u{2019}s gateway sent these when it connected."
+    );
+}
+
+/// Opened from the log's "Show in ACME": the host's tab, its row lit; a
+/// host only pinned opens Pinned.
+#[gpui_kit::test]
+fn the_log_opens_it_on_a_host(cx: &mut TestAppContext) {
+    let w = open(cx);
+    let host = w.rows(cx)[0].target.clone();
+    w.view.update(cx, |d, cx| d.show_host(host.clone(), cx));
+    w.view.read_with(cx, |d, _| {
+        assert!(d.tab == Tab::Learned);
+        assert_eq!(d.shown_host.as_deref(), Some(host.as_str()));
+    });
+    w.model.update(cx, |m, _| {
+        m.host_rows.get_mut("acme").unwrap().push(HostRow {
+            target: "10.40.9.9".into(),
+            name: None,
+            kind: "pinned".into(),
+            learned: None,
+            used_ago: None,
+        });
+    });
+    w.view
+        .update(cx, |d, cx| d.show_host("10.40.9.9".into(), cx));
+    w.view.read_with(cx, |d, _| assert!(d.tab == Tab::Pinned));
+    // Drawn with the row lit and scrolled to.
+    assert!(found(&w, ("pin", 0usize), cx).is_some());
+}

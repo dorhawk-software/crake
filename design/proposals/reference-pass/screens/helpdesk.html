@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Copy for helpdesk</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}.mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}</style>
+</helmet>
+<div style="width: 760px; box-sizing: border-box; padding: 24px; background: {{c.desk}}; color: {{c.ink}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; line-height: 1.45">
+<div style="font-size: 13px; color: {{c.muted}}; margin-bottom: 8px">What Copy for helpdesk puts on the clipboard, pasted into a mail:</div>
+<pre class="mono" style="margin: 0; padding: 16px 18px; background: {{c.panel}}; border: 1px solid {{c.line}}; border-radius: 8px; font-size: 13px; line-height: 1.55; white-space: pre-wrap">{{text}}</pre>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"after":{"editor":"boolean","default":false},"$preview":{"width":760,"height":520}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = this.props.dark ?? false;
+    const c = dark ? { desk: '#121314', panel: '#1E2022', line: '#33363A', ink: '#ECEDEE', muted: '#A9AEB4' }
+      : { desk: '#DCDCD8', panel: '#FFFFFF', line: '#E2E2DE', ink: '#1A1C1E', muted: '#5A5F64' };
+    const after = this.props.after;
+    const text = [
+      'Crake, 2026-10-09 13:24 CEST',
+      ...(after ? ['', 'Crake sends only the hosts that need a tunnel through one. Everything else goes direct.'] : []),
+      '',
+      'Tunnels',
+      after ? '  ACME: Connected · 5 hosts, since 08:31 to vpn.acme.example with openconnect, address 10.40.12.7'
+        : '  ACME: Connected · 5 hosts, address 10.40.12.7',
+      after ? '  Nordbank: Connected · 2 hosts, since 08:31 to gw.nordbank.example with openconnect, address 172.20.4.18'
+        : '  Nordbank: Connected · 2 hosts, address 172.20.4.18',
+      '  Globex: Off',
+      '  Home lab: Off', '',
+      'Recent decisions (newest first)',
+      '  13:21  Sent git.acme.internal through ACME.',
+      '         It didn’t answer directly. Through ACME it answered in 38 ms.',
+      '  13:02  Left 10.62.0.77 alone.',
+      '         No answer just then, directly or through ACME. Nothing was changed.',
+      '  11:04  Sent sftp.nordbank.example through Nordbank.',
+      '         Refused directly. Through Nordbank it answered in 61 ms.'
+    ].join('\n');
+    return { c, text };
+  }
+}
+</script>
+</body>
+</html>

@@ -337,3 +337,39 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   wrong. The list alone can't tell a reset from an app closing its
   socket; telling them apart needs something that sees the packets (pf
   logging, or a network extension). Windows polls the same way.
+- **The reference pass's open ends (2026-10-29).** The pass
+  (design/proposals/reference-pass.html, the studies in design/research/)
+  was taken whole and built, sign-in's checks of a gateway that didn't
+  answer included, and a routed host's notification is Normal urgency
+  (GNOME showed a Low one only under the clock; the user's call). Left:
+  - *The panel on a single click with GNOME's AppIndicator extension.*
+    The user wants a single click to open the panel and a double-click
+    the menu. The extension (v53 to master, `indicatorStatusIcon.js`)
+    does the opposite and Crake can't swap it: a primary click waits the
+    double-click time and opens the extension's own menu if the item has
+    one; a double-click calls `Activate(x, y)` (Crake's panel). Crake
+    chooses only whether it has a menu and whether it takes `Activate`:
+    no menu makes a single click do nothing. Swapping them needs
+    Crake's own GNOME Shell extension (already "not now", CLAUDE.md), or
+    a change in the AppIndicator extension upstream (an option for
+    activate-on-click).
+  - *Platform notes that need a real system*
+    (design/research/crake-vs-references.md, "Platform notes"):
+    1. Dash to Panel's bar on the left or right edge: `place.rs` knows
+       top and bottom only; untried.
+    2. Windows credits toasts to "Windows PowerShell" with no
+       AppUserModelID (`notify.rs` sets none); the default action shows as
+       an "Open Crake" button. Needs the AUMID, Undo alone, and the
+       Reminder scenario for a stopped tunnel; check in the Windows VM.
+    3. Windows starts a new tray icon under the ^ overflow; a first-run
+       note for Windows is new work, not drawn.
+    4. Windows 11 rounds flyouts at 8 px, not DESIGN.md's 10, if DWM
+       draws the panel's corner.
+    5. Quick Settings can't host Crake's switch without a Shell extension
+       (already "not now").
+    6. A Mac's bird hidden behind the notch can't open the panel; how to
+       say so is a Mac decision.
+  - *The reconnect's log lines* ("Its 5 hosts can't be reached until it's
+    back", "Gone for 42 s") are proven by a Linux test with a fake
+    openconnect (`craked/tests/lifecycle_reconnect.rs`); no real gateway
+    has dropped one yet.

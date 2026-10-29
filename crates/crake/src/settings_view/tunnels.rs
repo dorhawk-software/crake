@@ -173,7 +173,7 @@ impl Settings {
                         let name = tunnel.name.clone();
                         cx.listener(move |this, _, _, _| {
                             this.requests
-                                .send_blocking(Request::OpenDetail(name.clone()))
+                                .send_blocking(Request::OpenDetail(name.clone(), None))
                                 .ok();
                         })
                     }).test_support()
@@ -282,7 +282,7 @@ impl Settings {
                         let name = tunnel.name.clone();
                         cx.listener(move |this, _, _, _| {
                             this.requests
-                                .send_blocking(Request::OpenDetail(name.clone()))
+                                .send_blocking(Request::OpenDetail(name.clone(), None))
                                 .ok();
                         })
                     }).test_support(),

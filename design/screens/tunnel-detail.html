@@ -65,6 +65,9 @@ button,input,select{font:inherit}
 <button type="button" role="tab" aria-selected="{{t.aria}}" onClick="{{t.pick}}" style="height: 42px; padding: 0; border: none; border-bottom: 2px solid {{t.bar}}; margin-bottom: -1px; background: transparent; color: {{t.fg}}; font-weight: {{t.weight}}; cursor: pointer">{{t.label}} <span class="mono" style="font-size: 12px; color: {{c.muted}}">{{t.n}}</span></button>
 </sc-for>
 </div>
+<sc-if value="{{lifetime}}" hint-placeholder-val="{{true}}">
+<div style="padding: 10px 0; font-size: 13px; color: {{c.muted}}; border-bottom: 1px solid {{c.line}}">{{lifetime}}</div>
+</sc-if>
 
 <sc-for list="{{rows}}" as="r" hint-placeholder-count="5">
 <div style="display: grid; grid-template-columns: 18px minmax(0, 1fr) 120px auto; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid {{c.line}}">
@@ -152,7 +155,9 @@ class Component extends DCLogic {
     const bar = (x, top, base, w) => 'M' + (x - w / 2).toFixed(2) + ' ' + base + 'V' + (top + w / 2).toFixed(2) + 'a' + (w / 2) + ' ' + (w / 2) + ' 0 0 1 ' + w + ' 0V' + base + 'Z';
     let ticks = '';
     [13.35, 10.78, 9.23, 9.2, 8.67].forEach(h => { const x = 2 + h / 13.4 * 836; ticks += bar(x, 10, 44, 3) + bar(x + 4.5, 18, 44, 3); });
-    return { c, tabs, rows, empty: rows.length === 0, bars: bars || 'M0 0', ticks };
+    // What keeps each kind of host, said once over the list (7 days: Settings → Learning, "Forget hosts unused for").
+    const lifetime = { learned: 'Crake forgets a learned host after 7 days unused.', pinned: 'Pinned hosts are kept until you forget them.', gateway: 'ACME’s gateway sent these when it connected.' }[st.tab];
+    return { c, tabs, rows, lifetime, empty: rows.length === 0, bars: bars || 'M0 0', ticks };
   }
 }
 </script>

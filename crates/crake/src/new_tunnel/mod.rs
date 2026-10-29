@@ -157,6 +157,15 @@ const MODES: [(&str, &str, &str, &str); 4] = [
     ),
 ];
 
+/// A routing mode's name as step 3 shows it ("learn": "Learn as it goes"),
+/// for every place that names a tunnel's mode (the panel's policy line).
+pub(crate) fn mode_name(id: &str) -> &'static str {
+    MODES
+        .iter()
+        .find(|(m, ..)| *m == id)
+        .map_or(MODES[0].1, |(_, name, ..)| name)
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum Detect {
     Idle,

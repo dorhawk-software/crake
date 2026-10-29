@@ -29,6 +29,7 @@ mod attached;
 mod clash;
 mod diagnostics;
 mod entry;
+mod gone;
 mod handover;
 mod hook;
 mod host_ops;
@@ -611,6 +612,7 @@ impl Manager {
                     self.traffic.untrack(&info.device);
                 }
                 e.up_since = None;
+                e.lost_at = None;
             }
         }
         let _ = self.changes.send(name.to_owned());
