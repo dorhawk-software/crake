@@ -302,7 +302,8 @@ real machine (not a VM made for tests), each item ticked with the date and
 who (a role, not a name), and what was found and fixed:
 **docs/engineering/tried-by-people.md** (tick items there). Windows, the
 other Linux desktops and most of macOS haven't met a real person yet;
-Ubuntu 26.04 with GNOME and a bottom bar is the user's own notebook.
+Ubuntu 26.04 with GNOME was the user's notebook until October 2026; the
+user now works on a Mac.
 
 ## Lints are errors
 

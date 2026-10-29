@@ -10,8 +10,9 @@ client's names kept private, a panic. Windows and the other Linux
 distributions haven't met a real person yet. Each item is ticked when
 someone used Crake for it on a real machine (not a VM made for tests),
 with the date and who (a role, not a name), and what was found and fixed.
-Ubuntu 26.04 with GNOME and a bottom bar is the user's own notebook, used
-daily.
+Ubuntu 26.04 with GNOME and a bottom bar was the user's own notebook, used
+daily until October 2026; since then the user works on a Mac (2026-10-29),
+so GNOME-only items wait for someone else on Ubuntu.
 
 **Windows** (a real PC, ideally a company laptop):
 - [ ] Installing: SmartScreen's warning for the unsigned installer, and
