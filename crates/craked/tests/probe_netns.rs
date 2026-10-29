@@ -188,6 +188,9 @@ struct World {
     /// (its SYNs lost, as on a flaky Wi-Fi): by its source port.
     flaky_direct: HashSet<IpAddr>,
     first_port: std::collections::HashMap<IpAddr, u16>,
+    /// Answered on the internet on this port only (a public web server in
+    /// front of a database only the company may reach).
+    direct_only_on: std::collections::HashMap<IpAddr, u16>,
 }
 
 /// An IPv4 UDP datagram in this packet: (source, destination).
@@ -222,9 +225,13 @@ fn responder(mut uplink: File, mut tun: File, world: Arc<Mutex<World>>, stop: Ar
         let mut idle = true;
         if let Ok(n) = uplink.read(&mut buf) {
             idle = false;
-            if let Some((_, dst, _)) = syn_of(&buf[..n]) {
+            if let Some((_, dst, dport)) = syn_of(&buf[..n]) {
                 let mut w = world.lock().unwrap();
-                if w.flaky_direct.contains(&dst) {
+                if let Some(&port) = w.direct_only_on.get(&dst) {
+                    if port == dport {
+                        uplink.write_all(&tcp_reply(&buf[..n], 0x12)).unwrap();
+                    }
+                } else if w.flaky_direct.contains(&dst) {
                     let ihl = usize::from(buf[0] & 0x0f) * 4;
                     let sport = u16::from_be_bytes([buf[ihl], buf[ihl + 1]]);
                     if *w.first_port.entry(dst).or_insert(sport) != sport {
@@ -917,10 +924,10 @@ async fn a_public_host_that_answers_directly_on_a_second_try_isnt_learned() {
     responder.join().unwrap();
 }
 
-/// A public host an older Crake learned by mistake (through a company's
-/// tunnel, after one lost connection) is tried directly once a new version
-/// runs: answering, it's forgotten and said; one that answers only through
-/// the tunnel stays.
+/// A public host learned by mistake (through a company's tunnel, after one
+/// lost connection) is tried directly within the hour: answering, it's
+/// forgotten and said; one that answers only through the tunnel stays, and
+/// so does one whose web server answers but not the port it was learned on.
 #[tokio::test(flavor = "multi_thread")]
 async fn a_public_host_learned_by_mistake_goes_direct_again() {
     if std::env::var("CRAKE_NETNS_TEST").as_deref() != Ok("1") {
@@ -933,14 +940,22 @@ async fn a_public_host_learned_by_mistake_goes_direct_again() {
         // Two public hosts only the tunnel answers for, for now.
         w.behind_tunnel.insert("198.51.100.40".parse().unwrap());
         w.behind_tunnel.insert("198.51.100.41".parse().unwrap());
+        w.behind_tunnel.insert("198.51.100.42".parse().unwrap());
     }
     let learned = || sh("nft list set inet crake learned_acme");
     tokio::task::spawn_blocking(move || {
-        for host in ["198.51.100.40", "198.51.100.41"] {
-            let _ = connect(host, 443, Duration::from_secs(1));
+        for (host, port) in [
+            ("198.51.100.40", 443),
+            ("198.51.100.41", 443),
+            ("198.51.100.42", 5432),
+        ] {
+            let _ = connect(host, port, Duration::from_secs(1));
         }
         let end = Instant::now() + Duration::from_secs(20);
-        while !(learned().contains("198.51.100.40") && learned().contains("198.51.100.41")) {
+        while !["198.51.100.40", "198.51.100.41", "198.51.100.42"]
+            .iter()
+            .all(|h| learned().contains(h))
+        {
             assert!(Instant::now() < end, "never learned:\n{}", learned());
             std::thread::sleep(Duration::from_millis(100));
         }
@@ -953,6 +968,9 @@ async fn a_public_host_learned_by_mistake_goes_direct_again() {
         let a: IpAddr = "198.51.100.41".parse().unwrap();
         w.flaky_direct.insert(a);
         w.first_port.insert(a, 1);
+        // .42's web server answers directly; its database (5432) doesn't.
+        w.direct_only_on
+            .insert("198.51.100.42".parse().unwrap(), 443);
     }
     p.mgr.recheck_tunnel("acme", "ACME").await;
     let set = sh("nft list set inet crake learned_acme");
@@ -961,12 +979,13 @@ async fn a_public_host_learned_by_mistake_goes_direct_again() {
         "answers directly: forgotten\n{set}"
     );
     assert!(
-        set.contains("198.51.100.40"),
-        "only through the tunnel: kept\n{set}"
+        set.contains("198.51.100.40") && set.contains("198.51.100.42"),
+        "only through the tunnel (on the port it was learned on): kept\n{set}"
     );
     let log = std::fs::read_to_string(p._dir.path().join("log")).unwrap();
     assert!(
-        log.contains("198.51.100.41 goes direct again.") && log.contains("an older Crake"),
+        log.contains("198.51.100.41 goes direct again.")
+            && log.contains("had sent it through ACME"),
         "{log}"
     );
     p.mgr.shutdown().await;

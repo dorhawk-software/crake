@@ -43,6 +43,7 @@ mod naming;
 mod openvpn;
 mod outage;
 mod probing;
+mod recheck;
 mod report;
 mod routes;
 mod settings;

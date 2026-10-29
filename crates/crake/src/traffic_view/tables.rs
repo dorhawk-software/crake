@@ -35,6 +35,9 @@ pub struct Row {
     pub goes: String,
     /// Crake learned the host for this way: the tick, not a dot.
     pub learned: bool,
+    /// The way is a tunnel that isn't connected: greyed, with a dot, since
+    /// the host goes direct until it is.
+    pub off: bool,
     pub cols: Vec<String>,
 }
 
@@ -70,6 +73,7 @@ pub fn right_now(model: &Model, now: Instant) -> Vec<Row> {
                 .entry(c.tunnel.clone())
                 .or_insert_with(|| super::graph::learned_labels(model, c.tunnel.as_deref()))
                 .contains(&c.name.clone().unwrap_or_else(|| c.dst.to_string())),
+            off: false,
             cols: vec![
                 rate(model.live.standing(c)),
                 model.live.open_for(c, now).map(since).unwrap_or_default(),
@@ -83,6 +87,8 @@ pub fn right_now(model: &Model, now: Instant) -> Vec<Row> {
 pub fn where_things_go(model: &Model) -> Vec<Row> {
     let mut rows = Vec::new();
     for tunnel in &model.tunnels {
+        // Only a connected tunnel carries its hosts (craked's `owner_of`).
+        let off = tunnel.state != "connected";
         for r in model.host_rows.get(&tunnel.name).into_iter().flatten() {
             let (way, why) = match r.kind.as_str() {
                 "direct" => (None, "You sent it direct with Undo".to_owned()),
@@ -93,6 +99,17 @@ pub fn where_things_go(model: &Model) -> Vec<Row> {
                 ),
             };
             let learned = !matches!(r.kind.as_str(), "direct" | "pinned");
+            let off = off && way.is_some();
+            let why = if off {
+                let is = if tunnel.state == "off" {
+                    "is off"
+                } else {
+                    "isn't connected"
+                };
+                format!("{} {is}: direct for now \u{b7} {why}", tunnel.display)
+            } else {
+                why
+            };
             rows.push(Row {
                 dest: r.name.clone().unwrap_or_else(|| r.target.clone()),
                 under: r.name.as_ref().map(|_| r.target.clone()),
@@ -101,6 +118,7 @@ pub fn where_things_go(model: &Model) -> Vec<Row> {
                     None => "direct".into(),
                 },
                 learned,
+                off,
                 cols: vec![why],
             });
         }
@@ -111,6 +129,7 @@ pub fn where_things_go(model: &Model) -> Vec<Row> {
             under: None,
             goes: "direct".into(),
             learned: false,
+            off: false,
             cols: vec!["Never through a tunnel (Settings \u{2192} Learning)".into()],
         });
     }
@@ -123,6 +142,7 @@ pub fn where_things_go(model: &Model) -> Vec<Row> {
         under: None,
         goes: full.map_or("direct".into(), |t| format!("through {}", t.display)),
         learned: false,
+        off: false,
         cols: vec![match full {
             Some(t) => format!("{} is a full tunnel", t.display),
             None => "Crake sends a host through a tunnel only when it needs one".into(),
@@ -205,7 +225,7 @@ pub fn table(heads: &[&'static str], rows: &[Row], t: &Theme, cx: &gpui_kit::App
                         d.child(div().text_size(px(12.)).text_color(t.muted).child(under))
                     }),
             )
-            .child(cell(WAY_COL).child(way(&r.goes, r.learned, t)));
+            .child(cell(WAY_COL).child(way(&r.goes, r.learned, r.off, t)));
         for c in &r.cols {
             line = line.child(
                 right(
@@ -243,8 +263,8 @@ fn right(d: Div, right_cols: usize) -> Div {
 }
 
 /// A way: its name, after the two-stroke tick when Crake learned the host
-/// for it (a decision), else a dot.
-fn way(label: &str, learned: bool, t: &Theme) -> Div {
+/// for it (a decision), else a dot; greyed when it's a tunnel that's off.
+fn way(label: &str, learned: bool, off: bool, t: &Theme) -> Div {
     let mark = div()
         .size(px(TICK_W))
         .flex()
@@ -255,7 +275,8 @@ fn way(label: &str, learned: bool, t: &Theme) -> Div {
         .items_center()
         .gap(px(6.))
         .font_weight(FontWeight::SEMIBOLD)
-        .child(if learned {
+        .when(off, |d| d.text_color(t.muted))
+        .child(if learned && !off {
             mark.child(
                 svg()
                     .path("crake/mark-routed.svg")
@@ -318,5 +339,50 @@ mod tests {
         );
         let last = rows.last().unwrap();
         assert_eq!(last.dest, "Everything else");
+        assert!(!rows[0].off, "ACME is connected");
+    }
+
+    /// A tunnel that's off still lists what it learned, greyed: those hosts
+    /// go direct until it's on (the user, 2026-10-28: a public site
+    /// "through" a tunnel that had been off for two days).
+    #[test]
+    fn a_tunnel_thats_off_sends_its_hosts_direct_for_now() {
+        let mut m = crate::model::demo();
+        let acme = m.tunnels.iter_mut().find(|t| t.name == "acme").unwrap();
+        acme.state = "off".into();
+        let display = acme.display.clone();
+        m.host_rows.insert(
+            "acme".into(),
+            vec![
+                crate::model::HostRow {
+                    target: "203.0.113.20".into(),
+                    name: Some("www.globex.example".into()),
+                    kind: "learned".into(),
+                    learned: Some((0, "probe".into())),
+                    used_ago: None,
+                },
+                crate::model::HostRow {
+                    target: "203.0.113.21".into(),
+                    kind: "direct".into(),
+                    ..Default::default()
+                },
+            ],
+        );
+        let rows = where_things_go(&m);
+        assert_eq!(rows[0].goes, format!("through {display}"));
+        assert!(rows[0].off);
+        assert!(
+            rows[0].cols[0].starts_with(&format!("{display} is off: direct for now \u{b7} ")),
+            "{}",
+            rows[0].cols[0]
+        );
+        assert!(!rows[1].off, "sent direct with Undo: direct either way");
+        m.tunnels
+            .iter_mut()
+            .find(|t| t.name == "acme")
+            .unwrap()
+            .state = "connecting".into();
+        let rows = where_things_go(&m);
+        assert!(rows[0].cols[0].starts_with(&format!("{display} isn't connected: ")));
     }
 }

@@ -326,3 +326,14 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   used eviction like Cachix's, but a server to keep), Cachix Starter
   (50 GiB, the dearest). Moving means the nixos job's substituter, key
   and push step, testing.md and CLAUDE.md's "Nix goes to Cachix".
+- **"Refused directly" on a Mac is often an app giving up (2026-10-28).**
+  macOS has no conntrack events: craked reads the kernel's connection
+  list four times a second, and a connection that leaves it before it's
+  answered is taken as refused (`probe.rs`, `Kind::Destroy`). Apps on a
+  Mac race several attempts and drop the slower ones, so the user's log
+  had "Left github.com alone. Refused directly. It answered directly when
+  Crake tried again" for a dozen public sites in an hour. The direct
+  second try catches them all (nothing was routed), but the reason is
+  wrong. The list alone can't tell a reset from an app closing its
+  socket; telling them apart needs something that sees the packets (pf
+  logging, or a network extension). Windows polls the same way.

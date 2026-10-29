@@ -202,6 +202,14 @@ impl fmt::Display for Target {
     }
 }
 
+/// How the connection that taught a tunnel a host went: `{"tcp": 5432}`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LearnedOn {
+    Tcp(u16),
+    Udp(u16),
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TunnelHosts {
     #[serde(default)]
@@ -236,10 +244,16 @@ pub struct TunnelHosts {
     /// to keep known names working while that DNS doesn't answer.
     #[serde(default)]
     pub answers: BTreeMap<String, (Vec<IpAddr>, u64)>,
-    /// The craked version that last tried its learned public hosts directly
-    /// (`Manager::recheck_public`): once per version.
+    /// What a host learned by probing was reached on (TCP or UDP and the
+    /// port), so the hourly recheck tries it the same way. Hosts learned
+    /// before it was kept (2026-10-28) have none: tried on 443, then 80.
     #[serde(default)]
-    pub rechecked: Option<String>,
+    pub learned_on: BTreeMap<IpAddr, LearnedOn>,
+    /// When its learned public hosts were last tried directly, seconds since
+    /// the epoch (`Manager::recheck_public`: hourly while it's up; until
+    /// 2026-10-28 once per version, in `rechecked`, now ignored).
+    #[serde(default)]
+    pub rechecked_at: Option<u64>,
     /// OpenVPN: its gateway can't take data channel offload (openvpn said
     /// "Use --disable-dco"), so it starts without.
     #[serde(default)]
@@ -256,6 +270,7 @@ impl TunnelHosts {
         });
         self.learned_how
             .retain(|a, _| learned.contains_key(a) || pinned.contains(&Target::host(*a)));
+        self.learned_on.retain(|a, _| learned.contains_key(a));
     }
 
     /// Already sent through the tunnel, learned or pinned (directly or by network).

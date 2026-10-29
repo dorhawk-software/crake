@@ -137,11 +137,20 @@
    tried again"); one a company allows only from its own addresses never
    answers directly and is learned as before, at most 3 s later
    (netns-tested, fails without it).
-   Public hosts an older Crake learned by mistake (2026-10-16; Windows
-   and macOS 2026-10-18): once per version, for each tunnel that's up,
-   craked tries every public address it learned by probing directly
-   (`recheck_public`, 443 then 80) and forgets those that answer
-   ("connectivity-check.ubuntu.com goes direct again."). The try carries
+   Public hosts learned by mistake (2026-10-16; Windows and macOS
+   2026-10-18; hourly since 2026-10-28): every hour, for each tunnel
+   that's up, craked tries every public address it learned by probing
+   directly (`manager/recheck.rs`), on the port it was learned on
+   (`learned_on`; 443 then 80 for hosts learned before it was kept; a
+   UDP host isn't tried), and forgets those that answer
+   ("connectivity-check.ubuntu.com goes direct again."). Until
+   2026-10-28 it ran once per version: on the user's Mac a public site
+   learned on a lossy morning (the direct second try lost too, while
+   github.com's took 2 s) stayed in Initech's tunnel for days. Hourly
+   can't flip a host back and forth: probing learns only what doesn't
+   answer directly, the recheck forgets only what does; the port keeps a
+   public database a company reaches from its own addresses from being
+   forgotten because its web server answers (netns-tested). The try carries
    `plan::DIRECT_MARK` (0x43520000): on Linux every tunnel's chain returns
    on it and no `ip rule` matches (netns-tested, fails if the try goes
    through the tunnel); on Windows and macOS, where a learned host is a

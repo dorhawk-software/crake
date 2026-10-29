@@ -19,6 +19,16 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ### Fixed
 
+- **A public site sent through a tunnel by mistake goes direct again within the hour.** On a
+  network losing packets, one connection to a public site could get no answer directly while a
+  company's tunnel answered, and Crake sent the site through that tunnel. It checked such sites
+  again only when Crake was updated, so one could stay in the tunnel for days. Now every hour,
+  while the tunnel is on, Crake tries each of them directly, on the port it was used on: one that
+  answers goes direct again, and the log says so. A company's host that answers only from inside
+  stays.
+- **Traffic no longer says a site goes through a tunnel that's off.** "Where things go" listed what
+  a tunnel had learned as going through it even while it was off. Those rows are greyed now and
+  say the tunnel is off and the host goes direct for now.
 - **Crake's service keeps its log on a Mac.** What it did and what openconnect told it (what a
   helpdesk asks for) went nowhere: `/var/log/craked.log` stayed empty. It's now in
   `/var/db/crake/craked.log`, readable by root alone like the rest of what the service keeps, and
