@@ -108,7 +108,10 @@
    standing in for every name never saw it). Scenario
    `a_short_name_means_the_tunnels_once_chosen` and a journey step on
    every system (Linux's journey container has no resolved: it asks
-   craked as the hush link would; the scenarios use resolved).
+   craked as the hush link would; the scenarios use resolved). A name
+   no tunnel knew is looked for again after 10 s (it was the 5 minutes
+   of an unknown name: on Windows the first look could come before the
+   tunnel was ready, and the question then never came).
 4. Connection probing and automatic learning; undo. **Built**, proven in a
    throwaway namespace (the fake gateway drops packets not from the tunnel
    address, like a real one; the test fails if the stuck flow isn't

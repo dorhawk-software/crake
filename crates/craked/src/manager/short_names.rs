@@ -21,6 +21,11 @@ use super::*;
 /// A short name offered isn't offered again for this long ("Not now", or
 /// a browser asking for it again and again).
 const OFFERED_FOR: Duration = Duration::from_secs(crate::units::SECS_PER_DAY);
+/// A short name no tunnel knew isn't looked for again for this long: a
+/// tunnel just up may know it a moment later (Windows asks before its
+/// adapter is ready; CI, 2026-10-30), and asking costs each tunnel's DNS
+/// one question.
+const NOT_FOUND_FOR: Duration = Duration::from_secs(10);
 
 impl Manager {
     /// A short name you chose a tunnel's full name for, while that tunnel
@@ -94,6 +99,7 @@ impl Manager {
             let mut offered = self.offered.lock().unwrap();
             offered.retain(|_, until| *until > now);
             if offered.contains_key(&short.name) {
+                tracing::debug!("short name {}: asked lately", short.name);
                 return;
             }
             offered.insert(short.name.clone(), now + UNKNOWN_FOR);
@@ -120,6 +126,7 @@ impl Manager {
                         addrs = dns::records(&reply);
                     }
                 }
+                tracing::debug!("short name {short}: {tunnel}'s DNS says {full} is {addrs:?}");
                 // Inside a managed tunnel's scope, and not on the never list.
                 let allowed = addrs
                     .iter()
@@ -142,6 +149,11 @@ impl Manager {
         .map(|(tunnel, full, _)| (tunnel, full))
         .collect();
         let Some((tunnel, full)) = found.first().cloned() else {
+            tracing::debug!("short name {short}: no tunnel knows it");
+            self.offered
+                .lock()
+                .unwrap()
+                .insert(short.to_owned(), Instant::now() + NOT_FOUND_FOR);
             return;
         };
         self.offered
