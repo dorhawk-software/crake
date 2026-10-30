@@ -180,35 +180,7 @@ async fn the_app_and_craked_work_together_over_dbus() {
     })
     .await;
 
-    // A short name: "Use Initech's" in the panel, the name in tunnel
-    // detail's Short names, then its Forget.
-    app.send(Command::UseShortName(
-        "initech".into(),
-        "expert".into(),
-        "expert.corp.initech.internal".into(),
-    ));
-    app.until("the choice in the log", |m| {
-        m.log
-            .iter()
-            .any(|e| e.message == "expert is expert.corp.initech.internal now.")
-    })
-    .await;
-    app.send(Command::Hosts("initech".into()));
-    app.until("the short name listed", |m| {
-        m.host_rows.get("initech").is_some_and(|rows| {
-            rows.iter().any(|r| {
-                r.kind == "short"
-                    && r.target == "expert"
-                    && r.name.as_deref() == Some("expert.corp.initech.internal")
-            })
-        })
-    })
-    .await;
-    app.send(Command::Forget("initech".into(), "expert".into()));
-    app.until("forgotten", |m| {
-        m.log.iter().any(|e| e.message == "Forgot expert.")
-    })
-    .await;
+    short_name(&mut app).await;
 
     // The Traffic window's counters: two looks give rates; this craked
     // stands in for routing, so it lists no connections (it says so).
@@ -341,4 +313,36 @@ async fn the_app_and_craked_work_together_over_dbus() {
         Some("off"),
         "ACME untouched throughout"
     );
+}
+
+/// A short name: "Use Initech's" in the panel, the name in tunnel detail's
+/// Short names, then its Forget.
+async fn short_name(app: &mut App) {
+    app.send(Command::UseShortName(
+        "initech".into(),
+        "expert".into(),
+        "expert.corp.initech.internal".into(),
+    ));
+    app.until("the choice in the log", |m| {
+        m.log
+            .iter()
+            .any(|e| e.message == "expert is expert.corp.initech.internal now.")
+    })
+    .await;
+    app.send(Command::Hosts("initech".into()));
+    app.until("the short name listed", |m| {
+        m.host_rows.get("initech").is_some_and(|rows| {
+            rows.iter().any(|r| {
+                r.kind == "short"
+                    && r.target == "expert"
+                    && r.name.as_deref() == Some("expert.corp.initech.internal")
+            })
+        })
+    })
+    .await;
+    app.send(Command::Forget("initech".into(), "expert".into()));
+    app.until("forgotten", |m| {
+        m.log.iter().any(|e| e.message == "Forgot expert.")
+    })
+    .await;
 }

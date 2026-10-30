@@ -157,7 +157,16 @@ fn a_day_with_crake(cx: &mut TestAppContext) {
 
     // 2b. A short name, chosen in "What Crake did", forgotten in tunnel
     //     detail.
-    crate::journey_kit::short_name(cx);
+    //     No resolved here: "git" is asked of craked as resolved asks the
+    //     hush link (git.crake.internal; the scenarios use the real one).
+    let (mgr, rt) = (craked.mgr.clone(), craked.rt.handle().clone());
+    crate::journey_kit::short_name(cx, &|name| {
+        let q = crate::e2e_tests::query(&format!("{name}.{}", craked::dns::SHORT_SUFFIX));
+        rt.block_on(mgr.answer_short(&q))
+            .and_then(|reply| craked::dns::parse_message(&reply))
+            .map(|a| a.addrs.iter().map(ToString::to_string).collect())
+            .unwrap_or_default()
+    });
 
     // 3. Settings: Learning's wait, changed in craked and shown back.
     settings_wait(cx);

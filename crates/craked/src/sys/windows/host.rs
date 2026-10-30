@@ -299,3 +299,23 @@ pub fn tun_of_process(_pid: u32) -> Option<String> {
 pub fn process_alive(_pid: u32) -> bool {
     false
 }
+
+/// A PowerShell string literal.
+pub(crate) fn quoted(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "''"))
+}
+
+/// A PowerShell script run to its end, without a window; failing, it
+/// says what it was for (`what`) and PowerShell's own words.
+pub(crate) async fn powershell(what: &str, script: &str) -> anyhow::Result<()> {
+    use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
+    let out = Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .await?;
+    if !out.status.success() {
+        anyhow::bail!("{what}: {}", String::from_utf8_lossy(&out.stderr).trim());
+    }
+    Ok(())
+}

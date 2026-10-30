@@ -7,8 +7,9 @@
 //! falls back to IPv4). Loopback, link-local, multicast, the LAN and the
 //! gateway are left out; Crake's own tunnels aren't among the adapters.
 
-use anyhow::{Result, bail};
-use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
+use anyhow::Result;
+
+use super::host::{powershell, quoted};
 
 use crate::hosts::Target;
 
@@ -43,14 +44,17 @@ pub async fn block6(name: &str, except: &[Target]) -> Result<()> {
         std::fs::create_dir_all(dir)?;
     }
     std::fs::write(MARKER, b"")?;
-    powershell(&format!(
-        "New-NetFirewallRule -DisplayName {} -Group {} -Direction Outbound -Action Block \
+    powershell(
+        "the firewall",
+        &format!(
+            "New-NetFirewallRule -DisplayName {} -Group {} -Direction Outbound -Action Block \
          -Profile Any -InterfaceAlias @({}) -RemoteAddress @({}) | Out-Null",
-        quoted(&rule(name)),
-        quoted(GROUP),
-        aliases.join(","),
-        ranges.join(",")
-    ))
+            quoted(&rule(name)),
+            quoted(GROUP),
+            aliases.join(","),
+            ranges.join(",")
+        ),
+    )
     .await
 }
 
@@ -77,33 +81,16 @@ pub async fn clear() -> Result<()> {
 /// The rules `which` finds removed. None found isn't a failure (finding
 /// none is one to PowerShell, whose exit code would say so).
 async fn remove(which: &str) -> Result<()> {
-    powershell(&format!(
-        "$found = Get-NetFirewallRule {which} -ErrorAction SilentlyContinue; \
+    powershell(
+        "the firewall",
+        &format!(
+            "$found = Get-NetFirewallRule {which} -ErrorAction SilentlyContinue; \
          if ($found) {{ $found | Remove-NetFirewallRule }}; exit 0"
-    ))
+        ),
+    )
     .await
 }
 
 fn rule(name: &str) -> String {
     format!("Crake {name} IPv6")
-}
-
-/// A PowerShell string literal.
-fn quoted(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "''"))
-}
-
-async fn powershell(script: &str) -> Result<()> {
-    let out = tokio::process::Command::new("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-Command", script])
-        .creation_flags(CREATE_NO_WINDOW)
-        .output()
-        .await?;
-    if !out.status.success() {
-        bail!(
-            "the firewall: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        );
-    }
-    Ok(())
 }

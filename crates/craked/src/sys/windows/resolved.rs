@@ -23,6 +23,16 @@ const PREFIX: &str = "Crake ";
 
 /// The public rule's name (`Crake public`).
 const PUBLIC_RULE: &str = "public";
+/// The short names' rule (`Crake short`): Windows asks "git", typed on
+/// its own, as git.crake.internal (`dns::SHORT_SUFFIX`, the suffix of
+/// each tunnel's adapter while it's up), and the rule sends that to
+/// craked's server (`manager::short_names`). Windows never asks DNS a
+/// name of one label by itself (CI, 2026-10-30).
+const SHORT_RULE: &str = "short";
+
+/// The tunnel adapters given the short names' suffix.
+static SUFFIXED: std::sync::Mutex<std::collections::BTreeSet<String>> =
+    std::sync::Mutex::new(std::collections::BTreeSet::new());
 
 pub use super::super::dns_links::{owner, public};
 
@@ -82,7 +92,12 @@ impl Resolved {
             return Ok(());
         }
         super::super::dns_links::set(device, servers, domains, everything);
-        write_rule(device, domains, everything)
+        write_rule(device, domains, everything)?;
+        // A tunnel's adapter (not craked's own links, which have none).
+        if ![crate::hush::DEVICE, crate::keep::DEVICE].contains(&device) {
+            short_suffix(device, true).await;
+        }
+        Ok(())
     }
 
     /// The link's NRPT rule still names what craked wrote: one another
@@ -146,7 +161,48 @@ impl Resolved {
         super::super::dns_links::remove(device);
         if let Self::Real = self {
             delete(&format!("{POLICY}\\{PREFIX}{device}"));
+            short_suffix(device, false).await;
         }
+    }
+}
+
+/// A tunnel's adapter with the short names' suffix (`on`) or without it,
+/// and the short names' rule there while any adapter has it. Done once
+/// per tunnel: PowerShell takes a second.
+async fn short_suffix(device: &str, on: bool) {
+    let (changed, any) = {
+        let mut suffixed = SUFFIXED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let changed = if on {
+            suffixed.insert(device.to_owned())
+        } else {
+            suffixed.remove(device)
+        };
+        (changed, !suffixed.is_empty())
+    };
+    if !changed {
+        return;
+    }
+    if any {
+        let short = [crate::dns::SHORT_SUFFIX.to_owned()];
+        if let Err(e) = write_rule(SHORT_RULE, &short, false) {
+            tracing::warn!("{e}");
+        }
+    } else {
+        delete(&format!("{POLICY}\\{PREFIX}{SHORT_RULE}"));
+    }
+    let suffix = if on { crate::dns::SHORT_SUFFIX } else { "" };
+    let script = format!(
+        "Set-DnsClient -InterfaceAlias {} -ConnectionSpecificSuffix {}",
+        super::host::quoted(device),
+        super::host::quoted(suffix)
+    );
+    // Gone with its adapter already, when off: nothing to undo.
+    if let Err(e) = super::host::powershell("the short names' suffix", &script).await
+        && on
+    {
+        tracing::warn!("{device}: {e}");
     }
 }
 

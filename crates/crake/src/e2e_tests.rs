@@ -65,7 +65,7 @@ pub(crate) fn config(dir: &std::path::Path) -> Config {
 }
 
 /// A DNS query for `name`'s address, as resolved would send it.
-fn query(name: &str) -> Vec<u8> {
+pub(crate) fn query(name: &str) -> Vec<u8> {
     let mut m = vec![0xab, 0xcd, 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 0];
     for label in name.split('.') {
         m.push(u8::try_from(label.len()).unwrap());

@@ -97,13 +97,18 @@
    answers the short name itself, a CNAME to the full name and the
    tunnel's records, routed first; Forget takes it back. Chosen and
    forgotten are System entries, so no chart or count takes them for
-   routes. How the short name reaches craked: macOS and Windows, its own
-   DNS server standing in for the system's (macOS sends "expert." as it
-   is, seen on the user's Mac); Linux, the hush link's search domain
-   `crake.internal` while a tunnel is up (resolved never sends a single
-   label to unicast DNS), answered by the hush answerer. Scenario
+   routes. How the short name reaches craked: macOS, its own DNS server
+   standing in for the system's (macOS sends "expert." as it is, seen on
+   the user's Mac); Linux, the hush link's search domain `crake.internal`
+   while a tunnel is up (resolved never sends a single label to unicast
+   DNS), answered by the hush answerer; Windows, `crake.internal` as each
+   tunnel adapter's connection-specific suffix and an NRPT rule (`Crake
+   short`) sending it to craked's server. Windows, too, never sent "git"
+   by itself to DNS (CI, 2026-10-30, the first try: craked's server
+   standing in for every name never saw it). Scenario
    `a_short_name_means_the_tunnels_once_chosen` and a journey step on
-   every system; on Windows and Linux first proven by CI.
+   every system (Linux's journey container has no resolved: it asks
+   craked as the hush link would; the scenarios use resolved).
 4. Connection probing and automatic learning; undo. **Built**, proven in a
    throwaway namespace (the fake gateway drops packets not from the tunnel
    address, like a real one; the test fails if the stuck flow isn't

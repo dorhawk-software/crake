@@ -184,7 +184,7 @@ fn a_day_with_crake_on_windows(cx: &mut TestAppContext) {
 
     // 2b. A short name, chosen in "What Crake did", forgotten in tunnel
     //     detail.
-    crate::journey_kit::short_name(cx);
+    crate::journey_kit::short_name(cx, &crate::journey_kit::look_up);
 
     // 3. Settings: Learning's wait, changed in craked and shown back.
     request(cx, Request::Settings);

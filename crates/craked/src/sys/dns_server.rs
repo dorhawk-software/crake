@@ -9,7 +9,8 @@
 //! and TCP (the system asks again over TCP when an answer was truncated);
 //! a question that came over TCP is asked of the tunnel's DNS over TCP.
 //! Short names (`manager::short_names`) come here as the system asks
-//! them, with no domain after them.
+//! them: with no domain after them (macOS), or under the suffix
+//! `dns::SHORT_SUFFIX` (Windows).
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4};
 use std::sync::Arc;
@@ -98,6 +99,10 @@ async fn answer(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> 
     // A short name you chose a tunnel's full name for.
     if let Some(reply) = mgr.short_name_answer(query).await {
         return Some(reply);
+    }
+    // Windows asks one as git.crake.internal (its adapter's suffix).
+    if name.ends_with(&format!(".{}", crate::dns::SHORT_SUFFIX)) {
+        return mgr.answer_short(query).await;
     }
     let Some((device, servers)) = super::dns_links::owner(&name) else {
         if super::dns_links::public() {

@@ -77,14 +77,7 @@ pub async fn serve(sock: UdpSocket, mgr: std::sync::Weak<crate::manager::Manager
         };
         let sock = std::sync::Arc::clone(&sock);
         tokio::spawn(async move {
-            let reply = match mgr.short_name_answer(&query).await {
-                Some(reply) => Some(reply),
-                None => {
-                    mgr.offer_short(&query);
-                    reply_code(&query, dns::NXDOMAIN)
-                }
-            };
-            if let Some(reply) = reply {
+            if let Some(reply) = mgr.answer_short(&query).await {
                 let _ = sock.send_to(&reply, from).await;
             }
         });

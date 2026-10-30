@@ -347,7 +347,7 @@ pub(crate) fn show_in(cx: &mut TestAppContext, log: AnyWindowHandle, host: &str)
 }
 
 /// What `name` resolves to, asked as an app asks the system.
-fn look_up(name: &'static str) -> Vec<String> {
+pub(crate) fn look_up(name: &'static str) -> Vec<String> {
     std::thread::spawn(move || {
         use std::net::ToSocketAddrs as _;
         (name, 80)
@@ -361,8 +361,10 @@ fn look_up(name: &'static str) -> Vec<String> {
 
 /// A short name: "git", typed on its own, is asked about in "What Crake
 /// did"; "Use ACME's" makes it ACME's git.acme.internal (10.40.1.10), and
-/// tunnel detail's Short names forgets it.
-pub(crate) fn short_name(cx: &mut TestAppContext) {
+/// tunnel detail's Short names forgets it. `look_up` finds a name's
+/// addresses: the system's (`look_up` above), or, in Linux's journey (a
+/// container without resolved), craked's answer as the hush link gives it.
+pub(crate) fn short_name(cx: &mut TestAppContext, look_up: &dyn Fn(&'static str) -> Vec<String>) {
     let asked = |cx: &mut TestAppContext| {
         model(cx).decisions(panel::DECISIONS).iter().position(|d| {
             d.action == Some(crate::model::Action::Use)

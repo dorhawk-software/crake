@@ -10,8 +10,9 @@
 //! its DNS for good.
 //!
 //! Where the short name reaches craked: its own DNS server, standing in
-//! for the system's (macOS and Windows, `sys::dns_server`), and the hush
-//! link's search domain (Linux, `hush`).
+//! for the system's (macOS, `sys::dns_server`), and `dns::SHORT_SUFFIX`:
+//! the hush link's search domain (Linux, `hush`), each tunnel adapter's
+//! suffix (Windows, `sys::windows::resolved`, sent to craked's server).
 
 use crake_proto::{ShortName, ShortStep};
 
@@ -45,6 +46,17 @@ impl Manager {
             self.learn_answer(&tunnel, &answer, Why::TunnelDomain).await;
         }
         dns::short_answer(&short, &full, reply)
+    }
+
+    /// A short name asked under `dns::SHORT_SUFFIX` (Linux's hush link,
+    /// Windows' adapter suffix): the full name you chose, or else offered
+    /// and said not to exist, so the system tries its next suffix.
+    pub async fn answer_short(self: &Arc<Self>, query: &[u8]) -> Option<Vec<u8>> {
+        if let Some(reply) = self.short_name_answer(query).await {
+            return Some(reply);
+        }
+        self.offer_short(query);
+        crate::hush::reply_code(query, dns::NXDOMAIN)
     }
 
     /// A public answer with no address for a short name (Settings: "Ask
