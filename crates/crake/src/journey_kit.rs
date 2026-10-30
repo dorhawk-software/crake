@@ -387,8 +387,9 @@ pub(crate) fn short_name(cx: &mut TestAppContext, look_up: &dyn Fn(&'static str)
             .iter()
             .any(|e| e.message == "git is git.acme.internal now.")
     });
-    let found = look_up("git");
-    assert!(found.iter().any(|a| a == "10.40.1.10"), "git: {found:?}");
+    until(cx, "git found as ACME's", Duration::from_secs(10), |_| {
+        look_up("git").iter().any(|a| a == "10.40.1.10")
+    });
     request(cx, Request::OpenDetail("acme".into(), None));
     let (d, _) = wait_window::<crate::tunnel_detail::TunnelDetail>(cx, "tunnel detail opens");
     until(cx, "git in Short names", Duration::from_secs(10), |cx| {
@@ -402,4 +403,6 @@ pub(crate) fn short_name(cx: &mut TestAppContext, look_up: &dyn Fn(&'static str)
     until(cx, "git forgotten", Duration::from_secs(10), |cx| {
         model(cx).log.iter().any(|e| e.message == "Forgot git.")
     });
+    // Back on Learned: the window keeps its tab when it opens again.
+    click(cx, d, ("tab", 0usize));
 }

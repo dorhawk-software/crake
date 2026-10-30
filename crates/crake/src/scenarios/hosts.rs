@@ -99,14 +99,23 @@ pub(crate) async fn a_short_name_means_the_tunnels_once_chosen(up: &mut Up) {
         "{SHORT} before"
     );
     let name = up.name;
-    up.wait_for("the question about git", |m| {
+    // Typed again until it's asked about, as a person would: the first
+    // look may come before the system takes the tunnel's suffix (Windows).
+    let asked = |m: &crate::model::Model| {
         m.log.iter().any(|e| {
             e.short
                 .as_ref()
                 .is_some_and(|s| s.name == SHORT && s.full == [(name.to_owned(), FULL.to_owned())])
         })
-    })
-    .await;
+    };
+    let end = Instant::now() + WAIT;
+    while !asked(&up.app.model) {
+        if Instant::now() > end {
+            up.fail("never saw the question about git").await;
+        }
+        let _ = super::platform::look_up(SHORT).await;
+        up.app.settle(Duration::from_millis(500)).await;
+    }
     up.app.send(Command::UseShortName(
         name.into(),
         SHORT.into(),
@@ -118,9 +127,16 @@ pub(crate) async fn a_short_name_means_the_tunnels_once_chosen(up: &mut Up) {
             .any(|e| e.message == "git is git.acme.internal now.")
     })
     .await;
-    let found = super::platform::look_up(SHORT).await;
-    if !found.iter().map(ToString::to_string).eq([GIT.to_owned()]) {
-        up.fail(&format!("{SHORT} once chosen: {found:?}")).await;
+    let end = Instant::now() + APPLIED;
+    loop {
+        let found = super::platform::look_up(SHORT).await;
+        if found.iter().map(ToString::to_string).eq([GIT.to_owned()]) {
+            break;
+        }
+        if Instant::now() > end {
+            up.fail(&format!("{SHORT} once chosen: {found:?}")).await;
+        }
+        up.app.settle(Duration::from_millis(500)).await;
     }
     until_way(up, GIT, true).await;
     assert!(answers(GIT).await, "{SHORT} through {}", up.label);
