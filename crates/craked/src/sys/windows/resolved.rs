@@ -195,11 +195,14 @@ async fn short_suffix(device: &str, on: bool) {
     }
     // Windows completes a name only with the suffixes of adapters that
     // have a DNS server: craked's own (`system_dns` never asks crake-*).
+    // Its cache goes too: a short name asked a moment before was kept as
+    // unknown for up to 15 minutes (CI, 2026-10-30: OpenVPN's adapter).
     let alias = super::host::quoted(device);
     let script = if on {
         format!(
             "Set-DnsClient -InterfaceAlias {alias} -ConnectionSpecificSuffix {}; \
-             Set-DnsClientServerAddress -InterfaceAlias {alias} -ServerAddresses {}",
+             Set-DnsClientServerAddress -InterfaceAlias {alias} -ServerAddresses {}; \
+             Clear-DnsClientCache",
             super::host::quoted(crate::dns::SHORT_SUFFIX),
             super::dns_queue::ADDR
         )
