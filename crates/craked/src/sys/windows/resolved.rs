@@ -25,8 +25,9 @@ const PREFIX: &str = "Crake ";
 const PUBLIC_RULE: &str = "public";
 /// The short names' rule (`Crake short`): Windows asks "git", typed on
 /// its own, as git.crake.internal (`dns::SHORT_SUFFIX`, the suffix of
-/// each tunnel's adapter while it's up), and the rule sends that to
-/// craked's server (`manager::short_names`). Windows never asks DNS a
+/// each tunnel's adapter while it's up, with craked's server as its DNS
+/// server), and the rule sends that to craked's server
+/// (`manager::short_names`). Windows never asks DNS a
 /// name of one label by itself (CI, 2026-10-30).
 const SHORT_RULE: &str = "short";
 
@@ -192,12 +193,22 @@ async fn short_suffix(device: &str, on: bool) {
     } else {
         delete(&format!("{POLICY}\\{PREFIX}{SHORT_RULE}"));
     }
-    let suffix = if on { crate::dns::SHORT_SUFFIX } else { "" };
-    let script = format!(
-        "Set-DnsClient -InterfaceAlias {} -ConnectionSpecificSuffix {}",
-        super::host::quoted(device),
-        super::host::quoted(suffix)
-    );
+    // Windows completes a name only with the suffixes of adapters that
+    // have a DNS server: craked's own (`system_dns` never asks crake-*).
+    let alias = super::host::quoted(device);
+    let script = if on {
+        format!(
+            "Set-DnsClient -InterfaceAlias {alias} -ConnectionSpecificSuffix {}; \
+             Set-DnsClientServerAddress -InterfaceAlias {alias} -ServerAddresses {}",
+            super::host::quoted(crate::dns::SHORT_SUFFIX),
+            super::dns_queue::ADDR
+        )
+    } else {
+        format!(
+            "Set-DnsClient -InterfaceAlias {alias} -ConnectionSpecificSuffix ''; \
+             Set-DnsClientServerAddress -InterfaceAlias {alias} -ResetServerAddresses"
+        )
+    };
     // Gone with its adapter already, when off: nothing to undo.
     if let Err(e) = super::host::powershell("the short names' suffix", &script).await
         && on

@@ -47,6 +47,11 @@ pub(crate) fn diagnose(device: &str) -> String {
          Get-NetIPAddress -InterfaceAlias {device} -ErrorAction SilentlyContinue | Format-Table | Out-String; \
          Get-NetRoute -InterfaceAlias {device} -ErrorAction SilentlyContinue | Format-Table | Out-String; \
          'NRPT:'; Get-DnsClientNrptRule | Format-Table Namespace,NameServers -AutoSize | Out-String; \
+         'suffixes:'; Get-DnsClient | Format-Table InterfaceAlias,ConnectionSpecificSuffix -AutoSize | Out-String; \
+         Get-DnsClientServerAddress -InterfaceAlias {device} -ErrorAction SilentlyContinue | Out-String; \
+         Get-DnsClientGlobalSetting | Format-List | Out-String; \
+         'git:'; Resolve-DnsName git -Type A 2>&1 | Out-String; \
+         Resolve-DnsName git.crake.internal -Type A -DnsOnly 2>&1 | Out-String; \
          'decisions:'; Get-Content C:\\ProgramData\\Crake\\log -Tail 15 | Out-String; \
          'craked:'; Get-Content C:\\ProgramData\\Crake\\craked.log -Tail 40 | Out-String"
     ))

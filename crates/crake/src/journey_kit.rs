@@ -347,6 +347,7 @@ pub(crate) fn show_in(cx: &mut TestAppContext, log: AnyWindowHandle, host: &str)
 }
 
 /// What `name` resolves to, asked as an app asks the system.
+#[cfg(not(target_os = "linux"))]
 pub(crate) fn look_up(name: &'static str) -> Vec<String> {
     std::thread::spawn(move || {
         use std::net::ToSocketAddrs as _;
