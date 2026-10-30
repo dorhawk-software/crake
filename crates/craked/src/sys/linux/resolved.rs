@@ -77,7 +77,10 @@ impl Resolved {
                 std::net::IpAddr::V6(a) => (libc::AF_INET6, a.octets().to_vec()),
             })
             .collect();
-        let mut domains: Vec<(&str, bool)> = domains.iter().map(|d| (d.as_str(), true)).collect();
+        let mut domains: Vec<(&str, bool)> = domains
+            .iter()
+            .map(|d| (d.as_str(), routing_only(d)))
+            .collect();
         if everything {
             domains.push((".", true)); // "~.": every name
         }
@@ -274,6 +277,15 @@ fn ifindex(device: &str) -> Result<i32> {
     Ok(i32::try_from(i)?)
 }
 
+/// Each domain as resolved takes it: for routing only ("~acme.internal"),
+/// but craked's own for short names, a search domain, so resolved
+/// completes "expert" with it (`dns::SHORT_SUFFIX`, the hush link's).
+fn routing_only(domain: &str) -> bool {
+    !domain
+        .trim_end_matches('.')
+        .eq_ignore_ascii_case(crate::dns::SHORT_SUFFIX)
+}
+
 /// resolved's domains for a link (name, routing only) and its default
 /// route are what `set_link` made for `domains`.
 fn as_set(
@@ -286,7 +298,10 @@ fn as_set(
         let d = d.trim_end_matches('.').to_ascii_lowercase();
         if d.is_empty() { ".".to_owned() } else { d }
     };
-    let mut want: Vec<(String, bool)> = domains.iter().map(|d| (plain(d), true)).collect();
+    let mut want: Vec<(String, bool)> = domains
+        .iter()
+        .map(|d| (plain(d), routing_only(d)))
+        .collect();
     if everything {
         want.push((".".to_owned(), true));
     }

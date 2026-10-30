@@ -135,6 +135,7 @@ impl Log {
             reason,
             hosts: Vec::new(),
             others: Vec::new(),
+            short: None,
         });
     }
 
@@ -184,6 +185,7 @@ mod tests {
             reason: None,
             hosts: Vec::new(),
             others: Vec::new(),
+            short: None,
         }
     }
 

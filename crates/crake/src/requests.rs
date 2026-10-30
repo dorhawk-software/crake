@@ -302,6 +302,7 @@ pub(super) fn on_request(request: Request, cx: &mut App) {
         Request::NoTray(event) => crate::tray_host::handle(event, cx),
         Request::Move(from, to, hosts) => send(Command::Move(from, to, hosts)),
         Request::Send(t, hosts) => send(Command::AddHosts(t, hosts)),
+        Request::UseShortName(t, short, full) => send(Command::UseShortName(t, short, full)),
         Request::Pin(t, targets) => send(Command::Pin(t, targets)),
         Request::OpenDetail(t, host) => open_detail(t, host, cx),
         Request::Detail(t) => {
@@ -500,6 +501,7 @@ fn undo(tunnel: String, hosts: Vec<String>, cx: &mut App) {
             ),
             hosts,
             others: Vec::new(),
+            short: None,
         }));
         cx.notify();
     });

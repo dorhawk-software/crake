@@ -267,6 +267,35 @@ pub struct LogEntry {
     /// can move them there ("When two tunnels answer: Ask me").
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub others: Vec<String>,
+    /// A short name ("expert") a decision was about: asked which tunnel's
+    /// full name it means, chosen, or forgotten.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub short: Option<ShortName>,
+}
+
+/// A name of one label, as typed ("https://expert/"), and its full name in
+/// each tunnel whose DNS knows it, (tunnel, full name), in try order.
+/// Asked is a `LogKind::Asked` entry; chosen and forgotten are `System`
+/// ones (not routes: the charts and counts leave them out), which the
+/// panel lists with the decisions all the same.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ShortName {
+    pub name: String,
+    pub full: Vec<(String, String)>,
+    #[serde(default)]
+    pub step: ShortStep,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ShortStep {
+    /// Which tunnel's full name does it mean?
+    #[default]
+    Asked,
+    /// You chose one: craked answers the short name with it.
+    Chosen,
+    /// You forgot it.
+    Forgotten,
 }
 
 impl LogEntry {
@@ -484,6 +513,7 @@ mod tests {
             reason: Some(left_running_reason("globex", 4242)),
             hosts: Vec::new(),
             others: Vec::new(),
+            short: None,
         };
         assert!(entry.is_left_running());
         assert!(!entry.is_unexpected_stop());
@@ -573,6 +603,7 @@ mod tests {
             reason: None,
             hosts: Vec::new(),
             others: Vec::new(),
+            short: None,
         };
         assert!(entry(stopped_unexpectedly("Initech"), Some("initech")).is_unexpected_stop());
         assert!(!entry("Switched Initech off.".into(), Some("initech")).is_unexpected_stop());

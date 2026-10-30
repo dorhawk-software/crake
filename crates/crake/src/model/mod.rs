@@ -187,6 +187,8 @@ pub enum Action {
     Redo,
     /// "Ask me first": send the host through the tunnel.
     Send,
+    /// A short name: use a tunnel's full name for it ("Use ACME's").
+    Use,
 }
 
 #[derive(Clone, Debug)]
@@ -584,13 +586,14 @@ impl Model {
             .collect()
     }
 
-    /// The latest decisions (not system events), newest first, each with
-    /// Undo or Redo while it's still the last word on its hosts.
+    /// The latest decisions (not system events, but short names chosen or
+    /// forgotten), newest first, each with Undo or Redo while it's still
+    /// the last word on its hosts (or short name).
     pub fn decisions(&self, count: usize) -> Vec<Decision> {
         let decisions: Vec<&LogEntry> = self
             .log
             .iter()
-            .filter(|e| e.kind != LogKind::System)
+            .filter(|e| e.kind != LogKind::System || e.short.is_some())
             .collect();
         let mut out = Vec::new();
         for (i, e) in decisions.iter().enumerate().rev() {
@@ -603,6 +606,10 @@ impl Model {
                     && matches!(l.kind, LogKind::Routed | LogKind::Undone)
                     && l.hosts.iter().any(|h| e.hosts.contains(h))
             });
+            if let Some(d) = moments::short_decision(e, later) {
+                out.push(d);
+                continue;
+            }
             let action = match e.kind {
                 _ if e.hosts.is_empty() || superseded => None,
                 LogKind::Routed if !e.message.starts_with("Pinned") => Some(Action::Undo),
@@ -726,6 +733,7 @@ mod tests {
             reason: Some("It didn't answer directly.".into()),
             hosts: hosts.iter().map(|h| h.to_string()).collect(),
             others: Vec::new(),
+            short: None,
         }
     }
 
@@ -1079,6 +1087,7 @@ mod tests {
             reason: None,
             hosts: vec!["10.40.1.20".into()],
             others: Vec::new(),
+            short: None,
         };
         let mut m = demo();
         m.log.clear();

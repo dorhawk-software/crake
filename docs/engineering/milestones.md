@@ -83,6 +83,27 @@
    serves IPv6 addresses (an A and an AAAA answer each keep the other's),
    and "one address, two companies" covers IPv6 addresses (netns and
    lifecycle tests).
+   **Short names** (requested 2026-10-30: https://expert/ worked with plain
+   openconnect, whose vpnc-script makes the gateway's default domain a
+   search domain, and not with Crake, which sets none). Not a search
+   domain: that completes every short name with the company's (`wpad`
+   included, the proxy auto-detection that hung a browser, 7g) and sends
+   every word typed in an address bar to its DNS for good. Instead
+   (`manager/short_names.rs`): a short name public DNS has no address for
+   ("expert" is a top-level domain: "no such record", not NXDOMAIN) is
+   asked of each tunnel that's up under each of its domains, once a day
+   per name, and the log asks which tunnel's it means (`LogEntry::short`;
+   "When two tunnels answer" applies). Chosen (`UseShortName`), craked
+   answers the short name itself, a CNAME to the full name and the
+   tunnel's records, routed first; Forget takes it back. Chosen and
+   forgotten are System entries, so no chart or count takes them for
+   routes. How the short name reaches craked: macOS and Windows, its own
+   DNS server standing in for the system's (macOS sends "expert." as it
+   is, seen on the user's Mac); Linux, the hush link's search domain
+   `crake.internal` while a tunnel is up (resolved never sends a single
+   label to unicast DNS), answered by the hush answerer. Scenario
+   `a_short_name_means_the_tunnels_once_chosen` and a journey step on
+   every system; on Windows and Linux first proven by CI.
 4. Connection probing and automatic learning; undo. **Built**, proven in a
    throwaway namespace (the fake gateway drops packets not from the tunnel
    address, like a real one; the test fails if the stuck flow isn't

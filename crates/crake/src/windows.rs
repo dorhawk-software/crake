@@ -827,6 +827,7 @@ mod tests {
             reason: None,
             hosts: Vec::new(),
             others: Vec::new(),
+            short: None,
         };
         // As craked says it, not switched on just now: no window.
         let windows = |cx: &mut TestAppContext| cx.update(|cx| cx.windows().len());

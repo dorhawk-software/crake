@@ -182,6 +182,10 @@ fn a_day_with_crake_on_windows(cx: &mut TestAppContext) {
         |_| routed("10.40.1.10"),
     );
 
+    // 2b. A short name, chosen in "What Crake did", forgotten in tunnel
+    //     detail.
+    crate::journey_kit::short_name(cx);
+
     // 3. Settings: Learning's wait, changed in craked and shown back.
     request(cx, Request::Settings);
     let (s, _) = wait_window::<settings_view::Settings>(cx, "Settings opens");

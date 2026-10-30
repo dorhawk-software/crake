@@ -395,6 +395,12 @@ impl Manager {
 
     /// Stop sending a host or network through the tunnel, now.
     pub async fn forget(&self, name: &str, input: &str) -> Result<String> {
+        // A short name chosen for it (tunnel detail's Short names).
+        if input.parse::<Target>().is_err()
+            && let Some(msg) = self.forget_short_name(name, input).await
+        {
+            return Ok(msg);
+        }
         let _ops = self.ops.lock().await;
         let (label, _) = self.prepare(name)?;
         let t: Target = input.parse()?;

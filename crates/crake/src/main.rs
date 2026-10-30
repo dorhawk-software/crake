@@ -7,6 +7,7 @@
 // builds; development builds keep the console for their debug lines).
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
+mod assets;
 mod requests;
 mod updates;
 mod windows;
@@ -188,6 +189,9 @@ pub enum Request {
     Move(String, String, Vec<String>),
     /// "Ask me first": send these hosts through the tunnel.
     Send(String, Vec<String>),
+    /// A short name is a tunnel's full name from now on (tunnel, short,
+    /// full): "Use ACME's", and Redo after it was forgotten.
+    UseShortName(String, String, String),
     /// Open New tunnel, or the same window to edit one (its name).
     NewTunnel(Option<String>),
     /// From New tunnel: add one (fields), maybe with a certificate to keep
@@ -301,81 +305,6 @@ struct Shell {
 
 impl Global for Shell {}
 
-/// Crake's own icons (bundled); everything else from gpui-kit.
-struct Assets;
-
-impl gpui_kit::AssetSource for Assets {
-    fn load(&self, path: &str) -> gpui_kit::Result<Option<std::borrow::Cow<'static, [u8]>>> {
-        macro_rules! icons {
-            ($($name:literal),* $(,)?) => {
-                match path {
-                    $(concat!("crake/", $name) => {
-                        return Ok(Some(std::borrow::Cow::Borrowed(include_bytes!(concat!("../../../assets/icons/", $name)))));
-                    })*
-                    _ => {}
-                }
-            };
-        }
-        icons!(
-            "bird.svg",
-            "bird-grass.svg",
-            "bird-alone.svg",
-            "call.svg",
-            "head-warning.svg",
-            "warning-triangle.svg",
-            "warning-mark.svg",
-            "bird-badge-warning.svg",
-            "bird-badge-trouble.svg",
-            "bird-badge-mark.svg",
-            "bird-badge-warning-mark.svg",
-            "clipboard.svg",
-            "mark-routed.svg",
-            "mark-left-alone.svg",
-            "mark-undone.svg",
-            "mark-pinned.svg",
-            "person.svg",
-            "shield.svg",
-            "block.svg",
-            "lock.svg",
-            "settings.svg",
-            "dots.svg",
-            "circle.svg",
-            "check.svg",
-            "cross.svg",
-            "mark-system.svg",
-            "search.svg",
-            "close.svg",
-            "chevron-down.svg",
-            "chevron-up.svg",
-            "chevron-left.svg",
-            "chevron-right.svg",
-            "mark-gateway.svg",
-            "sliders.svg",
-            "grip.svg",
-            "section-general.svg",
-            "section-learning.svg",
-            "section-names.svg",
-            "section-privacy.svg",
-            "section-managed.svg",
-            "section-about.svg",
-            "help.svg",
-            "trash.svg",
-            "plus.svg",
-            "section-tunnels.svg",
-            "disclose-right.svg",
-            "disclose-down.svg",
-            "broom.svg",
-            "section-diagnostics.svg",
-            "file.svg",
-        );
-        gpui_kit::assets::AllAssets.load(path)
-    }
-
-    fn list(&self, path: &str) -> gpui_kit::Result<Vec<gpui_kit::SharedString>> {
-        gpui_kit::assets::AllAssets.list(path)
-    }
-}
-
 fn main() {
     // `crake report`: the file, no window.
     if let Some(code) = report::cli(&std::env::args().skip(1).collect::<Vec<_>>()) {
@@ -394,7 +323,7 @@ fn main() {
         }
     }
     windows::dock::application()
-        .with_assets(Assets)
+        .with_assets(assets::Assets)
         .run(move |cx: &mut App| {
             gpui_kit::init(cx);
             // A tray app: closing the panel (its only window) mustn't end it.
@@ -450,8 +379,8 @@ fn main() {
                 Ok("staying") => model::demo_staying(model),
                 // CRAKE_DEMO=long: names that take two lines in the panel.
                 Ok("long") => model::demo_long_names(model),
-                // CRAKE_DEMO=first, back or ask: the panel's moments.
-                Ok(m @ ("first" | "back" | "ask")) => model::demo_moment(model, m),
+                // CRAKE_DEMO=first, back, ask or short: the panel's moments.
+                Ok(m @ ("first" | "back" | "ask" | "short")) => model::demo_moment(model, m),
                 _ => model,
             };
             let mut model = model;
@@ -534,6 +463,7 @@ fn main() {
                             reason: Some("Only ACME\u{2019}s DNS knows it.".into()),
                             hosts: vec![format!("10.40.9.{n}")],
                             others: Vec::new(),
+                            short: None,
                         };
                         cx.update(|cx| {
                             on_update(client::Update::Appended(entry), cx);

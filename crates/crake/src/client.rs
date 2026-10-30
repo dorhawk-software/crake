@@ -29,6 +29,8 @@ pub enum Command {
     Move(String, String, Vec<String>),
     /// Send hosts through a tunnel (an "Ask me first" answer).
     AddHosts(String, Vec<String>),
+    /// A short name is a tunnel's full name from now on (tunnel, short, full).
+    UseShortName(String, String, String),
     /// Keep hosts or networks on a tunnel.
     Pin(String, Vec<String>),
     Unpin(String, String),
@@ -513,6 +515,9 @@ async fn session(
                             done = done.and(api.call::<_, String>("AddHost", &(t.clone(), h)).await.map(drop));
                         }
                         done
+                    }
+                    Command::UseShortName(t, short, full) => {
+                        api.call::<_, String>("UseShortName", &(t, short, full)).await.map(drop)
                     }
                     Command::Attach(t, fields) => match api.call::<_, ()>("Attach", &(t.clone(), fields)).await {
                         Err(e) => {

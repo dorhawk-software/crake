@@ -76,7 +76,9 @@ button,input,select{font:inherit}
 <div style="font-size: 13px; color: {{c.muted}}; text-align: right">{{r.used}}</div>
 <div style="display: flex; gap: 6px; justify-content: flex-end">
 <sc-if value="{{r.editable}}" hint-placeholder-val="{{true}}">
+<sc-if value="{{r.pinnable}}" hint-placeholder-val="{{true}}">
 <button type="button" aria-pressed="{{r.pinAria}}" onClick="{{r.pin}}" style="height: 34px; padding: 0 12px; border: 1px solid {{r.pinBorder}}; border-radius: 6px; background: {{r.pinBg}}; color: {{r.pinFg}}; font-weight: 600; cursor: pointer">{{r.pinLabel}}</button>
+</sc-if>
 <button type="button" onClick="{{r.forget}}" style="height: 34px; padding: 0 12px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Forget</button>
 </sc-if>
 <sc-if value="{{r.locked}}" hint-placeholder-val="{{false}}">
@@ -123,22 +125,26 @@ class Component extends DCLogic {
       { id: 'jira', host: 'jira.acme.internal', how: 'Learned at 09:12 · name only exists inside', used: '3 min ago', src: 'learned' },
       { id: 'ci', host: 'builds.acme.example', how: 'Learned at 08:40 · public name, private address', used: '2 h ago', src: 'learned' },
       { id: 'dns', host: '10.40.0.53', how: 'ACME’s DNS server', used: 'Used now', src: 'gateway' },
-      { id: 'net', host: '10.40.0.0/16', how: 'Pushed when ACME connects', used: '—', src: 'gateway' }
+      { id: 'net', host: '10.40.0.0/16', how: 'Pushed when ACME connects', used: '—', src: 'gateway' },
+      // A short name you chose ACME's full name for ("Use ACME's" in the panel).
+      { id: 'expert', host: 'expert', how: 'expert.corp.acme.internal · chosen at 13:02', used: '', src: 'short' }
     ];
     const live = hosts.filter(h => !st.gone[h.id]);
     const pinned = h => !!st.pins[h.id];
-    const inTab = (h, t) => t === 'learned' ? h.src === 'learned' : t === 'pinned' ? pinned(h) : h.src === 'gateway';
-    const tabs = [['learned', 'Learned'], ['pinned', 'Pinned'], ['gateway', 'From the gateway']].map(([id, label]) => {
+    const inTab = (h, t) => t === 'learned' ? h.src === 'learned' : t === 'pinned' ? pinned(h) : t === 'short' ? h.src === 'short' : h.src === 'gateway';
+    // Short names: a tab once there are any.
+    const shortTab = st.tab === 'short' || live.some(h => h.src === 'short');
+    const tabs = [['learned', 'Learned'], ['pinned', 'Pinned'], ['gateway', 'From the gateway'], ['short', 'Short names']].filter(([id]) => id !== 'short' || shortTab).map(([id, label]) => {
       const on = st.tab === id;
       return { label, n: live.filter(h => inTab(h, id)).length, aria: on ? 'true' : 'false', bar: on ? c.accent : 'transparent',
         fg: on ? c.ink : c.muted, weight: on ? 700 : 600, pick: () => this.setState({ tab: id }) };
     });
     const rows = live.filter(h => inTab(h, st.tab)).map(h => {
-      const p = pinned(h), gw = h.src === 'gateway';
+      const p = pinned(h), gw = h.src === 'gateway', sh = h.src === 'short';
       return {
         host: h.host, how: p ? 'Pinned · kept until you forget it' : h.how, used: h.used,
-        icon: gw ? lock : (p ? pinIcon : tick), iconColor: gw ? c.muted : (p ? c.ink : c.accent),
-        editable: !gw, locked: gw,
+        icon: gw ? lock : (p || sh ? pinIcon : tick), iconColor: gw ? c.muted : (p || sh ? c.ink : c.accent),
+        editable: !gw, locked: gw, pinnable: !gw && !sh,
         pinAria: p ? 'true' : 'false', pinLabel: p ? 'Unpin' : 'Pin',
         pinBg: c.panel, pinFg: c.ink, pinBorder: c.line,
         pin: () => this.setState({ pins: Object.assign({}, this.state.pins, { [h.id]: !p }) }),
@@ -156,7 +162,7 @@ class Component extends DCLogic {
     let ticks = '';
     [13.35, 10.78, 9.23, 9.2, 8.67].forEach(h => { const x = 2 + h / 13.4 * 836; ticks += bar(x, 10, 44, 3) + bar(x + 4.5, 18, 44, 3); });
     // What keeps each kind of host, said once over the list (7 days: Settings → Learning, "Forget hosts unused for").
-    const lifetime = { learned: 'Crake forgets a learned host after 7 days unused.', pinned: 'Pinned hosts are kept until you forget them.', gateway: 'ACME’s gateway sent these when it connected.' }[st.tab];
+    const lifetime = { learned: 'Crake forgets a learned host after 7 days unused.', pinned: 'Pinned hosts are kept until you forget them.', gateway: 'ACME’s gateway sent these when it connected.', short: 'Short names are kept until you forget them.' }[st.tab];
     return { c, tabs, rows, lifetime, empty: rows.length === 0, bars: bars || 'M0 0', ticks };
   }
 }

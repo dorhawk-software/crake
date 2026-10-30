@@ -11,6 +11,16 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### New
+
+- **Short names work through a tunnel.** Typed on its own, a name like https://expert/ only
+  worked with a VPN client that completes every short name with the company's domain. When a
+  tunnel's DNS knows one, Crake now asks which tunnel's you mean ("ACME knows expert as
+  expert.corp.acme.internal.", Use ACME's), and from then on the short name works, through that
+  tunnel. Only names you chose are completed, never `wpad`, and tunnel detail lists them under
+  Short names, where Forget takes one back. "Ask every tunnel when a name is unknown" turns it
+  off, as it does the rest.
+
 ## 0.17.0 (2026-10-29)
 
 ### New

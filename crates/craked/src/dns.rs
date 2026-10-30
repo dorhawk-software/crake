@@ -30,6 +30,8 @@ pub const OPCODE_AND_RD: u8 = 0x79;
 pub const RA: u8 = 0x80;
 pub const RCODE: u8 = 0x0f;
 pub const REFUSED: u8 = 5;
+/// "No such name": a response code.
+pub const NXDOMAIN: u8 = 3;
 /// After a question's name (ending in a zero byte): its type and class.
 pub const QUESTION_FIELDS: usize = 4;
 /// How an answer names the question's name: a pointer to it, right after
@@ -208,6 +210,96 @@ fn question(msg: &Message, types: &[RecordType]) -> Option<Failure> {
         query,
     })
 }
+
+/// A question, or its answer, about a short name: one label ("expert", as
+/// in https://expert/), A or AAAA. With no search domain to complete it,
+/// the system asks it as it is; a tunnel's DNS may know it under one of its
+/// domains.
+pub fn short_question(payload: &[u8]) -> Option<Failure> {
+    let msg = Message::from_vec(payload).ok()?;
+    if msg.queries.len() != 1 {
+        return None;
+    }
+    let query = msg.queries[0].clone();
+    if ![RecordType::A, RecordType::AAAA].contains(&query.query_type)
+        || query.query_class != DNSClass::IN
+    {
+        return None;
+    }
+    let name = normalize(&query.name.to_ascii());
+    // Linux: resolved asks it under the hush link's search domain.
+    let name = name
+        .strip_suffix(&format!(".{SHORT_SUFFIX}"))
+        .map_or(name.clone(), str::to_owned);
+    short_name(&name).then_some(Failure {
+        id: msg.metadata.id,
+        name,
+        qtype: query.query_type,
+        query,
+    })
+}
+
+/// One label a host may be called by (letters, digits, hyphens inside),
+/// and not one a network answers for itself: a browser's proxy
+/// auto-detection hung on a company's `wpad` (2026-10-14).
+pub fn short_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= MAX_LABEL
+        && !name.starts_with('-')
+        && !name.ends_with('-')
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        && !NOT_SHORT_NAMES.contains(&name)
+}
+
+/// Linux: the hush link's search domain, so resolved asks craked about a
+/// short name ("expert" as expert.crake.internal); no name under it is
+/// ever anyone else's (`.internal` is for private use), and none goes
+/// further than craked.
+pub const SHORT_SUFFIX: &str = "crake.internal";
+
+/// Short names never completed with a tunnel's domain: proxy
+/// auto-detection, IPv6 over IPv4 (ISATAP), this computer.
+const NOT_SHORT_NAMES: [&str; 3] = ["wpad", "isatap", "localhost"];
+
+/// A public answer with no address in it: "no such name", or "no such
+/// record" (a short name that is also a top-level domain, as "expert" is,
+/// has no address of its own).
+pub fn no_address(payload: &[u8]) -> bool {
+    Message::from_vec(payload).is_ok_and(|msg| {
+        msg.metadata.message_type == MessageType::Response
+            && matches!(
+                msg.metadata.response_code,
+                ResponseCode::NoError | ResponseCode::NXDomain
+            )
+            && records(&msg).is_empty()
+    })
+}
+
+/// The answer to a short name's question: it is `full` (a CNAME, so the
+/// system takes the records that follow), then what the tunnel's DNS said
+/// `full` is.
+pub fn short_answer(short: &Failure, full: &str, mut reply: Message) -> Option<Vec<u8>> {
+    let target = hickory_proto::rr::Name::from_ascii(format!("{full}.")).ok()?;
+    let ttl = reply
+        .answers
+        .iter()
+        .map(|r| r.ttl)
+        .min()
+        .unwrap_or(SHORT_TTL);
+    let alias = hickory_proto::rr::Record::from_rdata(
+        short.query.name.clone(),
+        ttl,
+        RData::CNAME(hickory_proto::rr::rdata::CNAME(target)),
+    );
+    reply.answers.insert(0, alias);
+    rewrite(short, reply)
+}
+
+/// How long a short name's answer is kept when the tunnel's answer has
+/// no records to take it from (seconds).
+const SHORT_TTL: u32 = 60;
 
 /// A recursive question for `name`, with EDNS (1232 bytes).
 pub fn query(id: u16, name: &str, qtype: RecordType) -> Vec<u8> {
@@ -579,6 +671,36 @@ pub(crate) mod tests {
             0,
             "valid IPv4 header checksum"
         );
+    }
+
+    #[test]
+    fn short_names_are_answered_with_a_tunnels_full_name() {
+        // One label; not a full name, not one a network answers itself.
+        let f = short_question(&query(ID, "expert.", RecordType::A)).unwrap();
+        assert_eq!((f.id, f.name.as_str()), (ID, "expert"));
+        assert!(short_question(&query(ID, "git.acme.internal", RecordType::A)).is_none());
+        assert!(short_question(&query(ID, "wpad", RecordType::A)).is_none());
+        assert!(short_question(&query(ID, "expert", RecordType::MX)).is_none());
+        assert!(!short_name("-x") && !short_name("") && !short_name("a_b"));
+
+        // "No such name", and "no such record" (a top-level domain).
+        assert!(no_address(&nxdomain("expert")));
+        assert!(no_address(&response("expert", &[])));
+        let ip: Ipv4Addr = "10.40.8.37".parse().unwrap();
+        assert!(!no_address(&response("expert", &[ip])));
+
+        // It is the full name, then the tunnel's records for that.
+        let tunnel = Message::from_vec(&response("expert.corp.acme.internal", &[ip])).unwrap();
+        let answer = short_answer(&f, "expert.corp.acme.internal", tunnel).unwrap();
+        let m = Message::from_vec(&answer).unwrap();
+        assert_eq!(m.metadata.id, ID);
+        assert_eq!(normalize(&m.queries[0].name.to_ascii()), "expert");
+        match &m.answers[0].data {
+            RData::CNAME(c) => assert_eq!(c.0.to_ascii(), "expert.corp.acme.internal."),
+            other => panic!("not a CNAME: {other:?}"),
+        }
+        assert_eq!(normalize(&m.answers[0].name.to_ascii()), "expert");
+        assert_eq!(records(&m), vec![IpAddr::V4(ip)]);
     }
 
     #[test]

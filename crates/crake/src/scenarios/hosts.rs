@@ -88,6 +88,53 @@ pub(crate) async fn a_name_added_by_hand_goes_through(up: &mut Up) {
     assert!(answers(at).await, "{name} after adding it");
 }
 
+/// A short name ("git", typed on its own as in http://git/) ACME's DNS
+/// knows under its domain: Crake asks which tunnel's it means; chosen, it
+/// is ACME's git.acme.internal, through the tunnel, until forgotten.
+pub(crate) async fn a_short_name_means_the_tunnels_once_chosen(up: &mut Up) {
+    const SHORT: &str = "git";
+    const FULL: &str = "git.acme.internal";
+    assert!(
+        super::platform::look_up(SHORT).await.is_empty(),
+        "{SHORT} before"
+    );
+    let name = up.name;
+    up.wait_for("the question about git", |m| {
+        m.log.iter().any(|e| {
+            e.short
+                .as_ref()
+                .is_some_and(|s| s.name == SHORT && s.full == [(name.to_owned(), FULL.to_owned())])
+        })
+    })
+    .await;
+    up.app.send(Command::UseShortName(
+        name.into(),
+        SHORT.into(),
+        FULL.into(),
+    ));
+    up.wait_for("the choice", |m| {
+        m.log
+            .iter()
+            .any(|e| e.message == "git is git.acme.internal now.")
+    })
+    .await;
+    let found = super::platform::look_up(SHORT).await;
+    if !found.iter().map(ToString::to_string).eq([GIT.to_owned()]) {
+        up.fail(&format!("{SHORT} once chosen: {found:?}")).await;
+    }
+    until_way(up, GIT, true).await;
+    assert!(answers(GIT).await, "{SHORT} through {}", up.label);
+    up.app.send(Command::Forget(name.into(), SHORT.into()));
+    up.wait_for("forgotten", |m| {
+        m.log.iter().any(|e| e.message == "Forgot git.")
+    })
+    .await;
+    assert!(
+        super::platform::look_up(SHORT).await.is_empty(),
+        "{SHORT} forgotten"
+    );
+}
+
 /// A pinned network goes through as a whole; unpinned, it doesn't.
 pub(crate) async fn a_pinned_network_goes_through_until_unpinned(up: &mut Up) {
     up.app

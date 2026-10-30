@@ -1,5 +1,7 @@
 //! The panel's “What Crake did”: the latest decisions, with Undo or Redo.
 
+use crake_proto::LogEntry;
+
 use super::*;
 
 /// A new decision's row slides in over this many ms.
@@ -148,7 +150,13 @@ impl Panel {
     ) -> AnyElement {
         let asked = asked.map(|a| self.also_answered(i, &d, a, t, cx));
         use crake_proto::LogKind;
+        let step = d.entry.short.as_ref().map(|s| s.step);
         let (mark, color) = match d.entry.kind {
+            // A short name chosen is kept until forgotten, as a pin is.
+            _ if step == Some(crake_proto::ShortStep::Chosen) => ("crake/mark-pinned.svg", t.ink),
+            _ if step == Some(crake_proto::ShortStep::Forgotten) => {
+                ("crake/mark-undone.svg", t.muted)
+            }
             LogKind::Routed if d.entry.message.starts_with("Pinned") => {
                 ("crake/mark-pinned.svg", t.ink)
             }
@@ -170,8 +178,13 @@ impl Panel {
                     .text_color(t.muted)
                     .child(d.time.clone()),
             );
-        if let (Some(action), Some(tunnel)) = (d.action.clone(), d.entry.tunnel.clone()) {
-            let hosts = d.entry.hosts.clone();
+        // A short name two tunnels know: which one, under the reason.
+        let choices = d.entry.short.as_ref().map_or(0, |s| s.full.len());
+        let choose = (d.action == Some(Action::Use) && choices > 1)
+            .then(|| self.short_choices(i, &d.entry, t, cx));
+        if let (Some(action), Some(tunnel)) = (d.action.clone(), d.entry.tunnel.clone())
+            && choose.is_none()
+        {
             let label = match action {
                 Action::Undo => "Undo".to_owned(),
                 Action::Redo => "Redo".to_owned(),
@@ -179,19 +192,21 @@ impl Panel {
                     "Send through {}",
                     self.model.read(cx).display_of(Some(&tunnel))
                 ),
+                Action::Use => format!(
+                    "Use {}\u{2019}s",
+                    self.model.read(cx).display_of(Some(&tunnel))
+                ),
             };
+            let entry = d.entry.clone();
             right = right.child(
                 button(("act", i), label, t)
                     .px(px(10.))
                     .h(px(30.))
                     .keys()
                     .on_click(cx.listener(move |this, _, _, _| {
-                        let r = match action {
-                            Action::Undo => Request::Undo(tunnel.clone(), hosts.clone()),
-                            Action::Redo => Request::Redo(tunnel.clone(), hosts.clone()),
-                            Action::Send => Request::Send(tunnel.clone(), hosts.clone()),
-                        };
-                        this.send(r);
+                        if let Some(r) = request(&action, &entry, 0) {
+                            this.send(r);
+                        }
                     }))
                     .test_support(),
             );
@@ -230,9 +245,64 @@ impl Panel {
                                 d.entry.reason.as_deref().unwrap_or_default(),
                             )),
                     )
-                    .children(asked),
+                    .children(asked)
+                    .children(choose),
             )
             .child(right)
             .into_any_element()
     }
+}
+
+impl Panel {
+    /// "Use ACME's", "Use Nordbank's": one for each tunnel that knows a
+    /// short name, as moment C offers "Use Nordbank".
+    fn short_choices(&self, i: usize, entry: &LogEntry, t: &Theme, cx: &mut Context<Self>) -> Div {
+        let mut actions = div().flex().items_center().gap(px(16.)).mt(px(6.));
+        let full = entry
+            .short
+            .as_ref()
+            .map(|s| s.full.clone())
+            .unwrap_or_default();
+        for (j, (tunnel, _)) in full.iter().enumerate() {
+            let display = self.model.read(cx).display_of(Some(tunnel));
+            let entry = entry.clone();
+            actions = actions.child(
+                crate::controls::action(
+                    ("use-short", i * CHOICES + j),
+                    format!("Use {display}\u{2019}s"),
+                    t,
+                )
+                .keys()
+                .on_click(cx.listener(move |this, _, _, _| {
+                    if let Some(r) = request(&Action::Use, &entry, j) {
+                        this.send(r);
+                    }
+                }))
+                .test_support(),
+            );
+        }
+        actions
+    }
+}
+
+/// Room for this many tunnels' "Use …" per row in their ids.
+const CHOICES: usize = 8;
+
+/// What a decision's button asks of craked: about its hosts, or about its
+/// short name (`choice`: which tunnel's full name, for Use; Redo uses the
+/// one it had).
+pub(super) fn request(action: &Action, entry: &LogEntry, choice: usize) -> Option<Request> {
+    let tunnel = entry.tunnel.clone()?;
+    let hosts = entry.hosts.clone();
+    Some(match (action, &entry.short) {
+        (Action::Use | Action::Redo, Some(s)) => {
+            let (t, full) = s.full.get(choice)?.clone();
+            Request::UseShortName(t, s.name.clone(), full)
+        }
+        (Action::Undo, Some(s)) => Request::Forget(tunnel, s.name.clone()),
+        (Action::Undo, None) => Request::Undo(tunnel, hosts),
+        (Action::Redo, None) => Request::Redo(tunnel, hosts),
+        (Action::Send, _) => Request::Send(tunnel, hosts),
+        (Action::Use, None) => return None,
+    })
 }

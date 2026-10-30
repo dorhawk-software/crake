@@ -225,6 +225,8 @@ short:
 3. DNS learning via systemd-resolved, routed before the first packet;
    the public-NXDOMAIN rescue, split-horizon, keep names private
    (crake-hush), over TCP, IPv6. Built, netns- and real-gateway-tested.
+   Short names ("expert"): asked which tunnel's, then answered by craked;
+   never a search domain (it would complete `wpad` too).
 4. Connection probing and learning; Undo; the first-SYN race; ICMP
    unreachable; a network in trouble; public hosts rechecked; UDP. Built.
 5. Several tunnels: try order, "when two answer", collisions, one

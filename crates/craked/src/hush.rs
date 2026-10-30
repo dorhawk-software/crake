@@ -3,7 +3,8 @@
 //! dummy link, `crake-hush`, takes those domains in systemd-resolved as
 //! routing domains; its DNS server is an address on that link where craked
 //! answers every question with REFUSED, so such names fail at once and stay
-//! on the machine.
+//! on the machine. Linux: while a tunnel is up it also carries craked's
+//! search domain for short names (`dns::SHORT_SUFFIX`).
 
 use std::net::Ipv4Addr;
 
@@ -57,14 +58,36 @@ pub async fn bind() -> std::io::Result<Option<UdpSocket>> {
     UdpSocket::bind((ADDR, dns::PORT)).await.map(Some)
 }
 
-/// Answer on `sock` until it fails.
-pub async fn serve(sock: UdpSocket) -> Result<()> {
+/// Answer on `sock` until it fails: REFUSED, but a short name (resolved
+/// asks "expert" as expert.crake.internal, `dns::SHORT_SUFFIX` being this
+/// link's search domain while a tunnel is up), which the manager answers
+/// with the full name you chose for it, or else offers (`short_names`)
+/// and says doesn't exist, so resolved tries the next search domain.
+pub async fn serve(sock: UdpSocket, mgr: std::sync::Weak<crate::manager::Manager>) -> Result<()> {
+    let sock = std::sync::Arc::new(sock);
     let mut buf = vec![0u8; dns::BUFFER];
     loop {
         let (n, from) = sock.recv_from(&mut buf).await?;
-        if let Some(reply) = refuse(&buf[..n]) {
-            let _ = sock.send_to(&reply, from).await;
-        }
+        let query = buf[..n].to_vec();
+        let Some(mgr) = dns::short_question(&query).and(mgr.upgrade()) else {
+            if let Some(reply) = refuse(&query) {
+                let _ = sock.send_to(&reply, from).await;
+            }
+            continue;
+        };
+        let sock = std::sync::Arc::clone(&sock);
+        tokio::spawn(async move {
+            let reply = match mgr.short_name_answer(&query).await {
+                Some(reply) => Some(reply),
+                None => {
+                    mgr.offer_short(&query);
+                    reply_code(&query, dns::NXDOMAIN)
+                }
+            };
+            if let Some(reply) = reply {
+                let _ = sock.send_to(&reply, from).await;
+            }
+        });
     }
 }
 

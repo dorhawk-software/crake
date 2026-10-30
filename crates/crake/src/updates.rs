@@ -87,9 +87,25 @@ pub(super) fn on_update(update: client::Update, cx: &mut App) {
             notify::left_running(&entry);
         }
         // "Ask me first": the user decides (with the call, if they like).
+        // A short name a tunnel knows: which tunnel's full name it means.
         if entry.kind == crake_proto::LogKind::Asked {
-            let display = model.read(cx).display_of(entry.tunnel.as_deref());
-            notify::asked(&entry, display, requests.clone());
+            let m = model.read(cx);
+            match &entry.short {
+                Some(short) if how != "none" => {
+                    let displays = short
+                        .full
+                        .iter()
+                        .map(|(t, _)| m.display_of(Some(t)))
+                        .collect();
+                    notify::short_name(&entry, displays, requests.clone());
+                }
+                Some(_) => {}
+                None => notify::asked(
+                    &entry,
+                    m.display_of(entry.tunnel.as_deref()),
+                    requests.clone(),
+                ),
+            }
             if how == "crex" {
                 notify::crex();
             }

@@ -102,7 +102,7 @@ impl Manager {
     /// less what another program serves.
     async fn hush_domains(&self) -> Vec<String> {
         let private = self.settings.lock().unwrap().keep_private;
-        let domains: Vec<String> = if private {
+        let mut domains: Vec<String> = if private {
             let map = self.tunnels.lock().unwrap();
             let store = self.hosts.lock().unwrap();
             let mut v: Vec<String> = Vec::new();
@@ -123,6 +123,14 @@ impl Manager {
         } else {
             Vec::new()
         };
+        // Linux: short names come to the hush link while a tunnel is up
+        // (resolved completes "expert" with its search domain).
+        let short = cfg!(target_os = "linux")
+            && self.settings.lock().unwrap().ask_unknown
+            && self.tunnels.lock().unwrap().values().any(|e| e.routed);
+        if short {
+            domains.push(dns::SHORT_SUFFIX.to_owned());
+        }
         if domains.is_empty() {
             return domains;
         }
@@ -167,8 +175,9 @@ impl Manager {
                         .store(true, std::sync::atomic::Ordering::SeqCst);
                     if let Some(sock) = sock {
                         let serving = self.hush_serving.clone();
+                        let me = self.me.clone();
                         tokio::spawn(async move {
-                            if let Err(e) = crate::hush::serve(sock).await {
+                            if let Err(e) = crate::hush::serve(sock, me).await {
                                 tracing::error!("answering for private names: {e:#}");
                             }
                             serving.store(false, std::sync::atomic::Ordering::SeqCst);

@@ -258,6 +258,11 @@ pub struct TunnelHosts {
     /// "Use --disable-dco"), so it starts without.
     #[serde(default)]
     pub no_dco: bool,
+    /// Short names you chose this tunnel's full name for ("expert" ->
+    /// ("expert.corp.acme.internal", when, seconds since the epoch)): kept
+    /// until you forget them (`Manager::use_short_name`).
+    #[serde(default)]
+    pub short: BTreeMap<String, (String, u64)>,
 }
 
 impl TunnelHosts {

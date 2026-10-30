@@ -22,6 +22,7 @@ pub fn demo() -> Model {
             reason: Some(why.into()),
             hosts: hosts.iter().map(|h| h.to_string()).collect(),
             others: Vec::new(),
+            short: None,
         };
     let tunnel = |name: &str, display: &str, state: &str, hosts: u32| Tunnel {
         name: name.into(),
@@ -320,9 +321,19 @@ const NORD_HOSTS: [(&str, &str, u64, &str, u64, bool); 2] = [
     ),
 ];
 
-/// ACME's host rows as craked would list them, `now` seconds since the epoch.
+/// ACME's host rows as craked would list them, `now` seconds since the
+/// epoch, and the short name chosen for it (expert, 22 minutes ago).
 fn acme_hosts(now: u64) -> Vec<HostRow> {
-    rows(&ACME_HOSTS, now)
+    let mut rows = rows(&ACME_HOSTS, now);
+    rows.push(HostRow {
+        target: "expert".into(),
+        name: Some("expert.corp.acme.internal".into()),
+        kind: "short".into(),
+        // literal: the design's sample (chosen 22 minutes ago)
+        learned: Some((now - 22 * crate::units::SECS_PER_MINUTE, "you".into())),
+        used_ago: None,
+    });
+    rows
 }
 
 /// Nordbank's host rows, as `acme_hosts`.
@@ -381,6 +392,7 @@ pub fn demo_detail() -> Model {
             reason: Some(how.into()),
             hosts: vec![target.into()],
             others: Vec::new(),
+            short: None,
         });
     }
     m.log.sort_by(|a, b| a.ts.cmp(&b.ts));
@@ -434,6 +446,7 @@ fn log_until(until: jiff::Timestamp) -> Model {
             reason: Some(why.into()),
             hosts: vec!["10.0.0.1".into()],
             others: Vec::new(),
+            short: None,
         };
     let mut log = vec![
         row(

@@ -6,7 +6,7 @@
 //! (`gateway_tests::own_craked`, as root), Homebrew's openconnect, and the
 //! CI gateway through Cloudflare (scripts/ci-through-cloudflare.sh). One
 //! day in the app: the panel's switch and sign-in, a host probed, undone
-//! and redone from "What Crake did", Settings, tunnel detail's "Add a
+//! and redone from "What Crake did", a short name chosen there, Settings, tunnel detail's "Add a
 //! host", the log's Copy for helpdesk, a report, New tunnel, switching
 //! off, and craked starting again under the app.
 //!
@@ -185,6 +185,10 @@ fn a_day_with_crake_on_macos(cx: &mut TestAppContext) {
         Duration::from_secs(10),
         |_| routed("10.40.1.10"),
     );
+
+    // 2b. A short name, chosen in "What Crake did", forgotten in tunnel
+    //     detail.
+    crate::journey_kit::short_name(cx);
 
     // 3. Settings: Learning's wait, changed in craked and shown back.
     request(cx, Request::Settings);

@@ -13,7 +13,7 @@ use crate::Request;
 // macOS: notify-rust shows plain notifications there (no actions, no
 // urgency); the panel offers what the buttons would.
 #[cfg(target_os = "macos")]
-pub use plain::{also_answered, asked, left_running, no_tray, routed, stopped};
+pub use plain::{also_answered, asked, left_running, no_tray, routed, short_name, stopped};
 
 /// The desktop entry and icon name the packages install
 /// (`software.dorhawk.crake.desktop`, the hicolor theme's
@@ -169,6 +169,36 @@ pub fn asked(entry: &LogEntry, display: String, requests: async_channel::Sender<
     });
 }
 
+/// A short name a tunnel's DNS knows ("ACME knows expert as …"): use
+/// that tunnel's full name for it, one button per tunnel that knows it.
+/// `displays`: each tunnel's display name, in the entry's order.
+#[cfg(not(target_os = "macos"))]
+pub fn short_name(
+    entry: &LogEntry,
+    displays: Vec<String>,
+    requests: async_channel::Sender<Request>,
+) {
+    let Some(short) = entry.short.clone() else {
+        return;
+    };
+    let mut n = note(entry, Urgency::Normal, ASKED_SHOWN);
+    for (i, display) in displays.iter().enumerate() {
+        n.action(&i.to_string(), &format!("Use {display}\u{2019}s"));
+    }
+    n.action("leave", "Not now");
+    std::thread::spawn(move || {
+        let Ok(handle) = n.show() else { return };
+        handle.wait_for_action(|action| {
+            let chosen = action.parse::<usize>().ok();
+            if let Some((tunnel, full)) = chosen.and_then(|i| short.full.get(i)).cloned() {
+                requests
+                    .send_blocking(Request::UseShortName(tunnel, short.name.clone(), full))
+                    .ok();
+            }
+        });
+    });
+}
+
 /// A tunnel stopped without being asked to (`LogEntry::is_unexpected_stop`):
 /// say why, and offer to switch it back on (sign-in opens if it needs one).
 #[cfg(not(target_os = "macos"))]
@@ -260,6 +290,15 @@ mod plain {
     }
 
     pub fn asked(entry: &LogEntry, _display: String, _requests: async_channel::Sender<Request>) {
+        show(entry);
+    }
+
+    /// The panel offers "Use ACME's" under the question.
+    pub fn short_name(
+        entry: &LogEntry,
+        _displays: Vec<String>,
+        _requests: async_channel::Sender<Request>,
+    ) {
         show(entry);
     }
 

@@ -117,6 +117,7 @@ impl Manager {
             )),
             hosts: vec![addr.to_string()],
             others: vec![tunnel.to_owned()],
+            short: None,
         });
     }
 

@@ -382,6 +382,7 @@ impl Manager {
                         )),
                         hosts: vec![dst.to_string()],
                         others: others.iter().map(|j| candidates[*j].0.clone()).collect(),
+                        short: None,
                     });
                 }
             }

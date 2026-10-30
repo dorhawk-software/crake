@@ -473,7 +473,16 @@ mark as dorhawk.software/crake's.
   hosts go through it again."; **two tunnels answered** with "When two
   tunnels answer: Ask me": under the route's reason, "Nordbank answers for
   it too." with Use Nordbank (small action) and Keep ACME (muted dismiss),
-  until one is chosen.
+  until one is chosen; a **short name** ("expert", typed on its own) a
+  tunnel's DNS knows: the "Ask me first" row (help mark, accent), "ACME
+  knows expert as expert.corp.acme.internal." with Use ACME's (its button,
+  as Send through ACME), or, when two tunnels know it, "ACME and Nordbank
+  know expert." / "As expert.corp.acme.internal and
+  expert.nordbank.internal. Public DNS doesn't know a name that short."
+  with Use ACME's and Use Nordbank's under it (small actions, as Use
+  Nordbank). Chosen, "expert is expert.corp.acme.internal now." wears the
+  pin (kept until forgotten) with Undo; forgotten, "Forgot expert." the
+  undone mark with Redo. Notifications offer the same buttons and Not now.
 - The tray's menu (and the tooltip, the Mac's menu) opens with what the
   bird would say: "Listening · ACME, Nordbank · last route 13:21", "· nothing
   routed today" without one, "Listening · 4 tunnels" past three. On GNOME
@@ -493,13 +502,13 @@ mark as dorhawk.software/crake's.
 
 | File | What it shows |
 | --- | --- |
-| `tray-panel.html` | The main surface: last hour, what Crake did, tunnels with policy ("Your profile · Learn as it goes"), full log / copy for helpdesk. `?moment=first` (the first route's notice), `back` (a tunnel that lost its gateway), `ask` (two tunnels answered) |
+| `tray-panel.html` | The main surface: last hour, what Crake did, tunnels with policy ("Your profile · Learn as it goes"), full log / copy for helpdesk. `?moment=first` (the first route's notice), `back` (a tunnel that lost its gateway), `ask` (two tunnels answered), `short` (a short name two tunnels know) |
 | `tray-menu.html` | The desktop's own menu, the fallback and the Mac's: the summary line, tunnels with checks, Open Crake, New tunnel…, Settings…, Quit |
 | `helpdesk-copy.html` | What Copy for helpdesk puts on the clipboard |
 | `new-tunnel.html` | Three steps: server and protocol (auto-detect, AnyConnect/ocserv, GlobalProtect, Ivanti/Pulse, Juniper NC, Fortinet, F5, Array), sign-in method, routing mode |
 | `settings.html` | General, Learning, Names (DNS), Privacy & log, Managed by IT, Diagnostics (the report), About; plus Tunnels, first (`proposals/settings-tunnels.html`): the tunnels in traffic order, Edit / Remove…, + New tunnel |
 | `log.html` | Day chart and decisions as sentences (craked's own), filters, search, Copy for helpdesk. `?pointed=13:21`: the routed row pointed at, with Show in ACME |
-| `tunnel-detail.html` | Facts, policy, today's chart, learned / pinned / gateway hosts with how long each is kept, add a host |
+| `tunnel-detail.html` | Facts, policy, today's chart, learned / pinned / gateway hosts with how long each is kept, short names chosen for the tunnel (their tab once there are any: the pin, "expert.corp.acme.internal · chosen at 13:02", Forget), add a host |
 | `sign-in.html` | Browser sign-on waiting, one-time code, couldn't reach gateway |
 
 Open any of them directly in a browser. Add `?dark=true` or `?dark=false` to

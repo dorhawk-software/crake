@@ -173,6 +173,20 @@ fn an_openvpn3_profile_can_be_edited(cx: &mut TestAppContext) {
 }
 
 /// "Forget all…" (design/proposals/forget-all.html): asked in place first;
+/// A short name chosen for the tunnel has a tab of its own (once there is
+/// one), and its Forget forgets the short name.
+#[gpui_kit::test]
+fn a_short_name_is_forgotten_in_its_tab(cx: &mut TestAppContext) {
+    let w = open(cx);
+    assert!(
+        w.rows(cx).iter().any(|r| r.kind == "short"),
+        "the sample has a short name"
+    );
+    w.click(("tab", 3usize), cx);
+    w.click(("forget", 0usize), cx);
+    assert!(matches!(w.changed(), Request::Forget(t, h) if t == "acme" && h == "expert"));
+}
+
 /// Cancel asks the app nothing, Forget all asks it to forget everything
 /// learned for the tunnel, and the list is fetched again at once.
 #[gpui_kit::test]
@@ -268,7 +282,7 @@ fn with_the_systems_window_buttons(cx: &mut TestAppContext) {
 fn a_pinned_host_counts_once(cx: &mut TestAppContext) {
     let w = open(cx);
     let rows = w.rows(cx);
-    let [learned_count, pinned_count, _] = super::hosts::tab_counts(&rows, 0);
+    let [learned_count, pinned_count, _, _] = super::hosts::tab_counts(&rows, 0);
     let listed = learned(&rows).len();
     let pinned_learned = rows
         .iter()

@@ -20,6 +20,7 @@ use crate::theme::{Theme, fonts};
 mod chart;
 mod facts;
 mod hosts;
+mod short_names;
 pub(crate) use self::hosts::learned_how;
 
 #[cfg(test)]
@@ -45,6 +46,7 @@ enum Tab {
     Learned,
     Pinned,
     Gateway,
+    Short,
 }
 
 pub struct TunnelDetail {

@@ -424,6 +424,7 @@ macro_rules! every_scenario {
                 hosts::undo_sends_a_host_direct_and_redo_brings_it_back,
                 hosts::a_host_added_by_hand_goes_through,
                 hosts::a_name_added_by_hand_goes_through,
+                hosts::a_short_name_means_the_tunnels_once_chosen,
                 hosts::a_pinned_network_goes_through_until_unpinned,
                 hosts::forgetting_a_host_sends_it_direct,
                 hosts::forget_all_keeps_the_pins,

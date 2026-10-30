@@ -79,13 +79,7 @@ fn a_decisions_button_does_what_it_says(cx: &mut TestAppContext) {
         let Some(action) = d.action.clone() else {
             continue;
         };
-        let tunnel = d.entry.tunnel.clone().unwrap();
-        let hosts = d.entry.hosts.clone();
-        let want = match action {
-            Action::Undo => Request::Undo(tunnel, hosts),
-            Action::Redo => Request::Redo(tunnel, hosts),
-            Action::Send => Request::Send(tunnel, hosts),
-        };
+        let want = super::decisions::request(&action, &d.entry, 0).unwrap();
         let got = w.click(("act", i), cx);
         assert_eq!(format!("{got:?}"), format!("{want:?}"));
         pressed += 1;
@@ -622,6 +616,32 @@ fn a_question_stays_under_its_route(cx: &mut TestAppContext) {
         cx.global_mut::<Prefs>().dismissed.insert(key);
     });
     assert!(!w.shows_element(("keep", i), cx));
+}
+
+/// A short name two tunnels know (tray-panel.html?moment=short): "Use
+/// ACME's" and "Use Nordbank's" under the question, each choosing its
+/// tunnel's full name.
+#[gpui_kit::test]
+fn a_short_name_is_chosen_under_its_question(cx: &mut TestAppContext) {
+    let w = open(cx, Prefs::default());
+    w.model.update(cx, |m, cx| {
+        *m = crate::model::demo_moment(m.clone(), "short");
+        cx.notify();
+    });
+    let i = w.model.read_with(cx, |m, _| {
+        m.decisions(DECISIONS)
+            .iter()
+            .position(|d| d.entry.short.is_some())
+            .unwrap()
+    });
+    assert!(!w.shows_element(("act", i), cx), "no one button for two");
+    match w.click(("use-short", i * 8 + 1), cx) {
+        Request::UseShortName(tunnel, short, full) => assert_eq!(
+            (tunnel.as_str(), short.as_str(), full.as_str()),
+            ("nord", "expert", "expert.nordbank.internal")
+        ),
+        other => panic!("{other:?}"),
+    }
 }
 
 /// A tunnel that lost its gateway says so, with the dashed head

@@ -1,5 +1,6 @@
 //! The panel's moments (design/screens/tray-panel.html?moment=…): Crake's
-//! first route, and a question still open about a route.
+//! first route, a question still open about a route, and one about a
+//! short name.
 
 use super::*;
 
@@ -54,8 +55,27 @@ impl Model {
     }
 }
 
+/// A decision about a short name: which tunnel's full name it means
+/// (Use), or the way back from a choice (Undo forgets it, Redo chooses it
+/// again), while it's the last word on that name. None: not about one.
+pub(super) fn short_decision(e: &LogEntry, later: &[&LogEntry]) -> Option<Decision> {
+    let short = e.short.as_ref()?;
+    let superseded = later
+        .iter()
+        .any(|l| l.short.as_ref().is_some_and(|s| s.name == short.name));
+    Some(Decision {
+        entry: e.clone(),
+        time: local_time(&e.ts),
+        action: (!superseded).then_some(match short.step {
+            crake_proto::ShortStep::Asked => Action::Use,
+            crake_proto::ShortStep::Chosen => Action::Undo,
+            crake_proto::ShortStep::Forgotten => Action::Redo,
+        }),
+    })
+}
+
 /// The demo at one of the panel's moments, as tray-panel.html?moment=…
-/// (CRAKE_DEMO=first, back or ask).
+/// (CRAKE_DEMO=first, back, ask or short).
 pub fn demo_moment(mut m: Model, moment: &str) -> Model {
     let routed = |e: &LogEntry| e.message == "Sent git.acme.internal through ACME.";
     match moment {
@@ -79,6 +99,28 @@ pub fn demo_moment(mut m: Model, moment: &str) -> Model {
                     - crate::units::SECS_PER_HOUR;
             }
         }
+        // ACME's and Nordbank's DNS both know "expert", typed on its own.
+        "short" => m.log.push(LogEntry {
+            ts: jiff::Timestamp::now().to_string(),
+            kind: LogKind::Asked,
+            tunnel: Some("acme".into()),
+            message: "ACME and Nordbank know expert.".into(),
+            reason: Some(
+                "As expert.corp.acme.internal and expert.nordbank.internal. Public DNS \
+                 doesn\u{2019}t know a name that short."
+                    .into(),
+            ),
+            hosts: Vec::new(),
+            others: Vec::new(),
+            short: Some(crake_proto::ShortName {
+                name: "expert".into(),
+                full: vec![
+                    ("acme".into(), "expert.corp.acme.internal".into()),
+                    ("nord".into(), "expert.nordbank.internal".into()),
+                ],
+                step: crake_proto::ShortStep::Asked,
+            }),
+        }),
         // Nordbank answered for git.acme.internal too ("Ask me").
         "ask" => {
             if let Some(mut asked) = m.log.iter().find(|e| routed(e)).cloned() {
@@ -109,6 +151,7 @@ mod tests {
             reason: None,
             hosts: vec![host.into()],
             others: Vec::new(),
+            short: None,
         }
     }
 
@@ -198,5 +241,65 @@ mod tests {
             model(vec![routed.clone(), asked, moved]).also_answered(&routed),
             None
         );
+    }
+
+    #[test]
+    fn a_short_name_is_asked_then_undone_or_redone() {
+        use crake_proto::{ShortName, ShortStep};
+        let short = |ts: &str, kind: LogKind, msg: &str, step: ShortStep| LogEntry {
+            hosts: Vec::new(),
+            short: Some(ShortName {
+                name: "expert".into(),
+                full: vec![
+                    ("acme".into(), "expert.corp.acme.internal".into()),
+                    ("nord".into(), "expert.nordbank.internal".into()),
+                ],
+                step,
+            }),
+            ..entry(ts, kind, "acme", msg, "")
+        };
+        let asked = short(
+            "2026-10-29T10:00:00Z",
+            LogKind::Asked,
+            "ACME and Nordbank know expert.",
+            ShortStep::Asked,
+        );
+        let actions = |log: Vec<LogEntry>| -> Vec<Option<Action>> {
+            model(log)
+                .decisions(10)
+                .into_iter()
+                .map(|d| d.action)
+                .collect()
+        };
+        assert_eq!(actions(vec![asked.clone()]), vec![Some(Action::Use)]);
+        let chosen = short(
+            "2026-10-29T10:01:00Z",
+            LogKind::System,
+            "expert is expert.corp.acme.internal now.",
+            ShortStep::Chosen,
+        );
+        // Answered: only the choice offers a way back (Undo forgets it).
+        assert_eq!(
+            actions(vec![asked.clone(), chosen.clone()]),
+            vec![Some(Action::Undo), None]
+        );
+        let forgotten = short(
+            "2026-10-29T10:02:00Z",
+            LogKind::System,
+            "Forgot expert.",
+            ShortStep::Forgotten,
+        );
+        assert_eq!(
+            actions(vec![asked, chosen, forgotten]),
+            vec![Some(Action::Redo), None, None]
+        );
+        // Not a route: no tick in the charts, no "first route".
+        let m = model(vec![short(
+            "2026-10-29T10:01:00Z",
+            LogKind::System,
+            "expert is expert.corp.acme.internal now.",
+            ShortStep::Chosen,
+        )]);
+        assert!(m.first_route().is_none());
     }
 }

@@ -368,6 +368,7 @@ mod tests {
                 reason: Some("It didn't answer directly. Through ACME it answered in 31 ms.".into()),
                 hosts: vec!["10.40.1.10".into()],
                 others: Vec::new(),
+                short: None,
             }],
             computer: Ok(Computer {
                 checks: vec![
@@ -443,6 +444,7 @@ mod tests {
             ),
             hosts: Vec::new(),
             others: Vec::new(),
+            short: None,
         });
         g.tunnels
             .push("Initech: off, profile /var/lib/crake/profiles/initech.ovpn".into());

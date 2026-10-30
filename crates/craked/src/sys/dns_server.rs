@@ -8,6 +8,8 @@
 //! memory (`crake-keep`, a tunnel whose DNS stopped answering). Over UDP
 //! and TCP (the system asks again over TCP when an answer was truncated);
 //! a question that came over TCP is asked of the tunnel's DNS over TCP.
+//! Short names (`manager::short_names`) come here as the system asks
+//! them, with no domain after them.
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4};
 use std::sync::Arc;
@@ -93,6 +95,10 @@ async fn write_message(stream: &mut TcpStream, msg: &[u8]) -> std::io::Result<()
 /// is wanted, not one cut to a datagram.
 async fn answer(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> {
     let (name, _) = crate::keep::question(query)?;
+    // A short name you chose a tunnel's full name for.
+    if let Some(reply) = mgr.short_name_answer(query).await {
+        return Some(reply);
+    }
     let Some((device, servers)) = super::dns_links::owner(&name) else {
         if super::dns_links::public() {
             return public(mgr, query, tcp).await;
@@ -142,6 +148,7 @@ async fn public(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> 
         return crate::hush::reply_code(query, SERVFAIL);
     };
     watch().answered();
+    mgr.offer_short_name(&reply);
     Some(mgr.rescue_answer(&reply).await.unwrap_or(reply))
 }
 

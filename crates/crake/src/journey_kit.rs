@@ -345,3 +345,58 @@ pub(crate) fn show_in(cx: &mut TestAppContext, log: AnyWindowHandle, host: &str)
         view.read_with(cx, |v, _| v.shown_host() == Some(host))
     });
 }
+
+/// What `name` resolves to, asked as an app asks the system.
+fn look_up(name: &'static str) -> Vec<String> {
+    std::thread::spawn(move || {
+        use std::net::ToSocketAddrs as _;
+        (name, 80)
+            .to_socket_addrs()
+            .map(|a| a.map(|a| a.ip().to_string()).collect())
+            .unwrap_or_default()
+    })
+    .join()
+    .unwrap_or_default()
+}
+
+/// A short name: "git", typed on its own, is asked about in "What Crake
+/// did"; "Use ACME's" makes it ACME's git.acme.internal (10.40.1.10), and
+/// tunnel detail's Short names forgets it.
+pub(crate) fn short_name(cx: &mut TestAppContext) {
+    let asked = |cx: &mut TestAppContext| {
+        model(cx).decisions(panel::DECISIONS).iter().position(|d| {
+            d.action == Some(crate::model::Action::Use)
+                && d.entry.short.as_ref().is_some_and(|s| s.name == "git")
+        })
+    };
+    until(cx, "asked about git", Duration::from_secs(20), |cx| {
+        asked(cx).is_some() || {
+            look_up("git");
+            false
+        }
+    });
+    let p = panel(cx);
+    let i = asked(cx).unwrap();
+    click(cx, p, ("act", i));
+    until(cx, "git is ACME's", Duration::from_secs(10), |cx| {
+        model(cx)
+            .log
+            .iter()
+            .any(|e| e.message == "git is git.acme.internal now.")
+    });
+    let found = look_up("git");
+    assert!(found.iter().any(|a| a == "10.40.1.10"), "git: {found:?}");
+    request(cx, Request::OpenDetail("acme".into(), None));
+    let (d, _) = wait_window::<crate::tunnel_detail::TunnelDetail>(cx, "tunnel detail opens");
+    until(cx, "git in Short names", Duration::from_secs(10), |cx| {
+        model(cx)
+            .host_rows
+            .get("acme")
+            .is_some_and(|rows| rows.iter().any(|r| r.kind == "short" && r.target == "git"))
+    });
+    click(cx, d, ("tab", 3usize));
+    click(cx, d, ("forget", 0usize));
+    until(cx, "git forgotten", Duration::from_secs(10), |cx| {
+        model(cx).log.iter().any(|e| e.message == "Forgot git.")
+    });
+}

@@ -1,5 +1,6 @@
 //! Tunnel detail: the hosts in their tabs (learned, pinned, from the
-//! gateway) with Pin and Forget, and Add a host.
+//! gateway, and short names once there are any) with Pin and Forget, and
+//! Add a host.
 
 use super::*;
 use crate::units::{SECS_PER_DAY as DAY, SECS_PER_HOUR as HOUR, SECS_PER_MINUTE as MINUTE};
@@ -28,17 +29,26 @@ impl TunnelDetail {
             .collect();
         // Newest first.
         learned.sort_by_key(|r| std::cmp::Reverse(r.learned.as_ref().map_or(0, |l| l.0)));
-        let pinned: Vec<&HostRow> = rows.iter().filter(|r| r.kind == "pinned").collect();
+        // Kept until forgotten: pinned hosts, or short names in their tab.
+        let kept_kind = if self.tab == Tab::Short {
+            "short"
+        } else {
+            "pinned"
+        };
+        let pinned: Vec<&HostRow> = rows.iter().filter(|r| r.kind == kept_kind).collect();
         let counts = tab_counts(rows, gateway.len());
+        let short = counts[TABS - 1] > 0 || self.tab == Tab::Short;
 
         let mut bar = div().flex().gap(px(22.)).border_b_1().border_color(t.line);
         for (i, (tab, label)) in [
             (Tab::Learned, "Learned"),
             (Tab::Pinned, "Pinned"),
             (Tab::Gateway, "From the gateway"),
+            (Tab::Short, "Short names"),
         ]
         .into_iter()
         .enumerate()
+        .filter(|(_, (tab, _))| *tab != Tab::Short || short)
         {
             let on = self.tab == tab;
             bar = bar.child(
@@ -215,7 +225,7 @@ impl TunnelDetail {
     ) -> (Div, bool) {
         let count = match self.tab {
             Tab::Learned => learned.len(),
-            Tab::Pinned => pinned.len(),
+            Tab::Pinned | Tab::Short => pinned.len(),
             Tab::Gateway => gateway.len(),
         };
         let body = crate::controls::scroll_handle(super::BODY, window, cx);
@@ -258,6 +268,11 @@ impl TunnelDetail {
                 .iter()
                 .zip(range.clone())
                 .map(|(r, i)| self.host_row(i, r, t, cx).into_any_element())
+                .collect(),
+            Tab::Short => pinned[range.clone()]
+                .iter()
+                .zip(range.clone())
+                .map(|(r, i)| self.short_row(i, r, t, cx).into_any_element())
                 .collect(),
             Tab::Gateway => gateway[range.clone()]
                 .iter()
@@ -375,8 +390,8 @@ impl TunnelDetail {
     }
 }
 
-/// Learned, Pinned, From the gateway.
-const TABS: usize = 3;
+/// Learned, Pinned, From the gateway, Short names.
+const TABS: usize = 4;
 
 /// A host row's height: its two lines, 11 px above and below, its border.
 pub(super) const ROW_HEIGHT: f32 = 63.;
@@ -412,12 +427,13 @@ pub(super) fn kept_line(tab: Tab, display: &str, forget: &str) -> String {
         },
         Tab::Pinned => "Pinned hosts are kept until you forget them.".into(),
         Tab::Gateway => format!("{display}\u{2019}s gateway sent these when it connected."),
+        Tab::Short => "Short names are kept until you forget them.".into(),
     }
 }
 
 pub(super) fn tab_counts(rows: &[HostRow], gateway: usize) -> [usize; TABS] {
     let of = |kind: &str| rows.iter().filter(|r| r.kind == kind).count();
-    [of("learned"), of("pinned"), gateway]
+    [of("learned"), of("pinned"), gateway, of("short")]
 }
 
 pub(super) fn row_frame(t: &Theme) -> Div {

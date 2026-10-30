@@ -45,9 +45,11 @@ mod openvpn;
 mod outage;
 mod probing;
 mod recheck;
+mod record;
 mod report;
 mod routes;
 mod settings;
+mod short_names;
 mod tunnels;
 
 // Helpers one part uses and others need too.
@@ -113,6 +115,8 @@ pub struct HostRow {
 type Datagram = (Arc<Vec<u8>>, Instant);
 
 pub struct Manager {
+    /// Itself, for what answers outside its calls (the hush link's DNS).
+    me: std::sync::Weak<Self>,
     cfg: Config,
     tunnels: Mutex<BTreeMap<String, Entry>>,
     hosts: Mutex<HostStore>,
@@ -168,6 +172,9 @@ pub struct Manager {
     contested: Mutex<HashMap<(String, IpAddr), Instant>>,
     /// "Ask me first" questions lately (tunnel, host): not asked again soon.
     asked: Mutex<HashMap<(String, IpAddr), Instant>>,
+    /// Short names offered lately (`short_names`), until when they aren't
+    /// offered again.
+    offered: Mutex<HashMap<String, Instant>>,
     /// Names under an organisation's domain whose tunnel DNS had no private
     /// address lately; not asked again for a while.
     no_split: Mutex<HashMap<(String, RecordType), Instant>>,
@@ -312,7 +319,8 @@ impl Manager {
             crate::settings::Settings::load(&crate::settings::path_for(&cfg.state_path), &cfg);
         log.keep(settings.log_days);
         let (changes, _) = broadcast::channel(CHANGES_BACKLOG);
-        Ok(Arc::new(Self {
+        Ok(Arc::new_cyclic(|me| Self {
+            me: me.clone(),
             cfg,
             tunnels: Mutex::new(tunnels),
             hosts: Mutex::new(hosts),
@@ -342,6 +350,7 @@ impl Manager {
             unknown: Mutex::new(HashMap::new()),
             contested: Mutex::new(HashMap::new()),
             asked: Mutex::new(HashMap::new()),
+            offered: Mutex::new(HashMap::new()),
             no_split: Mutex::new(HashMap::new()),
             probed: Mutex::new(HashMap::new()),
             down_everywhere: Mutex::new(HashMap::new()),
@@ -670,29 +679,5 @@ impl Manager {
             .get(name)
             .and_then(|t| t.gateway);
         Ok((label, gw.or(saved)))
-    }
-
-    fn record(&self, kind: LogKind, tunnel: &str, message: &str, reason: String) {
-        self.record_hosts(kind, tunnel, message, reason, Vec::new());
-    }
-
-    /// A decision about specific addresses (so it can be undone).
-    fn record_hosts(
-        &self,
-        kind: LogKind,
-        tunnel: &str,
-        message: &str,
-        reason: String,
-        hosts: Vec<String>,
-    ) {
-        self.log.append(LogEntry {
-            ts: crate::log::now(),
-            kind,
-            tunnel: Some(tunnel.to_owned()),
-            message: message.to_owned(),
-            reason: Some(reason),
-            hosts,
-            others: Vec::new(),
-        });
     }
 }

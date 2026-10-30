@@ -10,9 +10,9 @@ const MAX_RECENT: u32 = 10_000;
 
 use zbus::message::Header;
 use zbus::object_server::SignalEmitter;
-use zbus::{Connection, OwnedVariant, Variant, fdo, interface};
+use zbus::{Connection, OwnedVariant, fdo, interface};
 
-use crate::manager::{Manager, Snapshot};
+use crate::manager::Manager;
 
 // Where the API is served: the system bus, private and app sockets, the
 // loopback port.
@@ -20,6 +20,9 @@ mod serve;
 pub use serve::*;
 // Who may use it, reading included.
 mod guard;
+// A tunnel as a dictionary.
+mod dict;
+use dict::to_dict;
 
 pub const POLKIT_ACTION: &str = "software.dorhawk.crake.manage-tunnels";
 
@@ -158,6 +161,23 @@ impl Service {
     ) -> fdo::Result<String> {
         self.authorize(&hdr, conn).await?;
         self.mgr.forget(tunnel, target).await.map_err(failed)
+    }
+
+    /// A short name ("expert") is the tunnel's `full` name from now on
+    /// (the panel's "Use ACME's"); Forget takes it back.
+    async fn use_short_name(
+        &self,
+        tunnel: &str,
+        short: &str,
+        full: &str,
+        #[zbus(header)] hdr: Header<'_>,
+        #[zbus(connection)] conn: &Connection,
+    ) -> fdo::Result<String> {
+        self.authorize(&hdr, conn).await?;
+        self.mgr
+            .use_short_name(tunnel, short, full)
+            .await
+            .map_err(failed)
     }
 
     /// Forget everything learned for the tunnel, and what was sent direct
@@ -437,7 +457,9 @@ impl Service {
     /// Tunnel detail's host list: one dictionary per host, with `target`,
     /// `name`, `kind` (pinned | learned | direct), `learned_at` (seconds
     /// since the epoch), `how` (probe | dns | inside | split | you),
-    /// `used_ago` and `expires_in` (seconds), each only when known.
+    /// `used_ago` and `expires_in` (seconds), each only when known. Then
+    /// its short names: `target` the short name, `name` its full name,
+    /// `kind` short, `learned_at` when you chose it.
     async fn host_details(
         &self,
         #[zbus(header)] hdr: Header<'_>,
@@ -474,6 +496,19 @@ impl Service {
                 }
                 d
             })
+            .chain(
+                self.mgr
+                    .short_names(tunnel)
+                    .into_iter()
+                    .map(|(short, full, at)| {
+                        HashMap::from([
+                            ("target".to_owned(), short),
+                            ("name".to_owned(), full),
+                            ("kind".to_owned(), "short".to_owned()),
+                            ("learned_at".to_owned(), at.to_string()),
+                        ])
+                    }),
+            )
             .collect())
     }
 
@@ -554,133 +589,4 @@ impl Service {
 
 fn failed(e: anyhow::Error) -> fdo::Error {
     fdo::Error::Failed(format!("{e:#}"))
-}
-
-fn to_dict(s: &Snapshot) -> HashMap<String, OwnedVariant> {
-    let info = s.info.as_ref();
-    let strings = |v: Vec<String>| OwnedVariant::try_from(Variant::from(v)).unwrap();
-    let text = |v: &str| OwnedVariant::try_from(Variant::from(v)).unwrap();
-    let mut d = HashMap::new();
-    d.insert("name".into(), text(&s.config.name));
-    d.insert("display_name".into(), text(s.config.display()));
-    d.insert("state".into(), text(s.state.as_str()));
-    d.insert("interface".into(), text(&s.interface));
-    d.insert("gateway".into(), text(&s.config.gateway));
-    d.insert("protocol".into(), text(s.config.protocol.as_str()));
-    d.insert("hosts".into(), OwnedVariant::from(s.hosts as u32));
-    d.insert("signed_in".into(), OwnedVariant::from(s.signed_in));
-    d.insert("user".into(), text(s.config.user.as_deref().unwrap_or("")));
-    // What sign-in needs, so the user's session can run it.
-    d.insert("auth_args".into(), strings(s.config.auth_args.clone()));
-    d.insert("extra_args".into(), strings(s.config.extra_args.clone()));
-    // Who decides (Managed profiles): the panel says it in plain words.
-    let managed = s.config.managed.as_ref();
-    d.insert("managed".into(), OwnedVariant::from(managed.is_some()));
-    d.insert(
-        "policy".into(),
-        text(
-            &managed
-                .map(|m| m.describe(s.config.display()))
-                .unwrap_or_default(),
-        ),
-    );
-    d.insert(
-        "full_tunnel".into(),
-        OwnedVariant::from(s.config.learning() == crate::policy::Learning::FullTunnel),
-    );
-    // What a managed tunnel may learn: names and networks (Settings, Managed by IT).
-    let learn = match s.config.learning() {
-        crate::policy::Learning::Only { names, nets } => names
-            .into_iter()
-            .chain(nets.iter().map(|n| n.to_string()))
-            .collect(),
-        _ => Vec::new(),
-    };
-    d.insert("learn".into(), strings(learn));
-    // Where it comes from: what the app may change.
-    let source = match (&s.config.managed, &s.config.own) {
-        (Some(_), _) => "managed",
-        (_, Some(_)) => "app",
-        _ => "config",
-    };
-    d.insert("source".into(), text(source));
-    d.insert(
-        "organisation".into(),
-        text(managed.map(|m| m.organisation.as_str()).unwrap_or("")),
-    );
-    // An app tunnel's fields, for editing (keys as AddTunnel's).
-    let own: HashMap<String, String> = s
-        .config
-        .own
-        .as_ref()
-        .map(|o| o.to_map().into_iter().collect())
-        .unwrap_or_default();
-    d.insert(
-        "own".into(),
-        OwnedVariant::try_from(Variant::from(own)).unwrap(),
-    );
-    // Names that go to its DNS: pushed by the gateway, plus the config's.
-    let mut dns_domains: Vec<String> = info.map(|i| i.domains.clone()).unwrap_or_default();
-    for d in &s.config.dns_domains {
-        if !dns_domains.contains(d) {
-            dns_domains.push(d.clone());
-        }
-    }
-    d.insert("dns_domains".into(), strings(dns_domains));
-    d.insert(
-        "managed_file".into(),
-        text(
-            &managed
-                .map(|m| m.file.display().to_string())
-                .unwrap_or_default(),
-        ),
-    );
-    d.insert("since".into(), OwnedVariant::from(s.since.unwrap_or(0)));
-    d.insert("clash".into(), text(s.clash.as_deref().unwrap_or("")));
-    d.insert("dns_down".into(), OwnedVariant::from(s.dns_down));
-    d.insert("why".into(), text(s.why.as_deref().unwrap_or("")));
-    // OpenVPN: its sign-in asks the user something (`Asking` says what).
-    d.insert("asking".into(), OwnedVariant::from(s.asking.unwrap_or(0)));
-    d.insert(
-        "transport".into(),
-        text(s.transport.as_deref().unwrap_or("")),
-    );
-    d.insert(
-        "address".into(),
-        text(
-            &info
-                .and_then(|i| {
-                    i.address
-                        .map(|a| a.to_string())
-                        .or_else(|| i.address6.map(|(a, _)| a.to_string()))
-                })
-                .unwrap_or_default(),
-        ),
-    );
-    d.insert(
-        "dns".into(),
-        strings(
-            info.map(|i| {
-                i.dns
-                    .iter()
-                    .map(ToString::to_string)
-                    .chain(i.dns6.iter().map(ToString::to_string))
-                    .collect()
-            })
-            .unwrap_or_default(),
-        ),
-    );
-    d.insert(
-        "domains".into(),
-        strings(info.map(|i| i.domains.clone()).unwrap_or_default()),
-    );
-    d.insert(
-        "split_include".into(),
-        strings(info.map(|i| i.split_include.clone()).unwrap_or_default()),
-    );
-    d.insert(
-        "split_exclude".into(),
-        strings(info.map(|i| i.split_exclude.clone()).unwrap_or_default()),
-    );
-    d
 }
