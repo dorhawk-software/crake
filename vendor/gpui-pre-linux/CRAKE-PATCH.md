@@ -1,4 +1,4 @@
-# gpui-pre-linux 0.3.9, patched for Crake
+# gpui-pre-linux 0.3.10, patched for Crake
 
 Vendored from crates.io (Apache-2.0, see LICENSE-APACHE) and used through
 `[patch.crates-io]` in the workspace `Cargo.toml`.
