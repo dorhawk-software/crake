@@ -239,6 +239,7 @@ async fn a_browser_sign_in_then_the_gateways_token() {
         "pgrep -a -x openvpn | grep -F openvpn-{name}.conf"
     ));
     assert!(left.trim().is_empty(), "openvpn stopped: {left}");
+    mgr.shutdown().await;
 }
 
 /// What a night did to the user's tunnel (2026-11-04), on a profile like
@@ -326,6 +327,10 @@ async fn a_night_of_restarts_then_a_token_turned_down() {
     ));
     assert!(left.trim().is_empty(), "openvpn stopped: {left}");
     mgr.remove_tunnel(&name).await.unwrap();
+    // Left running, its hush answerer kept answering on the link's
+    // address for the tests after it (CI: their short names and private
+    // names failed).
+    mgr.shutdown().await;
 }
 
 /// The app's side of a password sign-in, over D-Bus as the sign-in window
@@ -401,6 +406,7 @@ async fn a_password_sign_in_through_the_app() {
         m.tunnels.iter().any(|t| t.name == name && t.state == "off")
     })
     .await;
+    mgr.shutdown().await;
 }
 
 /// An OpenVPN tunnel IT set up (`managed.d`: its file names a profile
