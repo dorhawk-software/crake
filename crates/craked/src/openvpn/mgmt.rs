@@ -7,8 +7,10 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 /// One line from openvpn, as far as craked acts on it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Said {
-    /// Waiting to be let go (`--management-hold`).
-    Hold,
+    /// Waiting to be let go (`--management-hold`), and for how many
+    /// seconds openvpn would have paused before trying again by itself
+    /// (0 the first time; its retry pause, growing, at each restart).
+    Hold(u64),
     /// It needs the user name and password; a static challenge asks for a
     /// code with them.
     NeedAuth { challenge: Option<Challenge> },
@@ -61,8 +63,13 @@ const SC_CONCAT: u32 = 2;
 
 pub fn parse(line: &str) -> Said {
     let line = line.trim_end_matches(['\r', '\n']);
-    if line.starts_with(">HOLD:") {
-        return Said::Hold;
+    if let Some(rest) = line.strip_prefix(">HOLD:") {
+        // ">HOLD:Waiting for hold release:<seconds>"
+        let wait = rest
+            .rsplit_once(':')
+            .and_then(|(_, n)| n.trim().parse().ok())
+            .unwrap_or(0);
+        return Said::Hold(wait);
     }
     if let Some(rest) = line.strip_prefix(">PASSWORD:") {
         return password(rest);
@@ -226,6 +233,14 @@ mod tests {
             parse(">PASSWORD:Auth-Token:SESS_ID_AT_abc"),
             Said::Token("SESS_ID_AT_abc".into())
         );
+    }
+
+    #[test]
+    fn a_hold_says_how_long_openvpn_would_have_paused() {
+        // As openvpn 2.7 says them: at its start, then at a restart.
+        assert_eq!(parse(">HOLD:Waiting for hold release:0"), Said::Hold(0));
+        assert_eq!(parse(">HOLD:Waiting for hold release:2\r"), Said::Hold(2));
+        assert_eq!(parse(">HOLD:Waiting for hold release"), Said::Hold(0));
     }
 
     #[test]

@@ -3,6 +3,12 @@
 //! last time, the profile's own credentials), what it asks the user, and
 //! the commands it sends. No I/O here: the runner (`super`) does what it
 //! says.
+//!
+//! Once the tunnel has been up, nobody may be there to answer: a sign-in
+//! that would need the user (the gateway refused its token in the night,
+//! 2026-11-04, and wanted the browser again) ends the tunnel, "Session
+//! expired", as openconnect's does (decided with the user); one the
+//! profile's own credentials make is made without asking.
 
 use crate::openvpn::mgmt::{self, Challenge, Crv1, Said};
 use crate::openvpn::{AskKind, Token};
@@ -21,6 +27,13 @@ pub enum Do {
     Forget,
     /// Signed in: nothing more to ask.
     Done,
+    /// Let openvpn go on after this many seconds (its own pause before
+    /// trying again; released at once, it tried again at once: 314 times in
+    /// a fifth of a second while DNS was down, 2026-11-04).
+    ReleaseIn(u64),
+    /// Stop it: signing in again would need the user, and the tunnel has
+    /// been up (nobody may be there). Why, for the log and the panel.
+    End(String),
     /// openvpn is stopping because of this.
     Fatal(String),
 }
@@ -70,6 +83,8 @@ pub struct SignIn {
     collecting: Option<Collecting>,
     /// The user name the last sign-in went with (a token is for it).
     user: String,
+    /// The tunnel has been up in this run: what needs the user ends it.
+    was_up: bool,
 }
 
 impl SignIn {
@@ -85,12 +100,27 @@ impl SignIn {
             key_refused: false,
             collecting: None,
             user: String::new(),
+            was_up: false,
         }
     }
 
     pub fn said(&mut self, said: Said) -> Vec<Do> {
+        let todo = self.decide(said);
+        if self.was_up && todo.iter().any(|d| matches!(d, Do::Ask(..))) {
+            self.collecting = None;
+            return vec![Do::End(format!(
+                "{}. {}",
+                crake_proto::trouble::EXPIRED,
+                crake_proto::trouble::SIGN_IN_AGAIN
+            ))];
+        }
+        todo
+    }
+
+    fn decide(&mut self, said: Said) -> Vec<Do> {
         match said {
-            Said::Hold => vec![Do::Send("hold release".into())],
+            Said::Hold(0) => vec![Do::Send("hold release".into())],
+            Said::Hold(wait) => vec![Do::ReleaseIn(wait)],
             Said::NeedAuth { challenge } => self.need_auth(challenge),
             Said::NeedKeyPassword => {
                 self.collecting = Some(Collecting::KeyPassword);
@@ -118,11 +148,19 @@ impl SignIn {
                 self.collecting = Some(Collecting::CrText);
                 vec![Do::Ask(AskKind::Code { echo }, text, None, false)]
             }
-            // Past signing in: the gateway is sending its settings.
+            // Past signing in: the gateway is sending its settings. The
+            // tries start again for the next sign-in (kept for the whole
+            // run until 2026-11-04: a token tried twice as the tunnel came
+            // up, and the profile's credentials once, left nothing to send
+            // when the gateway turned the next token down hours later).
             Said::State { name, .. }
                 if matches!(name.as_str(), "GET_CONFIG" | "ASSIGN_IP" | "CONNECTED") =>
             {
                 self.collecting = None;
+                self.token_tries = 0;
+                self.tried_credentials = false;
+                self.refused = false;
+                self.was_up |= name == "CONNECTED";
                 vec![Do::Done]
             }
             Said::Fatal(why) => vec![Do::Fatal(why)],
@@ -274,6 +312,8 @@ mod tests {
     }
 
     const NEED_AUTH: &str = ">PASSWORD:Need 'Auth' username/password";
+    /// A gateway that turns a token down, as openvpn 2.7 passes it on.
+    const EXPIRED_TOKEN: &str = ">PASSWORD:Verification Failed: 'Auth' ['SESSION: token expired']";
 
     /// The user's real gateway: placeholder credentials, then the page,
     /// then its token.
@@ -284,6 +324,11 @@ mod tests {
         assert_eq!(
             said(&mut s, ">HOLD:Waiting for hold release:0"),
             [Do::Send("hold release".into())]
+        );
+        // At a restart, after openvpn's own pause.
+        assert_eq!(
+            said(&mut s, ">HOLD:Waiting for hold release:2"),
+            [Do::ReleaseIn(2)]
         );
         assert_eq!(
             said(&mut s, NEED_AUTH),
@@ -430,6 +475,97 @@ mod tests {
         assert_eq!(
             said(&mut s, ">PASSWORD:Need 'Private Key' password"),
             [Do::Ask(AskKind::KeyPassword, String::new(), None, true)]
+        );
+    }
+
+    /// The night of 2026-11-04, as openvpn 2.7.8 says it (reproduced with
+    /// a gateway whose token lasts 20 s): switched on with yesterday's
+    /// token, signed in in the browser, hours later the next token refused.
+    #[test]
+    fn a_token_turned_down_after_hours_ends_the_tunnel_instead_of_asking() {
+        let old = Token {
+            user: "sso-placeholder".into(),
+            token: "SESS_ID_AT_yesterday".into(),
+        };
+        let creds = Some(("sso-placeholder".into(), Some("sso-placeholder".into())));
+        let mut s = SignIn::new(Some(old), creds);
+        // Yesterday's token: refused twice, forgotten.
+        said(&mut s, NEED_AUTH);
+        said(&mut s, EXPIRED_TOKEN);
+        said(&mut s, NEED_AUTH);
+        assert_eq!(
+            said(&mut s, ">PASSWORD:Verification Failed: 'Auth'"),
+            [Do::Forget]
+        );
+        // The profile's placeholder, then the browser.
+        assert_eq!(
+            said(&mut s, NEED_AUTH)[1],
+            Do::Send(r#"password "Auth" "sso-placeholder""#.into())
+        );
+        assert!(matches!(
+            said(&mut s, ">INFOMSG:WEB_AUTH::https://vpn.initech.example/s")[..],
+            [Do::Ask(AskKind::Browser, ..)]
+        ));
+        assert_eq!(said(&mut s, ">STATE:1,GET_CONFIG,,,,,,"), [Do::Done]);
+        said(&mut s, ">PASSWORD:Auth-Token:SESS_ID_AT_tonight");
+        said(&mut s, ">STATE:1,CONNECTED,SUCCESS,10.40.254.10,,,,");
+        // Hours later, a restart: openvpn's own token turned down.
+        assert_eq!(
+            said(&mut s, ">STATE:2,RECONNECTING,ping-restart,,,,,"),
+            Vec::<Do>::new()
+        );
+        said(&mut s, EXPIRED_TOKEN);
+        assert_eq!(
+            said(&mut s, ">HOLD:Waiting for hold release:2"),
+            [Do::ReleaseIn(2)]
+        );
+        // openvpn asks (a profile with auth-nocache): the new token first,
+        // not nothing (craked answered nothing, and openvpn waited for 2½
+        // hours).
+        assert_eq!(
+            said(&mut s, NEED_AUTH)[1],
+            Do::Send(r#"password "Auth" "SESS_ID_AT_tonight""#.into())
+        );
+        said(&mut s, EXPIRED_TOKEN);
+        said(&mut s, NEED_AUTH);
+        said(&mut s, EXPIRED_TOKEN);
+        // Then the profile's placeholder again, not "your user name".
+        assert_eq!(
+            said(&mut s, NEED_AUTH)[1],
+            Do::Send(r#"password "Auth" "sso-placeholder""#.into())
+        );
+        // The gateway wants the browser: nobody may be there.
+        let ended = said(&mut s, ">INFOMSG:WEB_AUTH::https://vpn.initech.example/s");
+        let [Do::End(why)] = &ended[..] else {
+            panic!("{ended:?}");
+        };
+        assert_eq!(crake_proto::trouble::label(why), Some("Session expired"));
+    }
+
+    /// A gateway the profile's own password signs in to: back by itself.
+    #[test]
+    fn a_profiles_own_password_signs_in_again_without_asking() {
+        let creds = Some(("alice".into(), Some("hunter2".into())));
+        let mut s = SignIn::new(None, creds);
+        said(&mut s, NEED_AUTH);
+        said(&mut s, ">STATE:1,CONNECTED,SUCCESS,10.40.254.10,,,,");
+        said(&mut s, ">PASSWORD:Verification Failed: 'Auth'");
+        assert_eq!(
+            said(&mut s, NEED_AUTH)[1],
+            Do::Send(r#"password "Auth" "hunter2""#.into())
+        );
+        // Refused now (the password was changed): the user would be asked.
+        said(&mut s, ">PASSWORD:Verification Failed: 'Auth'");
+        assert!(matches!(said(&mut s, NEED_AUTH)[..], [Do::End(_)]));
+    }
+
+    /// Before the tunnel was ever up, the user is there: asked, as before.
+    #[test]
+    fn coming_up_the_user_is_still_asked() {
+        let mut s = SignIn::new(None, None);
+        assert_eq!(
+            said(&mut s, NEED_AUTH),
+            [Do::Ask(AskKind::User, String::new(), None, false)]
         );
     }
 }

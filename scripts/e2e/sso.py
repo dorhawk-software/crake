@@ -8,6 +8,13 @@ when the client says it can answer one (IV_SSO crtext); a client back
 with its token is let in by openvpn itself (auth-gen-token), without asking
 here; any other is refused. What each client said goes to /link/openvpn-seen.
 
+/expire (tests only) restarts the gateway, which makes a new key for its
+tokens: at its next restart a client's token is turned down (a plain
+AUTH_FAILED, as the user's real gateway said it, 2026-11-04) and it signs
+in again, its browser page and all. (client-kill, to restart a client from
+here, lost its RESTART now and then: the tests restart the client's
+openvpn themselves.)
+
     sso.py <management socket> <page address> <page port> [seen file]
 """
 import base64, socket, sys, threading, time
@@ -35,7 +42,14 @@ def send(line):
 
 class Page(BaseHTTPRequestHandler):
     def do_GET(self):
-        cid = parse_qs(urlparse(self.path).query).get("cid", [""])[0]
+        url = urlparse(self.path)
+        if url.path == "/expire":
+            send("signal SIGHUP")
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"Done\n")
+            return
+        cid = parse_qs(url.query).get("cid", [""])[0]
         kid = pending.pop(cid, None)
         if kid is None:
             self.send_response(404)

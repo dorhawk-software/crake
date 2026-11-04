@@ -14,7 +14,8 @@ use super::super::entry::Answers;
 use super::super::*;
 use super::listen::Listen;
 use super::sign_in::{Do, SignIn};
-use crate::openvpn::{self, AskKind, mgmt};
+use crate::openvpn::mgmt::{self, Said};
+use crate::openvpn::{self, AskKind};
 
 /// How long it gets to stop once told to, before it's killed.
 const STOP_WAIT: Duration = Duration::from_secs(10);
@@ -168,6 +169,8 @@ impl Manager {
         let (answers, mut answer_rx) = mpsc::unbounded_channel::<(u32, String)>();
         let mut asked_id = None;
         let mut fatal = None;
+        // When to let a hold go (`Do::ReleaseIn`).
+        let mut release_at: Option<tokio::time::Instant> = None;
         loop {
             let todo = tokio::select! {
                 status = child.wait() => {
@@ -196,7 +199,11 @@ impl Manager {
                         let shown = if line.contains("Auth-Token") { "(its token)" } else { line.as_str() };
                         tracing::debug!("openvpn's management said: {shown}");
                         paced.heard(&mut writer, &line).await;
-                        sign_in.said(mgmt::parse(&line))
+                        let said = mgmt::parse(&line);
+                        if matches!(&said, Said::State { name: s, .. } if s == "RECONNECTING") {
+                            self.openvpn_restarting(name);
+                        }
+                        sign_in.said(said)
                     }
                     // openvpn is going: its exit says why.
                     _ => {
@@ -204,6 +211,12 @@ impl Manager {
                         continue;
                     }
                 },
+                () = tokio::time::sleep_until(release_at.unwrap_or_else(tokio::time::Instant::now)),
+                    if release_at.is_some() =>
+                {
+                    release_at = None;
+                    vec![Do::Send("hold release".into())]
+                }
                 Some((id, text)) = answer_rx.recv() => {
                     if asked_id != Some(id) {
                         continue;
@@ -226,6 +239,16 @@ impl Manager {
                         self.asked(name);
                     }
                     Do::Fatal(why) => fatal = Some(why),
+                    Do::ReleaseIn(secs) => {
+                        release_at = Some(tokio::time::Instant::now() + Duration::from_secs(secs));
+                    }
+                    // Its token is no good any more: the next switch-on
+                    // signs in afresh.
+                    Do::End(why) => {
+                        self.keep_token(name, None);
+                        stop(&mut child, &mut writer).await;
+                        return Ok(Run::Ended(TunnelState::Trouble, Some(why)));
+                    }
                 }
             }
         }
@@ -338,6 +361,9 @@ impl Manager {
             retry,
             extra,
         };
+        // What it asked, for craked's own log: on 2026-11-04 a question
+        // nobody saw left openvpn waiting for hours, and nothing said what.
+        tracing::info!(tunnel = name, kind = ?ask.kind, "asking the user to sign in");
         if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
             e.asking = Some((ask, answers.clone()));
         }

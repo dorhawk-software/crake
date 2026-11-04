@@ -58,6 +58,34 @@ async fn openvpn_browser_sign_in_through_cloudflare() {
             .is_some_and(|b| b.contains("crex")),
         "git through Initech"
     );
+    // openvpn restarting, as at a ping-restart in the night (2026-11-04):
+    // it closes its utun and opens another. The tunnel is trying again,
+    // then back, its hosts reached again; until then it stayed "Connected"
+    // with its device gone. macOS: the test is root, as craked; Windows'
+    // openvpn has no signal to restart it by.
+    #[cfg(target_os = "macos")]
+    {
+        let app = &mut crake.app;
+        sh("pkill -USR1 -f '[o]penvpn-initech.conf'");
+        app.within(WAIT, "Initech trying again", |m| {
+            m.tunnels
+                .iter()
+                .any(|t| t.name == "initech" && t.state == "connecting")
+        })
+        .await;
+        app.within(WAIT, "Initech back", |m| {
+            m.tunnels
+                .iter()
+                .any(|t| t.name == "initech" && t.state == "connected")
+        })
+        .await;
+        assert!(
+            get_within("10.40.1.10")
+                .await
+                .is_some_and(|b| b.contains("crex")),
+            "git through Initech after the restart"
+        );
+    }
     let app = &mut crake.app;
     app.send(Command::Disconnect("initech".into()));
     app.within(WAIT, "Initech off", |m| {

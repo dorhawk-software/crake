@@ -4,6 +4,38 @@
 use super::*;
 
 impl Manager {
+    /// The tunnel lost its gateway and its engine is trying again: the
+    /// panel's "Lost the gateway · trying again…".
+    pub(super) fn lost_gateway(&self, name: &str, display: &str) {
+        self.set_state(name, TunnelState::Connecting, false);
+        if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
+            e.ups += 1;
+            e.lost_at.get_or_insert_with(hosts::now);
+        }
+        self.log.system(
+            Some(name),
+            format!("{display} lost the gateway. Trying again."),
+            Some(self.while_lost(name)),
+        );
+    }
+
+    /// openvpn says it's starting again (`>STATE:…,RECONNECTING,…`): a
+    /// tunnel that was up lost its gateway. Its `--down` doesn't say so
+    /// without persist-tun (`script_context` is "init" then, as when it
+    /// stops), and until 2026-11-04 the tunnel stayed "Connected" with its
+    /// device gone. Said once: openvpn may restart many times before it's
+    /// back.
+    pub(in crate::manager) fn openvpn_restarting(&self, name: &str) {
+        let display = {
+            let map = self.tunnels.lock().unwrap();
+            match map.get(name) {
+                Some(e) if e.state == TunnelState::Connected => e.config.display().to_owned(),
+                _ => return,
+            }
+        };
+        self.lost_gateway(name, &display);
+    }
+
     /// More of a connected tunnel's networks as hints; whether any was new.
     fn add_hints(&self, name: &str, nets: &[String]) -> bool {
         let mut map = self.tunnels.lock().unwrap();
@@ -23,7 +55,7 @@ impl Manager {
     /// Apply one call from the hook. An error makes the hook fail, which makes
     /// openconnect give up on that step.
     pub async fn handle_hook(&self, msg: HookMessage) -> Result<()> {
-        let (display, state, protocol, replacing) = {
+        let (display, state, protocol, replacing, lost) = {
             let map = self.tunnels.lock().unwrap();
             let e = map
                 .get(&msg.tunnel)
@@ -33,6 +65,7 @@ impl Manager {
                 e.state,
                 e.config.protocol,
                 e.replacing,
+                e.lost_at.is_some(),
             )
         };
         // Only a tunnel Crake started may report in.
@@ -104,20 +137,16 @@ impl Manager {
                 if let Some((addr, prefix)) = info.address6 {
                     self.net.assign6(&info.device, addr, prefix).await?;
                 }
-                self.tunnel_up(name, &display, info, msg.reason == "connect")
+                // openvpn without persist-tun closes its device at a
+                // restart and opens a new one: its "up" is a first one, but
+                // the tunnel is back, not new (until 2026-11-04 each of a
+                // night's restarts logged "is up" again).
+                let back = protocol == crate::config::Protocol::Openvpn && lost;
+                self.tunnel_up(name, &display, info, msg.reason == "connect" && !back)
                     .await
             }
             "attempt-reconnect" => {
-                self.set_state(name, TunnelState::Connecting, false);
-                if let Some(e) = self.tunnels.lock().unwrap().get_mut(name) {
-                    e.ups += 1;
-                    e.lost_at.get_or_insert_with(hosts::now);
-                }
-                self.log.system(
-                    Some(name),
-                    format!("{display} lost the gateway. Trying again."),
-                    Some(self.while_lost(name)),
-                );
+                self.lost_gateway(name, &display);
                 Ok(())
             }
             "disconnect" => Ok(()), // the supervisor logs the end once the process exits

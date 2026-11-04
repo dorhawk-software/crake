@@ -21,6 +21,22 @@ What's new in each Crake release, for the people using it. The newest is at the 
   Short names, where Forget takes one back. "Ask every tunnel when a name is unknown" turns it
   off, as it does the rest.
 
+### Fixed
+
+- **An OpenVPN tunnel that loses its gateway says so.** When openvpn started over on its own
+  (after the computer slept, say), the panel kept saying Connected while nothing went through,
+  and at most that the tunnel's DNS didn't answer. Now it says "Lost the gateway · trying
+  again…", and the log says "Initech is back." when it is, instead of "Initech is up." after
+  every restart.
+- **A sign-in that runs out in the night ends the tunnel, and says so.** When an OpenVPN gateway
+  turned down the sign-in it had given hours before, Crake could leave the tunnel waiting for an
+  answer nobody was asked for, still showing Connected. Now, when signing in again would need
+  you (a page in the browser, a code), the tunnel stops with "Session expired", as an AnyConnect
+  one does: switch it on to sign in again. Where the profile's own password is enough, it signs
+  in again by itself.
+- **OpenVPN waits between tries again.** While the network was gone, openvpn tried to reach its
+  gateway hundreds of times a second; it now pauses between tries, as it does on its own.
+
 ## 0.17.0 (2026-10-29)
 
 ### New

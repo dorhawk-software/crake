@@ -1002,6 +1002,47 @@
    sign-in, the utun the hook names with the tunnel's address and its DNS
    route, gone with the tunnel. Not the data path (a server on the same
    Mac answers its own addresses directly): 7j's.
+   **A night on the user's Mac (2026-11-04): restarts, and a token that
+   ran out.** The Mac dozed overnight with the user's browser-sign-in
+   tunnel on. Every 15–30 minutes openvpn hit its `ping-restart`, closed
+   its utun (craked drops `persist-tun` from profiles) and came back with
+   the gateway's token. Without persist-tun, `--down` says
+   `script_context=init` at a restart, as it does when openvpn stops, so
+   the hook's reason was "disconnect" and nothing changed: the tunnel stayed
+   Connected while its device was gone, and each return logged "is up"
+   again (18 times). About 8 h after the browser sign-in the gateway turned
+   the token down (a plain `AUTH_FAILED`). openvpn asked for credentials
+   and craked answered nothing: `SignIn`'s tries were kept for the whole
+   run, so the kept token had used its two tries and the profile's
+   placeholder its one when the tunnel came up (switched on with
+   yesterday's token). That left only "ask the user for a user name",
+   for a gateway that signs in in the browser. openvpn waited from 03:32
+   (a `sample` of it, blocked in `management_query_user_pass`), and the
+   panel said only "its DNS doesn't answer" once the 7h check noticed. Earlier, with DNS down
+   in a dark wake, it had restarted 314 times in a fifth of a second:
+   each `>HOLD` was released at once, which skips openvpn's own pause.
+   Now: `>STATE:…,RECONNECTING` makes a tunnel that was up "lost the
+   gateway" (`openvpn_restarting`), and its next `connect` is "is back"
+   (`lost_at`); `SignIn` starts its tries again at each sign-in
+   (GET_CONFIG, CONNECTED); once the tunnel has been up, whatever would ask
+   the user ends it instead ("Session expired", `Do::End`, the token
+   forgotten), as openconnect's expired session does (decided with the
+   user: nothing opens in the night), while the profile's own password
+   signs in again without asking; a hold is released after the seconds
+   it names (`Do::ReleaseIn`), and craked's log says when it asks the user
+   anything. Reproduced first in a throwaway container (openvpn 2.7.0 and
+   2.7.8, a gateway whose token lasts 20 s, a stand-in for craked's
+   management answers): whether openvpn asks after a refused token, or
+   sends its cached placeholder by itself and gets the page, varies with
+   timing and with `auth-nocache`; both now end the same way. Tests:
+   `sign_in.rs` replays the night's lines; `e2e_openvpn.rs`
+   (`a_night_of_restarts_then_a_token_turned_down`) restarts the client's
+   openvpn with SIGUSR1, then has the gateway forget its tokens (sso.py's
+   `/expire` restarts it: a new token key) before the next restart;
+   `gateway_tests/sso.rs` restarts it on CI's Mac (Windows' openvpn has no
+   signal to restart by). sso.py's `/expire` isn't used through
+   Cloudflare: the Mac and Windows jobs share those gateways, and
+   restarting one would cut the other job's tunnels.
 7j. **Real gateways in CI, on every system (requested 2026-10-18; after
    7i).** Each CI system (Linux, macOS, Windows) starts Crake, connects to
    a real gateway of each kind there is software for, and checks that,

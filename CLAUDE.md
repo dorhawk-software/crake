@@ -295,6 +295,9 @@ one line each:
 - The reference pass's open ends: the panel on a single click under GNOME's
   AppIndicator extension (it opens its menu; needs Crake's own extension),
   platform notes to try (Windows' AUMID, side bars, the Mac's notch…).
+- After a wake: probes before the network is back read as verdicts; the
+  stand-in DNS once bound to a gone utun's address. A token turned down
+  mid-session isn't tested through Cloudflare (shared gateways).
 - Untried on real systems: the checklist below.
 
 ## Tried by real people (a checklist, ticked one by one)

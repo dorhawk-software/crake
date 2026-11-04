@@ -81,6 +81,10 @@ async fn until<T>(what: &str, mut f: impl FnMut() -> Option<T>) -> T {
 
 /// How much of the gateway's log a failure shows.
 const GATEWAY_LINES: usize = 25;
+/// How far back a test looks in craked's log.
+const LOG_LOOK: usize = 50;
+/// How long the gateway takes to restart (its own pause is a second).
+const GATEWAY_RESTART: Duration = Duration::from_secs(3);
 
 /// The tunnel, and why it's in trouble, for a failure's message.
 fn why(mgr: &Manager, name: &str) -> String {
@@ -235,6 +239,88 @@ async fn a_browser_sign_in_then_the_gateways_token() {
         "pgrep -a -x openvpn | grep -F openvpn-{name}.conf"
     ));
     assert!(left.trim().is_empty(), "openvpn stopped: {left}");
+}
+
+/// What a night did to the user's tunnel (2026-11-04), on a profile like
+/// theirs (a browser sign-in, no persist-tun: openvpn closes its device at
+/// each restart): openvpn restarting, as at a ping-restart, is "lost the
+/// gateway" and then "is back", not "Connected" with the device gone; and
+/// once the gateway turns its token down (here: the gateway restarted,
+/// with a new key for its tokens), a new sign-in would need the browser,
+/// so the tunnel ends, "Session expired", asking nobody.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_night_of_restarts_then_a_token_turned_down() {
+    if !enabled() {
+        return;
+    }
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = config(dir.path());
+    let hook_socket = cfg.hook_socket.clone();
+    let mgr = Manager::new(cfg).unwrap();
+    mgr.init().await.unwrap();
+    craked::hook_server::serve(mgr.clone(), &hook_socket).unwrap();
+    let profile = profile().replace("persist-tun\n", "");
+    let name = mgr.add_tunnel(&fields_for("ACME Night", profile)).unwrap();
+    mgr.connect(&name).unwrap();
+    let ask = until("the gateway's sign-in page", || mgr.asking(&name)).await;
+    assert!(open(&ask["url"]).contains("Signed in"));
+    until("connected", || {
+        (state(&mgr, &name) == TunnelState::Connected).then_some(())
+    })
+    .await;
+    // Its openvpn, as the chroot sees it (the gateway's runs there too).
+    let restart = format!("pkill -USR1 -f '[o]penvpn-{name}.conf'");
+    let said = |text: &str| {
+        mgr.log()
+            .recent(LOG_LOOK)
+            .iter()
+            .filter(|e| e.tunnel.as_deref() == Some(name.as_str()) && e.message == text)
+            .count()
+    };
+
+    // A restart: the panel says it's trying again, then it's back.
+    sh(&restart);
+    until("trying again", || {
+        (state(&mgr, &name) == TunnelState::Connecting).then_some(())
+    })
+    .await;
+    until("back", || {
+        (state(&mgr, &name) == TunnelState::Connected).then_some(())
+    })
+    .await;
+    assert_eq!(said("ACME Night lost the gateway. Trying again."), 1);
+    assert_eq!(said("ACME Night is back."), 1);
+    assert!(mgr.asking(&name).is_none(), "asked after a restart");
+
+    // The gateway forgets its tokens; at the next restart the token is
+    // turned down, and a new sign-in would need the browser.
+    assert!(open(&format!("http://{GATEWAY}:8080/expire")).contains("Done"));
+    tokio::time::sleep(GATEWAY_RESTART).await;
+    sh(&restart);
+    until("ended", || {
+        assert!(mgr.asking(&name).is_none(), "asked with nobody there");
+        (state(&mgr, &name) == TunnelState::Trouble).then_some(())
+    })
+    .await;
+    let why = mgr.get(&name).unwrap().why.unwrap_or_default();
+    assert_eq!(
+        crake_proto::trouble::label(&why),
+        Some("Session expired"),
+        "{why}"
+    );
+    assert!(
+        !mgr.get(&name).unwrap().signed_in,
+        "its token is forgotten: the next switch-on signs in afresh"
+    );
+    let left = sh(&format!(
+        "pgrep -a -x openvpn | grep -F openvpn-{name}.conf"
+    ));
+    assert!(left.trim().is_empty(), "openvpn stopped: {left}");
+    mgr.remove_tunnel(&name).await.unwrap();
 }
 
 /// The app's side of a password sign-in, over D-Bus as the sign-in window

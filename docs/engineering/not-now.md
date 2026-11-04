@@ -337,6 +337,30 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   wrong. The list alone can't tell a reset from an app closing its
   socket; telling them apart needs something that sees the packets (pf
   logging, or a network extension). Windows polls the same way.
+- **Waking up: probes before the network is back (2026-11-04).** The
+  user's Mac woke at 05:58 and Crake logged four "Left … alone. Refused
+  directly, and no answer through Initech." within a second (api.anthropic.com,
+  web.whatsapp.com, ACME's gateway): the network wasn't back yet, and the
+  tunnel had been gone for hours (milestones.md, 7i, "A night on the
+  user's Mac"). Nothing was routed, but the lines read as verdicts on the
+  hosts. Not looked into: whether "a network in trouble" (manager/mod.rs)
+  should have held them, or craked should wait out a wake (macOS'
+  power notifications, the network's reachability) before probing.
+- **The stand-in DNS answering for a tunnel whose device is gone
+  (2026-11-04).** In the same night, "answering from memory: Can't assign
+  requested address (os error 49)" (outage.rs) at 05:27: it answered for
+  a tunnel that was still "Connected" with its utun gone. A tunnel that
+  loses its gateway is now "trying again" instead; whether the stand-in
+  still binds to an address that's gone, there or after a restart's new
+  utun, wasn't checked.
+- **A token turned down mid-session, through Cloudflare (2026-11-04).**
+  Tested on Linux's e2e (sso.py's `/expire` restarts the gateway, so its
+  tokens are turned down); CI's Mac restarts openvpn but doesn't expire
+  tokens, because the Mac and Windows jobs share the Cloudflare gateways
+  and a gateway restart would cut the other job's tunnels. A gateway of
+  the Mac job's own (or an `/expire` that only forgets one user's tokens,
+  e.g. `auth-gen-token … external-auth` with sso.py deciding) would let
+  it run there.
 - **The reference pass's open ends (2026-10-29).** The pass
   (design/proposals/reference-pass.html, the studies in design/research/)
   was taken whole and built, sign-in's checks of a gateway that didn't
