@@ -116,26 +116,17 @@ impl Manager {
         let mut found: Vec<(String, String, Duration)> = Vec::new();
         for (tunnel, device, servers) in self.routed_tunnels() {
             let learning = self.learning(&tunnel);
-            for domain in self.domains(&tunnel) {
-                let full = format!("{short}.{domain}");
-                let started = Instant::now();
-                let mut addrs = Vec::new();
-                for qtype in [RecordType::A, RecordType::AAAA] {
-                    if addrs.is_empty()
-                        && let Some(reply) = ask(&device, &servers, &full, qtype).await
-                    {
-                        addrs = dns::records(&reply);
-                    }
-                }
-                tracing::debug!("short name {short}: {tunnel}'s DNS says {full} is {addrs:?}");
-                // Inside a managed tunnel's scope, and not on the never list.
-                let allowed = addrs
+            let (device, servers) = (&device, &servers);
+            let addrs_of = move |name| addresses(device, servers, name);
+            // Inside a managed tunnel's scope, and not on the never list.
+            let allowed = |full: &str, addrs: &[IpAddr]| {
+                addrs
                     .iter()
-                    .any(|a| learning.allows(Some(&full), *a) && !self.never(Some(&full), *a));
-                if allowed {
-                    found.push((tunnel.clone(), full, started.elapsed()));
-                    break;
-                }
+                    .any(|a| learning.allows(Some(full), *a) && !self.never(Some(full), *a))
+            };
+            let domains = self.domains(&tunnel);
+            if let Some((full, took)) = full_name(short, &domains, addrs_of, allowed).await {
+                found.push((tunnel.clone(), full, took));
             }
         }
         let both = self.settings.lock().unwrap().both;
@@ -271,5 +262,140 @@ impl Manager {
             },
         );
         Some(msg)
+    }
+}
+
+/// The first of a tunnel's `domains` its DNS (`addrs_of`) knows `short`
+/// under, with an address `allowed` lets through, and how long that DNS
+/// took to answer. A domain whose DNS gives a made-up name under it the
+/// same address answers every name (a company's gave each name under its
+/// GitLab's domain GitLab's address, 2026-11-04, so it seemed to know
+/// every short name typed): its answer says nothing about `short`, and
+/// the next domain is asked.
+async fn full_name<F, Fut>(
+    short: &str,
+    domains: &[String],
+    addrs_of: F,
+    allowed: impl Fn(&str, &[IpAddr]) -> bool,
+) -> Option<(String, Duration)>
+where
+    F: Fn(String) -> Fut,
+    Fut: Future<Output = Vec<IpAddr>>,
+{
+    for domain in domains {
+        let full = format!("{short}.{domain}");
+        let started = Instant::now();
+        let addrs = addrs_of(full.clone()).await;
+        let took = started.elapsed();
+        tracing::debug!("short name {short}: {full} is {addrs:?}");
+        if addrs.is_empty() || !allowed(&full, &addrs) {
+            continue;
+        }
+        let made_up = addrs_of(format!("{}.{domain}", made_up_label())).await;
+        if made_up.iter().any(|a| addrs.contains(a)) {
+            tracing::debug!("short name {short}: {domain}'s DNS answers any name under it");
+            continue;
+        }
+        return Some((full, took));
+    }
+    None
+}
+
+/// A label no network names a host by.
+fn made_up_label() -> String {
+    use std::hash::BuildHasher;
+    let n = std::collections::hash_map::RandomState::new().hash_one(Instant::now());
+    format!("crake-made-up-{n:x}")
+}
+
+/// A name's addresses by a tunnel's DNS: IPv4's, or else IPv6's.
+async fn addresses(device: &str, servers: &[Ipv4Addr], name: String) -> Vec<IpAddr> {
+    for qtype in [RecordType::A, RecordType::AAAA] {
+        if let Some(reply) = ask(device, servers, &name, qtype).await {
+            let addrs = dns::records(&reply);
+            if !addrs.is_empty() {
+                return addrs;
+            }
+        }
+    }
+    Vec::new()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const DOMAINS: [&str; 3] = [
+        "gitlab.initech.example",
+        "acme.example",
+        "corp.acme.example",
+    ];
+
+    fn domains() -> Vec<String> {
+        DOMAINS.map(String::from).to_vec()
+    }
+
+    fn at(a: &str) -> Vec<IpAddr> {
+        vec![a.parse().unwrap()]
+    }
+
+    /// Initech's DNS answers every name under its GitLab's domain; ACME's
+    /// knows expert.corp.acme.example.
+    async fn dns(name: String) -> Vec<IpAddr> {
+        if name.ends_with(".gitlab.initech.example") {
+            at("10.30.1.4")
+        } else if name == "expert.corp.acme.example" {
+            at("10.40.1.20")
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn anything(_: &str, _: &[IpAddr]) -> bool {
+        true
+    }
+
+    async fn full(domains: &[String], allowed: impl Fn(&str, &[IpAddr]) -> bool) -> Option<String> {
+        full_name("expert", domains, dns, allowed)
+            .await
+            .map(|(f, _)| f)
+    }
+
+    #[tokio::test]
+    async fn a_domain_that_answers_every_name_doesnt_know_a_short_one() {
+        let all = domains();
+        assert_eq!(
+            full(&all, anything).await.as_deref(),
+            Some("expert.corp.acme.example")
+        );
+        assert_eq!(full(&all[..1], anything).await, None);
+        // Outside what's allowed: not a name to offer.
+        assert_eq!(
+            full(&all, |f: &str, _: &[IpAddr]| f.contains("gitlab")).await,
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn a_name_of_its_own_under_such_a_domain_is_known() {
+        let own = |name: String| async move {
+            if name == "expert.gitlab.initech.example" {
+                at("10.30.1.9")
+            } else {
+                dns(name).await
+            }
+        };
+        let found = full_name("expert", &domains(), own, anything).await;
+        assert_eq!(
+            found.map(|(f, _)| f).as_deref(),
+            Some("expert.gitlab.initech.example")
+        );
+    }
+
+    #[test]
+    fn a_made_up_label_is_new_each_time_and_a_short_name() {
+        let (a, b) = (made_up_label(), made_up_label());
+        assert_ne!(a, b);
+        assert!(dns::short_name(&a), "{a}");
     }
 }

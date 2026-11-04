@@ -11,6 +11,14 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### Fixed
+
+- **A short name is offered only from a tunnel that really knows it.** Some company DNS answers
+  every name under one of its domains (with its GitLab's address, say), so that tunnel seemed to
+  know every short name typed, and Crake asked which tunnel's `expert` you meant even when only
+  one had it. Crake now checks with a made-up name under the same domain first, and leaves such
+  an answer out.
+
 ## 0.18.0 (2026-11-04)
 
 ### New
