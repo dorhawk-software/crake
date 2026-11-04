@@ -272,8 +272,13 @@ async fn a_night_of_restarts_then_a_token_turned_down() {
         (state(&mgr, &name) == TunnelState::Connected).then_some(())
     })
     .await;
-    // Its openvpn, as the chroot sees it (the gateway's runs there too).
-    let restart = format!("pkill -USR1 -f '[o]penvpn-{name}.conf'");
+    // Its openvpn, by the number this container gives it: the chroot's
+    // /proc is the runner's, so pgrep finds the runner's number, which
+    // means nothing to kill here (NSpid's last is this container's).
+    let restart = format!(
+        "for p in $(pgrep -f '[o]penvpn-{name}.conf'); do \
+         kill -USR1 $(awk '/^NSpid/ {{print $NF}}' /proc/$p/status); done"
+    );
     let said = |text: &str| {
         mgr.log()
             .recent(LOG_LOOK)
