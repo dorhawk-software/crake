@@ -386,14 +386,21 @@ pub(crate) fn short_name(cx: &mut TestAppContext, look_up: &dyn Fn(&'static str)
         Some(crate::tray::Badge::Warning),
         "the bird says it needs you"
     );
+    // The scenarios, run before in the same job, chose git too: wait for
+    // this answer's line, not an older one.
+    let chosen = |cx: &mut TestAppContext| {
+        model(cx)
+            .log
+            .iter()
+            .filter(|e| e.message == "git is git.acme.internal now.")
+            .count()
+    };
+    let before = chosen(cx);
     let p = panel(cx);
     let i = asked(cx).unwrap();
     click(cx, p, ("question-use", i));
     until(cx, "git is ACME's", Duration::from_secs(10), |cx| {
-        model(cx)
-            .log
-            .iter()
-            .any(|e| e.message == "git is git.acme.internal now.")
+        chosen(cx) > before
     });
     // Its notice goes once answered (another name's may wait: say which).
     let waiting: Vec<(String, String)> = model(cx)
