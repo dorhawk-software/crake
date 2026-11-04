@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.18.0 (2026-11-04)
+
 ### New
 
 - **Short names work through a tunnel.** Typed on its own, a name like https://expert/ only
