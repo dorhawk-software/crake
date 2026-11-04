@@ -395,9 +395,15 @@ pub(crate) fn short_name(cx: &mut TestAppContext, look_up: &dyn Fn(&'static str)
             .iter()
             .any(|e| e.message == "git is git.acme.internal now.")
     });
+    // Its notice goes once answered (another name's may wait: say which).
+    let waiting: Vec<(String, String)> = model(cx)
+        .waiting()
+        .into_iter()
+        .map(|w| (w.name, w.entry.message))
+        .collect();
     assert!(
-        model(cx).waiting().is_empty(),
-        "the notice goes once answered"
+        waiting.iter().all(|(name, _)| name != "git"),
+        "git's notice goes once answered; waiting: {waiting:?}"
     );
     until(cx, "git found as ACME's", Duration::from_secs(10), |_| {
         look_up("git").iter().any(|a| a == "10.40.1.10")
