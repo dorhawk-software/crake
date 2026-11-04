@@ -416,3 +416,12 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   tokens (leftover, staying, a short name's question), so a darker edge
   token (about #A8823A light, #94783A dark) is its own change, through a
   proposal.
+- **For SignPath (2026-11-04): openconnect on tap-windows6, and its fix
+  upstream.** SignPath Foundation won't sign an installer with Wintun's
+  prebuilt DLL in it (platforms.md, Signing). The plan the user gave
+  them: craked makes each openconnect tunnel's adapter with tapctl, as
+  for OpenVPN, and the installer drops wintun.dll (first a Windows CI
+  test that openconnect 9.12 takes a TAP adapter when wintun.dll is
+  absent); and scripts/windows/openconnect-unbuffered.c is offered to
+  openconnect upstream, so a later release can ship it unmodified. Then
+  the application, through signpath.org/apply.

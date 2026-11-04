@@ -22,8 +22,20 @@ a fully automated build (release.yml) and a code signing policy page on
 the website. The user emailed support@signpath.io (the apply form is
 signpath.org/apply) and asked whether bundling Wintun's prebuilt DLL
 (WireGuard's own licence, already signed by its authors) is acceptable,
-offering to download it at install time instead. Waiting for their
-answer. Fallbacks, researched the same day: Certum's open-source
+offering to download it at install time instead. **Their answer
+(2026-11-04):** Wintun's prebuilt DLL (non-OSI licence) can't be in the
+installer, and downloading it during installation doesn't change that
+(a user-managed dependency might, after review); upstream open-source
+binaries may be included unsigned by them, but signing a modified one
+has further requirements; a VPN client's network functions get a
+review against their acceptable use. The user replied the same day:
+Crake will move its openconnect tunnels from Wintun to tap-windows6
+(already shipped for OpenVPN, GPL-2.0, signed by Microsoft for OpenVPN
+Inc.) and drop wintun.dll, offer the unbuffered-output fix upstream to
+openconnect, and ask them to sign only crake.exe, craked.exe,
+crake-hook.exe and the installer; the application follows once the
+Wintun change is released. Both changes are written down in
+not-now.md. Fallbacks, researched the same day: Certum's open-source
 certificate (cheap, in the user's name, a cloud key that's awkward from
 CI); Azure Artifact Signing ($9.99/month) takes individuals from the US
 and Canada only, organisations in the EU. Microsoft has no free tier for

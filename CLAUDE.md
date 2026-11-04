@@ -302,6 +302,8 @@ one line each:
   takes the tunnel adapter's (11 s to over a minute).
 - Amber notices' button edges are under 3:1 (a token of their own, via
   a proposal).
+- For SignPath: openconnect on tap-windows6 (no Wintun), its unbuffered
+  fix offered upstream; then the application.
 - Untried on real systems: the checklist below.
 
 ## Tried by real people (a checklist, ticked one by one)
