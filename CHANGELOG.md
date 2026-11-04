@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.18.1 (2026-11-04)
+
 ### Better
 
 - **A question Crake asks waits for you.** When a tunnel's DNS knows a short name you typed
