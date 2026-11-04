@@ -84,14 +84,7 @@ impl Manager {
             return;
         };
         // Chosen already: its tunnel is off, then.
-        if self
-            .hosts
-            .lock()
-            .unwrap()
-            .tunnels
-            .values()
-            .any(|t| t.short.contains_key(&short.name))
-        {
+        if self.chosen(&short.name) {
             return;
         }
         // Asked lately, or being asked now: once per name for a while.
@@ -140,6 +133,14 @@ impl Manager {
         .into_iter()
         .map(|(tunnel, full, _)| (tunnel, full))
         .collect();
+        // Chosen while its tunnels were asked: an answer to a question from
+        // before craked started (the log keeps it) came first. Asking
+        // again would put the question back up (Windows' journey, CI,
+        // 2026-11-04).
+        if self.chosen(short) {
+            tracing::debug!("short name {short}: chosen meanwhile");
+            return;
+        }
         let Some((tunnel, full)) = found.first().cloned() else {
             tracing::debug!("short name {short}: no tunnel knows it");
             self.offered
@@ -183,6 +184,16 @@ impl Manager {
                 step: ShortStep::Asked,
             },
         );
+    }
+
+    /// Whether a tunnel's full name was chosen for `short`.
+    fn chosen(&self, short: &str) -> bool {
+        self.hosts
+            .lock()
+            .unwrap()
+            .tunnels
+            .values()
+            .any(|t| t.short.contains_key(short))
     }
 
     /// "Use ACME's": `short` is `tunnel`'s `full` from now on, until you
