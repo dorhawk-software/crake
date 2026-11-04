@@ -10,7 +10,6 @@ pub mod net;
 pub mod report;
 pub mod resolved;
 pub mod routing;
-pub mod short_probe;
 pub mod syn_queue;
 
 mod firewall;

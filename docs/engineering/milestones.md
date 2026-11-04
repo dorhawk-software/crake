@@ -114,14 +114,17 @@
    tunnel was ready, and the question then never came). Windows, once
    more (CI, 2026-11-04, both gateway jobs): "git" asked again and again
    from just after the tunnel was up never reached craked in the
-   scenario's minute, the suffix and craked's server on the adapter;
-   the failure's diagnosis, asking once more just after, got through.
-   Set-DnsClient returns at once, and Windows' DNS client seems to take
-   the suffix later, keeping a name asked meanwhile as unknown. So
-   craked asks throwaway short names of its own (`crake-probe-N`,
-   answered by itself, never asked of a tunnel) until its server sees
-   one under the suffix, then empties Windows' DNS cache, and logs how
-   long Windows took (`sys/windows/short_probe.rs`).
+   scenario's minute, the suffix and craked's server on the adapter; the
+   failure's diagnosis, asking once more just after, got through. A probe
+   of craked's own (throwaway short names until its server saw one under
+   the suffix) measured Windows taking the tunnel adapter's suffix 11 s
+   to over a minute after the tunnel was up. But Windows completes a
+   short name with the network adapter's own suffix at once, and with
+   Crake's root rule sends git.<that suffix> to craked: that's a short
+   name too now (`dns::SYSTEM_SUFFIXES`, the adapters' suffixes looked at
+   every 10 s), offered once public DNS says it doesn't exist; choosing
+   empties Windows' cache of that answer. The probe went; what's left (a
+   network with no suffix) is in not-now.md.
 4. Connection probing and automatic learning; undo. **Built**, proven in a
    throwaway namespace (the fake gateway drops packets not from the tunnel
    address, like a real one; the test fails if the stuck flow isn't

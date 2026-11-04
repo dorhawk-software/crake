@@ -10,7 +10,8 @@
 //! a question that came over TCP is asked of the tunnel's DNS over TCP.
 //! Short names (`manager::short_names`) come here as the system asks
 //! them: with no domain after them (macOS), or under the suffix
-//! `dns::SHORT_SUFFIX` (Windows).
+//! `dns::SHORT_SUFFIX` or one of the system's own (Windows,
+//! `dns::SYSTEM_SUFFIXES`).
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4};
 use std::sync::Arc;
@@ -96,11 +97,9 @@ async fn write_message(stream: &mut TcpStream, msg: &[u8]) -> std::io::Result<()
 /// is wanted, not one cut to a datagram.
 async fn answer(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> {
     let (name, _) = crate::keep::question(query)?;
-    // craked's own throwaway short name: Windows took the suffix.
+    // Windows completes a short name with the system's own suffixes too.
     #[cfg(windows)]
-    if super::windows::short_probe::is_probe(&name) {
-        return crate::hush::reply_code(query, crate::dns::NXDOMAIN);
-    }
+    super::windows::refresh_system_suffixes();
     // A short name you chose a tunnel's full name for.
     if let Some(reply) = mgr.short_name_answer(query).await {
         return Some(reply);

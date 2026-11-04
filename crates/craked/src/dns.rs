@@ -227,10 +227,12 @@ pub fn short_question(payload: &[u8]) -> Option<Failure> {
         return None;
     }
     let name = normalize(&query.name.to_ascii());
-    // Linux: resolved asks it under the hush link's search domain.
-    let name = name
-        .strip_suffix(&format!(".{SHORT_SUFFIX}"))
-        .map_or(name.clone(), str::to_owned);
+    // Linux: resolved asks it under the hush link's search domain;
+    // Windows, under the tunnel adapter's suffix or the system's own.
+    let name = std::iter::once(SHORT_SUFFIX.to_owned())
+        .chain(system_suffixes())
+        .find_map(|suffix| name.strip_suffix(&format!(".{suffix}")).map(str::to_owned))
+        .unwrap_or(name);
     short_name(&name).then_some(Failure {
         id: msg.metadata.id,
         name,
@@ -251,6 +253,35 @@ pub fn short_name(name: &str) -> bool {
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
         && !NOT_SHORT_NAMES.contains(&name)
+}
+
+/// The system's own DNS suffixes (Windows: its adapters', Crake's left
+/// out), which Windows completes a name of one label with before asking:
+/// "git" comes as git.<suffix>, and to craked's server with Crake's root
+/// rule. Unlike the tunnel adapter's `SHORT_SUFFIX`, which Windows took
+/// 11 s to over a minute after the tunnel was up (CI, 2026-11-04), these
+/// are used at once. A short name is offered only once public DNS has
+/// said git.<suffix> doesn't exist. Empty on Linux and macOS.
+static SYSTEM_SUFFIXES: std::sync::RwLock<Vec<String>> = std::sync::RwLock::new(Vec::new());
+
+/// The system's own DNS suffixes, as `set_system_suffixes` last said.
+fn system_suffixes() -> Vec<String> {
+    SYSTEM_SUFFIXES
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
+}
+
+/// Windows: the system's own DNS suffixes now (see `SYSTEM_SUFFIXES`).
+pub fn set_system_suffixes(suffixes: Vec<String>) {
+    let suffixes = suffixes
+        .iter()
+        .map(|s| normalize(s))
+        .filter(|s| !s.is_empty())
+        .collect();
+    *SYSTEM_SUFFIXES
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = suffixes;
 }
 
 /// Linux: the hush link's search domain, so resolved asks craked about a
@@ -671,6 +702,23 @@ pub(crate) mod tests {
             0,
             "valid IPv4 header checksum"
         );
+    }
+
+    #[test]
+    fn windows_completes_a_short_name_with_the_systems_own_suffix() {
+        // The tunnel adapter's suffix, and (Windows) the network's own.
+        let f = short_question(&query(ID, "git.crake.internal", RecordType::A)).unwrap();
+        assert_eq!(f.name, "git");
+        set_system_suffixes(vec!["Office.LAN.example.".into(), String::new()]);
+        let f = short_question(&query(ID, "git.office.lan.example", RecordType::AAAA)).unwrap();
+        assert_eq!((f.name.as_str(), f.qtype), ("git", RecordType::AAAA));
+        // The question as it was asked, for the answer's CNAME.
+        assert_eq!(f.query.name.to_ascii(), "git.office.lan.example.");
+        // Two labels before it: a name of its own, not a short one.
+        assert!(short_question(&query(ID, "a.git.office.lan.example", RecordType::A)).is_none());
+        assert!(short_question(&query(ID, "wpad.office.lan.example", RecordType::A)).is_none());
+        set_system_suffixes(Vec::new());
+        assert!(short_question(&query(ID, "git.office.lan.example", RecordType::A)).is_none());
     }
 
     #[test]

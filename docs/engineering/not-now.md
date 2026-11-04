@@ -361,6 +361,17 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   the Mac job's own (or an `/expire` that only forgets one user's tokens,
   e.g. `auth-gen-token … external-auth` with sso.py deciding) would let
   it run there.
+- **Short names on Windows, on a network with no DNS suffix
+  (2026-11-04).** Windows completes "git" with the network adapter's
+  own suffix at once, and craked takes git.<that suffix> for the short
+  name (`dns::SYSTEM_SUFFIXES`). With no suffix there, only the tunnel
+  adapter's `crake.internal` brings it to craked, and Windows started
+  using that 11 s to over a minute after the tunnel was up (CI; a probe
+  of craked's own measured it, then went). Until then a short name
+  doesn't resolve. Not understood yet: what Windows waits for (the
+  adapter's network being identified is a guess). Also untried: a
+  domain-joined machine's primary suffix, which GetAdaptersAddresses
+  doesn't list (usually the adapter's suffix too).
 - **The reference pass's open ends (2026-10-29).** The pass
   (design/proposals/reference-pass.html, the studies in design/research/)
   was taken whole and built, sign-in's checks of a gateway that didn't

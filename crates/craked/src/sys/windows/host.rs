@@ -69,6 +69,27 @@ pub fn adapter_domains() -> Vec<String> {
         .collect()
 }
 
+/// When the system's own DNS suffixes were last looked at.
+static SUFFIXES_AT: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+/// How often craked's server looks at them again (a network joined, its
+/// suffix with it).
+const SUFFIXES_EVERY: Duration = Duration::from_secs(10);
+
+/// craked's server, before a question: the system's own DNS suffixes
+/// (`dns::set_system_suffixes`), looked at again if a while has passed.
+pub fn refresh_system_suffixes() {
+    {
+        let mut at = SUFFIXES_AT
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if at.is_some_and(|t| t.elapsed() < SUFFIXES_EVERY) {
+            return;
+        }
+        *at = Some(std::time::Instant::now());
+    }
+    crate::dns::set_system_suffixes(adapter_domains());
+}
+
 /// Which tunnel interface each routing mark stands for. Probing names a
 /// tunnel by its mark (Linux's fwmark); Windows binds to its interface.
 /// Filled by `routing` as tunnels come up and go down.

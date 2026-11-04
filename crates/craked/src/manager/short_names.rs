@@ -12,7 +12,8 @@
 //! Where the short name reaches craked: its own DNS server, standing in
 //! for the system's (macOS, `sys::dns_server`), and `dns::SHORT_SUFFIX`:
 //! the hush link's search domain (Linux, `hush`), each tunnel adapter's
-//! suffix (Windows, `sys::windows::resolved`, sent to craked's server).
+//! suffix (Windows, `sys::windows::resolved`, sent to craked's server),
+//! and the network's own suffixes (Windows, `dns::SYSTEM_SUFFIXES`).
 
 use crake_proto::{ShortName, ShortStep};
 

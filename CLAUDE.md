@@ -298,6 +298,8 @@ one line each:
 - After a wake: probes before the network is back read as verdicts; the
   stand-in DNS once bound to a gone utun's address. A token turned down
   mid-session isn't tested through Cloudflare (shared gateways).
+- Short names on Windows with no network DNS suffix: only once Windows
+  takes the tunnel adapter's (11 s to over a minute).
 - Untried on real systems: the checklist below.
 
 ## Tried by real people (a checklist, ticked one by one)
