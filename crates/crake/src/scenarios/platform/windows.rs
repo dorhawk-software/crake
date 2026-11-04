@@ -53,6 +53,8 @@ pub(crate) fn diagnose(device: &str) -> String {
          'git:'; Resolve-DnsName git -Type A 2>&1 | Out-String; \
          Resolve-DnsName git.crake.internal -Type A -DnsOnly 2>&1 | Out-String; \
          'decisions:'; Get-Content C:\\ProgramData\\Crake\\log -Tail 15 | Out-String; \
+         'short names:'; Select-String -Path C:\\ProgramData\\Crake\\craked.log -Pattern 'short name' | \
+         Select-Object -Last 20 | ForEach-Object Line | Out-String; \
          'craked:'; Get-Content C:\\ProgramData\\Crake\\craked.log -Tail 40 | Out-String"
     ))
 }

@@ -96,6 +96,11 @@ async fn write_message(stream: &mut TcpStream, msg: &[u8]) -> std::io::Result<()
 /// is wanted, not one cut to a datagram.
 async fn answer(mgr: &Arc<Manager>, query: &[u8], tcp: bool) -> Option<Vec<u8>> {
     let (name, _) = crate::keep::question(query)?;
+    // craked's own throwaway short name: Windows took the suffix.
+    #[cfg(windows)]
+    if super::windows::short_probe::is_probe(&name) {
+        return crate::hush::reply_code(query, crate::dns::NXDOMAIN);
+    }
     // A short name you chose a tunnel's full name for.
     if let Some(reply) = mgr.short_name_answer(query).await {
         return Some(reply);

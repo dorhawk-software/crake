@@ -213,10 +213,10 @@ async fn short_suffix(device: &str, on: bool) {
         )
     };
     // Gone with its adapter already, when off: nothing to undo.
-    if let Err(e) = super::host::powershell("the short names' suffix", &script).await
-        && on
-    {
-        tracing::warn!("{device}: {e}");
+    match super::host::powershell("the short names' suffix", &script).await {
+        Err(e) if on => tracing::warn!("{device}: {e}"),
+        Ok(()) if on => super::short_probe::start(),
+        _ => {}
     }
 }
 

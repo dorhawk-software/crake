@@ -111,7 +111,17 @@
    craked as the hush link would; the scenarios use resolved). A name
    no tunnel knew is looked for again after 10 s (it was the 5 minutes
    of an unknown name: on Windows the first look could come before the
-   tunnel was ready, and the question then never came).
+   tunnel was ready, and the question then never came). Windows, once
+   more (CI, 2026-11-04, both gateway jobs): "git" asked again and again
+   from just after the tunnel was up never reached craked in the
+   scenario's minute, the suffix and craked's server on the adapter;
+   the failure's diagnosis, asking once more just after, got through.
+   Set-DnsClient returns at once, and Windows' DNS client seems to take
+   the suffix later, keeping a name asked meanwhile as unknown. So
+   craked asks throwaway short names of its own (`crake-probe-N`,
+   answered by itself, never asked of a tunnel) until its server sees
+   one under the suffix, then empties Windows' DNS cache, and logs how
+   long Windows took (`sys/windows/short_probe.rs`).
 4. Connection probing and automatic learning; undo. **Built**, proven in a
    throwaway namespace (the fake gateway drops packets not from the tunnel
    address, like a real one; the test fails if the stuck flow isn't
