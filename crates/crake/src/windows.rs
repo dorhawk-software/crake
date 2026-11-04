@@ -520,6 +520,11 @@ pub(super) fn open_log(cx: &mut App) {
                 cx.defer(move |cx| open_detail(tunnel, Some(host), cx));
             })
             .detach();
+            // A question's "Use ACME's".
+            cx.subscribe(&view, |_, e: &log_view::Asks, cx| {
+                let _ = cx.global::<Shell>().requests.send_blocking(e.0.clone());
+            })
+            .detach();
             view
         },
     );

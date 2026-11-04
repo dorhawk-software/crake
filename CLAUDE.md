@@ -300,6 +300,8 @@ one line each:
   mid-session isn't tested through Cloudflare (shared gateways).
 - Short names on Windows with no network DNS suffix: only once Windows
   takes the tunnel adapter's (11 s to over a minute).
+- Amber notices' button edges are under 3:1 (a token of their own, via
+  a proposal).
 - Untried on real systems: the checklist below.
 
 ## Tried by real people (a checklist, ticked one by one)

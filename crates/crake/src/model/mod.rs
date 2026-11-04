@@ -17,10 +17,11 @@ mod moments;
 mod scrub;
 // Which decisions still stand (undo, redo), for the charts.
 mod standing;
+pub mod waiting;
 
 // The log by day and the sample data, as the rest of the app knows them.
 use self::days::local_time;
-pub use self::days::{Day, Row, Show};
+pub use self::days::{Day, Question, Row, Show};
 #[cfg(test)]
 pub use self::demo::demo_log_whole_day;
 pub use self::demo::{
@@ -29,6 +30,7 @@ pub use self::demo::{
 };
 pub use self::moments::{AlsoAnswered, demo_moment};
 pub use self::scrub::{Keep, scrub, scrub_keeping};
+pub use self::waiting::Waiting;
 
 /// How long the tray shows the "routed" shape after a decision.
 const ROUTED_SHAPE_FOR: Duration = Duration::from_secs(4);
@@ -136,6 +138,8 @@ pub struct Model {
     pub no_tray: Option<crate::no_tray::Remedy>,
     /// The panel's note about it was put off ("Not now") until next start.
     pub no_tray_quiet: bool,
+    /// Questions put off with Not now (`waiting::key`).
+    pub not_now: std::collections::BTreeSet<String>,
 }
 
 /// One of a tunnel's hosts (craked's HostDetails).
@@ -483,7 +487,8 @@ impl Model {
     /// head as it would be without one (asleep, dashed or awake): red when a
     /// tunnel stopped on its own (design/proposals/dismiss-trouble.html),
     /// else amber when something needs you (an OpenVPN 3 process left
-    /// running; design/proposals/leftover-warning.html). Red wins.
+    /// running, design/proposals/leftover-warning.html; a short name's
+    /// question, waiting-for-you.html). Red wins.
     pub fn shape(&self) -> Shape {
         let shape = self.shape_untroubled();
         if self.reachable != Some(true) {
@@ -491,7 +496,7 @@ impl Model {
         }
         if self.tunnels.iter().any(|t| t.state == "trouble") {
             shape.with(Badge::Trouble)
-        } else if !self.leftovers.is_empty() {
+        } else if !self.leftovers.is_empty() || !self.waiting().is_empty() {
             shape.with(Badge::Warning)
         } else {
             shape
@@ -550,7 +555,8 @@ impl Model {
                     } else {
                         on.join(", ")
                     };
-                    format!("Listening · {names} · {}", self.last_route_today())
+                    let (last, question) = (self.last_route_today(), self.question_line());
+                    format!("Listening · {names} · {last}{question}")
                 }
             }
             Some(false) => "Crake isn't running".into(),
@@ -588,12 +594,15 @@ impl Model {
 
     /// The latest decisions (not system events, but short names chosen or
     /// forgotten), newest first, each with Undo or Redo while it's still
-    /// the last word on its hosts (or short name).
+    /// the last word on its hosts (or short name). A question shown as a
+    /// notice (`waiting`) isn't among them: it isn't asked twice.
     pub fn decisions(&self, count: usize) -> Vec<Decision> {
+        let notices: Vec<String> = self.waiting().into_iter().map(|w| w.key).collect();
         let decisions: Vec<&LogEntry> = self
             .log
             .iter()
             .filter(|e| e.kind != LogKind::System || e.short.is_some())
+            .filter(|e| e.kind != LogKind::Asked || !notices.contains(&waiting::key(e)))
             .collect();
         let mut out = Vec::new();
         for (i, e) in decisions.iter().enumerate().rev() {

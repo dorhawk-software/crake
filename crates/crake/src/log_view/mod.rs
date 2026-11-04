@@ -70,6 +70,12 @@ pub struct ShowIn(pub String, pub String);
 
 impl gpui_kit::EventEmitter<ShowIn> for Log {}
 
+/// Asks the app for something from a row: a short name's question's
+/// "Use ACME's".
+pub struct Asks(pub crate::Request);
+
+impl gpui_kit::EventEmitter<Asks> for Log {}
+
 impl Render for Log {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let days_scroll = crate::controls::scroll_handle("days", window, cx);

@@ -157,7 +157,7 @@ impl Manager {
             (
                 format!("{label} knows {short} as {full}."),
                 format!(
-                    "Public DNS doesn\u{2019}t know a name that short. Crake can use {label}\u{2019}s from now on."
+                    "Public DNS doesn\u{2019}t know a name that short. Until you choose, {short} doesn\u{2019}t open."
                 ),
             )
         } else {
@@ -167,7 +167,7 @@ impl Manager {
             (
                 format!("{} know {short}.", and_list(&labels)),
                 format!(
-                    "As {}. Public DNS doesn\u{2019}t know a name that short.",
+                    "As {}. Until you choose, {short} doesn\u{2019}t open.",
                     and_list(&fulls)
                 ),
             )

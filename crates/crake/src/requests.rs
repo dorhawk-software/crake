@@ -516,6 +516,8 @@ fn dismiss(key: String, cx: &mut App) {
     let model = cx.global::<Shell>().model.clone();
     model.update(cx, |m, cx| {
         m.leftovers.retain(|l| l.dismiss_key() != key);
+        m.not_now
+            .extend(crate::model::waiting::not_now(&[key.clone()].into()));
         cx.notify();
     });
 }

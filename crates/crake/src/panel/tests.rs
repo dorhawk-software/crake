@@ -618,28 +618,51 @@ fn a_question_stays_under_its_route(cx: &mut TestAppContext) {
     assert!(!w.shows_element(("keep", i), cx));
 }
 
-/// A short name two tunnels know (tray-panel.html?moment=short): "Use
-/// ACME's" and "Use Nordbank's" under the question, each choosing its
-/// tunnel's full name.
+/// A short name two tunnels know (tray-panel.html?moment=short,
+/// waiting-for-you.html): a notice that needs you, first under the header,
+/// with "Use ACME's" and "Use Nordbank's", each choosing its tunnel's full
+/// name, and the amber triangle on the bird; not also a line in What Crake
+/// did. Not now puts the notice off; the line comes back with its Use.
 #[gpui_kit::test]
-fn a_short_name_is_chosen_under_its_question(cx: &mut TestAppContext) {
+fn a_short_name_waits_for_you_at_the_top(cx: &mut TestAppContext) {
     let w = open(cx, Prefs::default());
     w.model.update(cx, |m, cx| {
         *m = crate::model::demo_moment(m.clone(), "short");
         cx.notify();
     });
-    let i = w.model.read_with(cx, |m, _| {
-        m.decisions(DECISIONS)
-            .iter()
-            .position(|d| d.entry.short.is_some())
-            .unwrap()
-    });
-    assert!(!w.shows_element(("act", i), cx), "no one button for two");
-    match w.click(("use-short", i * 8 + 1), cx) {
+    let in_rows = |cx: &mut TestAppContext| {
+        w.model.read_with(cx, |m, _| {
+            m.decisions(DECISIONS)
+                .iter()
+                .position(|d| d.entry.short.is_some())
+        })
+    };
+    assert_eq!(in_rows(cx), None, "asked once, as the notice");
+    let badge = w.model.read_with(cx, |m, _| m.shape().badged().1);
+    assert_eq!(badge, Some(crate::tray::Badge::Warning));
+    match w.click(("question-use", 1usize), cx) {
         Request::UseShortName(tunnel, short, full) => assert_eq!(
             (tunnel.as_str(), short.as_str(), full.as_str()),
             ("nord", "expert", "expert.nordbank.internal")
         ),
+        other => panic!("{other:?}"),
+    }
+    let key = match w.click(("question-not-now", 0usize), cx) {
+        Request::Dismiss(key) => key,
+        other => panic!("{other:?}"),
+    };
+    assert!(key.starts_with("short:"), "{key}");
+    w.model.update(cx, |m, cx| {
+        m.not_now.insert(key);
+        cx.notify();
+    });
+    assert!(!w.shows_element(("question", 0usize), cx));
+    let badge = w.model.read_with(cx, |m, _| m.shape().badged().1);
+    assert_eq!(badge, None, "the bird is plain again");
+    let i = in_rows(cx).expect("the line is back");
+    assert!(!w.shows_element(("act", i), cx), "no one button for two");
+    match w.click(("use-short", i * 8 + 1), cx) {
+        Request::UseShortName(tunnel, ..) => assert_eq!(tunnel, "nord"),
         other => panic!("{other:?}"),
     }
 }

@@ -384,6 +384,7 @@ fn main() {
                 _ => model,
             };
             let mut model = model;
+            model.not_now = model::waiting::not_now(&cx.global::<prefs::Prefs>().dismissed);
             model.no_tray = std::env::var("CRAKE_DEMO")
                 .ok()
                 .as_deref()

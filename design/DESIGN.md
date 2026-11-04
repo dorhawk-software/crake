@@ -171,7 +171,7 @@ Copy for helpdesk for 3 s, is muted with the app's check (an
 acknowledgement). Keyboard focus keeps the 2 px accent ring, with 2 px of
 room inside an underlined action so it clears the letters.
 
-**Notices** (the leftover process, "acting as AnyConnect", no tray, a new
+**Notices** (a short name's question, the leftover process, "acting as AnyConnect", no tray, a new
 version, the service's approval on macOS) share one shape: a title at 600,
 a body, and an actions row of a bordered action and a muted text dismiss
 ("Not now"); "Got it" is that bordered button. The leftover notice's
@@ -353,7 +353,7 @@ White; the states:
 | listening | the bird, eye open, bill parted |
 | routed (a few seconds) | the bill open in the call, the two call marks in front of it, **teal** |
 | trouble | a **red** badge with "!" at the bottom right, over the breast (14/32 of the icon: 7 px at 16 px), clear of the eye and the bill, on the bird as it would be without it: asleep when nothing is up, dashed while another tunnel connects, awake while one is up (design/proposals/dismiss-trouble.html, tray-badge.html B) |
-| needs you | an **amber** triangle with "!" in the same place, on the bird as it is: an OpenVPN 3 process left running, until it ends or "Got it" (design/proposals/leftover-warning.html). Red wins: a tunnel that stopped shows trouble's badge instead |
+| needs you | an **amber** triangle with "!" in the same place, on the bird as it is: an OpenVPN 3 process left running, until it ends or "Got it" (design/proposals/leftover-warning.html); a short name's question, until you choose, Not now, or an hour (waiting-for-you.html). Red wins: a tunnel that stopped shows trouble's badge instead |
 
 The badge is drawn on each size's whole pixels, as the eye is: the circle
 an odd or even number of pixels across and centred to match, its "!" a
@@ -474,20 +474,31 @@ mark as dorhawk.software/crake's.
   tunnels answer: Ask me": under the route's reason, "Nordbank answers for
   it too." with Use Nordbank (small action) and Keep ACME (muted dismiss),
   until one is chosen; a **short name** ("expert", typed on its own) a
-  tunnel's DNS knows: the "Ask me first" row (help mark, accent), "ACME
-  knows expert as expert.corp.acme.internal." with Use ACME's (its button,
-  as Send through ACME), or, when two tunnels know it, "ACME and Nordbank
-  know expert." / "As expert.corp.acme.internal and
-  expert.nordbank.internal. Public DNS doesn't know a name that short."
-  with Use ACME's and Use Nordbank's under it (small actions, as Use
-  Nordbank). Chosen, "expert is expert.corp.acme.internal now." wears the
+  tunnel's DNS knows waits for you (design/proposals/waiting-for-you.html,
+  chosen by the user 2026-11-04, after it scrolled out of sight unseen):
+  for an hour it's the needs-you notice, first under the header, with the
+  amber triangle on the bird in the bar and the header: "ACME knows expert
+  as expert.corp.acme.internal." / "Public DNS doesn't know a name that
+  short. Until you choose, expert doesn't open.", or, when two tunnels
+  know it, "ACME and Nordbank know expert." / "As
+  expert.corp.acme.internal and expert.nordbank.internal. Until you
+  choose, expert doesn't open.", with Use ACME's and Use Nordbank's
+  (bordered, in try order, none recommended) and Not now; meanwhile What
+  Crake did leaves its line out. After Not now or the hour, the line is
+  back with its Use (small actions), and the log's row keeps Use for the
+  rest of the day; the row's help mark is amber while the notice shows,
+  muted after (never teal: nothing was decided), with both tunnels' chips.
+  A name ending in s takes an apostrophe alone (Use ACME Holdings').
+  Chosen, "expert is expert.corp.acme.internal now." wears the
   pin (kept until forgotten) with Undo; forgotten, "Forgot expert." the
-  undone mark with Redo. Notifications offer the same buttons and Not now.
+  undone mark with Redo. Notifications offer the same buttons and Not
+  now; the Mac's (no buttons, on the lock screen) the title only.
 - The tray's menu (and the tooltip, the Mac's menu) opens with what the
   bird would say: "Listening · ACME, Nordbank · last route 13:21", "· nothing
   routed today" without one, "Listening · 4 tunnels" past three. On GNOME
   it's the only place the bird's state is in words: the AppIndicator
-  extension shows no tooltips.
+  extension shows no tooltips; while a short name's question waits, it
+  ends "· a question about expert".
 - Copy for helpdesk opens with "Crake sends only the hosts that need a
   tunnel through one. Everything else goes direct." and each tunnel's line
   says since when, to which gateway, with which engine and from which

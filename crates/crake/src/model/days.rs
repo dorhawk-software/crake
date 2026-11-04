@@ -23,6 +23,7 @@ impl Model {
         let today = jiff::Zoned::now().date();
         let words: Vec<String> = search.split_whitespace().map(str::to_lowercase).collect();
         let mut days: Vec<(jiff::civil::Date, Day)> = Vec::new();
+        let notices: Vec<String> = self.waiting().into_iter().map(|w| w.key).collect();
         for e in self.log.iter().rev() {
             if !show.keeps(e.kind) || tunnel.is_some_and(|t| e.tunnel.as_deref() != Some(t)) {
                 continue;
@@ -59,6 +60,7 @@ impl Model {
                     (LogKind::Routed, Some(t), Some(h)) => Some((t.clone(), h.clone())),
                     _ => None,
                 },
+                question: self.row_question(e, &notices),
             };
             let date = at.date();
             match days.last_mut() {
@@ -178,6 +180,46 @@ pub struct Row {
     /// A routed row's tunnel (its name) and host: "Show in ACME" opens
     /// tunnel detail there.
     pub show_in: Option<(String, String)>,
+    /// A short name's question (its tags, its Use actions).
+    pub question: Option<Question>,
+}
+
+/// A short name's question in the log (waiting-for-you.html): each
+/// tunnel's tag, and its Use actions while it can still be answered.
+#[derive(Clone, Debug, Default)]
+pub struct Question {
+    pub name: String,
+    /// Each tunnel asked about, by its display name.
+    pub tags: Vec<String>,
+    /// (tunnel, its display name, its full name) for each Use, while it
+    /// can still be answered.
+    pub choices: Vec<(String, String, String)>,
+    /// Shown as a notice now: its mark is amber (it needs you).
+    pub waiting: bool,
+}
+
+impl Model {
+    /// `e`'s question, when it asks about a short name; `notices`: the
+    /// questions shown as notices now.
+    fn row_question(&self, e: &LogEntry, notices: &[String]) -> Option<Question> {
+        let short = e.short.as_ref().filter(|_| e.kind == LogKind::Asked)?;
+        let choices = self.answerable(e).map_or_else(Vec::new, |w| {
+            w.choices
+                .into_iter()
+                .map(|(t, full)| (t.clone(), self.display_of(Some(&t)), full))
+                .collect()
+        });
+        Some(Question {
+            name: short.name.clone(),
+            tags: short
+                .full
+                .iter()
+                .map(|(t, _)| self.display_of(Some(t)))
+                .collect(),
+            choices,
+            waiting: notices.contains(&super::waiting::key(e)),
+        })
+    }
 }
 
 /// The log's rows for one day, newest first.

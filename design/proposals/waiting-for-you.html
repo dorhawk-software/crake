@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: a question that waits for you</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  .dark { --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A; --lineStrong: #4A4E53;
+    --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; --bars: #3E4246;
+    --warning: #F5B740; --warningSoft: #2C2618; --warningLine: #5C4A22; --onWarning: #1A1408; }
+  .light { --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE; --lineStrong: #BDBDB8;
+    --ink: #1A1C1E; --muted: #5A5F64; --accent: #0F766E; --bars: #D8D9D5;
+    --warning: #BF7E12; --warningSoft: #FCF4E4; --warningLine: #EFD9AE; --onWarning: #1A1C1E; }
+  body { margin: 0; background: #0E0F10; color: #ECEDEE; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.45; }
+  .page { padding: 28px 40px 48px; max-width: 1200px; }
+  .intro { color: #A9AEB4; font-size: 13px; max-width: 980px; }
+  .intro b { color: #ECEDEE; }
+  .cap { font-size: 15px; font-weight: 700; margin: 30px 0 2px; }
+  .sub { font-size: 13px; color: #A9AEB4; margin-bottom: 12px; max-width: 980px; }
+  .row { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  .theme { background: var(--desk); padding: 16px; border-radius: 10px; color: var(--ink); }
+  .mono { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; }
+
+  /* the bars: their own colours, as DESIGN.md's Tray icon says (a dark bar takes the dark theme's amber) */
+  .bars { display: flex; gap: 20px; flex-wrap: wrap; }
+  .bars figure { margin: 0; font-size: 12px; color: #A9AEB4; }
+  .bar { height: 28px; width: 220px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 12px;
+    border-radius: 6px; font-size: 13px; margin-bottom: 6px; }
+  .bar svg { width: 20px; height: 20px; }
+  .bar.dk { background: #000; color: #EDEDED; --warning: #F5B740; --onWarning: #1A1408; }
+  .bar.lt { background: #F6F6F6; color: #1A1C1E; --warning: #BF7E12; --onWarning: #1A1C1E; }
+
+  /* the panel (design/screens/tray-panel.html) */
+  .panel { width: 452px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 24px 50px -20px rgba(0,0,0,0.35); }
+  .head { display: flex; align-items: center; gap: 10px; padding: 14px 14px 12px 18px; }
+  .head .bird { width: 24px; height: 24px; color: var(--ink); flex: none; }
+  .head .t { font-size: 17px; font-weight: 700; }
+  .head .s { display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; font-size: 13px; color: var(--muted); }
+  .head .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .head .gear { margin-left: auto; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+  .chart { padding: 0 18px; }
+  .chart .h { display: flex; justify-content: space-between; align-items: baseline; }
+  .chart .h b { font-size: 13px; font-weight: 600; }
+  .chart .h span { font-size: 12px; color: var(--muted); }
+  .sw1 { display: inline-block; width: 10px; height: 10px; background: var(--bars); vertical-align: -1px; margin-right: 5px; }
+  .sw2 { display: inline-block; width: 3px; height: 11px; background: var(--accent); vertical-align: -1px; margin: 0 5px 0 10px; }
+  .chart svg { display: block; width: 100%; height: auto; margin-top: 8px; }
+  .sec { margin-top: 14px; border-top: 1px solid var(--line); }
+  .sec + .sec { margin-top: 6px; }
+  .sec .n { padding: 12px 18px 4px; font-size: 13px; font-weight: 600; }
+  .item { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 18px 10px; }
+  .item svg { margin-top: 2px; }
+  .item .what { font-size: 14px; line-height: 1.4; }
+  .item .why { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .item .side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .item .at { font-size: 12px; color: var(--muted); }
+  .undo { height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; font-weight: 600;
+    display: inline-flex; align-items: center; }
+  .tun { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 9px 18px; }
+  .tun .nm { font-size: 15px; font-weight: 700; } .tun .st { font-size: 13px; color: var(--muted); margin-left: 8px; }
+  .tun .pol { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .sw { width: 46px; height: 26px; border-radius: 13px; background: var(--accent); position: relative; }
+  .sw::after { content: ''; position: absolute; top: 3px; left: 23px; width: 20px; height: 20px; border-radius: 50%; background: #fff; }
+  .foot { display: flex; gap: 8px; padding: 12px 14px 14px; margin-top: 6px; border-top: 1px solid var(--line); }
+  .foot span { flex: 1 1 0; height: 40px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 6px; display: flex;
+    align-items: center; justify-content: center; font-size: 14px; font-weight: 600; }
+
+  /* the notice that needs you: panel/leftover.rs's numbers */
+  .notice { margin: 0 18px 10px; padding: 10px 12px; border-radius: 8px; background: var(--warningSoft);
+    border: 1px solid var(--warningLine); display: flex; gap: 10px; font-size: 13px; line-height: 20px; }
+  .notice .ico { flex: none; width: 22px; height: 22px; color: var(--ink); }
+  .notice .body { flex: 1; min-width: 0; }
+  .notice .title { font-weight: 600; }
+  .notice .why { color: var(--muted); margin-top: 3px; }
+  .notice .acts { display: flex; align-items: center; flex-wrap: wrap; column-gap: 10px; row-gap: 8px; margin-top: 8px; }
+  .btn { padding: 6px 12px; border: 1px solid var(--warningLine); border-radius: 6px; background: var(--panel);
+    font-weight: 600; line-height: 20px; }
+  .dismiss { color: var(--muted); font-weight: 600; padding: 0 4px; }
+
+  /* small actions (text-actions.html, A) */
+  .small { display: flex; gap: 16px; margin-top: 6px; }
+  .small span { font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+
+  /* the log window's rows (design/screens/log.html, log_view/rows.rs) */
+  .log { width: 760px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0 20px; }
+  .lrow { display: grid; grid-template-columns: 52px 20px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 11px 0;
+    border-top: 1px solid var(--line); }
+  .lrow:first-child { border-top: none; }
+  .lrow .at { font-size: 13px; color: var(--muted); padding-top: 1px; }
+  .lrow svg { margin-top: 1px; }
+  .lrow .why { font-size: 13px; color: var(--muted); }
+  .tags { display: flex; gap: 6px; }
+  .tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: var(--surface); color: var(--muted); white-space: nowrap; }
+
+  .q { margin-top: 30px; padding: 12px 14px; border: 1px solid #33363A; border-radius: 8px; max-width: 980px; font-size: 13px; color: #A9AEB4; }
+  .q b { color: #ECEDEE; }
+  ul { margin: 6px 0 0 18px; padding: 0; } li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- design/icons/tray-head-warning.svg: the bird with the amber triangle. -->
+  <symbol id="head-warning" viewBox="0 0 32 32"><defs><mask id="mw" maskUnits="userSpaceOnUse" x="-8" y="-8" width="48" height="48"><rect x="-8" y="-8" width="48" height="48" fill="#fff"/><rect x="13" y="5" width="3" height="3.00" fill="#000"/><path d="M7.00 20.00L9.00 20.00L15.00 32.00L13.00 32.00Z" fill="#000"/><path d="M25.00 18.00L32.00 31.00H18.00Z" fill="#000" stroke="#000" stroke-width="2.00" stroke-linejoin="round"/></mask></defs><g mask="url(#mw)" fill="currentColor"><path d="M6.42 20.39L4.11 16.98C1.55 9.93 3.64 5.44 8.81 3.56L13.04 2.02C14.92 1.34 17.03 2.17 18.03 4.04L25.79 3.45L19.99 6.52L20.34 7.46L26.41 6.31L20.42 10.62L19.75 12.56L19.92 16.55L19.50 22.50C19.50 26.50 26.00 28.50 29.00 32.00L2.00 32.00L4.50 22.00Z"/></g><path d="M25.00 16.95L32.57 31.00H17.43Z" fill="var(--warning)"/><rect x="24.00" y="23.00" width="2.00" height="4.00" fill="var(--onWarning)"/><rect x="24.00" y="28.00" width="2.00" height="2.00" fill="var(--onWarning)"/></symbol>
+  <!-- design/icons/tray-head-listening.svg: the bird as it is in the bar today. -->
+  <symbol id="head" viewBox="0 0 32 32"><defs><mask id="ml" maskUnits="userSpaceOnUse" x="-8" y="-8" width="48" height="48"><rect x="-8" y="-8" width="48" height="48" fill="#fff"/><rect x="13" y="5" width="3" height="3.00" fill="#000"/><path d="M7.00 20.00L9.00 20.00L15.00 32.00L13.00 32.00Z" fill="#000"/></mask></defs><g mask="url(#ml)" fill="currentColor"><path d="M6.42 20.39L4.11 16.98C1.55 9.93 3.64 5.44 8.81 3.56L13.04 2.02C14.92 1.34 17.03 2.17 18.03 4.04L25.79 3.45L19.99 6.52L20.34 7.46L26.41 6.31L20.42 10.62L19.75 12.56L19.92 16.55L19.50 22.50C19.50 26.50 26.00 28.50 29.00 32.00L2.00 32.00L4.50 22.00Z"/></g></symbol>
+  <!-- The panel header's bird with the call marks (design/screens/tray-panel.html). -->
+  <symbol id="head-call" viewBox="0 0 24 24"><defs><mask id="mc" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/><rect x="10" y="4" width="2" height="2.00" fill="#000"/><path d="M5.25 15.00L6.75 15.00L11.25 24.00L9.75 24.00Z" fill="#000"/></mask></defs><g mask="url(#mc)" fill="currentColor"><path d="M4.82 15.30L3.09 12.73C1.16 7.45 2.73 4.08 6.61 2.67L9.78 1.52C11.19 1.00 12.77 1.63 13.52 3.03L19.35 2.58L15.00 4.89L15.25 5.59L19.81 4.73L15.32 7.96L14.81 9.42L14.94 12.41L14.62 16.88C14.62 19.88 19.50 21.38 21.75 24.00L1.50 24.00L3.38 16.50Z"/></g><path d="M20.85 3.30L22.80 1.35" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round"/><path d="M21.15 6.30L22.80 5.81" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="gear" viewBox="0 0 24 24"><path d="M4 8h9M17 8h3M4 16h3M11 16h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="15" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="16" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="person" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8a4 4 0 1 0 0 8zM4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<!-- Parts shared by the panels. -->
+<template id="t-head-plain"><div class="head"><svg class="bird"><use href="#head-call"/></svg><span class="t">Crake</span><span class="s"><span class="dot"></span>Listening</span><span class="gear"><svg width="20" height="20"><use href="#gear"/></svg></span></div></template>
+<template id="t-head-warn"><div class="head"><svg class="bird"><use href="#head-warning"/></svg><span class="t">Crake</span><span class="s"><span class="dot"></span>Listening</span><span class="gear"><svg width="20" height="20"><use href="#gear"/></svg></span></div></template>
+<template id="t-chart">
+  <div class="chart"><div class="h"><b>Last hour</b><span><span class="sw1"></span>direct<span class="sw2"></span>routed</span></div>
+    <svg viewBox="0 0 416 96"><path d="M4 72V64M11 72V67M18 72V60M25 72V68M32 72V56M39 72V66M46 72V62M53 72V69M60 72V58M67 72V65M74 72V61M81 72V67M88 72V59M95 72V66M102 72V63M109 72V68M116 72V57M123 72V65M130 72V67M137 72V60M144 72V66M151 72V62M158 72V68M165 72V58M172 72V65M179 72V61M186 72V67M193 72V64M200 72V59M207 72V66M214 72V68M221 72V60M228 72V65M235 72V62M242 72V67M249 72V58M256 72V66M263 72V64M270 72V68M277 72V61M284 72V65M291 72V59M298 72V66M305 72V63M312 72V68M319 72V57M326 72V65M333 72V67M340 72V60M347 72V66M354 72V62M361 72V68M368 72V58M375 72V65M382 72V61M389 72V67M396 72V64M403 72V59M410 72V66" stroke="var(--bars)" stroke-width="3.6"/><line x1="0" y1="72" x2="416" y2="72" stroke="var(--lineStrong)"/><g font-family="Atkinson Hyperlegible Mono, monospace" font-size="11" fill="var(--muted)"><text x="0" y="90">10:02</text><text x="208" y="90" text-anchor="middle">10:32</text><text x="416" y="90" text-anchor="end">now</text></g></svg>
+  </div>
+</template>
+<template id="t-left3">
+  <div class="item"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M4 9.5h10" stroke="var(--muted)" stroke-width="2.4" stroke-linecap="round"/></svg>
+    <div><div class="what">Left outlook.office.com alone.</div><div class="why">Refused directly. It answered directly when Crake tried again (29 ms): nothing to send through Nordbank.</div></div><div class="side"><span class="at mono">11:01</span></div></div>
+  <div class="item"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M4 9.5h10" stroke="var(--muted)" stroke-width="2.4" stroke-linecap="round"/></svg>
+    <div><div class="what">Left cdnjs.cloudflare.com alone.</div><div class="why">Refused directly. It answered directly when Crake tried again (15 ms): nothing to send through Nordbank.</div></div><div class="side"><span class="at mono">10:52</span></div></div>
+  <div class="item"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M4 9.5h10" stroke="var(--muted)" stroke-width="2.4" stroke-linecap="round"/></svg>
+    <div><div class="what">Left news-edge.apple.com alone.</div><div class="why">Refused directly. It answered directly when Crake tried again (34 ms): nothing to send through Nordbank.</div></div><div class="side"><span class="at mono">10:44</span></div></div>
+</template>
+<template id="t-tunnels">
+  <div class="sec"><div class="n">Tunnels</div>
+    <div class="tun"><div><span class="nm">ACME</span><span class="st">Connected · 10 hosts</span><div class="pol"><svg width="14" height="14"><use href="#person"/></svg>Your profile · Learn as it goes</div></div><div class="sw"></div></div>
+    <div class="tun"><div><span class="nm">Nordbank</span><span class="st">Connected · 10 hosts</span><div class="pol"><svg width="14" height="14"><use href="#person"/></svg>Your profile · Learn as it goes</div></div><div class="sw"></div></div>
+  </div>
+  <div class="foot"><span>Traffic</span><span>Full log</span><span>Copy for helpdesk</span></div>
+</template>
+<template id="t-notice2">
+  <div class="notice" role="status">
+    <svg class="ico"><use href="#head-warning"/></svg>
+    <div class="body">
+      <div class="title">ACME and Nordbank know expert.</div>
+      <div class="why">As expert.corp.acme.internal and expert.nordbank.internal. Until you choose, expert doesn’t open.</div>
+      <div class="acts"><span class="btn">Use ACME’s</span><span class="btn">Use Nordbank’s</span><span class="dismiss">Not now</span></div>
+    </div>
+  </div>
+</template>
+
+<!-- The panels. -->
+<template id="t-before">
+  <div class="panel"><div data-use="t-head-plain"></div><div data-use="t-chart"></div>
+    <div class="sec"><div class="n">What Crake did</div><div data-use="t-left3"></div></div>
+    <div data-use="t-tunnels"></div></div>
+</template>
+<template id="t-after">
+  <div class="panel"><div data-use="t-head-warn"></div><div data-use="t-notice2"></div><div data-use="t-chart"></div>
+    <div class="sec"><div class="n">What Crake did</div><div data-use="t-left3"></div></div>
+    <div data-use="t-tunnels"></div></div>
+</template>
+<template id="t-just">
+  <div class="panel"><div data-use="t-head-warn"></div><div data-use="t-notice2"></div><div data-use="t-chart"></div>
+    <div class="sec"><div class="n">What Crake did</div>
+      <div class="item"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M4 9.5h10" stroke="var(--muted)" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <div><div class="what">Left news-edge.apple.com alone.</div><div class="why">Refused directly. It answered directly when Crake tried again (34 ms): nothing to send through Nordbank.</div></div><div class="side"><span class="at mono">10:26</span></div></div>
+      <div class="item"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M6 15V4M12 15V8" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <div><div class="what">Sent git.acme.internal through ACME.</div><div class="why">It didn’t answer directly. Through ACME it answered in 38 ms.</div></div><div class="side"><span class="at mono">10:21</span></div></div>
+      <div class="item"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M4 9.5h10" stroke="var(--muted)" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <div><div class="what">Left 10.62.0.77 alone.</div><div class="why">No answer just then, directly or through ACME. Nothing was changed.</div></div><div class="side"><span class="at mono">10:04</span></div></div>
+    </div>
+    <div data-use="t-tunnels"></div></div>
+</template>
+<template id="t-chosen">
+  <div class="panel"><div data-use="t-head-plain"></div><div data-use="t-chart"></div>
+    <div class="sec"><div class="n">What Crake did</div>
+      <div class="item"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M6 3h6M7.5 3v4.5L5 10h8l-2.5-2.5V3M9 10v5.5" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        <div><div class="what">expert is expert.corp.acme.internal now.</div><div class="why">You chose ACME’s name for it. Crake keeps it until you forget it.</div></div><div class="side"><span class="at mono">10:43</span><span class="undo">Undo</span></div></div>
+      <div class="item"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M4 9.5h10" stroke="var(--muted)" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <div><div class="what">Left news-edge.apple.com alone.</div><div class="why">Refused directly. It answered directly when Crake tried again (34 ms): nothing to send through Nordbank.</div></div><div class="side"><span class="at mono">10:26</span></div></div>
+      <div class="item"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M6 15V4M12 15V8" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <div><div class="what">Sent git.acme.internal through ACME.</div><div class="why">It didn’t answer directly. Through ACME it answered in 38 ms.</div></div><div class="side"><span class="at mono">10:21</span></div></div>
+    </div>
+    <div data-use="t-tunnels"></div></div>
+</template>
+<template id="t-one">
+  <div class="panel"><div data-use="t-head-warn"></div>
+    <div class="notice" role="status">
+      <svg class="ico"><use href="#head-warning"/></svg>
+      <div class="body">
+        <div class="title">ACME knows expert as expert.corp.acme.internal.</div>
+        <div class="why">Public DNS doesn’t know a name that short. Until you choose, expert doesn’t open.</div>
+        <div class="acts"><span class="btn">Use ACME’s</span><span class="dismiss">Not now</span></div>
+      </div>
+    </div>
+    <div data-use="t-chart"></div></div>
+</template>
+<template id="t-log">
+  <div class="log">
+    <div class="lrow"><span class="at mono">10:44</span><svg width="18" height="18" viewBox="0 0 18 18"><path d="M4 9.5h10" stroke="var(--muted)" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <div><div>Left news-edge.apple.com alone.</div><div class="why">Refused directly. It answered directly when Crake tried again (34 ms): nothing to send through Nordbank.</div></div><span class="tag">Nordbank</span></div>
+    <div class="lrow"><span class="at mono">10:42</span><svg width="18" height="18" viewBox="0 0 18 18"><path d="M1.5 9a7.5 7.5 0 1 0 15 0a7.5 7.5 0 1 0-15 0M6.83 6.75a2.25 2.25 0 0 1 4.35.75c0 1.5-2.25 2.25-2.25 2.25M9 12.75h.01" stroke="var(--warning)" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
+      <div><div>ACME and Nordbank know expert.</div><div class="why">As expert.corp.acme.internal and expert.nordbank.internal. Until you choose, expert doesn’t open.</div>
+        <div class="small"><span>Use ACME’s</span><span>Use Nordbank’s</span></div></div><span class="tags"><span class="tag">ACME</span><span class="tag">Nordbank</span></span></div>
+    <div class="lrow"><span class="at mono">10:26</span><svg width="18" height="18" viewBox="0 0 18 18"><path d="M4 9.5h10" stroke="var(--muted)" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <div><div>Left outlook.office.com alone.</div><div class="why">Refused directly. It answered directly when Crake tried again (29 ms): nothing to send through Nordbank.</div></div><span class="tag">Nordbank</span></div>
+  </div>
+</template>
+
+<div class="page">
+  <div class="intro"><b>A question that waits for you.</b> When a tunnel’s DNS knows a short name (“expert”, typed on
+    its own), Crake asks whether to use it, and which tunnel’s when two know it. Until you answer, the name doesn’t
+    open. Today the question is a line in What Crake did, and the panel shows only the last three lines, so three newer
+    lines push it out. The full log shows it with no way to answer, and the tray icon doesn’t change, so nothing says
+    Crake is waiting. <b>Proposed:</b> while the question waits, it’s a notice that needs you, with the shape and amber of
+    the leftover-process notice (leftover-warning.html, 3; panel/leftover.rs’s sizes). The bird in the bar and in the
+    panel’s header gets the amber triangle, as for that notice today. The log row keeps its Use actions.</div>
+
+  <div class="cap">The bar</div>
+  <div class="sub">Before, and while a question waits. A dark bar takes the dark theme’s amber and a light bar the light
+    theme’s (DESIGN.md, Tray icon). Drawn with the Linux bust at 20 px. The Mac’s menu-bar bird has its round eye,
+    and the triangle sits in the same place on it.</div>
+  <div class="bars">
+    <figure><div class="bar dk"><span>11:02</span><svg><use href="#head"/></svg></div>dark bar, before</figure>
+    <figure><div class="bar dk"><span>11:02</span><svg><use href="#head-warning"/></svg></div>dark bar, waiting</figure>
+    <figure><div class="bar lt"><span>11:02</span><svg><use href="#head"/></svg></div>light bar, before</figure>
+    <figure><div class="bar lt"><span>11:02</span><svg><use href="#head-warning"/></svg></div>light bar, waiting</figure>
+  </div>
+
+  <div class="cap">Before (0.18.0) and after, twenty minutes later</div>
+  <div class="sub">Asked at 10:42. Before, by 11:02 three “Left … alone” lines have pushed the question out, and the
+    birds are plain. After, the notice stays where the panel’s other notices are, first under the header, so nothing
+    newer pushes it out. The buttons are a notice’s: bordered, in try order, with no recommended one, and a muted Not
+    now. The body is craked’s sentence for the names, and what waiting costs you. Nothing else differs between the two.</div>
+  <div class="row" data-theme="t-before"></div>
+  <div class="row" data-theme="t-after" style="margin-top: 20px"></div>
+
+  <div class="cap">After: just asked</div>
+  <div class="sub">At 10:42, the moment you’d usually look. While the notice is there, What Crake did leaves the
+    question’s line out, so it isn’t asked twice.</div>
+  <div class="row" data-theme="t-just"></div>
+
+  <div class="cap">After: once you choose</div>
+  <div class="sub">The notice folds away (7c’s motion, as a notice that goes: the panel shrinks with it, no jump). The
+    answer arrives at the top of What Crake did with the pin and Undo, as today, and both birds are plain again. expert
+    opens at once (craked empties the system’s DNS cache).</div>
+  <div class="row" data-theme="t-chosen"></div>
+
+  <div class="cap">After: one tunnel knows it</div>
+  <div class="sub">craked’s title for that case, one choice. The body says what waiting costs you, as the other does.</div>
+  <div class="row" data-theme="t-one"></div>
+
+  <div class="cap">After: the full log</div>
+  <div class="sub">The question’s row keeps its Use actions (small actions, as in the panel’s rows) while it can still
+    be answered, after Not now too: it’s the way back for the rest of that day. Its mark is amber while the notice
+    shows (it needs you; nothing has been decided, so not teal); after that it’s muted, and Use stays until the day is
+    over. It shows both tunnels’ tags. Once it’s answered or the day is over, its actions go.</div>
+  <div class="row" data-theme="t-log"></div>
+
+  <div class="q"><b>How long it waits.</b>
+    <ul>
+      <li><b>Until you choose:</b> the notice and both triangles go, and the name works at once.</li>
+      <li><b>Not now:</b> the notice and the triangles go. The log row keeps Use for the rest of the day. Crake doesn’t ask
+        about that name again for a day, as now.</li>
+      <li><b>An hour unanswered:</b> the notice and the triangles go. The person who typed the name is waiting now or not
+        at all, and a browser looks up a word typed as a search too, so a stray search won’t keep the bird amber
+        all day. The log row keeps Use until the day is over.</li>
+      <li><b>A tunnel it names goes off:</b> its choice goes. When none is left, the notice and the triangles go.</li>
+      <li><b>Kept across restarts:</b> the app reads the question from the log (kept on disk), so restarting Crake or craked
+        doesn’t lose it or bring it back after you answered.</li>
+      <li><b>Several at once:</b> one notice each, newest first, above the other notices. Rare: a name is asked once a day.</li>
+    </ul>
+  </div>
+  <div class="q"><b>With it, in this change.</b>
+    <ul>
+      <li>The tray menu’s summary line (the words on GNOME’s fallback menu and the tooltip) adds “· a question about expert”
+        while it waits.</li>
+      <li>macOS’s notification has no buttons and shows on the lock screen. There it gives the title only (“ACME and
+        Nordbank know expert.”), not the companies’ full names.</li>
+      <li>DESIGN.md: the needs-you triangle’s row adds “a short name waiting for your choice”, and Notices list this one.</li>
+      <li>A name ending in s gets an apostrophe alone: “Use ACME Holdings’”, not “Holdings’s” (the panel’s rows and the
+        notice share it).</li>
+      <li>Host names in the body don’t break at a hyphen; a long one wraps whole to the next line.</li>
+    </ul>
+  </div>
+  <div class="q"><b>Not in this change.</b>
+    <ul>
+      <li>“Nordbank answers for git.acme.internal too” (When two tunnels answer: Ask me) stays a line in What Crake did.
+        The host already works through the first tunnel, and the question only offers a move.</li>
+      <li>The notices’ button edges (warningLine on warningSoft) are 1.8:1 in dark and 1.3:1 in light, under 3:1 for a
+        control’s edge; their words carry them. All amber notices share this, so a darker edge would be its own change.</li>
+      <li>Three or more tunnels that know one name: the buttons wrap, and Not now goes to the next line.</li>
+      <li>Two amber triangles while it waits, the header’s bird and the notice’s, about 40 px apart: as the leftover
+        notice has them today (the header’s says what the bar’s does). Kept alike for both.</li>
+      <li>Privacy, as it stands: the notice shows the names in the panel, as the line did. It goes after an hour, and
+        Copy for helpdesk can hide names as today.</li>
+    </ul>
+  </div>
+</div>
+<script>
+  for (let i = 0; i < 4; i++) for (const t of document.querySelectorAll('template')) {
+    for (const use of t.content.querySelectorAll('[data-use]')) {
+      use.replaceWith(document.getElementById(use.dataset.use).content.cloneNode(true));
+    }
+  }
+  for (const slot of document.querySelectorAll('[data-theme]')) {
+    for (const theme of ['dark', 'light']) {
+      const box = document.createElement('div');
+      box.className = 'theme ' + theme;
+      box.appendChild(document.getElementById(slot.dataset.theme).content.cloneNode(true));
+      slot.appendChild(box);
+    }
+  }
+</script>
+</body>
+</html>

@@ -408,3 +408,11 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
     back", "Gone for 42 s") are proven by a Linux test with a fake
     openconnect (`craked/tests/lifecycle_reconnect.rs`); no real gateway
     has dropped one yet.
+- **Amber notices' button edges (2026-11-04).** A notice's bordered
+  buttons are drawn in warningLine on warningSoft: 1.8:1 in dark and
+  1.3:1 in light, under WCAG's 3:1 for a control's edge (their words
+  carry them, so 1.4.11 passes on the label). Measured in the review of
+  design/proposals/waiting-for-you.html. Every amber notice shares the
+  tokens (leftover, staying, a short name's question), so a darker edge
+  token (about #A8823A light, #94783A dark) is its own change, through a
+  proposal.

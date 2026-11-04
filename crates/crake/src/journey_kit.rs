@@ -360,16 +360,19 @@ pub(crate) fn look_up(name: &'static str) -> Vec<String> {
     .unwrap_or_default()
 }
 
-/// A short name: "git", typed on its own, is asked about in "What Crake
-/// did"; "Use ACME's" makes it ACME's git.acme.internal (10.40.1.10), and
-/// tunnel detail's Short names forgets it. `look_up` finds a name's
-/// addresses: the system's (`look_up` above), or, in Linux's journey (a
-/// container without resolved), craked's answer as the hush link gives it.
+/// A short name: "git", typed on its own, is asked about in the panel's
+/// notice that waits for you (waiting-for-you.html), with the amber
+/// triangle on the bird; its "Use ACME's" makes it ACME's
+/// git.acme.internal (10.40.1.10), and tunnel detail's Short names
+/// forgets it. `look_up` finds a name's addresses: the system's
+/// (`look_up` above), or, in Linux's journey (a container without
+/// resolved), craked's answer as the hush link gives it.
 pub(crate) fn short_name(cx: &mut TestAppContext, look_up: &dyn Fn(&'static str) -> Vec<String>) {
+    // The notice and the place of ACME's "Use" in it.
     let asked = |cx: &mut TestAppContext| {
-        model(cx).decisions(panel::DECISIONS).iter().position(|d| {
-            d.action == Some(crate::model::Action::Use)
-                && d.entry.short.as_ref().is_some_and(|s| s.name == "git")
+        model(cx).waiting().iter().enumerate().find_map(|(i, w)| {
+            let j = w.choices.iter().position(|(t, _)| t == "acme")?;
+            (w.name == "git").then_some(i * crate::panel::QUESTION_CHOICES + j)
         })
     };
     until(cx, "asked about git", Duration::from_secs(20), |cx| {
@@ -378,15 +381,24 @@ pub(crate) fn short_name(cx: &mut TestAppContext, look_up: &dyn Fn(&'static str)
             false
         }
     });
+    assert_eq!(
+        model(cx).shape().badged().1,
+        Some(crate::tray::Badge::Warning),
+        "the bird says it needs you"
+    );
     let p = panel(cx);
     let i = asked(cx).unwrap();
-    click(cx, p, ("act", i));
+    click(cx, p, ("question-use", i));
     until(cx, "git is ACME's", Duration::from_secs(10), |cx| {
         model(cx)
             .log
             .iter()
             .any(|e| e.message == "git is git.acme.internal now.")
     });
+    assert!(
+        model(cx).waiting().is_empty(),
+        "the notice goes once answered"
+    );
     until(cx, "git found as ACME's", Duration::from_secs(10), |_| {
         look_up("git").iter().any(|a| a == "10.40.1.10")
     });

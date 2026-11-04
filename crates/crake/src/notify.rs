@@ -183,7 +183,10 @@ pub fn short_name(
     };
     let mut n = note(entry, Urgency::Normal, ASKED_SHOWN);
     for (i, display) in displays.iter().enumerate() {
-        n.action(&i.to_string(), &format!("Use {display}\u{2019}s"));
+        n.action(
+            &i.to_string(),
+            &format!("Use {}", crate::model::waiting::possessive(display)),
+        );
     }
     n.action("leave", "Not now");
     std::thread::spawn(move || {
@@ -293,13 +296,19 @@ mod plain {
         show(entry);
     }
 
-    /// The panel offers "Use ACME's" under the question.
+    /// The panel's notice offers "Use ACME's". The title only: a
+    /// notification shows on the lock screen, and the reason names each
+    /// company's full name for it (waiting-for-you.html).
     pub fn short_name(
         entry: &LogEntry,
         _displays: Vec<String>,
         _requests: async_channel::Sender<Request>,
     ) {
-        show(entry);
+        let mut n = crakes();
+        n.summary(&entry.message);
+        std::thread::spawn(move || {
+            let _ = n.show();
+        });
     }
 
     pub fn stopped(entry: &LogEntry, _requests: async_channel::Sender<Request>) {

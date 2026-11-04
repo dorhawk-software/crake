@@ -26,7 +26,11 @@ mod moments;
 
 #[cfg(test)]
 pub(crate) use self::moments::FIRST_ROUTE;
+/// The journeys find a question's "Use" by it.
+#[cfg(test)]
+pub(crate) use self::question::CHOICES as QUESTION_CHOICES;
 mod no_tray;
+mod question;
 mod staying;
 mod tunnels;
 mod version;
@@ -201,6 +205,7 @@ impl Render for Panel {
                         .flex_col()
                         .max_h(px(middle))
                         .overflow_y_scroll()
+                        .children(self.question_notices(model, &t, cx))
                         .children(self.version_notice(model, &t, cx))
                         .children(self.leftover_notices(model, &t, cx))
                         .children(self.staying_notices(model, &t, cx))

@@ -11,6 +11,16 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### Better
+
+- **A question Crake asks waits for you.** When a tunnel's DNS knows a short name you typed
+  (`expert`), Crake asks which tunnel's you mean, and until you choose the name doesn't open. That
+  question was one line in What Crake did, where three newer lines pushed it out of sight, and
+  nothing else said Crake was waiting. Now it's a notice at the top of the panel, with Use ACME's
+  for each tunnel that knows the name and Not now, and the bird in the menu bar wears the amber
+  triangle. The notice and the triangle go once you choose, say Not now, or after an hour. The
+  Full log's row keeps its Use buttons for the rest of the day.
+
 ### Fixed
 
 - **A short name is offered only from a tunnel that really knows it.** Some company DNS answers

@@ -43,9 +43,14 @@ impl Log {
                     host,
                 }
             });
+            let uses = r
+                .question
+                .as_ref()
+                .filter(|q| !q.choices.is_empty())
+                .map(|q| uses(&key(day, &r), q, t, cx));
             list = list.child(match routed {
                 Some(routed) => self.routed_row(r, routed, t, cx),
-                None => row(r, None, t).into_any_element(),
+                None => row(r, None, uses.map(IntoElement::into_any_element), t).into_any_element(),
             });
         }
         list
@@ -88,7 +93,7 @@ impl Log {
         .into_any_element();
         let pointed = key.clone();
         let nav_hover = t.nav_hover;
-        row(r, Some(stop), t)
+        row(r, Some(stop), None, t)
             .id(gpui_kit::SharedString::from(format!("row:{key}")))
             .when(lit, |row| {
                 // The tint runs under the list's inset to the window's edges;
@@ -139,14 +144,48 @@ fn edge(color: gpui_kit::Rgba, dx: f32) -> gpui_kit::BoxShadow {
     }
 }
 
-/// One row; `stop` takes the badge's place (a routed row's badge or "Show in").
-pub(super) fn row(r: Row, stop: Option<AnyElement>, t: &Theme) -> Div {
+/// A short name's question's "Use ACME's", one for each tunnel still up
+/// that knows it, under its reason: as the panel's row has them, while it
+/// can still be answered (waiting-for-you.html). Drawn over the row's
+/// reason.
+fn uses(
+    row: &str,
+    q: &crate::model::Question,
+    t: &Theme,
+    cx: &mut Context<Log>,
+) -> impl IntoElement + use<> {
+    let mut actions = div().flex().flex_wrap().gap(px(16.)).mt(px(6.));
+    for (tunnel, display, full) in &q.choices {
+        let request = crate::Request::UseShortName(tunnel.clone(), q.name.clone(), full.clone());
+        actions = actions.child(
+            crate::controls::action(
+                gpui_kit::SharedString::from(format!("use-short:{row}:{tunnel}")),
+                format!("Use {}", crate::model::waiting::possessive(display)),
+                t,
+            )
+            .keys()
+            .on_click(cx.listener(move |_, _, _, cx| cx.emit(Asks(request.clone()))))
+            .test_support(),
+        );
+    }
+    actions
+}
+
+/// One row; `stop` takes the badge's place (a routed row's badge or "Show
+/// in"); `under`: what goes under its reason (a question's Use actions).
+pub(super) fn row(r: Row, stop: Option<AnyElement>, under: Option<AnyElement>, t: &Theme) -> Div {
     let (mark, color) = match r.kind {
         LogKind::Routed => ("crake/mark-routed.svg", t.accent),
         LogKind::LeftAlone => ("crake/mark-left-alone.svg", t.muted),
         LogKind::Undone => ("crake/mark-undone.svg", t.muted),
         LogKind::System => ("crake/mark-system.svg", t.muted),
-        LogKind::Asked => ("crake/help.svg", t.accent),
+        // A short name's question needs you while its notice shows;
+        // nothing was decided, so it's never teal (waiting-for-you.html).
+        LogKind::Asked => match &r.question {
+            Some(q) if q.waiting => ("crake/help.svg", t.warning),
+            Some(_) => ("crake/help.svg", t.muted),
+            None => ("crake/help.svg", t.accent),
+        },
     };
     let row = div()
         .flex()
@@ -182,10 +221,21 @@ pub(super) fn row(r: Row, stop: Option<AnyElement>, t: &Theme) -> Div {
                         .text_size(px(13.))
                         .text_color(t.muted)
                         .child(crate::theme::breakable(&r.why)),
-                ),
+                )
+                .children(under),
         );
     if let Some(stop) = stop {
         return row.child(stop);
+    }
+    // A question about two tunnels' names: both tunnels' chips.
+    if let Some(q) = r.question.filter(|q| !q.tags.is_empty()) {
+        return row.child(
+            div()
+                .flex_none()
+                .flex()
+                .gap(px(6.))
+                .children(q.tags.into_iter().map(|tag| badge(tag, t))),
+        );
     }
     // A host left alone has no chip: a badge holding a dash said nothing.
     row.when(r.badge != "\u{2014}", |row| row.child(badge(r.badge, t)))

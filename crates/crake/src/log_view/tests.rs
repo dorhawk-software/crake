@@ -251,3 +251,54 @@ fn a_routed_row_shows_its_host_in_its_tunnel(cx: &mut TestAppContext) {
     w.click(gpui_kit::SharedString::from(format!("show-in:{key}")), cx);
     assert_eq!(asked.borrow().clone(), Some(want));
 }
+
+/// A short name's question (waiting-for-you.html): its row has both
+/// tunnels' tags and, while it can still be answered, "Use ACME's" and
+/// "Use Nordbank's", Not now in the panel or not; its mark is amber only
+/// while the panel's notice shows.
+#[gpui_kit::test]
+fn a_question_can_be_answered_from_its_row(cx: &mut TestAppContext) {
+    let w = open_with(cx, crate::model::demo_moment(crate::model::demo(), "short"));
+    let question = |cx: &mut TestAppContext| {
+        w.view.update(cx, |log, cx| {
+            log.days(cx).into_iter().find_map(|d| {
+                d.rows.into_iter().find_map(|r| {
+                    let key = format!("{}|{}|{}", d.title, r.time, r.text);
+                    r.question.map(|q| (key, q))
+                })
+            })
+        })
+    };
+    let (key, q) = question(cx).expect("the question's row");
+    assert_eq!(q.tags, ["ACME", "Nordbank"]);
+    assert!(q.waiting, "its notice shows");
+    let asked = std::rc::Rc::new(std::cell::RefCell::new(None));
+    let seen = asked.clone();
+    cx.update(|cx| {
+        cx.subscribe(&w.view, move |_, e: &Asks, _| {
+            *seen.borrow_mut() = Some(e.0.clone());
+        })
+        .detach()
+    });
+    w.click(
+        gpui_kit::SharedString::from(format!("use-short:{key}:nord")),
+        cx,
+    );
+    match asked.borrow().clone() {
+        Some(crate::Request::UseShortName(tunnel, short, full)) => assert_eq!(
+            (tunnel.as_str(), short.as_str(), full.as_str()),
+            ("nord", "expert", "expert.nordbank.internal")
+        ),
+        other => panic!("{other:?}"),
+    }
+    // Not now in the panel: still answerable here, no longer amber.
+    w.model.update(cx, |m, cx| {
+        let e = m.log.iter().rev().find(|e| e.short.is_some()).unwrap();
+        let key = crate::model::waiting::key(e);
+        m.not_now.insert(key);
+        cx.notify();
+    });
+    let (_, q) = question(cx).unwrap();
+    assert!(!q.waiting);
+    assert_eq!(q.choices.len(), 2);
+}

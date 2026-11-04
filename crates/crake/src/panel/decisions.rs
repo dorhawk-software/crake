@@ -193,8 +193,10 @@ impl Panel {
                     self.model.read(cx).display_of(Some(&tunnel))
                 ),
                 Action::Use => format!(
-                    "Use {}\u{2019}s",
-                    self.model.read(cx).display_of(Some(&tunnel))
+                    "Use {}",
+                    crate::model::waiting::possessive(
+                        &self.model.read(cx).display_of(Some(&tunnel))
+                    )
                 ),
             };
             let entry = d.entry.clone();
@@ -269,7 +271,7 @@ impl Panel {
             actions = actions.child(
                 crate::controls::action(
                     ("use-short", i * CHOICES + j),
-                    format!("Use {display}\u{2019}s"),
+                    format!("Use {}", crate::model::waiting::possessive(&display)),
                     t,
                 )
                 .keys()
