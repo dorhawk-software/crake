@@ -62,6 +62,18 @@ jobs:
           tool: cargo-deny,cargo-machete,cargo-llvm-cov
       - name: Lint gate
         run: scripts/lint.sh
+      # The e2e client container reads this runner's /etc/resolv.conf and
+      # its own resolved writes the stub that should point at (with
+      # crake.internal as a search domain while a tunnel is up). Some
+      # runners come with a file of their own there (resolved: "foreign"),
+      # and the short-name and keep-private scenarios then failed on every
+      # protocol (2026-11-03 and -04): Ubuntu's default link, set back.
+      - name: resolv.conf is resolved's stub
+        run: |
+          ls -l /etc/resolv.conf
+          [ "$(readlink -f /etc/resolv.conf)" = /run/systemd/resolve/stub-resolv.conf ] \
+            || sudo ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+          getent hosts github.com
       # Every test, measured (and failing when one does), then in the very
       # same build the namespace and e2e tests (nftables, policy routing, a
       # real ocserv; containers without a network). They had a job of their

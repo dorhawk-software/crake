@@ -11,6 +11,16 @@
 # CRAKE_E2E_KEEP=<folder> keeps the gateway's logs there.
 set -eu
 cd "$(dirname "$0")/.."
+# The client reads this computer's /etc/resolv.conf from its read-only
+# filesystem; pointing at resolved's stub, it gets the stub its own resolved
+# writes (search crake.internal while a tunnel is up). A file of its own
+# there sends every name past resolved, and short names and kept-private
+# names fail in ways that don't say why (CI, 2026-11-03 and -04).
+if [ "$(readlink -f /etc/resolv.conf)" != /run/systemd/resolve/stub-resolv.conf ]; then
+  echo "e2e-test: /etc/resolv.conf isn't systemd-resolved's stub ($(ls -l /etc/resolv.conf));" >&2
+  echo "  the scenarios need it: ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf" >&2
+  exit 1
+fi
 # These tests run the app headless (frames drawn by hand), so they don't need
 # the dev profile's opt-level 1, which is there for interactive GPUI stutter.
 # Building the workspace crates unoptimised cuts the crake crate's compile from
