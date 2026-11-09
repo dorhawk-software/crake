@@ -231,6 +231,16 @@ The user doesn't want development builds installed on their machine.
   scenario asks for up to 5 s and prints each miss. If it shows up again,
   craked's DNS server needs a debug line per question to say why (the
   new adapter not taking traffic yet is the guess).
+  Seen again (CI's Windows, OpenVPN, 2026-11-09), the other way round:
+  ACME's wiki.acme.internal, asked right after Globex came up, had no
+  answer (`two_companies_each_through_their_own`, which retries only
+  Globex's name). The next run passed. Still no debug line per question,
+  so the cause is unknown; that line is the next step if it comes back.
+  Same day, once: Initech's OpenVPN link through Cloudflare dropped 250 ms
+  after it came up ("lost the gateway", reconnected 3 s later), and
+  craked's DNS server gave the public answer meanwhile, as it should
+  (`a_public_name_with_a_private_address_goes_through`). The test log
+  keeps only openvpn's last lines, so why the link dropped isn't known.
   CI time (2026-10-20): Windows' gateway tests run on two runners at once
   (`windows-gateways (anyconnect)` and `(openvpn)`, split by
   CRAKE_GATEWAY_FILTER), and the scenarios' craked asks a tunnel's DNS
