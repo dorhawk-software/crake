@@ -11,6 +11,13 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### Underneath
+
+- **The libraries Crake is built on are up to date.** GPUI, which draws Crake's windows, through
+  gpui-kit 0.9 (on Linux it now follows the system's power mode); zbus 6.2.1 (between Crake and
+  its service), toml 1.2, jiff 0.2.39 and resvg 0.49 (the drawings): fixes and small additions,
+  nothing you'd notice. async-executor 1.14.1 replaces a release its authors withdrew.
+
 ## 0.18.1 (2026-11-04)
 
 ### Better

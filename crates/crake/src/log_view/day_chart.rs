@@ -210,7 +210,7 @@ impl Log {
                     .w_full()
                     .h(px(CHART_HEIGHT - 20.))
                     .cursor_grab()
-                    .on_scroll_wheel(cx.listener(|this, e: &gpui_kit::ScrollWheelEvent, _, cx| {
+                    .on_scroll(cx.listener(|this, e: &gpui_kit::ScrollEvent, _, cx| {
                         let (left, width) = this.chart_geometry.get();
                         if width <= 2. * crate::chart::INSET {
                             return;
