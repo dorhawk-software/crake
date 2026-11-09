@@ -72,7 +72,7 @@ jobs:
           exit 1
       - uses: actions/upload-artifact@v7
         with:
-          name: gateways-ready
+          name: gateways-ready-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/gateways/openvpn-ca.crt
             ${{ runner.temp }}/gateways/acme-user.p12

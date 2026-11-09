@@ -243,7 +243,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: env.HAVE_TUNNEL == 'true'
         with:
-          name: gateways-ready
+          name: gateways-ready-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/gateways/openvpn-ca.crt
             ${{ runner.temp }}/gateways/acme-user.p12

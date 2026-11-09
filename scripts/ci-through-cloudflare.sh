@@ -74,8 +74,13 @@ gateways_job() {
   gh run view "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --json jobs \
     --jq '.jobs[] | select(.name == "gateways") | .status + " " + .conclusion' 2>/dev/null || true
 }
+# The word is this attempt's own (the gateways job names it with the run's
+# attempt): a re-run of the failed jobs starts the gateways again, and the
+# first attempt's word, still in the run, let Windows' tests start before
+# they were up: every OpenVPN test "never saw connected" (2026-11-09).
+READY="gateways-ready-${GITHUB_RUN_ATTEMPT:-1}"
 i=0
-until gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n gateways-ready -D "$WORK/ready" >/dev/null 2>&1; do
+until gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n "$READY" -D "$WORK/ready" >/dev/null 2>&1; do
   i=$((i + 1))
   job=$(gateways_job)
   case "$job" in
@@ -89,7 +94,9 @@ until gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n gateways-ready
       ;;
     completed*)
       # Its artifact may land a moment after it ends: one more look.
-      gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n gateways-ready -D "$WORK/ready" >/dev/null 2>&1 && break
+      gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n "$READY" -D "$WORK/ready" >/dev/null 2>&1 && break
+      [ "${GITHUB_RUN_ATTEMPT:-1}" = 1 ] ||
+        echo "::error::The gateways job had already finished in an earlier attempt: re-running only the failed jobs doesn't start it again. Re-run all jobs."
       echo "the gateways job ended ($job) without saying they're up" >&2
       exit 1
       ;;
@@ -97,9 +104,9 @@ until gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n gateways-ready
   [ "$i" -lt "$WAIT_TRIES" ] || { echo "the gateways never said they're up (their job: ${job:-not found})" >&2; exit 1; }
   sleep 10
 done
-# A re-run of only the failed jobs finds the first attempt's word that the
-# gateways are up, but not their job, which had finished: Cloudflare then
-# answered "bad handshake" for five minutes (2026-10-21). Said at once.
+# The gateways' job ended while this waited: Cloudflare would answer "bad
+# handshake" for five minutes (2026-10-21, when a re-run of the failed jobs
+# found the first attempt's word). Said at once.
 case "$(gateways_job)" in
   completed*)
     echo "::error::The gateways job had already finished: re-running only the failed jobs doesn't start it again. Re-run all jobs."

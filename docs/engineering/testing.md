@@ -157,8 +157,10 @@ The user doesn't want development builds installed on their machine.
   would reach bob too; the package and Windows VM tests use ocserv.conf
   alone: CI's package tests failed the one run it was changed). carol
   signs in with a certificate (a PKCS#12 file from ACME's users' CA, in
-  the image; the gateways-ready artifact carries it to the Mac and
-  Windows jobs): the `anyconnect_certificate` scenarios. Found then:
+  the image; the gateways-ready-<attempt> artifact carries it to the Mac
+  and Windows jobs, named per attempt since 2026-11-09, when a re-run of
+  the failed jobs found the first attempt's and tested gateways not yet
+  up): the `anyconnect_certificate` scenarios. Found then:
   IT's files were read only with a craked.toml, which Windows' and macOS'
   installers don't ship (`Config::without_file`); the memory answerer
   (7h) took over a tunnel's names in the wrong order and was left behind
