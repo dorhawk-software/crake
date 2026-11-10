@@ -11,6 +11,8 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+## 0.18.2 (2026-11-10)
+
 ### Underneath
 
 - **The libraries Crake is built on are up to date.** GPUI, which draws Crake's windows, through
