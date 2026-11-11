@@ -11,6 +11,11 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### Fixed
+
+- **On a Mac, the window's buttons have more room.** Each header now keeps as much space after
+  them as before them, so a window's title no longer sits close to the green button.
+
 ## 0.18.2 (2026-11-10)
 
 ### Underneath

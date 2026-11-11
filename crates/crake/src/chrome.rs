@@ -20,9 +20,9 @@ pub fn system_buttons(cx: &App) -> bool {
 }
 
 /// The room macOS's three buttons take at a header's left edge, and the
-/// gap after them: the safe zone every header leaves on a Mac. 88 as in
-/// macos-window-buttons.html's log bar; 76 had left none (Traffic's title
-/// touched the green button, 2026-10-26).
+/// gap after them: the safe zone every header leaves on a Mac. 76 had left
+/// none (Traffic's title touched the green button, 2026-10-26); 88 left
+/// 10 px after them against 18 before them (2026-11-11); 96 matches.
 pub const BUTTONS_WIDTH: f32 = BUTTONS_LEFT + BUTTONS_SPAN + BUTTONS_CLEAR;
 /// A window header's height: the buttons sit centred on it.
 pub const HEADER_HEIGHT: f32 = 56.;
@@ -30,11 +30,11 @@ pub const HEADER_HEIGHT: f32 = 56.;
 const BUTTON: f32 = 14.;
 /// From the window's left edge to the first button.
 const BUTTONS_LEFT: f32 = 18.;
-/// From the first button's left edge to the last one's right (measured on
-/// macOS 26).
-const BUTTONS_SPAN: f32 = 54.;
-/// Kept clear after the last button.
-const BUTTONS_CLEAR: f32 = 16.;
+/// From the first button's left edge to the last one's right: three 14 px
+/// buttons 9 px apart (measured on macOS 26).
+const BUTTONS_SPAN: f32 = 60.;
+/// Kept clear after the last button: as much as before the first.
+const BUTTONS_CLEAR: f32 = BUTTONS_LEFT;
 
 /// Where macOS draws its buttons: centred on a header `HEADER_HEIGHT` tall.
 pub fn traffic_lights() -> Option<Point<Pixels>> {
