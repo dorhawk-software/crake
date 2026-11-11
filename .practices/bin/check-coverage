@@ -67,7 +67,10 @@ if ! tests=$(cargo test --workspace 2>&1); then
     printf 'cargo test failed:\n%s\n' "$tests"
     exit 1
 fi
-printf '%s\n' "$tests" | grep -E '^(     Running|test result:)'
+# Which test binaries ran, for CI's log; quiet locally (the hooks).
+if [ -n "${CI:-}" ]; then
+    printf '%s\n' "$tests" | grep -E '^(     Running|test result:)'
+fi
 if [ -s "$PRACTICES_SKIP_LOG" ]; then
     echo "skipped on this system: $(wc -l <"$PRACTICES_SKIP_LOG" | tr -d ' ')"
     sed 's/^/  /' "$PRACTICES_SKIP_LOG"
