@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# git's commit-msg hook: no session IDs, no private names.
+exec "$(git rev-parse --show-toplevel)/.practices/bin/check-commit-msg" "$1"

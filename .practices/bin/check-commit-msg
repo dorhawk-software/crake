@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# git's commit-msg hook: a commit message carries no agent session ID or
+# session link (a Co-Authored-By line is fine), and no private names
+# (check-private).
+#
+#   .practices/bin/check-commit-msg MSG_FILE
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+msg=${1:?usage: check-commit-msg MSG_FILE}
+[ -f "$msg" ] || { echo "check-commit-msg: no message file $msg" >&2; exit 2; }
+
+if grep -v '^#' "$msg" | grep -inE '^[A-Za-z-]+-session(-id)?:|claude\.ai/code/session_|session_[0-9A-Za-z]{16,}' >&2; then
+    echo "check-commit-msg: no session IDs or session links in commit messages (above)." >&2
+    exit 1
+fi
+exec "$PRACTICES_BIN/check-private" "$msg"

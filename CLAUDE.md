@@ -26,11 +26,10 @@ visual identity; Crake's is documented in `design/DESIGN.md`.
   data, designs or these notes. Use ACME, Nordbank, Globex, Initech,
   `*.example` / `*.internal` names and documentation addresses
   (192.0.2.x, 198.51.100.x, 203.0.113.x). What was learned on the real
-  gateways lives in `CLAUDE.local.md` (git-ignored). `scripts/check-private.sh`
-  (run by `scripts/lint.sh` and the pre-commit hook) refuses the names
-  listed in `dev/private-terms` (git-ignored); install the hooks with
-  `ln -s ../../scripts/pre-commit.sh .git/hooks/pre-commit` and
-  `ln -s ../../scripts/check-private.sh .git/hooks/commit-msg`.
+  gateways lives in `CLAUDE.local.md` (git-ignored).
+  `.practices/bin/check-private` (run by the lint gate and both git hooks;
+  it fails closed) refuses the names listed in `dev/private-terms`
+  (git-ignored). Once per clone: `.practices/bin/install-hooks`.
 
 ## Read first
 
@@ -281,8 +280,10 @@ one line each:
 - winget for Windows; Undo in macOS notifications.
 - No-tray's one-line command: no scrollbar (it would cover the text).
 - OpenVPN 3 sessions whose device openvpn3 doesn't name, under the package.
-- A shared practices repository for dorhawk.software (the user's idea, once
-  Crake is stable).
+- Rust toolchain pinned in rust-toolchain.toml (the practices' rule):
+  each package build's own toolchain checked first.
+- The private names in CI: only with a PRIVATE_TERMS secret (the user's
+  call); until then CI warns, the hooks check locally.
 - IPv6-only hosts on a network without IPv6: decided, left as it is.
 - Windows on ARM64: built; not yet a real Windows on ARM.
 - Browser sign-in on Windows (openconnect without `--external-browser`).
@@ -319,15 +320,22 @@ user now works on a Mac.
 ## Lints are errors
 
 Any lint stops the build; fix it and build again, never silence it.
+The checks come from the shared practices kit
+(github.com/dorhawk-software/practices, the user's, 2026-11-11, grown
+from this file): `.practices/bin/` is synced from there by pull request
+(never edit it here; change it there), and what is Crake's own is
+`.practices/config` (unsafe in crake-os, the coverage harness left out),
+`.practices/coverage-floors` and `.practices/lint.d/` (the GPUI patch
+check, the magic numbers). Read .practices/README.md.
 - `Cargo.toml` `[workspace.lints]`: every rustc warning (unused imports
   included) and every clippy lint is `deny`.
-- `scripts/lint.sh`: `cargo fmt --check` (run `cargo fmt`), clippy (all
+- `.practices/bin/lint` (the gate): `cargo fmt --check` (run `cargo fmt`), clippy (all
   targets), `cargo deny check` (`deny.toml`:
   known vulnerabilities anywhere, unmaintained crates Crake uses directly,
   licences compatible with GPL-3.0-or-later, crates.io only) and
   `cargo machete` (unused dependencies). Tools in `~/.cargo/bin`.
 - Size (requested): at most 700 lines of code per source file (its tests
-  not counted) and 1000 per integration test file (`scripts/check-size.sh`),
+  not counted) and 1000 per integration test file (`.practices/bin/check-size`),
   at most 200 lines per function (`clippy::too_many_lines`, `clippy.toml`).
   Only an inline test module (`#[cfg(test)]` over `mod x {`) isn't
   counted: until 2026-10-19 any `#[cfg(test)]` was taken as the start of
@@ -337,7 +345,7 @@ Any lint stops the build; fix it and build again, never silence it.
   pattern of `manager/`, `new_tunnel/`, `settings_view/`, `panel/`), or a
   function's parts into named helpers.
 - Magic numbers (requested 2026-10-12): `crates/lint-literals`, run by
-  `scripts/lint.sh`, fails on a number in a crate's own code (not its
+  the gate (`.practices/lint.d/magic-numbers`), fails on a number in a crate's own code (not its
   tests) that has no name. Name it (a const, a static, an enum
   discriminant), or keep it with `// literal: <reason>` on its line or
   alone on the line above; a reason alone above an item (fn, impl,
@@ -346,17 +354,22 @@ Any lint stops the build; fix it and build again, never silence it.
   0, 1, 2, and UI layout inside `px(..)`/`rgb(..)`/`rgba(..)` (it mirrors
   design/screens and DESIGN.md's tokens). It follows each crate's module
   tree from its roots, so `#[cfg(test)]` modules are left out. A crate
-  is in the list in lint.sh: every crate (crake-proto, craked, crake and
+  is in the list in lint.d/magic-numbers: every crate (crake-proto, craked, crake and
   the tool itself) is clean.
-- `.claude/settings.json`: a PostToolUse hook runs `scripts/lint.sh` after
-  every `cargo build` / `cargo test` from Claude Code and blocks on failure.
-- Coverage (`scripts/check-coverage.sh`, cargo-llvm-cov, about a minute):
+- `.claude/settings.json`: a PostToolUse hook (`.practices/bin/claude-hook`)
+  runs the gate after every building cargo command from Claude Code
+  (build, test, check, clippy, run) and blocks on failure; until
+  2026-11-11 only after `cargo build` / `cargo test`. It also keeps the
+  disk's floor (`.practices/bin/disk-guard`).
+- Coverage (`.practices/bin/check-coverage`, cargo-llvm-cov, about a minute):
   each crate's share of lines run by the tests stays at or above its floor
   (crake 73%, craked 63%, crake-proto 98%, lint-literals 82% as of Oct 2026;
-  macOS has lower floors of its own, in the script; crake's
+  macOS has lower floors of its own; all in `.practices/coverage-floors`,
+  and CI refuses a floor lowered against the base; crake's
   without the tests that need a real gateway, the scenario suite, e2e tests,
   journeys and their helpers: test code measured by running it, 2026-10-20). The pre-commit
-  hook runs it when Rust files are committed. Raise a floor as tests grow;
+  hook runs the gate and coverage when Rust files are committed (until
+  2026-11-11 coverage only). Raise a floor as tests grow;
   never lower one to let a change through.
 
 ## Testing without installing anything

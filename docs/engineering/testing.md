@@ -285,10 +285,10 @@ The user doesn't want development builds installed on their machine.
   own, the slowest (~15 min, ~11 of them compiling: `check`'s coverage
   build is instrumented, in another folder, and a `-p crake` build unifies
   dependencies' features differently, so nothing was reused).
-  `scripts/check-coverage.sh` now measures the cargo-llvm-cov "show-env"
+  `.practices/bin/check-coverage` now measures the cargo-llvm-cov "show-env"
   way (plain `cargo test --workspace`, instrumented, in
   target/llvm-cov-target, opt-level 0) and then runs the scripts it's given
-  in that very build (`CRAKE_CARGO_SCOPE=--workspace`): they build nothing.
+  in that very build (`PRACTICES_CARGO_SCOPE=--workspace`): they build nothing.
   Their binaries in containers write no coverage (`LLVM_PROFILE_FILE=
   /dev/null`). Locally the scripts work as before. **GitHub's 10 GB can't be raised** (asked 2026-10-12: same for
   public/OSS and private, no paid tier), so the Nix store (the 3.3 GB
@@ -300,7 +300,7 @@ The user doesn't want development builds installed on their machine.
   change the Rust caches were saved again under the new key while the old
   ones stayed, and together they pushed out the packages cache, so 0.7.0's
   .deb was built from scratch (17 min instead of 7). CI's `caches` job, on
-  main after the jobs that save, runs `scripts/prune-caches.sh`: per kind
+  main after the jobs that save, runs `.practices/bin/prune-caches`: per kind
   (the key without its trailing hashes and dates) only the newest stays.
   **The package cache is swept before it's saved (2026-10-17):** it had
   grown to 6 GB (from 2.6) and pushed out the macOS cache (macOS then
@@ -308,7 +308,7 @@ The user doesn't want development builds installed on their machine.
   to week, and nothing was ever removed from the two target folders in
   it, so each compiler (rustup's 1.99.0 and 1.99.1 side by side, Arch's
   rebuilds), each version of Crake's own crates and each replaced crate
-  stayed. `scripts/sweep-target.sh`, run by both package builds in their
+  stayed. `.practices/bin/sweep-target`, run by both package builds in their
   containers, keeps only the units Cargo's JSON says the build used
   (fresh ones included; the Arch build's PKGBUILD stays the AUR's, a
   `cargo` wrapper first on PATH asks for the JSON) and drops the unpacked

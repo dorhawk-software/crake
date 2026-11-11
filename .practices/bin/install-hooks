@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Points git at the project's hooks in .practices/hooks (pre-commit,
+# commit-msg). A clone's git settings aren't committed, so every clone
+# runs this once; the lint gate fails until it has.
+#
+#   .practices/bin/install-hooks           # install
+#   .practices/bin/install-hooks --check   # fail if not installed
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+want=.practices/hooks
+have=$(git config --get core.hooksPath || true)
+if [ "${1:-}" = --check ]; then
+    [ "$have" = "$want" ] && exit 0
+    echo "git hooks aren't installed (core.hooksPath is '${have:-unset}'): run .practices/bin/install-hooks"
+    exit 1
+fi
+git config core.hooksPath "$want"
+echo "git hooks: $want"

@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# No Rust file grows past what a person can hold in their head: at most
+# SIZE_CODE lines of code in a source file (700; its inline test module
+# not counted) and SIZE_TESTS in an integration test file (1000). Past
+# that, split it by topic. Functions: clippy::too_many_lines, its limit in
+# clippy.toml.
+#
+#   .practices/bin/check-size
+#
+# A project adopting the limit with files already past it lists them in
+# .practices/size-allowlist ("path lines" per line). The list only
+# shrinks: a listed file may not grow, a file that shrank must have its
+# number lowered, and one back under the limit must leave the list.
+#
+# The test module starts at a #[cfg(test)] (or #[cfg(all(test, ...))])
+# just above a `mod name {`. Not at any #[cfg(test)]: in Crake until
+# 2026-10-19 one over `mod tests;` near a file's top exempted everything
+# below it, and a file reached 736 lines unseen.
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+allowlist=.practices/size-allowlist
+listed() {
+    [ -f "$allowlist" ] || return 0
+    awk -v f="$1" '$1 == f { print $2; exit }' "$allowlist"
+}
+
+fail=0
+seen=$(mktemp)
+trap 'rm -f "$seen"' EXIT
+while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    total=$(wc -l <"$f" | tr -d ' ')
+    tests_at=$(awk '/^#\[cfg\((all\()?test[,)]/ { at = NR }
+        /^(pub(\([a-z]+\))? )?mod [a-z_0-9]+ \{/ && at && NR - at <= 3 { print at; exit }' "$f")
+    code=$total
+    [ -n "$tests_at" ] && code=$((tests_at - 1))
+    case "$f" in
+        tests/* | */tests/*) limit=$SIZE_TESTS ;;
+        *) limit=$SIZE_CODE ;;
+    esac
+    max=$(listed "$f")
+    if [ -n "$max" ]; then
+        echo "$f" >>"$seen"
+        if [ "$code" -le "$limit" ]; then
+            echo "$f: $code lines, under the limit of $limit now: remove it from $allowlist."
+            fail=1
+        elif [ "$code" -gt "$max" ]; then
+            echo "$f: $code lines, more than the $max it's allowed ($allowlist): split it by topic."
+            fail=1
+        elif [ "$code" -lt "$max" ]; then
+            echo "$f: shrank to $code lines: lower its number in $allowlist to $code."
+            fail=1
+        fi
+    elif [ "$code" -gt "$limit" ]; then
+        echo "$f: $code lines (at most $limit): split it by topic."
+        fail=1
+    fi
+done < <(rust_files)
+
+if [ -f "$allowlist" ]; then
+    while read -r f _; do
+        case "$f" in '' | '#'*) continue ;; esac
+        if ! grep -qxF -- "$f" "$seen"; then
+            echo "$allowlist: $f isn't a Rust file here any more: remove it."
+            fail=1
+        fi
+    done <"$allowlist"
+fi
+exit $fail

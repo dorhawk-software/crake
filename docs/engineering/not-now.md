@@ -89,7 +89,7 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   Manager, the service manager, console events and sessions; with `app`,
   monitors, window placement and frames by the handle's value). crake,
   craked, crake-hook, crake-proto and lint-literals `#![forbid(unsafe_code)]`;
-  `scripts/check-unsafe.sh` (lint gate) fails on `unsafe` anywhere else,
+  `.practices/bin/check-unsafe` (lint gate) fails on `unsafe` anywhere else,
   tests included (they no longer set the environment: fake scripts get
   their paths written in). Not yet: unit tests of crake-os's Windows and
   macOS parts on their CI runners beyond what the journeys exercise.
@@ -151,40 +151,18 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   company is dropping. Options if it matters: the capability and an
   AppArmor rule (a wide permission for one case), or matching the
   session's address to a tun device's.
-- **A shared practices repository for dorhawk.software (the user's idea,
-  2026-10-16; written down so it isn't lost, to do once Crake is stable).**
-  What the user has in mind, in their words' spirit: Crake grew a lot of
-  hard-won engineering practice (lints as hard errors, a magic-number lint,
-  file and function size limits, coverage floors that only rise, a journey
-  regression suite on every supported system, tests that never touch the
-  developer's machine, split and cached CI, pruned caches, two-layer Nix
-  dependency builds, release scripts that refuse an empty changelog, a
-  hand-written changelog in the product's voice, design proposals before UI
-  changes, "write down what we don't do now", nice'd builds, never
-  `nix path:` on a repo with target/...). That knowledge should outlive
-  Crake and help the sibling apps: tern (a Rust/GPUI mail client, on hold
-  until Crake is stable) and Obálka (TypeScript, React Native, which has
-  tried good patterns of its own). The plan:
-  1. A new **public** repository under dorhawk-software describing the
-     practices: each one with what it is, why it's worth it (the incident
-     or cost that taught it, e.g. the 328 GB disk fill, the cache
-     evictions), how to apply it, and how to check it's applied.
-     Actionable, not essays.
-  2. **Structure: common plus per language.** Practices that hold anywhere
-     (changelog discipline, deferrals written down, design proposals,
-     release gates, CI caching ideas, privacy rules for public repos) in a
-     common part; Rust specifics (clippy deny, lint-literals, cargo deny,
-     machete, llvm-cov floors, GPUI patterns) and TypeScript/React Native
-     specifics (from Obálka) in their own parts, with room for more.
-  3. **Central management:** project repositories register with it (or
-     hook into it), and when the practices change, the change reaches every
-     registered project (e.g. a workflow opening a pull request there), so
-     the practices are available to future agents in each repository as
-     skills, CLAUDE.md sections and checks, not just as a document.
-  4. **Usable beyond dorhawk.software:** any repository could adopt it as
-     its baseline, like a runbook of what was learned. How the hook works
-     (a template, a GitHub Action, a CLI, a skills package) is to be
-     designed when we start; this note is the reminder of the intent.
+- **Rust toolchain pinned (the shared practices' rule; not yet here,
+  2026-11-11).** The practices pin the toolchain in rust-toolchain.toml
+  (a new stable's clippy lints once broke CI on a day nothing changed:
+  ba10f9e). Crake doesn't yet: its package builds each take their own
+  toolchain (the .deb container's rustup, Arch's rust, nixpkgs' for Nix),
+  and a pinned file changes what each of them builds with. Each needs
+  checking first; then the weekly rust-toolchain-bump.yml.
+- **The private names in CI (2026-11-11).** CI's lint gate checks the
+  names in dev/private-terms only when the repository has them as the
+  PRIVATE_TERMS secret; until the user decides to store them there, the
+  step warns that they weren't checked (the hooks check every commit
+  locally).
 - **IPv6 hosts on a network without IPv6 (Linux; found 2026-10-20 by
   the scenario suite).** Crake routes by mark, after the system's own
   route lookup; on a network with no IPv6 route at all (much office

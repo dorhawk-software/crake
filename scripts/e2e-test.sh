@@ -29,10 +29,10 @@ fi
 : "${CARGO_PROFILE_DEV_OPT_LEVEL:=0}"
 export CARGO_PROFILE_DEV_OPT_LEVEL
 # shellcheck disable=SC2086
-cargo build -q ${CRAKE_CARGO_SCOPE:--p craked} --bin crake-hook
+cargo build -q ${PRACTICES_CARGO_SCOPE:--p craked} --bin crake-hook
 HOOK=${CARGO_TARGET_DIR:-$PWD/target}/debug/crake-hook
 # shellcheck disable=SC2086
-BIN=$(cargo test ${CRAKE_CARGO_SCOPE:--p crake} --no-run --message-format=json 2>/dev/null \
+BIN=$(cargo test ${PRACTICES_CARGO_SCOPE:--p crake} --no-run --message-format=json 2>/dev/null \
   | sed -n 's/.*"executable":"\([^"]*\/deps\/crake-[^"]*\)".*/\1/p' | head -n1)
 [ -n "$BIN" ] || { echo "could not build the tests" >&2; exit 1; }
 docker build -q -t crake-e2e-gateway scripts/e2e >/dev/null

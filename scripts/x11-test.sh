@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 : "${CARGO_PROFILE_DEV_OPT_LEVEL:=0}"
 export CARGO_PROFILE_DEV_OPT_LEVEL
 # shellcheck disable=SC2086
-BIN=$(cargo test ${CRAKE_CARGO_SCOPE:--p crake} --test x11_scale --no-run --message-format=json 2>/dev/null \
+BIN=$(cargo test ${PRACTICES_CARGO_SCOPE:--p crake} --test x11_scale --no-run --message-format=json 2>/dev/null \
   | sed -n 's/.*"executable":"\([^"]*x11_scale-[^"]*\)".*/\1/p')
 [ -n "$BIN" ] || { echo "could not build the test" >&2; exit 1; }
 . /etc/os-release

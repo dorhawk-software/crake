@@ -1,0 +1,21 @@
+# Crake's settings for the practices kit in .practices/bin (the defaults:
+# .practices/bin/lib.sh; what each means: dorhawk-software/practices).
+
+# The vendored GPUI patch isn't Crake's own code.
+EXCLUDE=':!vendor'
+
+# Unsafe code lives in crates/crake-os alone, behind safe functions
+# (CLAUDE.md, "the unsafe layer"); every other crate forbids it.
+UNSAFE_ALLOWED='crates/crake-os'
+
+# dev/private-terms (git-ignored) lists the user's clients' names, hosts
+# and addresses: CLAUDE.md's Git rules.
+PRIVATE_TERMS=dev/private-terms
+
+# The tests that need a real gateway (CRAKE_E2E: the scenario suite, the
+# e2e tests, the journeys, the gateway tests and their helpers) are test
+# code `cargo test` can't run, measured by running them: left out of the
+# share (2026-10-20, when the scenario suite's growth alone took crake
+# under its floor; the floor then rose from 66 to 73, what crake's own
+# code had without them).
+COVERAGE_EXCLUDE='^crates/crake/src/(scenarios/|e2e_|journey_|gateway_tests/|windows_tests|windows_journey|macos_journey|test_app|journey_kit)'

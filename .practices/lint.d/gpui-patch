@@ -1,0 +1,4 @@
+#!/bin/sh
+# Crake's patched GPUI is the one Cargo builds: a [patch] that no longer
+# matches is only a Cargo warning (CLAUDE.md, UI implementation notes).
+exec scripts/check-gpui-patch.sh

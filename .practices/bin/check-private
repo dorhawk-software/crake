@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Nothing customer-specific gets committed: refuses files (as staged, as
+# they are, and new ones) and commit messages that match any pattern in
+# the project's private terms (PRIVATE_TERMS, by default dev/private-terms:
+# a git-ignored list of clients' names, hosts and addresses, one PCRE
+# pattern per line, # for comments).
+#
+#   .practices/bin/check-private            # the files
+#   .practices/bin/check-private MSG_FILE   # a commit message
+#
+# It fails closed. Without the terms file it refuses, unless the project
+# says it has no such names (PRIVATE_TERMS=none in .practices/config), or
+# CI gives the patterns (PRACTICES_PRIVATE_TERMS, from a secret), or it
+# runs in CI with no secret (a fork, Dependabot): then it says it skipped.
+# A terms file git doesn't ignore is refused: it would be committed.
+#
+# git grep does every search: its -P is PCRE on every system (macOS'
+# grep has no -P), and what it can't search is refused, never taken as
+# clean. In Crake until 2026-10-26 this used GNU grep -P, and on a Mac it
+# let every commit through.
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+[ "$PRIVATE_TERMS" = none ] && exit 0
+terms=$PRIVATE_TERMS
+if [ ! -f "$terms" ]; then
+    if [ -n "${PRACTICES_PRIVATE_TERMS:-}" ]; then
+        terms=$(mktemp)
+        trap 'rm -f "$terms"' EXIT
+        printf '%s\n' "$PRACTICES_PRIVATE_TERMS" >"$terms"
+    elif [ -n "${CI:-}" ]; then
+        echo "check-private: skipped, this CI run has no private terms (no secret: a fork, Dependabot, or it isn't set)."
+        exit 0
+    else
+        echo "check-private: no $terms. Create it (git-ignored) with the names that must never be committed;"
+        echo "a file with only comments says there are none. Or set PRIVATE_TERMS=none in .practices/config."
+        exit 1
+    fi
+elif ! git check-ignore -q "$terms"; then
+    echo "check-private: $terms isn't git-ignored, so it would be committed. Add it to .gitignore."
+    exit 1
+fi
+
+args=()
+while IFS= read -r p || [ -n "$p" ]; do
+    [[ $p == '#'* || $p =~ ^[[:space:]]*$ ]] && continue
+    args+=(-e "$p")
+done <"$terms"
+[ ${#args[@]} -gt 0 ] || exit 0
+
+found=0
+# One search: git grep's options up to `--`, then the paths. 0 found,
+# 1 nothing, anything else couldn't search: refused.
+look() {
+    # Never empty: bash 3.2 calls an empty array unbound.
+    local opts=(-P -i -n -I)
+    while [ $# -gt 0 ] && [ "$1" != -- ]; do
+        opts+=("$1")
+        shift
+    done
+    git grep "${opts[@]}" "${args[@]}" "$@" >&2
+    case $? in
+        0) found=1 ;;
+        1) ;;
+        *)
+            echo "check-private: couldn't search (above), so nothing may be committed." >&2
+            exit 2
+            ;;
+    esac
+}
+
+if [ $# -ge 1 ]; then
+    [ -f "$1" ] || { echo "check-private: no message file $1" >&2; exit 2; }
+    # Without its comments, in a folder of its own: git grep searches no
+    # file outside the folder it starts in.
+    msg=$(mktemp -d)
+    trap 'rm -rf "$msg"' EXIT
+    grep -v '^#' "$1" >"$msg/message"
+    (cd "$msg" && git grep --no-index -P -i -n -I "${args[@]}" -- message) >&2
+    case $? in
+        0) echo "check-private: the commit message names a client (see above)." >&2 ;;
+        1) exit 0 ;;
+        *) echo "check-private: couldn't search the commit message (above)." >&2 ;;
+    esac
+    exit 1
+fi
+
+read -r -a spec <<<"$EXCLUDE"
+look --cached -- ${spec[@]+"${spec[@]}"}
+look -- ${spec[@]+"${spec[@]}"}
+new=()
+while IFS= read -r -d '' f; do new+=("$f"); done < <(git ls-files --others --exclude-standard -z)
+[ ${#new[@]} -eq 0 ] || look --no-index -- "${new[@]}"
+if [ $found = 1 ]; then
+    echo "check-private: client names, hosts or addresses above must not be committed." >&2
+    exit 1
+fi
+exit 0

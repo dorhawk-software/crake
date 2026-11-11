@@ -1,6 +1,6 @@
 //! `lint-literals crates/<crate>...`: the magic numbers in each crate's own
 //! code (not its tests), one per line, and a failing exit if there are any.
-//! Run by scripts/lint.sh, so they fail the build like any other lint.
+//! Run by .practices/bin/lint, so they fail the build like any other lint.
 //!
 //! A number may stay as it is when it is named (a const, a static, an enum
 //! discriminant), when it is 0, 1 or 2, when it is UI layout from the design

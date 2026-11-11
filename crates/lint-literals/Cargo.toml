@@ -1,6 +1,6 @@
 [package]
 name = "lint-literals"
-description = "Finds magic numbers in Crake's own code (scripts/lint.sh)."
+description = "Finds magic numbers in Crake's own code (.practices/bin/lint)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

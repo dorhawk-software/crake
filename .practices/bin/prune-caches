@@ -1,0 +1,27 @@
+#!/bin/sh
+# Deletes the default branch's GitHub Actions caches that a newer one of
+# the same kind replaced. A cache's kind is its key without the trailing
+# hashes: rust-cache's "v0-rust-linux-Linux-x64-<env>-<Cargo.lock>" is
+# "v0-rust-linux-Linux-x64". After a Cargo.lock change the old ones are
+# never restored again, yet they count toward GitHub's 10 GB per
+# repository; in Crake on 2026-10-14 they pushed out the packages cache
+# and a .deb was built from scratch (17 min, not 7). The newest of each
+# kind stays. Keep a kind's own name free of a trailing "-<hex>" part
+# (write versions with dashes: 1-99-1, not 1.99.1 if it could look hex).
+#
+#   .practices/bin/prune-caches [--dry-run]   (GH_TOKEN with actions: write)
+set -eu
+DRY=
+[ "${1:-}" = --dry-run ] && DRY=1
+REPO=${GITHUB_REPOSITORY:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}
+BRANCH=${PRACTICES_CACHE_BRANCH:-$(gh repo view "$REPO" --json defaultBranchRef --jq .defaultBranchRef.name)}
+gh cache list -R "$REPO" --ref "refs/heads/$BRANCH" --limit 100 \
+    --json id,key,createdAt,sizeInBytes \
+    --jq 'map(. + {kind: (.key | sub("(-[0-9a-f]+)+$"; ""))})
+          | group_by(.kind)[]
+          | sort_by(.createdAt) | reverse | .[1:][]
+          | "\(.id) \(.sizeInBytes) \(.key)"' |
+    while read -r id size key; do
+        echo "replaced: $key ($((size / 1000000)) MB)"
+        [ -n "$DRY" ] || gh cache delete -R "$REPO" "$id"
+    done

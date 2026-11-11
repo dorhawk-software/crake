@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Keeps at least DISK_FLOOR_GB (300) free on the disk the project's build
+# folder is on. In Crake (2026-10-19) the build folder filled a 937 GB disk
+# a second time while an agent worked, and the person's own work stopped.
+# Under the floor it clears the compiler's incremental caches (cheap to
+# lose); if that isn't enough it fails, saying what takes the room, so
+# whoever is building stops and asks before going on.
+#
+#   .practices/bin/disk-guard
+#
+# The build folder is cargo's: target/, or build-dir where a cargo config
+# moves the intermediate files (to an external disk, say). Claude Code runs
+# this after every shell command (claude-hook).
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+build=$ROOT/target
+if command -v jq >/dev/null; then
+    meta=$(cargo metadata --format-version 1 --no-deps --offline 2>/dev/null) &&
+        build=$(printf '%s' "$meta" | jq -r '.build_directory // .target_directory')
+fi
+where=$build
+while [ ! -d "$where" ]; do where=$(dirname "$where"); done
+# POSIX df (-Pk: 1024-byte blocks, "Available" in column 4); GNU's
+# -BG and --output aren't in macOS' df.
+free_gb() { df -Pk "$where" | awk 'NR == 2 { print int($4 / 1024 / 1024) }'; }
+
+[ "$(free_gb)" -ge "$DISK_FLOOR_GB" ] && exit 0
+for dir in "$build"/*/incremental "$build"/*/*/incremental; do
+    [ -d "$dir" ] && rm -rf "$dir"
+done
+free=$(free_gb)
+if [ "$free" -ge "$DISK_FLOOR_GB" ]; then
+    echo "disk: cleared the incremental caches; ${free} GB free again."
+    exit 0
+fi
+printf 'disk: %s GB free on %s, under the %s GB floor. Stop and ask before building more.\nWhat the build takes:\n%s\n' \
+    "$free" "$where" "$DISK_FLOOR_GB" "$(du -sh "$build"/* 2>/dev/null | sort -rh | head -n 6)"
+exit 1

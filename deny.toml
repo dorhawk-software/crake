@@ -1,4 +1,4 @@
-# cargo-deny: what Crake's dependencies may be. Run by scripts/lint.sh;
+# cargo-deny: what Crake's dependencies may be. Run by .practices/bin/lint;
 # any finding fails it.
 
 [graph]

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Claude Code hook (PostToolUse on Bash). After every command: the disk's
+# floor (disk-guard). After a cargo command that builds (build, test,
+# check, clippy, run, nextest): the lint gate. A failure exits 2, which
+# Claude Code hands back to the agent as an error to fix before going on.
+#
+# In .claude/settings.json (or through the practices plugin):
+#   "PostToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command",
+#     "command": "\"$CLAUDE_PROJECT_DIR\"/.practices/bin/claude-hook", "timeout": 900 }] }]
+set -uo pipefail
+bin=$(cd "$(dirname "$0")" && pwd)
+input=$(cat)
+
+# The command run; without jq or python3, the whole input (a cargo word in
+# the output then runs the gate once more than needed: never less).
+if command -v jq >/dev/null; then
+    command=$(printf '%s' "$input" | jq -r '.tool_input.command // ""' 2>/dev/null) || command=$input
+elif command -v python3 >/dev/null; then
+    command=$(printf '%s' "$input" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tool_input",{}).get("command",""))' 2>/dev/null) || command=$input
+else
+    command=$input
+fi
+
+if ! said=$("$bin/disk-guard" 2>&1); then
+    printf '%s\n' "$said" >&2
+    exit 2
+fi
+printf '%s\n' "$command" |
+    grep -qE '(^|[;&|( ]|nice -n [0-9]+ )cargo( \+[^ ]+)? +(build|b|test|t|check|c|clippy|run|r|nextest)( |$)' ||
+    exit 0
+if ! out=$(nice -n 19 "$bin/lint" 2>&1); then
+    printf 'Lint gate failed: fix these, then build again.\n\n%s\n' "$out" >&2
+    exit 2
+fi
+exit 0

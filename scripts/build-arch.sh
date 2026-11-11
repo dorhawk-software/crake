@@ -13,7 +13,7 @@ B=$PWD/target/arch
 rm -rf "$B" && mkdir -p "$B/build"
 git archive --format=tar.gz --prefix="crake-$VERSION/" HEAD > "$B/build/crake-$VERSION.tar.gz"
 cp packaging/arch/PKGBUILD packaging/arch/crake.install "$B/build/"
-cp scripts/sweep-target.sh "$B/"
+cp .practices/bin/sweep-target "$B/sweep-target.sh"
 # The PKGBUILD is the AUR's, as is: inside the container its cargo build
 # is asked for JSON (what it used, for sweep-target.sh), in makepkg's own
 # environment, by this cargo first on PATH.

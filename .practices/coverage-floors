@@ -1,0 +1,11 @@
+# Lines covered, in percent, per crate: at or above its floor, raised as
+# the tests grow, never lowered (.practices/bin/check-coverage). macOS has
+# floors of its own, first measured there 2026-10-26: its system code runs
+# in no test without root (tests/macos.rs and the journey run as root in
+# CI), and Linux's own code isn't built there. CI holds Linux's.
+# crate folder         linux  macos
+crates/crake           73     67
+crates/craked          63     44
+crates/crake-os        70     41
+crates/crake-proto     98     98
+crates/lint-literals   82     82

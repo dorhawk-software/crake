@@ -3,7 +3,7 @@
 # vendored copy (no `source`, it's a path), at the version GPUI asks for.
 # Otherwise Cargo quietly drops the [patch] (a warning, not an error) and
 # builds the unpatched crate from crates.io: the tray panel's X11 placement
-# would be gone with every test still green. Run by scripts/lint.sh.
+# would be gone with every test still green. Run by .practices/bin/lint.
 set -eu
 cd "$(dirname "$0")/.."
 # Once upstream has the change, nothing is vendored and nothing to check.

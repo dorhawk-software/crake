@@ -316,8 +316,8 @@ Tests and checks:
 cargo test                                    # unit, lifecycle, D-Bus and headless window tests
 scripts/e2e-test.sh                           # the app and craked end to end, the journey suite included
 scripts/netns-test.sh                         # real nftables and routing, in a throwaway container
-scripts/lint.sh                               # rustfmt, clippy, cargo-deny, cargo-machete, private names, sizes, magic numbers, unsafe only in crake-os
-scripts/check-coverage.sh                     # each crate's tested share of lines stays above its floor
+.practices/bin/lint                           # rustfmt, clippy, cargo-deny, cargo-machete, private names, sizes, magic numbers, unsafe only in crake-os
+.practices/bin/check-coverage                 # each crate's tested share of lines stays above its floor
 scripts/build-deb.sh                          # the .deb, built in an Ubuntu 22.04 container
 scripts/build-rpm.sh                          # the RPM for Fedora, from the same files
 scripts/build-arch.sh                         # the Arch package, from source in an Arch container

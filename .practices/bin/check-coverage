@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# Coverage may not fall: each crate's share of lines run by `cargo test`
+# (cargo-llvm-cov) stays at or above its floor in .practices/coverage-floors.
+# Raise a floor when the tests have grown past it; never lower one to let a
+# change through: add the tests instead.
+#
+#   .practices/bin/check-coverage [EXTRA_TEST_SCRIPT...]
+#
+# .practices/coverage-floors, one crate per line:
+#   # crate folder      linux  macos
+#   crates/app          73     67
+# A "-" leaves a crate without a floor on that system. macOS gets floors of
+# its own: Linux-only code isn't built there, and Crake's macOS system code
+# runs in no test without root.
+#
+# With PRACTICES_BASE_REF set (CI: the branch's base), a floor lower than
+# that ref's is refused: the never-lower rule, checked.
+#
+# Every test runs instrumented (cargo-llvm-cov's show-env: plain cargo
+# test), in a target folder of its own, so the scripts given as arguments
+# run against the same build, with nothing to rebuild (they see
+# PRACTICES_CARGO_SCOPE=--workspace). A failing test fails this. COVERAGE_EXCLUDE
+# leaves harness code that `cargo test` can't run out of the share.
+# Needs jq.
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+floors=.practices/coverage-floors
+[ -f "$floors" ] || { echo "coverage: no $floors (crate folder, linux floor, macos floor per line)"; exit 1; }
+command -v jq >/dev/null || { echo "coverage: needs jq"; exit 2; }
+case $(uname -s) in
+    Darwin) column=3 ;;
+    *) column=2 ;;
+esac
+entries() { awk -v c="$column" '$1 !~ /^#/ && NF >= 3 { print $1, $c }' "$1"; }
+
+fail=0
+if [ -n "${PRACTICES_BASE_REF:-}" ]; then
+    base=$(mktemp)
+    if git show "$PRACTICES_BASE_REF:$floors" >"$base" 2>/dev/null; then
+        for col in 2 3; do
+            column_name=$([ $col = 2 ] && echo linux || echo macos)
+            lowered=$(awk -v c=$col 'NR == FNR { if ($1 !~ /^#/ && NF >= 3) was[$1] = $c; next }
+                $1 !~ /^#/ && NF >= 3 && ($1 in was) && was[$1] != "-" && ($c == "-" || $c + 0 < was[$1] + 0) {
+                    print $1 ": " was[$1] " -> " $c }' "$base" "$floors")
+            if [ -n "$lowered" ]; then
+                printf 'coverage: floors lowered (%s), against %s. Never lower one; add tests:\n%s\n' \
+                    "$column_name" "$PRACTICES_BASE_REF" "$lowered"
+                fail=1
+            fi
+        done
+    fi
+    rm -f "$base"
+fi
+
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target/llvm-cov-target}"
+: "${CARGO_PROFILE_DEV_OPT_LEVEL:=0}"
+export CARGO_PROFILE_DEV_OPT_LEVEL
+eval "$(cargo llvm-cov show-env --export-prefix 2>/dev/null)"
+cargo llvm-cov clean --workspace 2>/dev/null
+# A test that can't run on this system appends "<test>: <why>" here
+# (testing.md: a skip is counted, never a quiet pass).
+PRACTICES_SKIP_LOG=$(mktemp)
+export PRACTICES_SKIP_LOG
+if ! tests=$(cargo test --workspace 2>&1); then
+    printf 'cargo test failed:\n%s\n' "$tests"
+    exit 1
+fi
+printf '%s\n' "$tests" | grep -E '^(     Running|test result:)'
+if [ -s "$PRACTICES_SKIP_LOG" ]; then
+    echo "skipped on this system: $(wc -l <"$PRACTICES_SKIP_LOG" | tr -d ' ')"
+    sed 's/^/  /' "$PRACTICES_SKIP_LOG"
+fi
+rm -f "$PRACTICES_SKIP_LOG"
+if ! report=$(cargo llvm-cov report --json --summary-only 2>&1); then
+    printf 'coverage: no report:\n%s\n' "$report"
+    exit 2
+fi
+
+while read -r crate floor; do
+    [ "$floor" = - ] && continue
+    crate=${crate%/}
+    read -r total covered < <(printf '%s' "$report" | jq -r --arg dir "$ROOT/$crate/" --arg root "$ROOT/" --arg ex "$COVERAGE_EXCLUDE" '
+        [.data[0].files[]
+         | select(.filename | startswith($dir))
+         | select(($ex == "") or ((.filename | ltrimstr($root)) | test($ex) | not))
+         | .summary.lines]
+        | "\(map(.count) | add // 0) \(map(.covered) | add // 0)"')
+    if [ "$total" -eq 0 ]; then
+        echo "coverage: no lines found for $crate"
+        fail=1
+        continue
+    fi
+    pct=$((covered * 100 / total))
+    if [ "$pct" -lt "$floor" ]; then
+        echo "coverage: $crate is at $pct% of lines, its floor is $floor%. Lines no test ran:"
+        cargo llvm-cov report --show-missing-lines 2>/dev/null | grep -F "$crate/" | sed 's/^/  /'
+        fail=1
+    elif [ "$pct" -ge $((floor + 5)) ]; then
+        echo "coverage: $crate is at $pct%, well over its floor of $floor%: raise the floor."
+    fi
+done < <(entries "$floors")
+
+for extra in "$@"; do
+    echo "== $extra"
+    PRACTICES_CARGO_SCOPE=--workspace "$extra" || fail=1
+done
+exit $fail

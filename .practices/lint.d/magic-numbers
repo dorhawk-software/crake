@@ -1,0 +1,4 @@
+#!/bin/sh
+# No magic numbers in the crates' own code: each named, or kept with
+# `// literal: <reason>` (crates/lint-literals; CLAUDE.md, Lints are errors).
+exec cargo run --quiet -p lint-literals -- crates/crake-proto crates/crake-os crates/craked crates/crake crates/lint-literals

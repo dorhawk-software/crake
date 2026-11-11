@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Unsafe code lives only in the folders UNSAFE_ALLOWED names (Crake keeps
+# it all in one crate, behind safe functions, so a review of what could
+# break memory safety is a review of that crate). Fails when `unsafe`
+# appears in code, not a comment, anywhere else. Every other crate also
+# says #![forbid(unsafe_code)]; this catches what the compiler doesn't
+# see: code a cfg leaves out on this system, tests and build scripts.
+#
+#   .practices/bin/check-unsafe
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+read -r -a spec <<<"$EXCLUDE"
+hits=$(git grep --untracked -P -n -I '\bunsafe\b' -- '*.rs' ${spec[@]+"${spec[@]}"})
+case $? in
+    0) ;;
+    1) exit 0 ;;
+    *)
+        echo "check-unsafe: couldn't search (above)."
+        exit 2
+        ;;
+esac
+
+found=$(printf '%s\n' "$hits" | awk -F: -v allowed="$UNSAFE_ALLOWED" '
+    BEGIN { n = split(allowed, dirs, " ") }
+    {
+        for (i = 1; i <= n; i++) {
+            d = dirs[i]; sub(/\/$/, "", d)
+            if (index($1, d "/") == 1) next
+        }
+        line = $0; sub(/^[^:]*:[^:]*:/, "", line); sub(/\/\/.*/, "", line)
+        if (line ~ /(^|[^A-Za-z0-9_])unsafe([^A-Za-z0-9_]|$)/) print
+    }')
+if [ -n "$found" ]; then
+    if [ -n "$UNSAFE_ALLOWED" ]; then
+        printf 'unsafe outside %s (put it behind a safe function there):\n%s\n' "$UNSAFE_ALLOWED" "$found"
+    else
+        printf 'unsafe code (this project allows it nowhere; see UNSAFE_ALLOWED):\n%s\n' "$found"
+    fi
+    exit 1
+fi
+exit 0

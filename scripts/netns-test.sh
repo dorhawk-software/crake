@@ -8,12 +8,12 @@ cd "$(dirname "$0")/.."
 # profile's opt-level 1 only slows the build. Unoptimised workspace crates build
 # far faster; dependencies keep their opt-level and stay cached.
 # (CI's check job builds the whole workspace once, measured, and hands its
-# own settings here: CRAKE_CARGO_SCOPE=--workspace reuses that build, as a
+# own settings here: PRACTICES_CARGO_SCOPE=--workspace reuses that build, as a
 # `-p craked` build would unify dependencies' features differently.)
 : "${CARGO_PROFILE_DEV_OPT_LEVEL:=0}"
 export CARGO_PROFILE_DEV_OPT_LEVEL
 # shellcheck disable=SC2086
-BINS=$(cargo test ${CRAKE_CARGO_SCOPE:--p craked} --test netns --test dns_netns --test probe_netns --no-run --message-format=json 2>/dev/null \
+BINS=$(cargo test ${PRACTICES_CARGO_SCOPE:--p craked} --test netns --test dns_netns --test probe_netns --no-run --message-format=json 2>/dev/null \
   | sed -n 's/.*"executable":"\([^"]*netns-[^"]*\)".*/\1/p')
 [ -n "$BINS" ] || { echo "could not build the tests" >&2; exit 1; }
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/crake-netns.XXXXXX")

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# git's pre-commit hook: nothing private (check-private), and when Rust
+# files are committed, the lint gate and the coverage floors. It runs at
+# the lowest CPU priority: the person committing is usually working on
+# the same machine.
+set -uo pipefail
+bin=$(git rev-parse --show-toplevel)/.practices/bin
+
+"$bin/check-private" || exit 1
+if git diff --cached --name-only --diff-filter=ACMR | grep -qE '(\.rs|Cargo\.(toml|lock))$'; then
+    nice -n 19 "$bin/lint" || exit 1
+    nice -n 19 "$bin/check-coverage" || exit 1
+fi
