@@ -1,0 +1,80 @@
+# cargo-deny: what the project's dependencies may be. Run by
+# .practices/bin/lint; any finding fails it. Keep ONE of the two licence
+# lists below, for the project's own licence, and delete the other.
+
+[graph]
+all-features = false
+
+[advisories]
+# Known vulnerabilities and unmaintained or yanked crates (RustSec database).
+version = 2
+yanked = "deny"
+# Known vulnerabilities fail the check wherever they are. "Unmaintained"
+# fails it only for crates the project depends on directly: GPUI's own
+# dependencies include unmaintained crates with no replacement yet.
+unmaintained = "workspace"
+# Each ignored advisory says why, and when to look again.
+ignore = []
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+
+# --- For a GPL-3.0-or-later project (Crake): licences that combine with it.
+allow = [
+    "0BSD",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "GPL-3.0-or-later",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+
+# --- For a closed-source (proprietary) app: permissive licences only. No
+# GPL, AGPL or LGPL crates: Rust links them into the program. MPL-2.0 is
+# file-level (its own files stay open, the app doesn't), so it may stay.
+# allow = [
+#     "0BSD",
+#     "Apache-2.0",
+#     "Apache-2.0 WITH LLVM-exception",
+#     "BSD-2-Clause",
+#     "BSD-3-Clause",
+#     "BSL-1.0",
+#     "CC0-1.0",
+#     "ISC",
+#     "MIT",
+#     "MIT-0",
+#     "MPL-2.0",
+#     "Unicode-3.0",
+#     "Unlicense",
+#     "Zlib",
+# ]
+#
+# [licenses.private]
+# # The app's own crates aren't published and have no open licence; without
+# # this, cargo deny calls each of them unlicensed (found adopting tern).
+# ignore = true
+
+# A crate whose licence is its own text (e.g. libbzip2's "bzip2-1.0.6")
+# goes in the list with a comment saying which crate brings it.
+
+[bans]
+# GPUI brings several versions of some crates; that's not a problem to fix here.
+multiple-versions = "allow"
+wildcards = "deny"
+# The workspace's own crates refer to each other by path.
+allow-wildcard-paths = true
+
+[sources]
+# crates.io only: no unknown registries or git repositories.
+unknown-registry = "deny"
+unknown-git = "deny"

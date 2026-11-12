@@ -1,0 +1,7 @@
+# The exact Rust release every build uses, here and in CI: a new stable
+# release's new clippy lints otherwise break CI on a day nobody changed
+# anything (Crake, ba10f9e). rust-toolchain-bump.yml moves it on weekly,
+# once a release is two weeks old.
+[toolchain]
+channel = "1.99.1"
+components = ["clippy", "rustfmt", "llvm-tools-preview"]

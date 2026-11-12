@@ -15,6 +15,8 @@
 # shellcheck source=lib.sh
 . "$(dirname "$0")/lib.sh"
 
+# A project without Rust has no cargo build folder to guard (yet).
+has_rust || exit 0
 build=$ROOT/target
 if command -v jq >/dev/null; then
     meta=$(cargo metadata --format-version 1 --no-deps --offline 2>/dev/null) &&

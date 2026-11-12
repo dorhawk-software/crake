@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# No Rust file grows past what a person can hold in their head: at most
-# SIZE_CODE lines of code in a source file (700; its inline test module
-# not counted) and SIZE_TESTS in an integration test file (1000). Past
-# that, split it by topic. Functions: clippy::too_many_lines, its limit in
-# clippy.toml.
+# No source file grows past what a person can hold in their head: at most
+# SIZE_CODE lines of code in a source file (700; a Rust file's inline test
+# module not counted) and SIZE_TESTS in a test file (1000: a Rust
+# integration test under tests/, or a JS/TS file under __tests__/ or named
+# *.test.* or *.spec.*). Past that, split it by topic. Rust functions:
+# clippy::too_many_lines, its limit in clippy.toml. Generated files are
+# left out through SIZE_EXCLUDE (a regex on paths).
 #
 #   .practices/bin/check-size
 #
@@ -31,13 +33,21 @@ seen=$(mktemp)
 trap 'rm -f "$seen"' EXIT
 while IFS= read -r f; do
     [ -f "$f" ] || continue
+    if [ -n "$SIZE_EXCLUDE" ] && printf '%s\n' "$f" | grep -qE -- "$SIZE_EXCLUDE"; then
+        continue
+    fi
     total=$(wc -l <"$f" | tr -d ' ')
-    tests_at=$(awk '/^#\[cfg\((all\()?test[,)]/ { at = NR }
-        /^(pub(\([a-z]+\))? )?mod [a-z_0-9]+ \{/ && at && NR - at <= 3 { print at; exit }' "$f")
     code=$total
-    [ -n "$tests_at" ] && code=$((tests_at - 1))
     case "$f" in
-        tests/* | */tests/*) limit=$SIZE_TESTS ;;
+        *.rs)
+            tests_at=$(awk '/^#\[cfg\((all\()?test[,)]/ { at = NR }
+                /^(pub(\([a-z]+\))? )?mod [a-z_0-9]+ \{/ && at && NR - at <= 3 { print at; exit }' "$f")
+            [ -n "$tests_at" ] && code=$((tests_at - 1))
+            ;;
+    esac
+    case "$f" in
+        *.rs) case "$f" in tests/* | */tests/*) limit=$SIZE_TESTS ;; *) limit=$SIZE_CODE ;; esac ;;
+        __tests__/* | */__tests__/* | *.test.* | *.spec.*) limit=$SIZE_TESTS ;;
         *) limit=$SIZE_CODE ;;
     esac
     max=$(listed "$f")
@@ -57,13 +67,13 @@ while IFS= read -r f; do
         echo "$f: $code lines (at most $limit): split it by topic."
         fail=1
     fi
-done < <(rust_files)
+done < <(rust_files; js_files)
 
 if [ -f "$allowlist" ]; then
     while read -r f _; do
         case "$f" in '' | '#'*) continue ;; esac
         if ! grep -qxF -- "$f" "$seen"; then
-            echo "$allowlist: $f isn't a Rust file here any more: remove it."
+            echo "$allowlist: $f isn't a source file here any more: remove it."
             fail=1
         fi
     done <"$allowlist"

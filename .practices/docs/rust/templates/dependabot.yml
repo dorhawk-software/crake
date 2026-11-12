@@ -1,0 +1,43 @@
+# Dependencies kept current: Rust crates and the workflows' actions, each
+# weekly as one grouped pull request (one CI run, not one per crate).
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    # A new version waits two weeks (a broken release is usually yanked or
+    # fixed by then); a security update comes at once regardless.
+    cooldown:
+      default-days: 14
+    # Minor and patch updates together; a major version (an API that
+    # changed) gets a pull request of its own, so it can't hold the rest
+    # back (Crake, 2026-10-26: zbus 6 failed the whole group's build).
+    groups:
+      crates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      # A private repository pays for each pull request's build: put the
+      # majors in one pull request too, and keep at most two open (tern,
+      # 2026-11-11: the first run opened six). With it, add
+      # `open-pull-requests-limit: 2` above `groups:`. Added after
+      # Dependabot already opened single majors, close those: with the limit
+      # reached it opens nothing, so the grouped one never comes (tern,
+      # 2026-11-11). It skips the closed versions and offers the next ones.
+      # majors:
+      #   patterns: ["*"]
+      #   update-types: ["major"]
+    # Crates updated another way, e.g. GPUI when the project patches it
+    # (a bump here would quietly drop the patch):
+    # ignore:
+    #   - dependency-name: "gpui-kit"
+    #   - dependency-name: "gpui-pre*"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    groups:
+      actions:
+        patterns: ["*"]

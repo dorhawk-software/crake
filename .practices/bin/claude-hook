@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Claude Code hook (PostToolUse on Bash). After every command: the disk's
 # floor (disk-guard). After a cargo command that builds (build, test,
-# check, clippy, run, nextest): the lint gate. A failure exits 2, which
+# check, clippy, run, nextest), or an npm/npx one that tests or checks
+# (test, verify, lint, jest, tsc, eslint): the lint gate. A failure exits 2, which
 # Claude Code hands back to the agent as an error to fix before going on.
 #
 # In .claude/settings.json (or through the practices plugin):
@@ -26,7 +27,7 @@ if ! said=$("$bin/disk-guard" 2>&1); then
     exit 2
 fi
 printf '%s\n' "$command" |
-    grep -qE '(^|[;&|( ]|nice -n [0-9]+ )cargo( \+[^ ]+)? +(build|b|test|t|check|c|clippy|run|r|nextest)( |$)' ||
+    grep -qE '(^|[;&|( ]|nice -n [0-9]+ )(cargo( \+[^ ]+)? +(build|b|test|t|check|c|clippy|run|r|nextest)|npm( run)? +(test|t|verify|lint)|npx( --no-install)? +(jest|tsc|eslint))( |$)' ||
     exit 0
 if ! out=$(nice -n 19 "$bin/lint" 2>&1); then
     printf 'Lint gate failed: fix these, then build again.\n\n%s\n' "$out" >&2

@@ -5,15 +5,18 @@
 #
 #   .practices/bin/lint
 #
-# The checks: rustfmt; clippy on all targets (Cargo.toml's
-# [workspace.lints] make every lint an error); cargo deny (advisories,
-# licences, sources); cargo machete (unused dependencies); no private
-# names (check-private); file sizes (check-size); unsafe only where
-# allowed (check-unsafe); the git hooks installed (not in CI); then every
-# executable file in .practices/lint.d/, the project's own checks.
+# The checks, in a Rust project (a Cargo.toml): rustfmt; clippy on all
+# targets (Cargo.toml's [workspace.lints] make every lint an error); cargo
+# deny (advisories, licences, sources); cargo machete (unused
+# dependencies); unsafe only where allowed (check-unsafe). In a
+# JavaScript/TypeScript project (a package.json): `tsc --noEmit` when
+# there's a tsconfig.json, then each npm script in NPM_CHECKS (default
+# "lint"). In every project: no private names (check-private); file sizes
+# (check-size); the git hooks installed (not in CI); then every executable
+# file in .practices/lint.d/, the project's own checks.
 #
-# Run by the Claude Code hook after cargo builds and tests (claude-hook),
-# by the pre-commit hook when Rust files are committed, and in CI.
+# Run by the Claude Code hook after builds and tests (claude-hook), by the
+# pre-commit hook when code is committed, and in CI.
 
 # shellcheck source=lib.sh
 . "$(dirname "$0")/lib.sh"
@@ -28,13 +31,23 @@ step() {
     fi
 }
 
-step "rustfmt (run cargo fmt)" cargo fmt --all --check
-step "clippy" cargo clippy --workspace --all-targets --quiet
-step "cargo deny" cargo deny --log-level error check
-step "cargo machete" cargo machete
+if has_rust; then
+    step "rustfmt (run cargo fmt)" cargo fmt --all --check
+    step "clippy" cargo clippy --workspace --all-targets --quiet
+    step "cargo deny" cargo deny --log-level error check
+    step "cargo machete" cargo machete
+    step "unsafe code" "$PRACTICES_BIN/check-unsafe"
+fi
+if has_node; then
+    if [ -f tsconfig.json ]; then
+        step "tsc" npx --no-install tsc --noEmit
+    fi
+    for script in $NPM_CHECKS; do
+        step "npm run $script" npm run --silent "$script"
+    done
+fi
 step "private names" "$PRACTICES_BIN/check-private"
 step "file sizes" "$PRACTICES_BIN/check-size"
-step "unsafe code" "$PRACTICES_BIN/check-unsafe"
 if [ -z "${CI:-}" ]; then
     step "git hooks (run .practices/bin/install-hooks)" "$PRACTICES_BIN/install-hooks" --check
 fi

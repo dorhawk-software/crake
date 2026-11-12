@@ -40,15 +40,36 @@ DISK_FLOOR_GB=300
 # Files (a regex on paths relative to the root) left out of the coverage
 # share: test harness code that only runs outside `cargo test`.
 COVERAGE_EXCLUDE=''
+# Files (a regex on paths from the root) the size limit skips: generated
+# code nobody edits by hand.
+SIZE_EXCLUDE=''
+# A JavaScript/TypeScript project (a package.json at the root): the npm
+# scripts the lint gate runs after `tsc --noEmit`, and the one the
+# pre-commit hook runs when JS/TS files are committed (empty: none).
+NPM_CHECKS='lint'
+NPM_TEST='test'
 
 if [ -f .practices/config ]; then
     # shellcheck source=/dev/null
     . .practices/config
 fi
 
+has_rust() { [ -f "$ROOT/Cargo.toml" ]; }
+has_node() { [ -f "$ROOT/package.json" ]; }
+
 # The project's Rust files, tracked or new, without the excluded ones.
 rust_files() {
     local spec
     read -r -a spec <<<"$EXCLUDE"
     git ls-files --cached --others --exclude-standard -- '*.rs' ${spec[@]+"${spec[@]}"}
+}
+
+# The project's JavaScript and TypeScript files, tracked or new, without
+# the excluded ones (none in a project without a package.json).
+js_files() {
+    local spec
+    has_node || return 0
+    read -r -a spec <<<"$EXCLUDE"
+    git ls-files --cached --others --exclude-standard -- \
+        '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' ${spec[@]+"${spec[@]}"}
 }

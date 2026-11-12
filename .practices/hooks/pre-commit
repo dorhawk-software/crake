@@ -1,13 +1,29 @@
 #!/usr/bin/env bash
-# git's pre-commit hook: nothing private (check-private), and when Rust
-# files are committed, the lint gate and the coverage floors. It runs at
-# the lowest CPU priority: the person committing is usually working on
-# the same machine.
+# git's pre-commit hook: nothing private (check-private); when Rust files
+# are committed, the lint gate and the coverage floors; when JavaScript or
+# TypeScript files are, the lint gate and the tests (NPM_TEST). It runs at
+# the lowest CPU priority: the person committing is usually working on the
+# same machine.
 set -uo pipefail
 bin=$(git rev-parse --show-toplevel)/.practices/bin
 
 "$bin/check-private" || exit 1
-if git diff --cached --name-only --diff-filter=ACMR | grep -qE '(\.rs|Cargo\.(toml|lock))$'; then
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+linted=
+if printf '%s\n' "$staged" | grep -qE '(\.rs|Cargo\.(toml|lock))$'; then
     nice -n 19 "$bin/lint" || exit 1
+    linted=1
     nice -n 19 "$bin/check-coverage" || exit 1
+fi
+if [ -f package.json ] && printf '%s\n' "$staged" | grep -qE '(\.(ts|tsx|js|jsx|mjs|cjs)|package(-lock)?\.json)$'; then
+    [ -n "$linted" ] || nice -n 19 "$bin/lint" || exit 1
+    NPM_TEST='test'
+    # shellcheck source=/dev/null
+    [ -f .practices/config ] && . .practices/config
+    # Quiet when the tests pass, like the gate: Obálka's 3,078 Jest tests
+    # printed 268 KB into a commit that went through.
+    if [ -n "$NPM_TEST" ] && ! out=$(nice -n 19 npm run --silent "$NPM_TEST" 2>&1); then
+        printf 'npm run %s failed:\n%s\n' "$NPM_TEST" "$out"
+        exit 1
+    fi
 fi

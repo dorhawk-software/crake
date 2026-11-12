@@ -1,0 +1,19 @@
+# Lints are errors, not warnings: a build with any of them fails. Paste into
+# the workspace's Cargo.toml, and give every crate `[lints] workspace = true`.
+# Fix what they find; never silence one (an #[expect] with a reason, for a
+# limit being worked down, is the one exception: it fails once not needed).
+
+[workspace.lints.rust]
+warnings = "deny"
+unused_imports = "deny"
+unused_must_use = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+# Unsafe code: forbid it in each crate's root (#![forbid(unsafe_code)]),
+# except the one crate that holds it behind safe functions; a crate can't
+# partly override workspace lints. .practices/bin/check-unsafe checks the rest.
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+# Long functions too (the limit is in clippy.toml); long files are checked by
+# .practices/bin/check-size.
+too_many_lines = "deny"

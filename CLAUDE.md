@@ -448,3 +448,8 @@ Keep the split that makes them possible: decisions (host store, expiry,
 policy, log, probing logic) stay portable; everything that touches the OS
 stays behind small modules (`net`, `routing`, DNS, tray). The notes per
 system: **docs/engineering/platforms.md**, "Someday: other platforms".
+
+## Practices
+
+The shared practices, a line per rule:
+@.practices/rules.md

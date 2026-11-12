@@ -1,0 +1,20 @@
+# Pulls the newest practices release of this project's major as a pull
+# request, weekly. Merge it when its CI is green, then restart agent
+# sessions. Made by the practices kit's bin/install; the project owns it.
+name: Practices
+
+on:
+  schedule:
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  practices:
+    uses: dorhawk-software/practices/.github/workflows/practices-update.yml@v1
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
