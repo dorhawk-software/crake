@@ -151,13 +151,20 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   company is dropping. Options if it matters: the capability and an
   AppArmor rule (a wide permission for one case), or matching the
   session's address to a tun device's.
-- **Rust toolchain pinned (the shared practices' rule; not yet here,
-  2026-11-11).** The practices pin the toolchain in rust-toolchain.toml
-  (a new stable's clippy lints once broke CI on a day nothing changed:
-  ba10f9e). Crake doesn't yet: its package builds each take their own
-  toolchain (the .deb container's rustup, Arch's rust, nixpkgs' for Nix),
-  and a pinned file changes what each of them builds with. Each needs
-  checking first; then the weekly rust-toolchain-bump.yml.
+- **Rust 1.100 and its stricter coverage (2026-11-16).** Rust is pinned
+  at 1.99.1 in rust-toolchain.toml since 2026-11-16 (until then each
+  build took the newest stable; this item said "each package build's own
+  toolchain checked first": the .deb, Windows and macOS builds take the
+  pin through rustup, the .deb's container by RUSTUP_TOOLCHAIN since its
+  cargo runs outside /src; Arch's and Nix's builds use their
+  distribution's Rust and ignore it). Pinned because 1.100 counts about
+  1000 fewer lines as run than 1.99.1 (25016 to 23979 of about 43700;
+  in lint-literals, match arms no test reaches, which 1.99.1 had counted
+  as run), and every crate fell under its floor, here and in CI (crake-os
+  68% against Linux's 70; crake-proto 93 against macOS's 98). The move
+  to 1.100 is toolchain.yml's weekly pull request; it goes in once tests
+  bring every crate back to its floor on 1.100's measure. Floors aren't
+  lowered for it.
 - **The private names in CI (2026-11-11).** CI's lint gate checks the
   names in dev/private-terms only when the repository has them as the
   PRIVATE_TERMS secret; until the user decides to store them there, the

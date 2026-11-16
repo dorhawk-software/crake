@@ -1,0 +1,10 @@
+# The exact Rust release every build uses, here and in CI: a new stable
+# release's new clippy lints, or its coverage measure, otherwise break CI
+# on a day nobody changed anything (Crake, ba10f9e; Rust 1.100 counted
+# about 1000 fewer lines as run, 2026-11-16). toolchain.yml moves it on
+# weekly, once a release is two weeks old. The .deb and the Windows and
+# macOS builds take it through rustup; Arch's and Nix's builds use their
+# own distribution's Rust and ignore it.
+[toolchain]
+channel = "1.99.1"
+components = ["clippy", "rustfmt", "llvm-tools-preview"]

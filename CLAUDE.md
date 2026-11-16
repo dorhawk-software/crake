@@ -280,8 +280,8 @@ one line each:
 - winget for Windows; Undo in macOS notifications.
 - No-tray's one-line command: no scrollbar (it would cover the text).
 - OpenVPN 3 sessions whose device openvpn3 doesn't name, under the package.
-- Rust toolchain pinned in rust-toolchain.toml (the practices' rule):
-  each package build's own toolchain checked first.
+- Rust 1.100: pinned at 1.99.1 until the tests meet the floors on
+  1.100's stricter coverage (toolchain.yml's pull request waits for it).
 - The private names in CI: only with a PRIVATE_TERMS secret (the user's
   call); until then CI warns, the hooks check locally.
 - IPv6-only hosts on a network without IPv6: decided, left as it is.

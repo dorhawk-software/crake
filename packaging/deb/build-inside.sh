@@ -10,7 +10,11 @@ apt-get install -qq -y --no-install-recommends \
 [ -x /root/.cargo/bin/cargo ] || \
   curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable >/dev/null
 . /root/.cargo/env
-rustup update stable >/dev/null 2>&1 || true
+# rust-toolchain.toml's Rust: rustup looks for that file in the current
+# folder, and cargo runs from elsewhere here (--manifest-path).
+RUSTUP_TOOLCHAIN=$(sed -n 's/^channel = "\(.*\)"/\1/p' /src/rust-toolchain.toml)
+export RUSTUP_TOOLCHAIN
+rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal >/dev/null
 
 # No incremental files: nothing here is rebuilt a line at a time, and they'd
 # bloat the cache CI keeps.

@@ -16,4 +16,4 @@ fi
 docker build -q -t crake-windows-build scripts/windows >/dev/null
 exec docker run --rm -v "$PWD:/src:ro" -v crake-win-cargo:/usr/local/cargo/registry \
   -v crake-win-target:/target -e CARGO_TARGET_DIR=/target crake-windows-build \
-  sh -c "cd /src && $CHECK"
+  sh -c "cd /src && rustup target add $TARGET >/dev/null 2>&1 && $CHECK"

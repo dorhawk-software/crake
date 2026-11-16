@@ -1,0 +1,19 @@
+# Weekly: a pull request moving rust-toolchain.toml to the newest stable
+# Rust, once it has been out for two weeks.
+name: Toolchain
+
+on:
+  schedule:
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  # Starting CI on the new branch: a pull request opened with the
+  # workflow's own token doesn't start it by itself.
+  actions: write
+
+jobs:
+  bump:
+    uses: dorhawk-software/practices/.github/workflows/rust-toolchain-bump.yml@v1
