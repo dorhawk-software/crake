@@ -65,7 +65,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function audit(cfg) {
   const out = [];
   const measured = { contrastMeasured: 0, contrastSkipped: 0, pending: [] };
-  const RULES = ["contain", "align", "gap", "clip", "text-size", "ring", "shadow", "halo", "centre", "state", "icon", "outcome", "same-look", "contrast", "mark", "ink"];
+  const RULES = ["contain", "align", "gap", "clip", "text-size", "ring", "shadow", "halo", "inset", "centre", "state", "icon", "outcome", "same-look", "contrast", "mark", "ink"];
   const isSvgInner = (e) => e instanceof SVGElement && e.tagName.toLowerCase() !== "svg";
   const cs = (e) => getComputedStyle(e);
   const hiddenByOpacity = (e) => { for (let a = e; a && a.nodeType === 1; a = a.parentElement) if (+cs(a).opacity === 0) return true; return false; };
@@ -319,6 +319,55 @@ function audit(cfg) {
     if (worst) add("halo", e, `${label(e)}'s ring reaches within ${px(worst.d)} px of "${words(worst.t.e)}"; a visible edge keeps ${cfg.halo} px from text.`);
   }
 
+  // inset: what lies over a surface's edge takes room from its padding. From the covering edge to the
+  // first text keeps the surface's smallest padding on its other sides (Obálka's letter, tucked 10 px
+  // under its envelope with a padding of 14, showed 4 px above its subject and 14 below, 1.6.5).
+  // A cover is a filled box. A drawing's box isn't what it paints (Obálka's postmark, whose box reaches
+  // over the stamp beside it), and a box that only clips paints nothing.
+  const fills = (c) => {
+    const s = cs(c);
+    if (s.backgroundImage !== "none") return true;
+    const m = s.backgroundColor.match(/[\d.]+/g);
+    return !!m && (m.length < 4 || +m[3] > 0);
+  };
+  const drawn = all.filter(fills).map((c) => ({ c, q: c.getBoundingClientRect() }));
+  const onTop = (c, x, yy) => {
+    window.scrollTo(Math.max(0, x - innerWidth / 2), Math.max(0, yy - innerHeight / 2));
+    const hit = document.elementFromPoint(x - scrollX, yy - scrollY);
+    return !!hit && (hit === c || c.contains(hit));
+  };
+  const SIDES = [["top", "bottom", "left", "right", 1], ["bottom", "top", "left", "right", -1], ["left", "right", "top", "bottom", 1], ["right", "left", "top", "bottom", -1]];
+  for (const s of all) {
+    if (!draws(s) || scrolls(s) || allowNode(s, "inset")) continue;
+    const own = texts.filter((t) => !t.covered && s.contains(t.e) && surfaceOf(t.e) === s);
+    if (!own.length) continue;
+    const r = s.getBoundingClientRect(), st = cs(s);
+    const pad = { top: parseFloat(st.paddingTop), bottom: parseFloat(st.paddingBottom), left: parseFloat(st.paddingLeft), right: parseFloat(st.paddingRight) };
+    for (const [lo, hi, a0, a1, k] of SIDES) {
+      const v = (x) => k * x;
+      const want = Math.min(...SIDES.map(([side]) => side).filter((side) => side !== lo).map((side) => pad[side]));
+      let worst = null;
+      for (const { c, q } of drawn) {
+        if (c === s || c.contains(s) || s.contains(c)) continue;
+        if (!(v(q[lo]) <= v(r[lo]) + 0.5 && v(q[hi]) > v(r[lo]) + 0.5 && v(q[hi]) < v(r[hi]))) continue;
+        const from = Math.max(q[a0], r[a0]), to = Math.min(q[a1], r[a1]);
+        if (to - from < 1) continue;
+        let room = null, line = null;
+        for (const t of own) for (const l of t.lines) {
+          if (l[a0] >= q[a1] || l[a1] <= q[a0]) continue;
+          const d = v(l[lo]) - v(q[hi]);
+          if (room === null || d < room) { room = d; line = t; }
+        }
+        if (room === null || room >= want - 1) continue;
+        const mid = (from + to) / 2, along = (r[lo] + q[hi]) / 2;
+        if (!(a0 === "left" ? onTop(c, mid, along) : onTop(c, along, mid))) continue;
+        if (!worst || room < worst.room) worst = { c, room, line, over: k * (q[hi] - r[lo]) };
+      }
+      window.scrollTo(0, 0);
+      if (worst) add("inset", s, `${label(worst.c)} lies ${px(worst.over)} px over ${label(s)}'s ${lo} edge, leaving ${px(worst.room)} px to "${words(worst.line.e)}"; the room from a covering edge to text keeps the surface's padding, ${px(want)} px.`, label(s) + "|" + words(s) + "|" + lo);
+    }
+  }
+
   // centre: a centred block sits on its column's axis.
   for (const e of all) {
     const s = cs(e);
@@ -487,6 +536,7 @@ const RULE = {
   ring: ["Tone, not outlines: a meaningful ring is drawn with outline", "Draw the ring with outline (and outline-offset), not box-shadow.", "A hairline the platform itself draws"],
   shadow: ["Depth and texture from a concept: shadows fall away from the light", "Give the shadow a downward offset of at least a quarter of its blur.", "Something the concept says glows (a lamp)"],
   halo: ["Spacing is measured from what you see: 16 px from a visible edge to text", "Move the text or the ringed object until 16 px separate them.", "A checkbox ring beside its own label"],
+  inset: ["Spacing is measured from what you see: what covers an edge takes room from the padding", "Add the covered part to the padding on that side (the overlap plus the padding the other sides keep), or move the cover off the text.", "A badge that hangs over a card's corner on purpose"],
   centre: ["Centred means on the axis", "Let the centred block take its column's full width, or centre it in the column.", "-"],
   state: ["A choice changes everything it owns, and like controls keep one look", "Draw the state with outline, colour or a fill; never with padding, a border or a weight that changes size.", "-"],
   outcome: ["Every button names its outcome", "Say what happens: the action's verb and object (\"Remove\"), and for the way out, what stays (\"Keep the app\", \"Keep editing\").", "A surface the platform draws (a macOS alert), in the platform's words"],

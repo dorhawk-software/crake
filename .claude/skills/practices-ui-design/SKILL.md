@@ -107,7 +107,8 @@ sometimes edits it.
   Clean output says nothing about taste: the review steps still run.
 - Geometry is measured, not eyeballed: 8 px between separate targets,
   nothing tappable within 34 px of the bottom edge, 16 px from a visible
-  halo to text, centred text on its column's axis. Re-run all of it
+  halo to text, a surface's padding counted from whatever covers its
+  edge, centred text on its column's axis. Re-run all of it
   after any global style change (visual-craft.md).
 - The product speaks as itself or names who acts, never "we" (and in
   Czech, never the -me verb): common/voice.md, checked by `check-voice`.

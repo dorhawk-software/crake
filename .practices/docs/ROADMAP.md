@@ -142,7 +142,8 @@ is the source of everything Rust here; its commit links are in each doc.
     CI: contain, clip, align, gap, text-size, ring, shadow, halo, centre,
     state, icon, same-look, contrast (on the pixels behind the text).
     Each check has a planted fault in `tests/run` and a mutant in
-    `tests/mutate` (1.6.0). ink: one hue per glyph (1.6.3).
+    `tests/mutate` (1.6.0). ink: one hue per glyph (1.6.3). inset: what
+    covers an edge takes room from the padding (1.6.5).
   - [ ] The next checks, most value for least effort (the 2026-11-15
     audit, [ENFORCEMENT.md](ENFORCEMENT.md)): the bottom safe area on
     phone boards (34 + 8 px); values off the project's spacing and type

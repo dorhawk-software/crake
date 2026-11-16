@@ -466,14 +466,27 @@ screens the disc came within 3 to 13 px of the text above. The owner saw
 it on the first night: the gap above the halo looked smaller than
 anywhere else. One change caused it, not 22 separate mistakes.
 
+The same holds the other way round: what lies over a surface's edge
+takes room from its padding. Obálka tucked its letter 10 px under the
+envelope it comes out of (2026-11-16). The letter kept its padding of
+14, so only 4 to 6 px showed above the subject against 14 below the
+last line. The owner: "the message title seems to be kinda hidden under
+the blue top bar".
+
 **Apply.**
 1. Build room for effects into the object itself. Scops' owl has room
    above the disc in its own viewBox, so every screen gained the gap at
    once.
 2. Keep at least 16 px between a visible edge and the nearest text.
+3. When something covers a surface's edge, pad that side by the overlap
+   plus the padding the other sides keep: Obálka's letter has 24 at the
+   top, the 10 under the envelope and 14.
 
 **Check.** `check-ui` (halo) measures every ring of 2 px or more and
-every glow to the nearest text that isn't its own. The painted extent of
+every glow to the nearest text that isn't its own. `check-ui` (inset)
+measures, on every filled surface with text, each filled box painted
+over one of its edges: from that box's edge to the nearest text must be
+at least the surface's smallest padding on its other sides. The painted extent of
 drawings (a disc behind a mascot) is still a project's own script
 ([ENFORCEMENT.md](../ENFORCEMENT.md)).
 
