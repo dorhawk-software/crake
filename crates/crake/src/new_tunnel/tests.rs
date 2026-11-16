@@ -516,8 +516,9 @@ fn asking_the_gateway_says_for_how_long_after_a_moment() {
     );
 }
 
-/// Cancel is a button the size of its word, not half the header (its
-/// hover background showed it spanning everything left of the title).
+/// The way out (“Don’t add it”, “Cancel” until 2026-11-16) is a button
+/// the size of its words, not half the header (its hover background once
+/// showed it spanning everything left of the title).
 #[gpui_kit::test]
 fn cancel_is_as_wide_as_its_word(cx: &mut TestAppContext) {
     let w = open(cx);
@@ -529,14 +530,14 @@ fn cancel_is_as_wide_as_its_word(cx: &mut TestAppContext) {
         .unwrap();
     let width = f32::from(cancel.size.width);
     assert!(
-        width < 120.,
-        "Cancel is {width:.0} px wide in a {:.0} px window",
+        width < 160.,
+        "Don’t add it is {width:.0} px wide in a {:.0} px window",
         f32::from(header.size.width)
     );
 }
 
 /// With macOS's own window buttons (top left): no × of Crake's, and
-/// Cancel moves to the right, where the × was.
+/// “Don’t add it” moves to the right, where the × was.
 #[gpui_kit::test]
 fn with_the_systems_window_buttons(cx: &mut TestAppContext) {
     let w = open(cx);

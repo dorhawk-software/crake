@@ -16,7 +16,7 @@ button,input,select{font:inherit}
 .mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}
 </style>
 </helmet>
-<div style="min-height: 1000px; box-sizing: border-box; padding: 40px 16px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
+<div data-allow="icon: Crake's buttons are words only, as DESIGN.md's Buttons says (the user, 2026-11-16)" style="min-height: 1000px; box-sizing: border-box; padding: 40px 16px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
 <div style="max-width: 980px; margin: 0 auto; background: {{c.panel}}; border: 1px solid {{c.line}}; border-radius: 12px; box-shadow: 0 30px 60px -30px rgba(0,0,0,0.35); overflow: hidden">
 
 <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px 10px 20px; border-bottom: 1px solid {{c.line}}">
@@ -29,7 +29,7 @@ button,input,select{font:inherit}
 
 <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid {{c.line}}">
 <div style="position: relative; flex: 1 1 220px; max-width: 300px">
-<label for="ls" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search the log</label>
+<label for="ls" data-allow="clip: a label for screen readers, hidden on purpose" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search the log</label>
 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{c.muted}}" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="position: absolute; left: 11px; top: 12px"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>
 <input id="ls" type="search" placeholder="Host, address or tunnel" value="{{q}}" onChange="{{onQ}}" style="width: 100%; box-sizing: border-box; height: 40px; padding: 0 12px 0 34px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}">
 </div>
@@ -38,7 +38,7 @@ button,input,select{font:inherit}
 <button type="button" role="radio" aria-checked="{{k.aria}}" onClick="{{k.pick}}" style="height: 38px; padding: 0 12px; border: none; border-left: {{k.border}}; background: {{k.bg}}; color: {{k.fg}}; font-weight: 600; cursor: pointer">{{k.label}}</button>
 </sc-for>
 </div>
-<label for="lt" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Tunnel</label>
+<label for="lt" data-allow="clip: a label for screen readers, hidden on purpose" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Tunnel</label>
 <select id="lt" style="height: 40px; padding: 0 10px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}"><option>All tunnels</option><option>ACME</option><option>Nordbank</option><option>Home lab</option></select>
 </div>
 
@@ -84,7 +84,7 @@ button,input,select{font:inherit}
 <sc-if value="{{e.chip}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: {{c.surface}}; color: {{c.muted}}; white-space: nowrap">{{e.tunnel}}</span></sc-if><sc-if value="{{e.show}}" hint-placeholder-val="{{false}}"><button type="button" style="padding: 1px 0 0; border: none; background: none; font-size: 13px; font-weight: 600; color: {{c.ink}}; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; cursor: pointer">Show in {{e.tunnel}}</button></sc-if><sc-if value="{{e.noChip}}" hint-placeholder-val="{{false}}"><span></span></sc-if>
 </div>
 </sc-for>
-<button type="button" style="margin-top: 8px; height: 38px; padding: 0 14px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Show earlier days</button>
+<button type="button" style="margin-top: 8px; height: 36px; padding: 0 14px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Show earlier days</button>
 </div>
 
 </div>

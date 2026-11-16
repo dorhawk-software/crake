@@ -130,7 +130,7 @@ impl Render for Log {
             if i + 1 == count && more && !self.earlier_days {
                 body = body.child(
                     div().px(px(20.)).child(
-                        outline_button("earlier", "Show earlier days", px(38.), &t)
+                        outline_button("earlier", "Show earlier days", px(36.), &t)
                             .mt(px(8.))
                             .px(px(14.))
                             .keys()

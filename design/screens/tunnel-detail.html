@@ -16,10 +16,10 @@ button,input,select{font:inherit}
 .mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}
 </style>
 </helmet>
-<div style="min-height: 1040px; box-sizing: border-box; padding: 40px 16px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
+<div data-allow="icon: Crake's buttons are words only, as DESIGN.md's Buttons says (the user, 2026-11-16)" style="min-height: 1040px; box-sizing: border-box; padding: 40px 16px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
 <div style="max-width: 900px; margin: 0 auto; background: {{c.panel}}; border: 1px solid {{c.line}}; border-radius: 12px; box-shadow: 0 30px 60px -30px rgba(0,0,0,0.35); overflow: hidden">
 
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px 10px 10px; border-bottom: 1px solid {{c.line}}">
+<div data-allow="align: the window's toolbar, its back button at the window's edge" style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px 10px 10px; border-bottom: 1px solid {{c.line}}">
 <button type="button" style="height: 36px; padding: 0 10px 0 6px; border: none; border-radius: 6px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>Tunnels</button>
 <span style="flex: 1 1 auto"></span>
 <button type="button" style="height: 36px; padding: 0 14px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Switch off</button>
@@ -60,7 +60,7 @@ button,input,select{font:inherit}
 </div>
 
 <div style="padding: 22px 28px 0">
-<div role="tablist" aria-label="Hosts" style="display: flex; gap: 22px; border-bottom: 1px solid {{c.line}}">
+<div role="tablist" aria-label="Hosts" data-allow="same-look: the selected tab is bold, the others semibold" style="display: flex; gap: 22px; border-bottom: 1px solid {{c.line}}">
 <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
 <button type="button" role="tab" aria-selected="{{t.aria}}" onClick="{{t.pick}}" style="height: 42px; padding: 0; border: none; border-bottom: 2px solid {{t.bar}}; margin-bottom: -1px; background: transparent; color: {{t.fg}}; font-weight: {{t.weight}}; cursor: pointer">{{t.label}} <span class="mono" style="font-size: 12px; color: {{c.muted}}">{{t.n}}</span></button>
 </sc-for>
@@ -74,12 +74,12 @@ button,input,select{font:inherit}
 <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="{{r.icon}}" stroke="{{r.iconColor}}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
 <div style="min-width: 0"><div class="mono" style="font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{r.host}}</div><div style="font-size: 13px; color: {{c.muted}}">{{r.how}}</div></div>
 <div style="font-size: 13px; color: {{c.muted}}; text-align: right">{{r.used}}</div>
-<div style="display: flex; gap: 6px; justify-content: flex-end">
+<div style="display: flex; gap: 8px; justify-content: flex-end">
 <sc-if value="{{r.editable}}" hint-placeholder-val="{{true}}">
 <sc-if value="{{r.pinnable}}" hint-placeholder-val="{{true}}">
-<button type="button" aria-pressed="{{r.pinAria}}" onClick="{{r.pin}}" style="height: 34px; padding: 0 12px; border: 1px solid {{r.pinBorder}}; border-radius: 6px; background: {{r.pinBg}}; color: {{r.pinFg}}; font-weight: 600; cursor: pointer">{{r.pinLabel}}</button>
+<button type="button" class="row-action" aria-pressed="{{r.pinAria}}" onClick="{{r.pin}}" style="height: 34px; padding: 0 12px; border: 1px solid {{r.pinBorder}}; border-radius: 6px; background: {{r.pinBg}}; color: {{r.pinFg}}; font-weight: 600; cursor: pointer">{{r.pinLabel}}</button>
 </sc-if>
-<button type="button" onClick="{{r.forget}}" style="height: 34px; padding: 0 12px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Forget</button>
+<button type="button" class="row-action" onClick="{{r.forget}}" style="height: 34px; padding: 0 12px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Forget</button>
 </sc-if>
 <sc-if value="{{r.locked}}" hint-placeholder-val="{{false}}">
 <span style="font-size: 13px; color: {{c.muted}}">Set by the gateway</span>
@@ -94,7 +94,7 @@ button,input,select{font:inherit}
 <form style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 16px 0 28px">
 <label for="addh" style="font-weight: 600">Add a host</label>
 <input id="addh" type="text" placeholder="name.acme.internal or 10.40.x.x" class="mono" style="flex: 1 1 240px; height: 40px; box-sizing: border-box; padding: 0 12px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-size: 13px">
-<button type="button" style="height: 40px; padding: 0 16px; border: none; border-radius: 6px; background: {{c.accent}}; color: {{c.accentInk}}; font-weight: 700; cursor: pointer">Send through ACME</button>
+<button type="button" class="primary" style="height: 40px; padding: 0 16px; border: none; border-radius: 6px; background: {{c.accent}}; color: {{c.accentInk}}; font-weight: 700; cursor: pointer">Send through ACME</button>
 </form>
 </div>
 

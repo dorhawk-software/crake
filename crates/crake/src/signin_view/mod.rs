@@ -173,7 +173,7 @@ impl Render for SignIn {
                         )
                         .child(div().flex_1())
                         .child(
-                            button("cancel", "Cancel", Look::Text, &t)
+                            button("cancel", "Don\u{2019}t connect", Look::Text, &t)
                                 .keys()
                                 .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
                                 .test_support(),
@@ -185,7 +185,7 @@ impl Render for SignIn {
                 .child(steps(stage.step(), None, None, &self.spec, &t))
                 .child(
                     buttons().child(div().flex_1()).child(
-                        button("cancel", "Cancel", Look::Text, &t)
+                        button("cancel", "Don\u{2019}t connect", Look::Text, &t)
                             .keys()
                             .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
                             .test_support(),

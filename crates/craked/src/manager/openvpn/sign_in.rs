@@ -432,6 +432,7 @@ mod tests {
         assert!(
             said(
                 &mut s,
+                // practices-allow voice: a gateway's own prompt, quoted in a test
                 ">PASSWORD:Verification Failed: 'Auth' ['CRV1:R:st8:Ym9i:Code we sent']"
             )
             .is_empty()
@@ -440,6 +441,7 @@ mod tests {
             said(&mut s, NEED_AUTH),
             [Do::Ask(
                 AskKind::Code { echo: false },
+                // practices-allow voice: a gateway's own prompt, quoted in a test
                 "Code we sent".into(),
                 None,
                 false

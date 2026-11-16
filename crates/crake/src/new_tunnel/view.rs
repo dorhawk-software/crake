@@ -85,7 +85,7 @@ impl NewTunnel {
             .font_weight(FontWeight::SEMIBOLD)
             .cursor_pointer()
             .hover(|s| s.bg(t.surface))
-            .child("Cancel")
+            .child("Don\u{2019}t add it")
             .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
                 cx.stop_propagation()
             })

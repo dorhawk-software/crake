@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Touch-ups, practices 1.6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --desk: #DCDCD8; --panel: #FFFFFF; --surface: #F1F1EE; --line: #E2E2DE;
+  --ink: #1A1C1E; --muted: #5A5F64; --accent: #0F766E; --mark: #B42318;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A;
+    --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; --mark: #F97066;
+  }
+}
+:root[data-theme="dark"] {
+  --desk: #121314; --panel: #1E2022; --surface: #2A2D30; --line: #33363A;
+  --ink: #ECEDEE; --muted: #A9AEB4; --accent: #2DD4BF; --mark: #F97066;
+}
+body { margin: 0; background: var(--desk); color: var(--ink); font: 14px/1.45 'Atkinson Hyperlegible Next', system-ui, sans-serif; }
+main { max-width: 860px; margin: 0 auto; padding: 32px 16px 48px; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.lede { color: var(--muted); margin: 0 0 24px; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px 20px; margin-bottom: 16px; }
+h2 { font-size: 15px; margin: 0 0 2px; }
+.where { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.side { background: var(--surface); border-radius: 6px; padding: 12px 14px 14px; }
+.tag { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 10px; }
+.row { display: flex; align-items: center; }
+.b { box-sizing: border-box; display: inline-flex; align-items: center; height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font: 600 14px/1 inherit; font-family: inherit; }
+.t { border-color: transparent; background: transparent; }
+.measure { font-size: 12px; color: var(--mark); margin-top: 8px; font-weight: 600; }
+.sent { font-size: 13px; color: var(--muted); max-width: 360px; }
+.sent b { color: var(--ink); }
+</style>
+</head>
+<body>
+<main>
+<h1>Touch-ups from practices 1.6</h1>
+<p class="lede">Each change by itself, before beside after. The checks found them on 2026-11-16; the words were chosen by the user.</p>
+
+<section>
+<h2>Pin and Forget, 8 px apart</h2>
+<p class="where">Tunnel detail → a host's row, the two actions on the right (design/screens/tunnel-detail.html; tunnel_detail/hosts.rs)</p>
+<div class="pair">
+<div class="side"><div class="tag">Before: 6 px</div><div class="row" style="gap: 6px"><span class="b">Pin</span><span class="b">Forget</span></div></div>
+<div class="side"><div class="tag">After: 8 px</div><div class="row" style="gap: 8px"><span class="b">Pin</span><span class="b">Forget</span></div><div class="measure">Separate targets keep 8 px</div></div>
+</div>
+</section>
+
+<section>
+<h2>Show earlier days, as tall as its neighbours</h2>
+<p class="where">Log → the end of the list (design/screens/log.html; log_view/mod.rs)</p>
+<div class="pair">
+<div class="side"><div class="tag">Before: 38 px</div><div class="row" style="gap: 8px; align-items: flex-end"><span class="b" style="height: 36px">Copy for helpdesk</span><span class="b" style="height: 38px">Show earlier days</span></div></div>
+<div class="side"><div class="tag">After: 36 px</div><div class="row" style="gap: 8px; align-items: flex-end"><span class="b" style="height: 36px">Copy for helpdesk</span><span class="b" style="height: 36px">Show earlier days</span></div><div class="measure">One button, one height</div></div>
+</div>
+</section>
+
+<section>
+<h2>The way out says what stays</h2>
+<p class="where">New tunnel → the header's left button; the sign-in window → its quiet button (design/screens/new-tunnel.html, sign-in.html)</p>
+<div class="pair">
+<div class="side"><div class="tag">Before</div><div class="row" style="gap: 8px"><span class="b t">Cancel</span><span class="b t">Cancel</span></div></div>
+<div class="side"><div class="tag">After</div><div class="row" style="gap: 8px"><span class="b t">Don’t add it</span><span class="b t">Don’t connect</span></div><div class="measure">Every button names its outcome</div></div>
+</div>
+</section>
+
+<section>
+<h2>Crake speaks as itself</h2>
+<p class="where">Settings → Privacy &amp; log, the statement at the top (design/screens/settings.html; settings_view/privacy.rs)</p>
+<div class="pair">
+<div class="side"><div class="tag">Before</div><p class="sent" style="margin: 0"><b>Everything Crake decides stays on this machine.</b><br>It sends nothing to anyone, including us. Your tunnels’ gateways see what passes through them, as with any VPN.</p></div>
+<div class="side"><div class="tag">After</div><p class="sent" style="margin: 0"><b>Everything Crake decides stays on this machine.</b><br>It sends nothing to anyone, including the people who make it. Your tunnels’ gateways see what passes through them, as with any VPN.</p></div>
+</div>
+</section>
+</main>
+</body>
+</html>

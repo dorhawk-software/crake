@@ -57,7 +57,7 @@ impl SignIn {
                 }
                 return body.child(list).child(
                     buttons().child(div().flex_1()).child(
-                        button("cancel", "Cancel", Look::Text, t)
+                        button("cancel", "Don\u{2019}t connect", Look::Text, t)
                             .keys()
                             .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
                             .test_support(),
@@ -191,7 +191,7 @@ impl SignIn {
             buttons()
                 .child(div().flex_1())
                 .child(
-                    button("cancel", "Cancel", Look::Text, t)
+                    button("cancel", "Don\u{2019}t connect", Look::Text, t)
                         .keys()
                         .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
                         .test_support(),

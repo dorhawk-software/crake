@@ -20,7 +20,7 @@ button,input{font:inherit}
 .w3{animation:crakewait 1.2s ease-in-out .4s infinite}
 </style>
 </helmet>
-<div style="width: 1160px; height: 760px; color-scheme: {{scheme}}; box-sizing: border-box; padding: 48px 40px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45; display: flex; gap: 28px; align-items: flex-start">
+<div data-allow="icon: Crake's buttons are words only, as DESIGN.md's Buttons says (the user, 2026-11-16)" style="width: 1160px; height: 760px; color-scheme: {{scheme}}; box-sizing: border-box; padding: 48px 40px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45; display: flex; gap: 28px; align-items: flex-start">
 
 <div style="flex: 1 1 0; min-width: 0">
 <div style="font-size: 13px; font-weight: 600; color: {{c.muted}}; margin-bottom: 10px">Single sign-on</div>
@@ -35,7 +35,7 @@ button,input{font:inherit}
 <div style="display: flex; gap: 8px; margin-top: 18px">
 <button type="button" style="height: 40px; padding: 0 14px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-weight: 600; cursor: pointer">Open the page again</button>
 <span style="flex: 1 1 auto"></span>
-<button type="button" style="height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">Cancel</button>
+<button type="button" style="height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">Don’t connect</button>
 </div>
 </div>
 </div>
@@ -59,8 +59,8 @@ button,input{font:inherit}
 <label style="display: flex; align-items: center; gap: 10px; margin-top: 14px"><input type="checkbox" style="width: 18px; height: 18px; accent-color: {{c.accent}}">Don’t ask on this computer for 12 hours</label>
 <div style="display: flex; gap: 8px; margin-top: 18px">
 <span style="flex: 1 1 auto"></span>
-<button type="button" style="height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">Cancel</button>
-<button type="button" style="height: 40px; padding: 0 18px; border: none; border-radius: 6px; background: {{c.accent}}; color: {{c.accentInk}}; font-weight: 700; cursor: pointer">Continue</button>
+<button type="button" style="height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">Don’t connect</button>
+<button type="button" class="primary" style="height: 40px; padding: 0 18px; border: none; border-radius: 6px; background: {{c.accent}}; color: {{c.accentInk}}; font-weight: 700; cursor: pointer">Continue</button>
 </div>
 </div>
 </div>
@@ -80,7 +80,7 @@ button,input{font:inherit}
 <div style="display: flex; gap: 8px; margin-top: 18px">
 <span style="flex: 1 1 auto"></span>
 <button type="button" style="height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">Close</button>
-<button type="button" style="height: 40px; padding: 0 18px; border: none; border-radius: 6px; background: {{c.accent}}; color: {{c.accentInk}}; font-weight: 700; cursor: pointer">Try again</button>
+<button type="button" class="primary" style="height: 40px; padding: 0 18px; border: none; border-radius: 6px; background: {{c.accent}}; color: {{c.accentInk}}; font-weight: 700; cursor: pointer">Try again</button>
 </div>
 </div>
 </div>

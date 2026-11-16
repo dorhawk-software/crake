@@ -590,10 +590,12 @@ mod tests {
         // A code, in the gateway's own words.
         let p = prompt(&ask(&[
             ("kind", "code-visible"),
+            // practices-allow voice: a gateway's own prompt, quoted in a test
             ("label", "Code we texted you"),
         ]))
         .unwrap();
         assert_eq!(p.ask, Ask::Text);
+        // practices-allow voice: a gateway's own prompt, quoted in a test
         assert_eq!(p.words.as_deref(), Some("Code we texted you"));
         let p = prompt(&ask(&[("kind", "key-password"), ("retry", "true")])).unwrap();
         assert_eq!(

@@ -16,16 +16,16 @@ button,input,select{font:inherit}
 .mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}
 </style>
 </helmet>
-<div style="min-height: 1000px; box-sizing: border-box; padding: 40px 16px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
+<div data-allow="icon: Crake's buttons are words only, as DESIGN.md's Buttons says (the user, 2026-11-16)" style="min-height: 1000px; box-sizing: border-box; padding: 40px 16px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
 <div style="max-width: 720px; margin: 0 auto; background: {{c.panel}}; border: 1px solid {{c.line}}; border-radius: 12px; box-shadow: 0 30px 60px -30px rgba(0,0,0,0.35); overflow: hidden">
 
 <div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 10px 12px; border-bottom: 1px solid {{c.line}}">
-<div><button type="button" style="height: 36px; padding: 0 12px; border: none; border-radius: 6px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">Cancel</button></div>
+<div><button type="button" class="bar" style="height: 36px; padding: 0 12px; border: none; border-radius: 6px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">Don’t add it</button></div>
 <span style="font-size: 15px; font-weight: 700">New tunnel</span>
 <div style="display: flex; justify-content: flex-end"><button type="button" aria-label="Close" style="width: 32px; height: 32px; border: none; border-radius: 50%; background: {{c.surface}}; color: {{c.ink}}; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"></path></svg></button></div>
 </div>
 
-<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0 32px; border-bottom: 1px solid {{c.line}}">
+<div data-allow="gap: the three steps are one tab bar; same-look: the current step is bold, the rest medium" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0 32px; border-bottom: 1px solid {{c.line}}">
 <sc-for list="{{steps}}" as="s" hint-placeholder-count="3">
 <button type="button" onClick="{{s.go}}" style="display: flex; align-items: center; gap: 8px; height: 50px; padding: 0; border: none; border-bottom: 2px solid {{s.bar}}; margin-bottom: -1px; background: transparent; color: {{s.fg}}; font-weight: {{s.weight}}; cursor: pointer">
 <span style="width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid {{s.ring}}; background: {{s.dotBg}}; color: {{s.dotFg}}; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; box-sizing: border-box">{{s.mark}}</span>{{s.label}}
@@ -53,7 +53,7 @@ button,input,select{font:inherit}
 </div>
 
 <div style="margin-top: 24px; font-weight: 600">Protocol</div>
-<div role="radiogroup" aria-label="Protocol" style="margin-top: 8px; border: 1px solid {{c.line}}; border-radius: 8px; overflow: hidden">
+<div role="radiogroup" aria-label="Protocol" data-allow="same-look: one row, a pixel taller where its words are" style="margin-top: 8px; border: 1px solid {{c.line}}; border-radius: 8px; overflow: hidden">
 <sc-for list="{{protocols}}" as="p" hint-placeholder-count="8">
 <button type="button" role="radio" aria-checked="{{p.aria}}" onClick="{{p.pick}}" style="width: 100%; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 46px; padding: 8px 14px; border: none; border-top: {{p.border}}; background: {{p.bg}}; color: {{c.ink}}; text-align: left; cursor: pointer">
 <span style="width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{p.ring}}; display: flex; align-items: center; justify-content: center"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{p.dot}}"></span></span>
@@ -147,7 +147,7 @@ button,input,select{font:inherit}
 </sc-if>
 <span style="flex: 1 1 auto"></span>
 <span style="font-size: 13px; color: {{c.muted}}">{{stepOf}}</span>
-<button type="button" onClick="{{next}}" style="height: 42px; padding: 0 20px; border: none; border-radius: 6px; background: {{c.accent}}; color: {{c.accentInk}}; font-weight: 700; cursor: pointer">{{nextLabel}}</button>
+<button type="button" class="primary" onClick="{{next}}" style="height: 42px; padding: 0 20px; border: none; border-radius: 6px; background: {{c.accent}}; color: {{c.accentInk}}; font-weight: 700; cursor: pointer">{{nextLabel}}</button>
 </div>
 
 </div>

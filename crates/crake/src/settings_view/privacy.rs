@@ -107,7 +107,7 @@ impl Settings {
                                     .child("Everything Crake decides stays on this machine."),
                             )
                             .child(sub(
-                                "It sends nothing to anyone, including us. Your tunnels\u{2019} gateways see what passes through them, as with any VPN.",
+                                "It sends nothing to anyone, including the people who make it. Your tunnels\u{2019} gateways see what passes through them, as with any VPN.",
                                 t,
                             )),
                     ),

@@ -16,10 +16,10 @@ button,input,select{font:inherit}
 .mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}
 </style>
 </helmet>
-<div style="min-height: 920px; box-sizing: border-box; padding: 40px 16px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
+<div data-allow="icon: Crake's buttons are words only, as DESIGN.md's Buttons says (the user, 2026-11-16)" style="min-height: 920px; box-sizing: border-box; padding: 40px 16px; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
 <div style="max-width: 1040px; margin: 0 auto; display: flex; flex-wrap: wrap; background: {{c.panel}}; border: 1px solid {{c.line}}; border-radius: 12px; box-shadow: 0 30px 60px -30px rgba(0,0,0,0.35); overflow: hidden">
 
-<nav aria-label="Settings sections" style="flex: 1 1 220px; box-sizing: border-box; padding: 16px 12px; background: {{c.surface}}; border-right: 1px solid {{c.line}}; min-height: 820px">
+<nav aria-label="Settings sections" data-allow="gap: the sections are one list of rows; same-look: the current section is bold, the rest regular" style="flex: 1 1 220px; box-sizing: border-box; padding: 16px 12px; background: {{c.surface}}; border-right: 1px solid {{c.line}}; min-height: 820px">
 <div style="display: flex; align-items: center; gap: 10px; padding: 4px 10px 16px">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{c.ink}}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><defs><mask id="m-n1" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/><rect x="10" y="4" width="2" height="2.00" fill="{{c.ink}}"/><path d="M5.25 15.00L6.75 15.00L11.25 24.00L9.75 24.00Z" fill="{{c.ink}}"/></mask><mask id="c-n1" maskUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><rect x="-8" y="-8" width="40" height="40" fill="#fff"/></mask></defs><g stroke="none" mask="url(#m-n1)" fill="{{c.ink}}" opacity="1.00"><path d="M4.82 15.30L3.09 12.73C1.16 7.45 2.73 4.08 6.61 2.67L9.78 1.52C11.19 1.00 12.77 1.63 13.52 3.03L19.35 2.58L15.00 4.89L15.25 5.59L19.81 4.73L15.32 7.96L14.81 9.42L14.94 12.41L14.62 16.88C14.62 19.88 19.50 21.38 21.75 24.00L1.50 24.00L3.38 16.50Z"/></g><path d="M20.85 3.30L22.80 1.35" fill="none" stroke="{{c.accent}}" stroke-width="1.6" stroke-linecap="round"/><path d="M21.15 6.30L22.80 5.81" fill="none" stroke="{{c.accent}}" stroke-width="1.6" stroke-linecap="round"/></svg>
 <span style="font-size: 17px; font-weight: 700">Settings</span>
@@ -89,9 +89,9 @@ button,input,select{font:inherit}
 <div style="font-weight: 600">Never send through a tunnel</div>
 <div style="font-size: 13px; color: {{c.muted}}">Personal banking, home devices. Crake leaves these alone even if they don’t answer.</div>
 <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px">
-<span class="mono" style="display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 6px 0 10px; border: 1px solid {{c.line}}; border-radius: 4px; font-size: 13px">*.mybank.example<button type="button" aria-label="Remove *.mybank.example" style="width: 22px; height: 22px; border: none; border-radius: 4px; background: transparent; color: {{c.muted}}; cursor: pointer">✕</button></span>
-<span class="mono" style="display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 6px 0 10px; border: 1px solid {{c.line}}; border-radius: 4px; font-size: 13px">192.168.1.0/24<button type="button" aria-label="Remove 192.168.1.0/24" style="width: 22px; height: 22px; border: none; border-radius: 4px; background: transparent; color: {{c.muted}}; cursor: pointer">✕</button></span>
-<button type="button" style="height: 30px; padding: 0 10px; border: 1px dashed {{c.lineStrong}}; border-radius: 4px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">+ Add</button>
+<span class="mono" style="display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 6px 0 10px; border: 1px solid {{c.line}}; border-radius: 4px; font-size: 13px">*.mybank.example<button type="button" class="chip-remove" aria-label="Remove *.mybank.example" style="width: 22px; height: 22px; border: none; border-radius: 4px; background: transparent; color: {{c.muted}}; cursor: pointer">✕</button></span>
+<span class="mono" style="display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 6px 0 10px; border: 1px solid {{c.line}}; border-radius: 4px; font-size: 13px">192.168.1.0/24<button type="button" class="chip-remove" aria-label="Remove 192.168.1.0/24" style="width: 22px; height: 22px; border: none; border-radius: 4px; background: transparent; color: {{c.muted}}; cursor: pointer">✕</button></span>
+<button type="button" class="chip-add" style="height: 30px; padding: 0 10px; border: 1px dashed {{c.lineStrong}}; border-radius: 4px; background: transparent; color: {{c.ink}}; font-weight: 600; cursor: pointer">+ Add</button>
 </div>
 </div>
 </sc-if>
@@ -120,7 +120,7 @@ button,input,select{font:inherit}
 <sc-if value="{{is.privacy}}" hint-placeholder-val="{{false}}">
 <div style="margin-top: 22px; display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 8px; background: {{c.surface}}">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{c.ink}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 auto; margin-top: 1px"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"></path></svg>
-<div><div style="font-weight: 700">Everything Crake decides stays on this machine.</div><div style="font-size: 13px; color: {{c.muted}}">It sends nothing to anyone, including us. Your tunnels’ gateways see what passes through them, as with any VPN.</div></div>
+<div><div style="font-weight: 700">Everything Crake decides stays on this machine.</div><div style="font-size: 13px; color: {{c.muted}}">It sends nothing to anyone, including the people who make it. Your tunnels’ gateways see what passes through them, as with any VPN.</div></div>
 </div>
 <div style="margin-top: 16px; border: 1px solid {{c.line}}; border-radius: 8px">
 <div style="display: flex; align-items: center; gap: 16px; padding: 14px 16px">

@@ -272,6 +272,7 @@ mod tests {
         );
         // "alice" in base64.
         let refused = parse(
+            // practices-allow voice: a gateway's own prompt, quoted in a test
             ">PASSWORD:Verification Failed: 'Auth' ['CRV1:R,E:Om01u7:YWxpY2U=:Enter the code: we texted you']",
         );
         let Said::Refused {
@@ -282,6 +283,7 @@ mod tests {
         };
         assert_eq!(c.user, "alice");
         assert!(c.echo);
+        // practices-allow voice: a gateway's own prompt, quoted in a test
         assert_eq!(c.text, "Enter the code: we texted you");
         assert_eq!(crv1_password(&c, "123456"), "CRV1::Om01u7::123456");
         assert_eq!(

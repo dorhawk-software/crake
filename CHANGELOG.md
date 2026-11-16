@@ -11,6 +11,18 @@ What's new in each Crake release, for the people using it. The newest is at the 
 
 ## Unreleased
 
+### Changed
+
+- **The way out says what stays.** New tunnel's Cancel is now "Don’t add it", and the sign-in
+  window's is "Don’t connect", the word its certificate question already used.
+- **Settings → Privacy & log says who it means.** "It sends nothing to anyone, including the
+  people who make it": Crake speaks as itself, not in its makers' voice.
+
+### Better
+
+- **Pin and Forget sit a little further apart.** In a tunnel's list of hosts, one is no longer
+  pressed for the other. The log's "Show earlier days" is as tall as the buttons beside it.
+
 ### Fixed
 
 - **On a Mac, the window's buttons have more room.** Each header now keeps as much space after

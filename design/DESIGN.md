@@ -429,6 +429,20 @@ mark as dorhawk.software/crake's.
   required by Globex IT. Crake won't learn here."
 - Buttons name the action, not the state: Pin / Unpin, Undo / Redo,
   "Send it direct instead", "Copy for helpdesk".
+- The way out names what stays: New tunnel's "Don’t add it", the sign-in
+  window's "Don’t connect" (the trust question's word too). Until
+  2026-11-16 both said "Cancel", which could answer either question
+  (practices 1.6, "Every button names its outcome"; the user chose the
+  words).
+- **Buttons are words only** (the user, 2026-11-16). The practices ask for
+  a drawn icon on every main button; Crake's buttons stay quiet, the way
+  its settings rows and What's new are (the user chose "quieter",
+  2026-10-21). The boards mark it (`data-allow="icon: …"` on each screen's
+  root). Icons stay where they carry meaning: the bird, the policy signs
+  under Icons, the × and the back chevron.
+- "Everything Crake decides stays on this machine. It sends nothing to
+  anyone, including the people who make it." Until 2026-11-16 "including
+  us": Crake speaks as itself, never as "we" (practices 1.6).
 - No exclamation marks, no "Oops", no emoji, no marketing.
 - Settings that need more than their one-line explanation get a "?" after
   their name (15 px, muted; teal while open). Hovering or clicking it opens

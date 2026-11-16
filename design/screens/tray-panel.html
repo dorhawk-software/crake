@@ -16,7 +16,7 @@ button{font:inherit}
 .mono{font-family:'Atkinson Hyperlegible Mono',ui-monospace,monospace}
 </style>
 </helmet>
-<div style="width: 760px; height: 1000px; position: relative; overflow: hidden; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
+<div data-allow="icon: Crake's buttons are words only, as DESIGN.md's Buttons says (the user, 2026-11-16)" style="width: 760px; height: 1000px; position: relative; overflow: hidden; background: {{c.desk}}; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: {{c.ink}}; font-size: 14px; line-height: 1.45">
 
 <div style="height: 30px; background: {{c.bar}}; color: {{c.barInk}}; display: flex; align-items: center; justify-content: flex-end; gap: 2px; padding: 0 10px; font-family: system-ui, sans-serif; font-size: 13px">
 <span style="position: absolute; left: 50%; transform: translateX(-50%); font-weight: 600">Fri 9 Oct  13:24</span>
@@ -61,7 +61,7 @@ button{font:inherit}
 <line x1="0" y1="72" x2="416" y2="72" stroke="{{c.lineStrong}}" stroke-width="1"></line>
 <path d="{{evA.d}}" fill="{{evA.color}}"></path>
 <circle cx="{{evB.x}}" cy="62" r="4.5" fill="{{c.panel}}" stroke="{{c.muted}}" stroke-width="1.6"></circle>
-<g font-family="Atkinson Hyperlegible Mono, monospace" font-size="11" fill="{{c.muted}}">
+<g data-allow="text-size: the 11 px axis, in a chart scaled to the panel" font-family="Atkinson Hyperlegible Mono, monospace" font-size="11" fill="{{c.muted}}">
 <text x="0" y="90">12:24</text><text x="208" y="90" text-anchor="middle">12:54</text><text x="416" y="90" text-anchor="end">now</text>
 </g>
 </svg>
@@ -92,7 +92,7 @@ button{font:inherit}
 <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px">
 <span class="mono" style="font-size: 12px; color: {{c.muted}}">{{l.t}}</span>
 <sc-if value="{{l.canUndo}}" hint-placeholder-val="{{false}}">
-<button type="button" onClick="{{l.undo}}" style="height: 30px; padding: 0 10px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-size: 13px; font-weight: 600; cursor: pointer">{{l.undoLabel}}</button>
+<button type="button" class="in-line" onClick="{{l.undo}}" style="height: 30px; padding: 0 10px; border: 1px solid {{c.line}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-size: 13px; font-weight: 600; cursor: pointer">{{l.undoLabel}}</button>
 </sc-if>
 </div>
 </div>
@@ -100,7 +100,7 @@ button{font:inherit}
 <div role="status" style="margin: 0 18px 10px; padding: 12px 14px; border-radius: 8px; background: {{c.surface}}">
 <div style="font-size: 14px; font-weight: 600">Crake’s first route.</div>
 <div style="font-size: 13px; color: {{c.muted}}; margin-top: 2px">Only git.acme.internal goes through ACME. Everything else still goes direct. Each time Crake sends a host through a tunnel, it shows here, and Undo puts it back.</div>
-<div style="display: flex; margin-top: 10px"><button type="button" style="height: 30px; padding: 0 12px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-size: 13px; font-weight: 600; cursor: pointer">Got it</button></div>
+<div style="display: flex; margin-top: 10px"><button type="button" class="in-line" style="height: 30px; padding: 0 12px; border: 1px solid {{c.lineStrong}}; border-radius: 6px; background: {{c.panel}}; color: {{c.ink}}; font-size: 13px; font-weight: 600; cursor: pointer">Got it</button></div>
 </div>
 </sc-if>
 </sc-for>

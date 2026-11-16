@@ -361,7 +361,7 @@ impl TunnelDetail {
             .child(
                 div()
                     .flex()
-                    .gap(px(6.))
+                    .gap(px(8.))
                     .justify_end()
                     .child(
                         row_button(("pin", i), if pinned { "Unpin" } else { "Pin" }, t)
