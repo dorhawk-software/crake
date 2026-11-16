@@ -34,7 +34,7 @@ crake-os = { path = "../crake-os" }
 # The tray icon (StatusNotifierItem; GNOME shows it with the AppIndicator extension).
 ksni = { version = "0.3", features = ["blocking"] }
 # Certificate passwords and certificates, in the GNOME keyring (Secret Service).
-oo7 = { version = "0.6", default-features = false, features = ["async-std", "native_crypto"] }
+oo7 = { version = "0.7", default-features = false, features = ["async-std", "native_crypto"] }
 # The real monitors (GPUI's X11 backend reports one screen spanning them all),
 # and XWayland's root cursor (`sys::keep_root_cursor`).
 x11rb = { version = "0.14", features = ["cursor", "randr", "resource_manager"] }
