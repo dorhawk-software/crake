@@ -3,6 +3,21 @@
 What changed for the projects that use the practices. Written by hand,
 newest first, in the kinds common/changelog.md describes.
 
+## 1.6.5 (2026-11-16)
+
+### New
+
+- **What covers a surface's edge takes room from its padding**
+  (ui/visual-craft.md, "Spacing is measured from what you see"). Obálka
+  tucked its letter 10 px under its envelope and kept the letter's
+  padding of 14, so 4 to 6 px showed above the subject against 14 below;
+  the owner saw the title "kinda hidden under the blue top bar".
+  - `check-ui` (inset) measures each filled box painted over a filled
+    surface's edge: from that box's edge to the surface's nearest text
+    must be at least the surface's smallest padding on its other sides.
+    On Obálka's 24 boards it flagged the 15 tucked letters before the fix
+    (9 findings: like letters fold into one) and nothing after it. Mark a deliberate cover with `data-allow="inset: <why>"`.
+
 ## 1.6.4 (2026-11-16)
 
 ### Fixed
