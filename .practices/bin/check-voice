@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# The voice gate: no "we" in the copy people see (common/voice.md). It
+# reads the strings in VOICE_FILES: string literals in code (not keys, not
+# comments), values in JSON, .strings, .xcstrings and .arb files, messages
+# in .ftl, .po and Android strings.xml, and plain text such as store
+# listings. English and Czech are known; VOICE_WORDS adds other words.
+# The reading is in voice-audit.py, beside this script.
+#
+#   .practices/bin/check-voice            # every copy file (VOICE_FILES)
+#   .practices/bin/check-voice FILE...    # just these
+#
+# A real quote keeps its words, marked on its line or the one above, with
+# a reason of three words or more:
+#   // practices-allow voice: a quote from the statute
+#
+# Why: a data-box app told people "Kód jsme vám poslali v SMS" (we sent
+# you the code by SMS) when the state's system had sent it, and promised
+# "nobody opens it, not even us" without saying who "us" was. A review
+# found eight such strings; this check found them, and the ones it missed.
+#
+# Needs python3; without it, it fails, never passes.
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+if [ $# -gt 0 ]; then
+    files=("$@")
+else
+    files=()
+    while IFS= read -r f; do
+        [ -f "$f" ] && files+=("$f")
+    done < <(voice_files)
+fi
+if [ ${#files[@]} = 0 ]; then
+    echo "check-voice: no copy files (VOICE_FILES in .practices/config), nothing to check."
+    exit 0
+fi
+if ! command -v python3 >/dev/null; then
+    echo "check-voice: needs python3, which isn't installed; the copy is unchecked."
+    exit 2
+fi
+if [ -n "$VOICE_WORDS" ]; then
+    python3 "$PRACTICES_BIN/voice-audit.py" --words "$VOICE_WORDS" "${files[@]}"
+else
+    python3 "$PRACTICES_BIN/voice-audit.py" "${files[@]}"
+fi

@@ -44,7 +44,7 @@ In a crate: `serde.workspace = true`.
 **Why.** "A review of what could break memory safety is a review of this crate" (asked for 2026-10-14; [91388a7](https://github.com/dorhawk-software/crake/commit/91388a7), [ffff883](https://github.com/dorhawk-software/crake/commit/ffff883)). A crate can't partly override workspace lints, so the attribute plus the grep is the design.
 
 **Apply.**
-- Set `UNSAFE_PATHS="crates/app-os"` in `.practices/config`; leave it empty for "no unsafe anywhere".
+- Set `UNSAFE_ALLOWED="crates/app-os"` in `.practices/config`; leave it empty for "no unsafe anywhere".
 - `std::env::set_var` is unsafe in edition 2024. It goes in the OS crate too. Tests stop setting environment variables, because that races with the test threads; pass the value in instead.
 
 **Check.** `.practices/bin/check-unsafe` in `lint`.

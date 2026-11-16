@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# The agent's gates stay wired: .claude/settings.json runs claude-hook
+# after Bash, Edit and Write (PostToolUse), and when the agent's turn ends
+# (Stop and SubagentStop). A hook that isn't registered never runs, and
+# nothing else would say so.
+#
+#   .practices/bin/check-hooks
+#
+# Why: the kit's gates feed findings back to the agent through these
+# hooks, so the agent can't skip them. Settings are the project's own
+# file; until 2026-11-15 nothing checked that they still named the hook.
+# The pre-commit hook runs this whenever the settings file exists.
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+settings=.claude/settings.json
+if [ ! -f "$settings" ]; then
+    echo "check-hooks: no $settings. Fix: bin/install --templates, or copy the kit's templates/claude-settings.json."
+    exit 1
+fi
+if command -v python3 >/dev/null; then
+    missing=$(python3 - "$settings" <<'EOF'
+import json, re, sys
+try:
+    hooks = json.load(open(sys.argv[1])).get("hooks", {})
+except Exception as e:
+    print(f"it doesn't parse: {e}")
+    sys.exit(0)
+def runs(event, tool=None):
+    for group in hooks.get(event, []):
+        matcher = group.get("matcher", "")
+        if tool and matcher not in ("", "*") and not re.fullmatch(matcher, tool):
+            continue
+        if any("claude-hook" in h.get("command", "") for h in group.get("hooks", [])):
+            return True
+    return False
+for tool in ("Bash", "Edit", "Write", "MultiEdit"):
+    if not runs("PostToolUse", tool):
+        print(f"PostToolUse doesn't run claude-hook after {tool}")
+for event in ("Stop", "SubagentStop"):
+    if not runs(event):
+        print(f"{event} doesn't run claude-hook")
+EOF
+    )
+else
+    echo "check-hooks: needs python3 to read $settings, and there is none." >&2
+    exit 2
+fi
+if [ -n "$missing" ]; then
+    printf 'check-hooks: %s:\n' "$settings"
+    printf '%s\n' "$missing" | sed 's/^/  - /'
+    echo "Fix: add the entries from the kit's templates/claude-settings.json (bin/install prints them)."
+    echo "Why: these hooks hand each gate's findings back to the agent, which then can't skip them."
+    exit 1
+fi

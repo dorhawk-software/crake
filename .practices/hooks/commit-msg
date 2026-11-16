@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
-# git's commit-msg hook: no session IDs, no private names.
+# git's commit-msg hook: no session IDs, no private names, and a changed
+# design board names its before/after page (check-commit-msg).
 exec "$(git rev-parse --show-toplevel)/.practices/bin/check-commit-msg" "$1"

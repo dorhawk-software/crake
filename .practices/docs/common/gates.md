@@ -28,6 +28,72 @@ check let every commit through on macOS until 2026-10-26.
 
 **Check.** Break the check's config on a branch: the canary fails the job.
 
+## A rule a machine can check runs where the agent can't skip it
+
+**What.** Every rule a script can decide is enforced by one: after each
+edit the agent makes, before the agent's turn ends, before each commit,
+and in CI. The script's findings go back to the agent as an error to fix.
+Only judgement (taste, wording, whether an icon is ugly) stays with
+reviewers.
+
+**Why.** On 2026-11-15 an agent called a design board ready. Five
+seconds later the owner saw a button sticking 3 px out of its panel. The
+rule was written, and the practices were strict, but every check ran only
+when the agent chose to run it, with scripts it wrote itself. Those
+measured height and not width, so they passed. An agent's diligence
+varies from run to run; a hook doesn't.
+
+**Apply.**
+1. Write the check as a script in the kit (`scripts/`), not as advice in a
+   Check paragraph. Its message follows
+   [the contract below](#every-finding-says-how-to-fix-it).
+2. Run it from the hooks the agent can't skip:
+   - `claude-hook` after Bash, Edit and Write (Claude Code's
+     PostToolUse), where exit 2 hands the findings to the agent;
+   - `claude-hook` on Stop and SubagentStop, so the agent can't end its
+     turn, or tell the person it's done, while a check fails;
+   - `hooks/pre-commit`, and CI for what got past both.
+3. Wire the hooks in `.claude/settings.json` from the kit's template.
+   `check-hooks` fails a commit whose settings drop them.
+4. A deliberate exception is written where it applies, with its reason
+   (for UI boards, `data-allow="rule: reason"`), and a mark without a
+   reason is itself a finding.
+5. List the rule in [ENFORCEMENT.md](../ENFORCEMENT.md): gate, partial,
+   todo or review.
+
+**Check.** `tests/enforcement` fails when a practice has a rule that
+ENFORCEMENT.md doesn't classify. Every gate has a planted fault in
+`tests/run` and a mutant in `tests/mutate`
+([below](#a-test-of-a-check-is-proven-by-breaking-the-check)).
+
+## A test of a check is proven by breaking the check
+
+**What.** A check's test (its canary) proves the check works only if the
+test fails when the check is broken. So each check has a mutant: one
+line of the check, broken on purpose, in a copy. The test suite must then
+fail on that check's own case.
+
+**Why.** On 2026-11-15 an agent proved its new checks by breaking them
+by hand. It reported every one "caught". None was: its copies sat
+outside a git repository, so every run stopped before checking, and the
+refusal counted as a kill. Its baseline then read the exit status of the
+wrong command, and passed every board, faults included. A test of a test
+needs its own guards.
+
+**Apply.**
+1. A mutant breaks one line, in a full copy of the project (its `.git`
+   too, so it runs as the real one does). Never mutate the real files: an
+   interrupted run leaves the break behind.
+2. First, the unmutated copy passes the whole suite. If it doesn't, no
+   result counts.
+3. A mutation that matches nothing fails the run. A no-op isn't a kill.
+4. Each mutant names the test case it must fail. A failure for another
+   reason (a crash, a refused start) is reported, not counted.
+5. Capture a command's exit status on the next line, into a variable.
+
+**Check.** The practices repository runs `tests/mutate` in CI: every
+check in the kit has a mutant, and each one is killed by its own case.
+
 ## Every finding says how to fix it
 
 **What.** A check's message says what it found, the fix, where the system
@@ -90,6 +156,25 @@ recorded would let the count climb back.
 idea for file lengths. Use it for any countable rule.
 
 **Check.** Fix one finding: the gate asks you to lower the baseline.
+
+## A size limit is met by splitting, never by trimming
+
+**What.** When a file at its size limit needs more, split it first.
+Never shorten what users read, drop a plural form or pick another
+implementation just so the change fits.
+
+**Why.** Obálka's strings file sat exactly at its allowlist count. A
+weekday under each day number came from the platform's calendar instead
+of the app's strings ([26ff3d5](https://github.com/dorhawk-software/obalka/commit/26ff3d5)). A
+freshness line folded "před 5 minutami" into "před 5 min". The gate
+passed both times; the wording and the design paid.
+
+**Apply.** Before adding to a file in `.practices/size-allowlist`, look
+at its room. With none, split it in the same commit (a strings file by
+feature, a screen by its parts), lower its count, then make the change.
+
+**Check.** No commit that adds to a capped file also shortens user text
+or drops a plural form; the reviewer reads the diff of that file.
 
 ## Audit only what ships; re-check every accepted advisory
 

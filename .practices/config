@@ -19,3 +19,15 @@ PRIVATE_TERMS=dev/private-terms
 # under its floor; the floor then rose from 66 to 73, what crake's own
 # code had without them).
 COVERAGE_EXCLUDE='^crates/crake/src/(scenarios/|e2e_|journey_|gateway_tests/|windows_tests|windows_journey|macos_journey|test_app|journey_kit)'
+
+# check-ui measures the approved screens, the UI's spec (CLAUDE.md, "Read
+# first"). design/proposals/ is the record of what was proposed, agreed
+# or rejected, kept as it was shown; measuring it would mean rewriting
+# history (2026-11-16, practices 1.6.4).
+UI_BOARDS=':(glob)design/screens/*.html'
+
+# check-voice reads Crake's copy where it lives: the Rust code of the app,
+# the daemon and the protocol crate (their strings reach the screen, the
+# log and the helpdesk copy), and the changelog. Test fixtures that quote
+# a gateway's own prompt are marked on their line (2026-11-16).
+VOICE_FILES=':(glob)CHANGELOG.md :(glob)crates/crake/src/**/*.rs :(glob)crates/craked/src/**/*.rs :(glob)crates/crake-proto/src/**/*.rs'

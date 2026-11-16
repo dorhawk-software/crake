@@ -96,7 +96,7 @@ jobs:
 
 ## Unsafe in one place
 
-See [conventions.md](conventions.md#unsafe-code-in-one-crate). `.practices/bin/check-unsafe` fails on `unsafe` outside the paths in `UNSAFE_PATHS` (in `.practices/config`).
+See [conventions.md](conventions.md#unsafe-code-in-one-crate). `.practices/bin/check-unsafe` fails on `unsafe` outside the paths in `UNSAFE_ALLOWED` (in `.practices/config`).
 
 ## Project-specific steps
 

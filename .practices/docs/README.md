@@ -48,27 +48,32 @@ as a pull request the project's own workflow opens.
 
 | Practice | In one line |
 | --- | --- |
+| [It just works](common/it-just-works.md) | Install it and it works: the product decides from signals, says why, and can undo; settings are preferences, never workarounds. |
 | [Commits](common/commits.md) | The subject is the outcome; the body says why, with numbers and proof; never a session ID. |
 | [Changelog](common/changelog.md) | Written by hand for users, in five kinds, in the same commit as the change. |
 | [Releases](common/releases.md) | Only a green main is released, by one command; a rehearsal publishes nothing. |
+| [The product's voice](common/voice.md) | The product speaks as itself or names who acts, never "we"; `check-voice` reads the copy. |
 | [Not now](common/not-now.md) | Whatever is deferred is written down in the same commit; stubs fail loudly. |
 | [Testing](common/testing.md) | Nothing touches your machine; a journey suite is the regression suite; red before green. |
 | [CI and caching](common/ci-caching.md) | GitHub's 10 GB cache and private repos' minutes are budgets, spent on purpose. |
 | [CLAUDE.md and docs](common/claude-md.md) | Rules and pointers in CLAUDE.md, detail in docs/engineering, every rule dated. |
 | [Privacy in public repos](common/privacy-public-repos.md) | Made-up names, documentation addresses, and a denylist the hooks refuse. |
 | [Working rules for coding agents](common/agent-working-rules.md) | Low CPU priority, a disk floor, rebuild before "restart", keep going on a plan. |
-| [Gates that can fail](common/gates.md) | A canary proves each check works; findings say how to fix them; audit and list licences from what ships. |
+| [Gates that can fail](common/gates.md) | A canary proves each check works; findings say how to fix them; a size limit is met by splitting; audit and list licences from what ships. |
 | [Crash reports and logs](common/crash-reports.md) | Consent before the SDK starts; every hook checked in the vendor's code; an allow-list scrubber; expected refusals unreported. |
 
 ### UI design ([ui/](ui))
 
 | Practice | In one line |
 | --- | --- |
-| [Design before build](ui/design-before-build.md) | Proposals with options first; build what was chosen, one to one. |
+| [Design before build](ui/design-before-build.md) | Proposals with options first; build what was chosen, one to one, measured and checked pixel by pixel; off-scale values go to the owner. |
 | [Window buttons](ui/window-buttons.md) | macOS draws its own on the left and the header makes room; the app's own on the right elsewhere. |
+| [Drag and drop](ui/drag-and-drop.md) | One calm panel over the target says what dropping does; the resting hint fades; nothing glows. |
 | [Keyboard shortcuts](ui/keyboard-shortcuts.md) | Bind the system's main modifier (⌘ on a Mac), and show shortcuts the way the system writes them. |
-| [An identity pass](ui/identity-pass.md) | Research the identity first (audience, job, inspiration, market, facts); then three agreed iterations: the identity, a few parts, the whole app re-audited. |
-| [Visual craft](ui/visual-craft.md) | Tone, not outlines; matching stroke ends; one drawing per object; compact; an 11 px floor. |
+| [An identity pass](ui/identity-pass.md) | Research the identity first (audience and their emotional state, job, inspiration, market, facts); then three agreed iterations: the identity, a few parts, the whole app re-audited from an inventory proven complete. |
+| [Visual craft](ui/visual-craft.md) | Tone, not outlines; depth from the product's own concept; one reading only; 8 px between targets; both safe areas in the frame; compact; facts ranked; an 11 px floor. |
+| [Dates, times and numbers](ui/pickers.md) | Picked, never typed, with what's derived recomputed; calendars jump to a year and show neighbouring days; suggestions never fence. |
+| [Consent without pressure](ui/consent.md) | Never pre-selected; two equal answers, no guilt; what is sent, said next to them; one tap to change your mind. |
 
 ### Rust ([rust/](rust))
 
@@ -94,7 +99,7 @@ as a pull request the project's own workflow opens.
 | [Releases and the stores](mobile/releases.md) | Version from the tag, build number from the run; a throwaway signing keychain; the artefact checked; promotion by hand. |
 | [CI for iOS and Android](mobile/ci.md) | Every platform built before every release; Xcode and toolchains pinned from the project's own files. |
 | [Devices and walks](mobile/devices.md) | Never test on a device with real data; done means walked on each platform; field crashes become tests. |
-| [Lifecycle and screens](mobile/lifecycle.md) | Modals close on background; single-flight actions; explain before a permission; no layout jumps. |
+| [Lifecycle and screens](mobile/lifecycle.md) | Modals close on background; single-flight actions; explain before a permission; no layout jumps; text takes its container's width; every string names its face; a control fades as one piece. |
 
 Coming: `web/` (from the dorhawk.software website). The roadmap lists it.
 
@@ -119,6 +124,7 @@ tests/             the kit's own tests and this repository's gate
 .githooks/         runs tests/check before each commit
 CHANGELOG.md       what changed, per release
 ROADMAP.md         what's planned and what's missing
+ENFORCEMENT.md     every rule, and the gate that enforces it (or why none can)
 FROM-*.md          what each project brought in, and what's left
 CLAUDE.md          how agents work on this repository
 ```
@@ -126,10 +132,16 @@ CLAUDE.md          how agents work on this repository
 ## The kit, in a project
 
 `bin/install` puts the scripts in the project's `.practices/bin/`. The
-same files then run in three places:
-- Claude Code's hook, after every cargo build;
+same files then run in four places:
+- Claude Code's hook, after every cargo build and every edit to a design
+  board, where findings go back to the agent to fix;
+- Claude Code's Stop hook, so an agent can't end its turn while a board
+  it changed fails;
 - the git hooks, before every commit;
 - CI.
+
+Every rule a script can check is enforced this way, so no agent can skip
+it; [ENFORCEMENT.md](ENFORCEMENT.md) says where each rule stands.
 
 Whatever passes locally passes in CI. What the project owns stays its
 own: `.practices/config`, its coverage floors and size allowlist, and its
@@ -139,12 +151,18 @@ own extra checks in `.practices/lint.d/`.
 | --- | --- |
 | `lint` | Rust: rustfmt, clippy (all lints errors), cargo deny, cargo machete; JS/TS: `tsc --noEmit` and the npm scripts in `NPM_CHECKS`; then the checks below and `lint.d/` |
 | `check-private` | no client names, hosts or addresses in files or messages (fails closed) |
+| `check-voice` | no "we" in the copy people see (`VOICE_FILES`), English and Czech; reads strings, not comments or keys |
+| `voice-audit.py` | check-voice's reading half (python3, no packages) |
 | `check-size` | 700 lines per Rust, TS or JS file, 1000 per test file, a shrinking allowlist |
 | `check-unsafe` | `unsafe` only where the project allows it |
 | `check-coverage` | tests, measured, against per-crate per-OS floors; never lowered |
-| `check-commit-msg` | no session IDs or session links in commit messages |
+| `check-commit-msg` | no session IDs or session links in commit messages; a commit that changes a design board names its before/after page |
+| `check-ui` | design boards (`design/**/*.html`), rendered in headless Chrome at each width, light and dark: nothing past its surface or cut off, buttons that follow their column and name their outcome, 8 px between targets, 11 px text, rings drawn with outline, shadows away from the light, 16 px from a ring to text, centring, states that don't move content, icons on buttons, like controls alike, contrast against the pixels behind the text, and each mark (`data-mark`) at its smallest size: no stroke under 1 px, no leftover piece of a cut, the brand element 10 px or taller |
+| `ui-audit.mjs` | check-ui's measuring half (Node, no packages; drives Chrome over a pipe) |
+| `ui-mark.mjs` | check-ui's mark check: each `svg[data-mark]` drawn alone and large, measured from its pixels at the smallest size the board shows |
+| `check-hooks` | `.claude/settings.json` still runs `claude-hook` after edits and when a turn ends |
 | `disk-guard` | cargo's build disk keeps a free-space floor |
-| `claude-hook` | Claude Code's PostToolUse hook: disk-guard, then the gate after cargo builds and tests, and after npm or npx tests, tsc and ESLint |
+| `claude-hook` | Claude Code's hooks. After Bash, Edit and Write: disk-guard; the lint gate after cargo builds and tests, and after npm or npx tests, tsc and ESLint; check-ui on any board that changed. On Stop: the turn can't end while a changed board fails |
 | `install-hooks` | points git at `.practices/hooks` (pre-commit, commit-msg) |
 | `prune-caches`, `sweep-target` | keep GitHub's 10 GB cache budget for what jobs restore |
 

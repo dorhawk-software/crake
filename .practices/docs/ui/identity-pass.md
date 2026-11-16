@@ -38,7 +38,12 @@ different processes.
 **Apply.** Before the first screen of a new product, write a one-page
 identity brief:
 1. **Audience.** Who uses it, how often, in what setting and light, with
-   what at stake (their money, their mail, their network).
+   what at stake (their money, their mail, their network). Their
+   emotional state at the moment of use (guilt, fear, exhaustion), and
+   what helps them in that moment. Scops' round 1 (2026-11-14) was built
+   for trust, not comfort. The owner called it "very plain": its users
+   are mostly mothers who used to rock their baby to sleep, at night,
+   often feeling guilty.
 2. **The job and the process.** What the app does, step by step, from
    the user's side. The identity should fit this process, not a
    category.
@@ -83,6 +88,92 @@ reason: real postal objects people recognise.
 **Check.** The design doc names the identifying features and shows the
 drawing at its smallest size with them still visible.
 
+## The name and the mark read clean (a hard stop)
+
+**What.** A name, its spelling and every mark built from it must not
+read as a slur, an insult, profanity or a sexual or derogatory term, in
+any way it can be read: as a whole, in any part a capital, a gap, a
+swapped letter, a colour change, a line break, a crop or an icon makes
+stand alone, and in slang, not only in dictionaries. Any such reading is
+a hard stop: the mark isn't shown again, and the name and mark are
+reworked before anything else ships.
+
+**Why.** Dorhawk's Windows-app runner (2026-11-13), first named after a
+bird. A capital letter in the middle of the name, and the egg that
+replaced that letter in the wordmark, both set its first letters apart
+as a derogatory slang word. Seven design rounds, two reviewers per round
+and the designer all missed it, because each read the bird's name they
+knew. The owner caught it: "this is a hard stop for me". The name was
+already on dorhawk.software.
+
+**Apply.**
+1. Before a name is agreed, and again before any mark is drawn, list
+   every way it can be cut: each prefix and suffix, each part a capital
+   or a mark sets apart, each hyphen, line break and truncation (the
+   first letters alone in a narrow sidebar), and the name with a letter
+   replaced.
+2. Read each part as a stranger would: a slang dictionary, a plain web
+   search for the part alone, and in every language of the owner and the
+   market (Czech, English and German for Dorhawk at least).
+3. Read the drawn mark at every size, covering what you know: what does
+   a stranger read first? A letter replaced by a picture leaves the rest
+   as a word of its own.
+4. If anything reads badly, stop: withdraw the mark from every board and
+   page, tell the owner plainly, and propose names and marks that can't
+   be cut that way. Don't soften it or argue it's unlikely.
+5. Record the check in the identity brief: the cuts read, the sources,
+   the date.
+
+**Check.** The identity brief lists every cut of the name and mark, each
+read clean, with sources. No part of the name stands alone as a word
+unless that word was checked.
+
+## A mark holds at its smallest size
+
+**What.** A wordmark or logo may be drawn any way the idea asks: letters
+cut and sampled, several typefaces mixed like tracks in a DJ's set, the
+brand's object set into a letter or beside the word. Only what fails at
+the size the mark ships is ruled out. At its smallest size:
+- every stroke is 1 px or more;
+- no leftover piece of a cut stands apart (a dot that is meant, like an
+  i's, is fine);
+- the brand's own element (the egg, the bird) is 10 px or taller, big
+  enough to tell what it is;
+- the brand element touches the letters, or keeps at least a quarter of
+  a stroke clear of them. Nearly touching reads as a mistake.
+
+**Why.** Dorhawk's Windows-app runner, its wordmark (2026-11-15). The
+first drawing set the egg as a speck in the G's mouth: "the egg is soo
+tiny that literally nobody will be able to make it out", the owner said.
+A later remix cut each letter its own way. Through the curves of the n,
+e and s, the cuts left bars of 3.8 units where the stroke is 9: 0.9 px at
+the smallest size shown, grey fuzz. Another variant's cut left a sliver of
+the G's terminal floating above the bowl. The designer saw none of it at
+the board's large sizes; a reviewer measuring the pixels did.
+
+**Apply.**
+1. Draw freely. The rule constrains no style: one cut or five, one
+   typeface or several, the brand inside a letter or outside the word.
+2. Show the mark on its board where it ships smallest: a title bar, a
+   menu, an About window (24 px or less). That is where it is measured.
+3. Mark it for the check: `data-mark="name"` on the `<svg>`, and
+   `data-mark-brand` on the brand's own element inside it.
+4. When a finding comes back, change the drawing, not the board: move the
+   cut to where a stroke runs full width, take a piece whole or leave it,
+   enlarge the brand element in the mark.
+5. A mark that only ever ships large (a poster, a splash) says so:
+   `data-allow="mark: only ever shown on the launch poster"`.
+
+**Check.** `check-ui` (rule `mark`) finds each `svg[data-mark]`, takes the
+smallest size the board shows it at, and draws it alone and large on a
+flat ground, with and without its brand element. From the pixels it
+measures the thinnest stroke, the pieces that stand apart, the brand
+element's height and its distance from the letters, all scaled to that
+smallest size. A mark the board never shows at 24 px or less is a
+finding. It runs after edits and on Stop (claude-hook) and in pre-commit.
+Whether the mark is good is review; whether it reads clean is
+the hard stop above.
+
 ## Iteration 1: establish the identity
 
 The identity brief above, then the two rules below: the bar, and how far
@@ -115,10 +206,15 @@ looks like a toy loses trust.
 4. Put identity into those few objects only, never into every piece of
    data. A date stays a date.
 5. Test each idea against "would I trust this app with my bank's
-   letters?". If not, cut it.
+   letters?". If not, cut it. Use this test where trust in data is the
+   point.
+6. Test every screen as the user in their worst moment: does it calm
+   them, or push them? For an audience under strain (Scops: a parent at
+   3 a.m.), this test leads.
 
 **Check.** You can name the idea in one sentence and list its objects,
-each with its one job. No object appears without a job.
+each with its one job. No object appears without a job. Each screen
+passes the worst-moment test.
 
 ### Scale of change follows the identity; scope is always the whole app
 
@@ -165,16 +261,23 @@ enough to call the product done; that is iteration 3.
 **Apply.**
 1. Survey every screen and board first. Read each one's source, not only
    its picture. Note where the identity is strong, generic, or missing.
-2. Run an independent critique of the whole surface before proposing:
-   two isolated reviewers, one doing a design review and one running an
-   automated detector. Neither sees the other's output.
+2. Run an independent critique of the whole surface before proposing,
+   and before every round you show, the first included: two isolated
+   reviewers, one doing a design review and one running an automated
+   detector. Neither sees the other's output. Give the design reviewer
+   1:1 crops of the dense areas, not only scaled-down sheets: at a
+   third, a 2 px gap is invisible. Scops' round 1 (2026-11-14) skipped
+   the critique.
 3. Verify every factual claim in the critique against the code before you
-   report it. Reviewers get facts wrong. On tern, a reviewer said three
-   undo windows disagreed. They were one window caught at three moments.
-   Another said a flow looked like another app. The app already framed
-   it correctly; only the canvas lagged.
+   report it, and before you fix anything. Reviewers get facts wrong. On
+   tern, a reviewer said three undo windows disagreed. They were one
+   window caught at three moments. Another said a flow looked like
+   another app. The app already framed it correctly; only the canvas
+   lagged. On Scops, the design reviewer was wrong about contrast twice.
 4. Draw two or three variants for each open choice, in place, with real
-   context. Real context means the real header, the real status bar, real
+   context. Every variant carries the whole identity
+   ([below](#every-variant-carries-the-identity)): a variant that differs
+   only in layout is a wireframe, not an identity option. Real context means the real header, the real status bar, real
    copy, both themes. The owner judges spacing from it.
 5. Recommend one variant per choice and say why in one line.
 6. Ask with concrete options. Ask at most four questions at a time.
@@ -188,6 +291,75 @@ enough to call the product done; that is iteration 3.
 **Check.** Every choice on the canvas has exactly one design left. The
 critique report and its verdicts are saved where the next pass can read
 them.
+
+### Every variant carries the identity
+
+**What.** From the first round of iteration 2, every variant shown uses
+the agreed identity in full. That means the drawn icon family, the
+identity's colours and type, and the idea's objects, each doing its job.
+Variants differ in how they carry the identity, never in whether they do.
+A quiet reference means restraint, not absence.
+
+**Why.** The Windows-app runner's brief (2026-11-13) named Apple's small
+utilities and Things as references. Round one read "quiet" as plain:
+system greys, a coloured dot, stock symbols, a numbered list. All three
+parts had three variants, and none used the egg, the icons or the
+colours. The owner: "it is so plain, where are some icons? … virtually
+no identity at all". A whole round was lost. Things itself has its own
+blue, icons, type and motion.
+
+**Apply.**
+1. Before drawing, list what each variant must carry: the icon family
+   (two families in round one), the palette, the type, and which of the
+   idea's objects appear in this part and with what job.
+2. Read each reference for what makes it recognisable, not only for its
+   calm. Write one line per reference: "Things: calm, and its own blue,
+   checkbox and type."
+3. Vary the treatment between variants: how much colour, which object
+   leads, line or filled icons. Don't vary whether the identity is there.
+4. Structure-only choices (what goes where) are settled first, as a
+   wireframe that says so. Don't present them as identity options.
+5. Run "Before you show anything" on round one too, step 6 above all.
+
+**Check.** Cover the product's name: each variant is still recognisable
+as this product, not as the platform's default template. Every icon on
+it comes from the family. The handoff says which objects each variant
+uses.
+
+### The real things the product handles
+
+**What.** When the product shows other people's things (apps, files,
+services, accounts), the mocks show real ones: real app icons, real
+names, real file types. Never a drawn stand-in for something that
+exists. Each one is sourced and credited on the board.
+
+**Why.** The Windows-app runner (2026-11-13) runs Windows apps. Five
+rounds showed drawn stand-ins (a blue square for Enterprise Architect,
+"ACME Accounting 2009"), though the Musts already said "never
+stand-ins". The owner had to ask: "use actual app logos, i wanna see how
+they are incorporated". The real icons raised the design questions the
+stand-ins hid: Windows icons come in any shape and macOS jails them on a
+grey tile; a black and white icon breaks a colour-matching rule; a red
+one reads as an alarm.
+
+**Apply.**
+1. Pick the real things your users bring: the owner's own first (an
+   app on their Mac, their CrossOver bottle), then common ones.
+2. Source each one, best first: the owner's own copy (an icon extracted
+   from the installed app), the maker's site, Wikimedia Commons. Treat a
+   download as untrusted: its own folder, read it before you embed it
+   (no scripts or outside references in an SVG), check it is the right
+   asset (an app icon, not a wordmark).
+3. Credit the sources on the board in one line, and say the artwork is
+   its makers', shown only to design the presentation.
+4. Where the identity derives anything from them (colours from an icon),
+   write the rule down and show the edge cases: no colour, an alarm
+   colour, an odd shape.
+5. Never show a real maker's product failing without a real test. The
+   failure state uses a made-up product, and the board says so.
+
+**Check.** No drawn stand-in for anything that exists. Every real asset
+has its source on the board.
 
 ## Iteration 3: the whole app, re-audited and polished
 
@@ -203,34 +375,101 @@ clacketies, modals, animations, processes", then iterating and
 re-auditing until it is polished.
 
 **Apply.**
-1. Build an inventory from the code, not from the canvas. List every
-   route, window, view, dialog and popover.
+1. Build an inventory from the code, not from the canvas or from memory,
+   and prove it complete ([below](#an-inventory-that-misses-nothing)).
+   List every route, window, view, dialog and popover.
 2. For each, list its states: empty, loading, partial, full, error,
-   offline, read-only, first run, signed out.
+   offline, read-only, first run, signed out. One line per state, not
+   one per screen.
 3. List every control and its states: rest, hover, pressed, focus,
    selected, disabled, busy.
 4. List every transient surface: toasts, menus, tooltips, confirmations,
    notifications, the tray or menu-bar icon, the app icon at every size.
-5. List every process end to end: onboarding, sign-in, adding an account,
+   Every use of a shared dialog, sheet or menu is its own line.
+5. List every surface the system draws around the app: launch and
+   launch failure, permission prompts and the app's words before them,
+   share sheets and file export, document viewers, keyboard and autofill.
+6. List every process end to end: onboarding, sign-in, adding an account,
    sending, syncing, undo, deleting, settings changes, quitting.
-6. List every motion: transitions, progress, empty-state scenes, and what
+7. List every motion: transitions, progress, empty-state scenes, and what
    reduced motion shows instead.
-7. Walk the list in both themes and in every shipped language, including
-   a pseudo-locale for long strings.
-8. Grade each item against the spec: matches, drifts, or misses the
+8. Walk the list in both themes, in every shipped language (with a
+   pseudo-locale for long strings), at the largest text size, and in
+   every orientation and device size the app allows.
+9. Grade each item against the spec: matches, drifts, or misses the
    identity. Use the rules in [visual-craft.md](visual-craft.md).
-9. Redraw what drifts or misses. Put it on the canvas with variants when
-   the choice is open. Ask the owner. Strip the losers.
-10. Fix canvas-versus-code drift as you find it: stale states, leftovers,
+   "Matches" needs a picture: a capture or a board, compared with the
+   spec. An item nobody has looked at is "not seen", never "matches".
+10. Redraw what drifts, misses or was not seen. Put it on the canvas with
+    variants when the choice is open. Ask the owner. Strip the losers.
+11. Fix canvas-versus-code drift as you find it: stale states, leftovers,
     features the canvas still calls "soon".
-11. Build the agreed designs one to one, then capture the app and compare
-    it with the canvas ([design-before-build.md](design-before-build.md)).
-12. Re-audit the built app with a fresh critique. Iterate with the owner
+12. Build the agreed designs one to one, then capture the app and compare
+    it with the canvas, object by object at full resolution
+    ([design-before-build.md](design-before-build.md), "Pixel by pixel").
+13. Re-audit the built app with a fresh critique. Iterate with the owner
     until the critique and the owner find nothing left to fix.
 
-**Check.** The inventory exists as a checklist, and every line is marked
-matches or fixed. The owner has seen every redrawn item. The last
-critique of the built app found nothing new.
+**Check.** The inventory exists as a checklist and passed its own check
+([below](#an-inventory-that-misses-nothing)). Every line is marked
+matches or fixed. The owner has seen every item in the identity, redrawn
+or not. The last critique of the built app found nothing new.
+
+## An inventory that misses nothing
+
+**What.** The iteration 3 inventory is derived from the code by a method
+that can be checked, then checked twice. A list written by reading and
+remembering is a draft, not the inventory.
+
+**Why.** Obálka's first iteration 3 inventory (2026-11-12) had 83 lines
+and looked complete. The owner asked where the modals were. The modals
+were there: 22 uses of the shared dialog, graded together as one
+"matches" line that nobody had drawn. The backup and transfer screens
+were one line each and hid 10 dialogs and two whole flows. A sweep then
+found at least nine kinds of surface with no line at all: a launch
+failure, a security notice, the permission explanations, file sharing,
+the progress bar, and the largest text size among them. Fifteen lines
+said "matches" without a picture. Each gap would have shipped in the old
+look beside the new one.
+
+**Apply.**
+1. **Sweep the sources.** List every UI source file, every route, and
+   every group of user-visible strings. Map each to inventory lines. A
+   file or string group that maps to nothing is a gap.
+2. **Count the shared pieces.** Search for every use of the shared
+   dialog, sheet, menu, alert, toast and banner. Each use is a line,
+   named by its title or trigger. The count on the list equals the count
+   in the code.
+3. **Split by state.** A screen with more than one state, flow or dialog
+   gets a line for each. "The backup screen" is not a line. For every
+   entity, list none, one, many and at once: two children falling
+   asleep together, two parents on two phones. For anything with a
+   time, also list repeating, one-off and imported (from the phone's
+   calendar). On Scops (2026-11-14), several children and two parents
+   surfaced midway, after most screens were drawn. It could add only
+   weekly events; the owner asked for a date, then for calendar sync.
+4. **Every attempt has a way back.** Every attempt (a nap, an upload, a
+   payment) has a failed state. It says what happens next, offers a
+   second way, and shows the consequence ("bedtime 35 minutes earlier
+   tonight"). It never reads as a verdict. Scops drew the nap that worked
+   and a dead end that said "go out". The real day went: failed, played,
+   a second attempt, a pram nap, an earlier bedtime. None of it was
+   designed.
+5. **Get a second inventory.** Someone who has not seen yours (a person
+   or a fresh agent) builds one from the code with the same headings.
+   Compare line by line. Every difference is a gap in one of the lists
+   or a mistake; resolve each before grading.
+6. **No grade without a picture.** Grade from a capture of the app or a
+   board on the canvas. Quiet chrome is drawn too; the owner judges
+   whether it holds the identity.
+7. **Record the proof** in the checklist: the files swept, the counts
+   per shared piece, and who made the second inventory.
+
+**Check.** Every UI file and string group maps to a line. The checklist
+records the counts, and they match the code. The two inventories' diff is
+resolved. No line says "matches" without a capture or a board. Every
+entity has its none, one, many and at-once lines, and every attempt its
+failed state.
 
 ## Where the product's mark appears
 
@@ -253,13 +492,28 @@ sending countdown. Nothing else got the bird.
    product's voice to a joke. A joke next to a bank statement reads wrong.
 4. Use one motion per moment, played once. Then rest. Loop only while
    something is actually working.
+5. Quiet is not plain. Away from the mark, the product's drawn icons,
+   the idea's object and the real logos of what it connects to carry the
+   identity (visual-craft.md, "A drawn icon set, grown from the idea").
+6. When the product's main job is one long emotional moment (a night, a
+   wait), the mark may stay on screen the whole time, as a companion. At
+   rest it only breathes. It moves only at its own moments. In Scops the
+   whole night is the moment: the owl stays from put-down to morning,
+   which is what the owner wanted (2026-11-14).
 
 **Check.** You can list every place the mark appears, and each one is one
-of the idea's moments.
+of the idea's moments. A companion mark that stays on screen moves only
+at those moments.
 
 ## Before you show anything
 
-**What.** A short pass over every page you are about to show the owner.
+**What.** A short pass over every page you are about to show the owner,
+the person guiding the work. It runs every time, before the owner is told
+the page is ready.
+
+This practice is the owner's standing request. A tool, an artifact or
+canvas type, or a skill that says not to verify unless asked does not
+apply to this pass: run it anyway, and say in the handoff that it ran.
 
 **Why.** The owner zooms in. They found leftover thin lines, a stroke
 with one round end and one square end, a stray word printed on a board,
@@ -275,5 +529,56 @@ in the whole proposal.
 4. Search the page for leftovers: placeholders, `[N]`, notes to yourself,
    text in the wrong language, states the code no longer has.
 5. Check every claim in captions against the code.
+6. Look for the plain spots: a stock symbol where the family should
+   be, a grey placeholder or drawn stand-in where a real logo exists
+   (yours or a third party's, [above](#the-real-things-the-product-handles)),
+   a monogram for a thing that has a mark.
+7. Check that every typeface renders as the face it names, in the
+   browser the owner opens it in. Measure it (`document.fonts.check`, or
+   a sample's width against the fallback's). A system-only face such as
+   SF Pro Rounded can't be reached by name in Chrome: load the local
+   font file with `@font-face`, or show a capture. On the Windows-app
+   runner the "recommended" SF Pro Rounded sample showed Helvetica Bold.
+   Keep the product's font files in its repository (or design system),
+   so boards render offline. With no network, Google Fonts did not
+   load, and a whole Scops round was checked in a fallback face. If a
+   font can't load, say so in the handoff; never call that render
+   verified.
+8. Show every state in every theme, not only the happy one. On the
+   Windows-app runner only "It runs" was drawn dark; dark copies of the
+   other states had a filled "undone" dot, ghost buttons as loud as
+   Open, and a failure reason in the success colour.
+9. Check the product's own copy on the mock as you would a release:
+   advice, promises and reasons must be true. The Windows-app runner's
+   mock advised a Windows VM for an x86 driver, which Windows on Apple
+   silicon can't load, and promised changes stay "not on your Mac" while
+   the app's 2 GB sat on the Mac.
+10. Read every number with its neighbours, as a stranger would
+    ([visual-craft.md](visual-craft.md#a-number-says-what-it-counts)).
+    The Windows-app runner's footer showed "Technical log 2.1 GB": the
+    app's size read as the log's.
+11. Read the name and the wordmark as a stranger would, every part a
+    capital, a mark or a crop sets apart
+    ([above](#the-name-and-the-mark-read-clean-a-hard-stop)). A bad
+    reading is a hard stop.
+12. Check every claim about health, safety or results. Each one cites
+    its source on the board, says exactly what was measured, and goes
+    no further than the data. Nothing promises an outcome. Scops' second
+    review found "one night won't spoil anything" and "better within a
+    week" with no source, and "stress-free" where the study measured
+    only cortisol.
+13. Render again after every copy change: a copy change is a layout
+    change. Big numbers never wrap (`white-space: nowrap`), and their
+    caption goes under them, not beside them. On Scops, clarifying "12
+    min of 45" into a longer caption pushed "12 min" onto two lines.
+14. Fix a class of bug in one pass, across all boards. When one typed
+    time, cramped gap or erased ring turns up, search every board for
+    the same kind before you show
+    ([pickers.md](pickers.md#picked-not-typed)).
+15. After a global style change (depth, shadows, a theme), run the whole
+    audit again: gaps between targets, safe areas, the space around
+    halos, meaningful rings
+    ([visual-craft.md](visual-craft.md#separate-targets-keep-their-distance)).
 
-**Check.** The handoff message says these checks ran.
+**Check.** The handoff message says these checks ran, on the rendered
+page, and what they found.

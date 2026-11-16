@@ -12,8 +12,9 @@
 # JavaScript/TypeScript project (a package.json): `tsc --noEmit` when
 # there's a tsconfig.json, then each npm script in NPM_CHECKS (default
 # "lint"). In every project: no private names (check-private); file sizes
-# (check-size); the git hooks installed (not in CI); then every executable
-# file in .practices/lint.d/, the project's own checks.
+# (check-size); no "we" in the copy (check-voice); the git hooks
+# installed (not in CI); then every executable file in
+# .practices/lint.d/, the project's own checks.
 #
 # Run by the Claude Code hook after builds and tests (claude-hook), by the
 # pre-commit hook when code is committed, and in CI.
@@ -48,6 +49,7 @@ if has_node; then
 fi
 step "private names" "$PRACTICES_BIN/check-private"
 step "file sizes" "$PRACTICES_BIN/check-size"
+step "the product's voice" "$PRACTICES_BIN/check-voice"
 if [ -z "${CI:-}" ]; then
     step "git hooks (run .practices/bin/install-hooks)" "$PRACTICES_BIN/install-hooks" --check
 fi

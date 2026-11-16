@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# git's pre-commit hook: nothing private (check-private); when Rust files
-# are committed, the lint gate and the coverage floors; when JavaScript or
+# git's pre-commit hook: nothing private (check-private); design boards
+# pass the UI gate (check-ui); the copy has no "we" (check-voice); the
+# Claude Code hooks stay wired (check-hooks); when Rust files are
+# committed, the lint gate and the coverage floors; when JavaScript or
 # TypeScript files are, the lint gate and the tests (NPM_TEST). It runs at
 # the lowest CPU priority: the person committing is usually working on the
 # same machine.
@@ -9,6 +11,31 @@ bin=$(git rev-parse --show-toplevel)/.practices/bin
 
 "$bin/check-private" || exit 1
 staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+# The design boards being committed pass the UI gate (as they are in the
+# working tree, where their fonts and images resolve).
+# shellcheck source=/dev/null
+boards=$(cd "$(git rev-parse --show-toplevel)" && . "$bin/lib.sh" && ui_boards)
+if [ -n "$boards" ] && [ -n "$staged" ]; then
+    ui=$(printf '%s\n' "$staged" | grep -Fx -f <(printf '%s\n' "$boards") || true)
+    if [ -n "$ui" ]; then
+        printf '%s\n' "$ui" | tr '\n' '\0' | xargs -0 nice -n 10 "$bin/check-ui" || exit 1
+    fi
+fi
+# The copy being committed speaks as the product, never as "we" (check-voice).
+# shellcheck source=/dev/null
+copy=$(cd "$(git rev-parse --show-toplevel)" && . "$bin/lib.sh" && voice_files)
+if [ -n "$copy" ] && [ -n "$staged" ]; then
+    voice=$(printf '%s\n' "$staged" | grep -Fx -f <(printf '%s\n' "$copy") || true)
+    if [ -n "$voice" ]; then
+        printf '%s\n' "$voice" | tr '\n' '\0' | xargs -0 "$bin/check-voice" || exit 1
+    fi
+fi
+# The agent's gates stay wired: claude-hook runs after edits and before an
+# agent's turn ends. A settings change that drops it can't be committed.
+if [ -f .claude/settings.json ]; then
+    "$bin/check-hooks" || exit 1
+fi
 linted=
 if printf '%s\n' "$staged" | grep -qE '(\.rs|Cargo\.(toml|lock))$'; then
     nice -n 19 "$bin/lint" || exit 1

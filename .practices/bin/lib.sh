@@ -48,6 +48,23 @@ SIZE_EXCLUDE=''
 # pre-commit hook runs when JS/TS files are committed (empty: none).
 NPM_CHECKS='lint'
 NPM_TEST='test'
+# The UI gate (check-ui): the HTML design boards it renders (git
+# pathspecs), the widths (px) and themes it renders each at, what counts
+# as a separate target and as a state class, and Chrome's path (empty:
+# found in the usual places).
+UI_BOARDS=':(glob)design/**/*.html'
+UI_WIDTHS='1100 1440'
+UI_THEMES='light dark'
+UI_TARGETS='button, a[href], [role=button], input, select, textarea, summary'
+UI_STATES='focus hover active pressed'
+UI_CHROME=''
+# The voice gate (check-voice): the files that hold the copy people see
+# (git pathspecs; tests and generated files left out), and more first-person plural words to flag, as a regex
+# alternation (a language the check doesn't know). The changelog is What's new
+# and the release notes, and a content/ folder holds a FAQ or help pages: until
+# 1.6.1 neither was read, and a FAQ's "not even us" passed.
+VOICE_FILES=':(glob)CHANGELOG*.md :(glob)**/content/**/*.ts :(glob)**/content/**/*.tsx :(glob)**/content/**/*.js :(glob)**/content/**/*.json :(glob)**/content/**/*.md :(glob)**/i18n/** :(glob)**/locales/** :(glob)**/l10n/** :(glob)**/*.lproj/*.strings :(glob)**/*.xcstrings :(glob)**/*.ftl :(glob)**/*.po :(glob)**/*.arb :(glob)**/res/values*/strings.xml :(glob)fastlane/metadata/**/*.txt :(exclude,glob)**/__tests__/** :(exclude,glob)**/*.test.* :(exclude,glob)**/*.spec.* :(exclude,glob)**/tests/** :(exclude,glob)**/*.generated.*'
+VOICE_WORDS=''
 
 if [ -f .practices/config ]; then
     # shellcheck source=/dev/null
@@ -72,4 +89,20 @@ js_files() {
     read -r -a spec <<<"$EXCLUDE"
     git ls-files --cached --others --exclude-standard -- \
         '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' ${spec[@]+"${spec[@]}"}
+}
+
+# The files check-voice reads: tracked or new, matching VOICE_FILES.
+voice_files() {
+    local spec
+    [ -n "$VOICE_FILES" ] || return 0
+    read -r -a spec <<<"$VOICE_FILES $EXCLUDE"
+    git ls-files --cached --others --exclude-standard -- "${spec[@]}"
+}
+
+# The design boards check-ui renders: tracked or new, matching UI_BOARDS.
+ui_boards() {
+    local spec
+    [ -n "$UI_BOARDS" ] || return 0
+    read -r -a spec <<<"$UI_BOARDS $EXCLUDE"
+    git ls-files --cached --others --exclude-standard -- "${spec[@]}"
 }

@@ -74,6 +74,8 @@ Links point at commits in [Crake](https://github.com/dorhawk-software/crake), wh
 
 **Apply.** Run the new test on the old code first, or break the code on purpose. Write one line in the commit body: "fails on the old code, passes now".
 
+Porting an agreed design is the one case where the code may come first: there is no old behaviour to fail on. Then prove each assertion by a mutation of the new code (a colour, a size, a branch). The commit lists the mutations, as Obálka's inbox did ([26ff3d5](https://github.com/dorhawk-software/obalka/commit/26ff3d5): six mutations, each failing a test).
+
 **Check.** The commit body says how the test was shown to fail.
 
 ## No retries for flaky tests

@@ -29,7 +29,7 @@ each, who owns which file, and how a change here reaches every project.
  actions/*, .github/workflows/rust-*.yml ◀── uses: …@v1 ── .github/workflows/*.yml
 
  templates/claude-settings.json ───── --templates ─▶ .claude/settings.json
-                                                    (PostToolUse ─▶ .practices/bin/claude-hook)
+                                                    (PostToolUse, Stop ─▶ .practices/bin/claude-hook)
 
  .claude-plugin/marketplace.json ◀── /plugin install ── Claude Code
    plugin/ (skills only)
@@ -105,12 +105,15 @@ also in `rules.md`.
 | --- | --- | --- |
 | `lint` | rustfmt, clippy, cargo deny, cargo machete, then the checks below and `lint.d/*` | Claude hook, pre-commit, CI |
 | `check-private` | no name from `dev/private-terms` in files or the message; fails closed | lint, both git hooks |
+| `check-voice` | no "we" in the copy people see ([common/voice.md](../common/voice.md)); a quote is marked `practices-allow voice: reason` | lint, Claude hook (edits, Stop), pre-commit |
 | `check-size` | 700 lines per file, 1000 per integration test, the shrinking allowlist | lint |
 | `check-unsafe` | `unsafe` only in `UNSAFE_ALLOWED` | lint |
 | `check-coverage` | each crate at or over its floor, per OS; floors never lowered | pre-commit, CI |
 | `check-commit-msg` | no session IDs or session links; no private names | commit-msg hook |
 | `install-hooks` | points git at `.practices/hooks` (`--check` to verify) | once per clone; lint checks it |
-| `claude-hook` | disk floor after every command; lint after cargo builds | Claude Code |
+| `check-ui` | design boards rendered in headless Chrome at each width and theme: nothing past its surface, buttons follow their column and name their outcome, 8 px between targets, 11 px text, contrast and the rest of [ui/visual-craft.md](../ui/visual-craft.md)'s measurable rules, and each mark at its smallest size ([ui/identity-pass.md](../ui/identity-pass.md)); `data-allow="rule: reason"` marks a deliberate exception | Claude hook (edits, Stop), pre-commit |
+| `check-hooks` | `.claude/settings.json` still runs `claude-hook` after edits and on Stop | pre-commit |
+| `claude-hook` | disk floor after every command; lint after cargo builds; check-ui on a board that changed; on Stop, the turn can't end while a board fails | Claude Code |
 | `disk-guard` | keeps `DISK_FLOOR_GB` free where cargo builds | Claude hook |
 | `prune-caches` | deletes GitHub caches a newer one of the same kind replaced | CI on main |
 | `sweep-target` | keeps only the build units cargo used, before caching by hand | CI, packaging |
@@ -240,28 +243,63 @@ time limits from measurements): [common/ci-caching.md](../common/ci-caching.md).
 
 ## The Claude Code hook
 
-The lint and disk hook lives in each project's own `.claude/settings.json`,
+The hook lives in each project's own `.claude/settings.json`,
 copied from [templates/claude-settings.json](../templates/claude-settings.json)
 by `bin/install --templates`:
 
 ```json
 {
   "hooks": {
-    "PostToolUse": [{
-      "matcher": "Bash",
-      "hooks": [{
-        "type": "command",
-        "command": "\"$CLAUDE_PROJECT_DIR\"/.practices/bin/claude-hook",
-        "timeout": 900
-      }]
-    }]
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.practices/bin/claude-hook",
+            "timeout": 900
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.practices/bin/claude-hook",
+            "timeout": 900
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.practices/bin/claude-hook",
+            "timeout": 900
+          }
+        ]
+      }
+    ]
   }
 }
 ```
 
 After each shell command an agent runs, `claude-hook` checks the disk floor,
 and after a cargo build, test, check, clippy, run or nextest it runs the lint
-gate. A failure goes back to the agent as an error to fix before going on.
+gate. After any edit, it runs `check-ui` on each design board whose content
+changed, and `check-voice` on each copy file that changed, and on any that
+failed before. A failure goes back to the
+agent as an error to fix before going on (exit 2). On Stop and
+SubagentStop it refuses to let the turn end while a board still fails, so
+the agent can't tell the person it's done; blocked twice on the same
+findings, it lets the turn end and tells the person what is still open.
+An install that finds the old template (PostToolUse on Bash only)
+replaces it; a project's own settings are left alone, and `check-hooks`
+fails its commits until they run the hook.
 Because it is in the project, it works for anyone who opens the project in
 Claude Code, with or without the plugin, and it never runs twice.
 

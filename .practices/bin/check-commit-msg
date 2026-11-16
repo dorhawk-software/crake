@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
 # git's commit-msg hook: a commit message carries no agent session ID or
 # session link (a Co-Authored-By line is fine), and no private names
-# (check-private).
+# (check-private). A commit that changes a design board already in the
+# repository (UI_BOARDS) names the page that shows that change before and
+# after (ui/design-before-build.md, "A touch-up gets its own before and
+# after"):
+#   Before-after: design/changes/postmark-waves.html   (a file here)
+#   Before-after: https://…                           (a published page)
+#   Before-after: none, only the markup was reindented (why, 3+ words)
 #
 #   .practices/bin/check-commit-msg MSG_FILE
+#
+# Why the trailer: on 2026-11-16 a touch-up went out as a new version of
+# a 70-screen canvas, and the owner couldn't see where to look.
 
 # shellcheck source=lib.sh
 . "$(dirname "$0")/lib.sh"
@@ -14,5 +23,44 @@ msg=${1:?usage: check-commit-msg MSG_FILE}
 if grep -v '^#' "$msg" | grep -inE '^[A-Za-z-]+-session(-id)?:|claude\.ai/code/session_|session_[0-9A-Za-z]{16,}' >&2; then
     echo "check-commit-msg: no session IDs or session links in commit messages (above)." >&2
     exit 1
+fi
+
+# The boards this commit changes (not the ones it adds: a new board has no
+# before), as they are staged.
+touched=$(git diff --cached --name-only --diff-filter=M 2>/dev/null)
+changed=
+if [ -n "$touched" ]; then
+    boards=$(ui_boards)
+    if [ -n "$boards" ]; then
+        changed=$(printf '%s\n' "$touched" | grep -Fx -f <(printf '%s\n' "$boards") || true)
+    fi
+fi
+if [ -n "$changed" ]; then
+    page=$(grep -v '^#' "$msg" | sed -n 's/^[Bb]efore-[Aa]fter:[[:space:]]*//p' | head -n 1)
+    why=
+    case $page in
+        "")
+            why="it has no Before-after: trailer" ;;
+        none,*)
+            reason=${page#none,}
+            if [ "$(printf '%s\n' "$reason" | wc -w | tr -d ' ')" -lt 3 ]; then
+                why="'Before-after: none,' needs a reason of three words or more"
+            fi ;;
+        https://*) ;;
+        *)
+            [ -f "$page" ] || why="its Before-after: page $page isn't a file in the repository" ;;
+    esac
+    if [ -n "$why" ]; then
+        {
+            echo "check-commit-msg: this commit changes design boards, and $why:"
+            printf '%s\n' "$changed" | sed 's/^/  /'
+            echo "Make a page that shows that one change, before beside after, cropped to what"
+            echo "changed and naming where to find it (ui/design-before-build.md, \"A touch-up"
+            echo "gets its own before and after\"). Name it in the message, on a line of its own:"
+            echo "  Before-after: <its path in the repository, or its https link>"
+            echo "A change that doesn't alter the look: Before-after: none, <why, three words or more>"
+        } >&2
+        exit 1
+    fi
 fi
 exec "$PRACTICES_BIN/check-private" "$msg"

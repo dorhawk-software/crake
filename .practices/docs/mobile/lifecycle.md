@@ -117,3 +117,84 @@ font scale.
 
 **Check.** Turn on the largest text size and Reduce Motion, and walk every
 screen.
+
+## Text takes its container's width
+
+**What.** A line of text beside something else, or centred, is given the
+width it may use: `flex: 1` in a row, `alignSelf: 'stretch'` in a
+column. It is never left sized to its own words.
+
+**Why.** React Native on Android measures a Text sized to its own words
+a few pixels narrower than it draws it. The last word wraps onto a
+second line that the box has no room for, and disappears. Obálka lost
+it twice in one day: the empty inbox's centred title read "Ve schránce
+nic" for "Ve schránce nic není"
+([513c75c](https://github.com/dorhawk-software/obalka/commit/513c75c)),
+and a slip's header beside "ISDS" read "DORUČENKA ·" for "Doručenka ·
+fikcí" ([422f75c](https://github.com/dorhawk-software/obalka/commit/422f75c)).
+iOS and every test drew both whole. Upper-casing the string instead of
+`textTransform` did not help: the box stayed short.
+
+**Apply.**
+1. In a row, the text that may grow takes `flex: 1`; what sits beside
+   it keeps its own size.
+2. A centred line stretches to its column and centres its words with
+   `textAlign`, rather than the box being centred.
+3. A test holds the fix: the Text's style has `flex: 1` (or the
+   stretch), and fails without it.
+
+**Check.** Walk each new screen on an Android device or emulator and
+read every line to its end; a screenshot of the iOS simulator or a
+test proves nothing here.
+
+## Every string names its face, checked on Android
+
+**What.** Every piece of text the app draws names the app's typeface,
+at the face for its weight. That includes the words inside a UI kit's
+buttons and fields. A test of the props is not proof; the device is.
+
+**Why.** Obálka draws in Public Sans, but Tamagui's `Button` and
+`Input` set no face. Their words fell back to the system's, Roboto on
+Android, on nine buttons and every field. Handing the face to the
+button's `fontFamily` prop did not hold either. The test saw
+`PublicSans-Bold`, while Android resolved the face again from the kit's
+own tokens by weight. The owner's walk still showed Roboto
+([4098c28](https://github.com/dorhawk-software/obalka/commit/4098c28)).
+
+**Apply.**
+1. On Android each weight of a custom font is its own named face
+   (`PublicSans-Bold`), with no synthetic bold. Pick the face from the
+   weight in one place.
+2. Wrap the kit's text-bearing parts once, in the theme module. The
+   wrapper sets the face, so the next button is right untold.
+3. When the kit re-resolves the face, draw the label yourself in the
+   platform's `Text`, with the face and a line height in its style.
+4. A hidden input laid over drawn boxes (a code field) keeps a tiny
+   opacity and a 1 px font. At full size its text shows faintly
+   through; at opacity 0 iOS offers no code to it
+   ([a35f9dd](https://github.com/dorhawk-software/obalka/commit/a35f9dd)).
+
+**Check.** A test asserts the face on the rendered text, and fails
+without the wrapper. Then crop each kind of label on an Android
+emulator at full size, and compare the letter shapes: Roboto's flat
+"S" and "a" give it away.
+
+## A control fades as one piece
+
+**What.** A control dimmed as a whole, such as an unavailable button,
+fades its fill and its words together, as one image.
+
+**Why.** Android applies a view's opacity to each child separately. On
+Obálka's SMS code screen the dimmed Confirm faded its fill, then drew
+its label faded over that faded fill. The label came out grey on grey.
+The browser that drew the design fades the group once, so its label
+stayed bright
+([a35f9dd](https://github.com/dorhawk-software/obalka/commit/a35f9dd)).
+
+**Apply.** Give the dimmed container `needsOffscreenAlphaCompositing`,
+so Android draws it whole before fading it. Or set the dimmed colours
+themselves, with no opacity.
+
+**Check.** Crop the dimmed control beside the design at full
+resolution, on Android. The label's colour matches.
+

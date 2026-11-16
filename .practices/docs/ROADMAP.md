@@ -16,7 +16,8 @@ is the source of everything Rust here; its commit links are in each doc.
 - [x] UI docs: [design before build](ui/design-before-build.md),
   [window buttons](ui/window-buttons.md),
   [keyboard shortcuts](ui/keyboard-shortcuts.md),
-  [an identity pass](ui/identity-pass.md), [visual craft](ui/visual-craft.md)
+  [an identity pass](ui/identity-pass.md), [visual craft](ui/visual-craft.md),
+  [dates, times and numbers](ui/pickers.md), [consent](ui/consent.md)
 - [x] Rust docs: [conventions](rust/conventions.md), [lints](rust/lints.md),
   [coverage](rust/coverage.md), [GPUI](rust/gpui.md)
 - [x] Templates: lints, clippy, deny (GPL and closed-source lists), toolchain,
@@ -130,6 +131,33 @@ is the source of everything Rust here; its commit links are in each doc.
 - **`ui/`, more pages:** tern's design canvas rules (an agreed design only,
   captures of the built app, every screen checked in each language), and
   what Obálka and the website teach about UI.
+- **`scripts/check-ui`, from Scops and the Windows-app runner:** the UI
+  rules' geometry, measured. Scops' misses of 2026-11-15 (targets 2 px
+  apart, buttons in the home indicator, a halo 4 px from text, an
+  off-centre line, two pickers of different sizes) and the runner's
+  button sticking out of its panel were all geometry, and all invisible
+  on a scaled-down board.
+  - [x] One runner over every board, at each width, light and dark, from
+    claude-hook (after edits, and before the turn ends), pre-commit and
+    CI: contain, clip, align, gap, text-size, ring, shadow, halo, centre,
+    state, icon, same-look, contrast (on the pixels behind the text).
+    Each check has a planted fault in `tests/run` and a mutant in
+    `tests/mutate` (1.6.0). ink: one hue per glyph (1.6.3).
+  - [ ] The next checks, most value for least effort (the 2026-11-15
+    audit, [ENFORCEMENT.md](ENFORCEMENT.md)): the bottom safe area on
+    phone boards (34 + 8 px); values off the project's spacing and type
+    scale; a border census (borders and inset rings that aren't focus or
+    a checkbox, nested cards); leftover text (TODO, lorem, "Option A");
+    the face that actually renders (CDP `CSS.getPlatformFontsForNode`);
+    one shadow recipe per elevation and a declared light direction;
+    nothing still animating under reduced motion; a row partly covered
+    by a drawing; one stroke cap and width per icon family; grain where
+    the identity declares texture.
+  - [ ] `actions/check-ui`: the gate in a project's CI, on macOS (boards
+    that use the system's fonts render the same as on the designer's Mac).
+  - [ ] `ui/frames/`: verified phone frames (iOS status bar and Dynamic
+    Island, the lock screen with a Live Activity, Android's status bar
+    with an ongoing notification), taken from the platforms' own kits.
 - **Starts when:** Rust has settled (phase 1 proven in Crake and tern).
 
 ## Known gaps
@@ -151,3 +179,67 @@ convention. Each one leaves this list when it's built.
   is published (phase 5).
 - Scenario suites (one test per scenario, run everywhere) are a documented
   pattern; the shared macro is phase 4.
+- Safe areas and typed values (`ui/visual-craft.md`, `ui/pickers.md`) are
+  a project's own scripts until `check-ui` measures them (phase 7).
+
+## Every rule a machine can check, a gate
+
+The rule since 1.6.0 (CLAUDE.md): a rule a script can decide is enforced
+by one the agent can't skip, and its findings go back to the agent. The
+audit of 2026-11-15 classified every rule ([ENFORCEMENT.md](ENFORCEMENT.md),
+its counts line says how many stand where today). The todo and partial
+rows are this list's source; the most valuable first.
+
+- **Holes in what already runs** (each found by reading the script, not
+  its doc):
+  - [ ] `lint` runs clippy without `-D warnings`, and nothing checks that
+    `[workspace.lints]` and each crate's `[lints] workspace = true` exist:
+    a project that never pasted Cargo-lints.toml passes with warnings.
+  - [ ] Coverage floors: a crate missing from `coverage-floors` is never
+    measured, and deleting a crate's line gets past "never lowered".
+  - [ ] `lint` skips a `lint.d` file that isn't executable, silently.
+  - [ ] `disk-guard` does nothing without a Cargo.toml: Xcode and Gradle
+    builds have no disk floor.
+  - [ ] `rust-ci.yml` never re-checks pushed commit messages
+    (`--no-verify` gets through); pull request bodies aren't checked.
+  - [ ] `actions/rust-lint` puts the private-terms secret in the
+    environment of the step that runs clippy ("Secrets reach only the
+    steps that need them").
+- **Common:**
+  - [ ] check-commit-msg: the Co-Authored-By trailer parses
+    (`git interpret-trailers --parse`), subjects stay under 72 characters,
+    no `feat:`/`fix:` prefixes.
+  - [ ] The commit identity: `user.email` set and equal to a `GIT_EMAIL`
+    in `.practices/config`.
+  - [ ] The changelog's shape: the five headings, `- **headline** body`,
+    and a lockfile change comes with an Unreleased line.
+  - [ ] A workflow lint: third-party actions pinned by SHA, no secrets in
+    the environment of build steps, `run_attempt` in artifact names, no
+    test retries, `cancel-in-progress: false` on release workflows.
+  - [ ] A PreToolUse claude-hook: refuse heavy commands without
+    `nice -n 19`, a `CARGO_TARGET_DIR` or `--target-dir` override, and
+    wiping a simulator or emulator that isn't on the demo list.
+  - [ ] Releases (common/releases.md, mobile/releases.md) and mobile CI
+    have no script in the kit yet: phase 2's release script carries them.
+  - [x] check-voice reads JSX text between tags (1.6.1).
+  - [ ] check-voice reads the copy on design boards, and knows more
+    languages' we-words than English and Czech.
+  - [ ] tests/mutate lists the kit's checks and fails when one has no
+    mutant ("A test of a check is proven by breaking the check").
+- **Rust:**
+  - [ ] `clippy::allow_attributes` and `allow_attributes_without_reason`
+    denied in Cargo-lints.toml.
+  - [ ] Fail on a `[[patch.unused]]` in Cargo.lock (a `[patch]` silently
+    not applied).
+  - [ ] A case-clash check for every project (`git ls-files` folded to
+    lower case has no duplicates).
+- **TypeScript:**
+  - [ ] A shared ESLint flat config (`curly: all`, `no-console`, comments
+    that disable a rule say why, `--max-warnings 0`) and a reusable Node
+    CI workflow that runs `.practices/bin/lint`.
+- **UI:** the next checks for `check-ui`, in phase 7 above.
+  - [x] A commit that changes an existing board names its before/after
+    page (`check-commit-msg`, 1.7.0).
+  - [ ] A `before-after` script: renders a board's object (a selector) at
+    HEAD and in the working tree, both themes, at the device's pixel
+    ratio, and writes the page the trailer names.

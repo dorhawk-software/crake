@@ -1,31 +1,121 @@
 #!/usr/bin/env bash
-# Claude Code hook (PostToolUse on Bash). After every command: the disk's
-# floor (disk-guard). After a cargo command that builds (build, test,
-# check, clippy, run, nextest), or an npm/npx one that tests or checks
-# (test, verify, lint, jest, tsc, eslint): the lint gate. A failure exits 2, which
-# Claude Code hands back to the agent as an error to fix before going on.
+# Claude Code hook. A failure exits 2, which Claude Code hands back to the
+# agent as an error to fix before going on: the agent can't skip it.
 #
-# In .claude/settings.json (or through the practices plugin):
-#   "PostToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command",
-#     "command": "\"$CLAUDE_PROJECT_DIR\"/.practices/bin/claude-hook", "timeout": 900 }] }]
+# PostToolUse (Bash, Edit, Write, MultiEdit, NotebookEdit):
+# - after every call: the disk's floor (disk-guard);
+# - after a cargo command that builds (build, test, check, clippy, run,
+#   nextest), or an npm/npx one that tests or checks (test, verify, lint,
+#   jest, tsc, eslint): the lint gate;
+# - when a design board (UI_BOARDS) changed since the last call, by any
+#   tool (a shell edit too): the UI gate, check-ui, on what changed; when
+#   a copy file (VOICE_FILES) changed: the voice gate, check-voice.
+# Stop and SubagentStop: the agent may not end its turn while a file it
+# changed fails a gate. Blocked twice on the same findings, it may
+# stop, and the person is told what is still open.
+#
+# Why the UI part: on 2026-11-15 an agent called a board ready while a
+# button stuck out of its panel. The rule was written; nothing measured
+# it unless the agent chose to.
+#
+# In .claude/settings.json (the kit's templates/claude-settings.json):
+#   "PostToolUse": [{ "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
+#     "hooks": [{ "type": "command",
+#       "command": "\"$CLAUDE_PROJECT_DIR\"/.practices/bin/claude-hook", "timeout": 900 }] }],
+#   "Stop" and "SubagentStop": the same command, without a matcher.
 set -uo pipefail
 bin=$(cd "$(dirname "$0")" && pwd)
 input=$(cat)
 
-# The command run; without jq or python3, the whole input (a cargo word in
-# the output then runs the gate once more than needed: never less).
-if command -v jq >/dev/null; then
-    command=$(printf '%s' "$input" | jq -r '.tool_input.command // ""' 2>/dev/null) || command=$input
-elif command -v python3 >/dev/null; then
-    command=$(printf '%s' "$input" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tool_input",{}).get("command",""))' 2>/dev/null) || command=$input
-else
-    command=$input
+field() { # field NAME: a string or boolean from the hook's JSON input (or its tool_input)
+    if command -v jq >/dev/null; then
+        printf '%s' "$input" | jq -r --arg k "$1" '(.[$k] // .tool_input[$k] // "") | tostring' 2>/dev/null
+    elif command -v python3 >/dev/null; then
+        printf '%s' "$input" | python3 -c 'import json, sys
+d = json.load(sys.stdin); k = sys.argv[1]; v = d.get(k, (d.get("tool_input") or {}).get(k, ""))
+print(str(v).lower() if isinstance(v, bool) else v)' "$1" 2>/dev/null
+    else # neither: the whole input, so a gate runs more often, never less
+        printf '%s' "$input"
+    fi
+}
+event=$(field hook_event_name)
+
+# --- The gates on files whose content changed since the last call, and on
+# those that failed then: check-ui on the design boards (UI_BOARDS),
+# check-voice on the copy (VOICE_FILES). State lives in the git directory.
+root=$(git -C "$bin" rev-parse --show-toplevel 2>/dev/null) || root=
+gitdir=
+if [ -n "$root" ]; then
+    gitdir=$(git -C "$root" rev-parse --absolute-git-dir 2>/dev/null)
+fi
+gate() { # gate NAME LIST CHECK: 0 when the changed files pass, or none changed; the findings on stderr otherwise
+    local name=$1 list=$2 check=$3 state files out status
+    [ -n "$gitdir" ] || return 0
+    state=$gitdir/practices-$name
+    files=$(
+        cd "$root" || exit 0
+        # shellcheck source=lib.sh
+        . "$bin/lib.sh" >/dev/null 2>&1 || exit 0
+        all=$("$list")
+        [ -n "$all" ] || exit 0
+        printf '%s\n' "$all" | git hash-object --stdin-paths | paste -d ' ' - <(printf '%s\n' "$all") >"$state.now"
+        {
+            if [ -f "$state.hashes" ]; then
+                awk 'NR == FNR { seen[$0] = 1; next } !seen[$0] { sub(/^[^ ]+ /, ""); print }' "$state.hashes" "$state.now"
+            else
+                cut -d ' ' -f 2- "$state.now"
+            fi
+            [ -f "$state.failing" ] && cat "$state.failing"
+        } | awk 'NF && !seen[$0]++' | while IFS= read -r f; do
+            [ -f "$f" ] && printf '%s\n' "$f"
+        done
+    )
+    [ -f "$state.now" ] && mv "$state.now" "$state.hashes"
+    [ -n "$files" ] || return 0
+    out=$(cd "$root" && printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 "$bin/$check" 2>&1)
+    status=$?
+    if [ $status = 0 ]; then
+        rm -f "$state.failing" "$state.findings"
+        return 0
+    fi
+    printf '%s\n' "$files" >"$state.failing"
+    printf '%s\n' "$out" >"$state.findings"
+    printf '%s failed: fix these, or mark a deliberate exception with its reason.\n%s\n' "$check" "$out" >&2
+    return 1
+}
+gates() { # every gate, each one run; 1 when any fails
+    local failed=0
+    gate ui ui_boards check-ui || failed=1
+    gate voice voice_files check-voice || failed=1
+    return $failed
+}
+
+if [ "$event" = Stop ] || [ "$event" = SubagentStop ]; then
+    blocked=${gitdir:+$gitdir/practices-blocked}
+    if found=$(gates 2>&1); then
+        [ -n "$blocked" ] && rm -f "$blocked"
+        exit 0
+    fi
+    # Blocked before on exactly these findings: the agent can't fix them. It may stop; the person is told.
+    if [ "$(field stop_hook_active)" = true ] && [ -f "$blocked" ] && [ "$found" = "$(cat "$blocked")" ]; then
+        n=$(printf '%s\n' "$found" | grep -c '^  - ')
+        failing=$(cat "$gitdir"/practices-*.failing 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
+        printf '{"systemMessage": "%s finding(s) still open in %s. The agent stopped without fixing them; run .practices/bin/check-ui and check-voice to see them."}\n' "$n" "$failing"
+        exit 0
+    fi
+    printf '%s' "$found" >"$blocked"
+    printf "You may not stop yet: files you changed fail a gate. Fix them, or mark a deliberate exception with its reason. Don't tell the person the work is ready while this fails.\n%s\n" "$found" >&2
+    exit 2
 fi
 
+# PostToolUse.
 if ! said=$("$bin/disk-guard" 2>&1); then
     printf '%s\n' "$said" >&2
     exit 2
 fi
+gates || exit 2
+
+command=$(field command)
 printf '%s\n' "$command" |
     grep -qE '(^|[;&|( ]|nice -n [0-9]+ )(cargo( \+[^ ]+)? +(build|b|test|t|check|c|clippy|run|r|nextest)|npm( run)? +(test|t|verify|lint)|npx( --no-install)? +(jest|tsc|eslint))( |$)' ||
     exit 0

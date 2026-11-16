@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# The UI gate: every HTML design board, rendered in headless Chrome at each
+# width and in light and dark, measured against ui/visual-craft.md (what
+# runs past its surface, cut-off content, targets closer than 8 px, text
+# under 11 px, rings drawn with box-shadow, shadows that fall toward the
+# light, rings within 16 px of text, centring off the axis, states that
+# move content, buttons without an icon, like controls that look unlike,
+# contrast). The measuring is in ui-audit.mjs, beside this script.
+#
+#   .practices/bin/check-ui            # every board (UI_BOARDS)
+#   .practices/bin/check-ui FILE...    # just these
+#
+# A deliberate exception is marked in the board, with its reason:
+#   <div class="list" data-allow="clip: the list scrolls, drawn mid-scroll">
+# and a mark without a reason of three words or more is itself a finding.
+#
+# Why: on 2026-11-15 a board was called ready while a button stuck 3 px
+# out of its panel. The rule existed; the agent's own checks measured
+# only height, and nothing ran on its own. A rule a script can measure is
+# measured on every edit (claude-hook), every commit (pre-commit) and in
+# CI, and its findings go back to the agent to fix.
+#
+# Needs Node 18+ and Chrome or Chromium; without them it fails, never
+# passes. Settings in .practices/config: UI_BOARDS, UI_WIDTHS, UI_THEMES,
+# UI_TARGETS, UI_STATES, UI_CHROME (see lib.sh).
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+if [ $# -gt 0 ]; then
+    boards=$(printf '%s\n' "$@")
+else
+    boards=$(ui_boards)
+fi
+if [ -z "$boards" ]; then
+    echo "check-ui: no boards (UI_BOARDS matches no file): nothing to measure"
+    exit 0
+fi
+
+if ! command -v node >/dev/null; then
+    echo "check-ui: needs Node 18 or newer, and there is no node on PATH." >&2
+    exit 2
+fi
+chrome=$UI_CHROME
+if [ -z "$chrome" ]; then
+    for c in "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+        "/Applications/Chromium.app/Contents/MacOS/Chromium" \
+        "$(command -v google-chrome 2>/dev/null)" "$(command -v google-chrome-stable 2>/dev/null)" \
+        "$(command -v chromium 2>/dev/null)" "$(command -v chromium-browser 2>/dev/null)"; do
+        if [ -n "$c" ] && [ -x "$c" ]; then
+            chrome=$c
+            break
+        fi
+    done
+fi
+
+list=()
+while IFS= read -r f; do
+    [ -n "$f" ] && list+=("$f")
+done <<EOF
+$boards
+EOF
+
+nice -n 10 node "$PRACTICES_BIN/ui-audit.mjs" --chrome "$chrome" --widths "$UI_WIDTHS" \
+    --themes "$UI_THEMES" --targets "$UI_TARGETS" --states "$UI_STATES" "${list[@]}"
