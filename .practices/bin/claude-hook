@@ -9,7 +9,15 @@
 #   jest, tsc, eslint): the lint gate;
 # - when a design board (UI_BOARDS) changed since the last call, by any
 #   tool (a shell edit too): the UI gate, check-ui, on what changed; when
-#   a copy file (VOICE_FILES) changed: the voice gate, check-voice.
+#   a proposal or review page (UI_PAGES) changed: the page gate,
+#   check-page; when a copy file (VOICE_FILES) changed: the voice gate,
+#   check-voice; when a board or a copy file (COPY_FILES) changed: the
+#   copy gate, check-copy;
+#   when copy or code changed (PERMISSION_FILES): check-permission-words;
+#   when an Xcode project, entitlements, Swift or a test script changed:
+#   check-xcode and check-ui-tests;
+# - after `xcodebuild archive` or `-exportArchive`: check-ios-artefact on
+#   the archive or the exported .ipa.
 # Stop and SubagentStop: the agent may not end its turn while a file it
 # changed fails a gate. Blocked twice on the same findings, it may
 # stop, and the person is told what is still open.
@@ -42,7 +50,8 @@ event=$(field hook_event_name)
 
 # --- The gates on files whose content changed since the last call, and on
 # those that failed then: check-ui on the design boards (UI_BOARDS),
-# check-voice on the copy (VOICE_FILES). State lives in the git directory.
+# check-page on the proposal pages (UI_PAGES), check-voice on the copy
+# (VOICE_FILES). State lives in the git directory.
 root=$(git -C "$bin" rev-parse --show-toplevel 2>/dev/null) || root=
 gitdir=
 if [ -n "$root" ]; then
@@ -65,7 +74,9 @@ gate() { # gate NAME LIST CHECK: 0 when the changed files pass, or none changed;
             else
                 cut -d ' ' -f 2- "$state.now"
             fi
-            [ -f "$state.failing" ] && cat "$state.failing"
+            # Those that failed, while the gate still reads them: a file taken out of its list
+            # (COPY_FILES narrowed) isn't checked again. Until 1.7.2 it was, on every call.
+            [ -f "$state.failing" ] && printf '%s\n' "$all" | grep -Fxf "$state.failing"
         } | awk 'NF && !seen[$0]++' | while IFS= read -r f; do
             [ -f "$f" ] && printf '%s\n' "$f"
         done
@@ -86,7 +97,12 @@ gate() { # gate NAME LIST CHECK: 0 when the changed files pass, or none changed;
 gates() { # every gate, each one run; 1 when any fails
     local failed=0
     gate ui ui_boards check-ui || failed=1
+    gate page ui_pages check-page || failed=1
     gate voice voice_files check-voice || failed=1
+    gate copy copy_files check-copy || failed=1
+    gate permission permission_files check-permission-words || failed=1
+    gate xcode xcode_files check-xcode || failed=1
+    gate uitests xcode_files check-ui-tests || failed=1
     return $failed
 }
 
@@ -100,7 +116,7 @@ if [ "$event" = Stop ] || [ "$event" = SubagentStop ]; then
     if [ "$(field stop_hook_active)" = true ] && [ -f "$blocked" ] && [ "$found" = "$(cat "$blocked")" ]; then
         n=$(printf '%s\n' "$found" | grep -c '^  - ')
         failing=$(cat "$gitdir"/practices-*.failing 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
-        printf '{"systemMessage": "%s finding(s) still open in %s. The agent stopped without fixing them; run .practices/bin/check-ui and check-voice to see them."}\n' "$n" "$failing"
+        printf '{"systemMessage": "%s finding(s) still open in %s. The agent stopped without fixing them; run .practices/bin/check-ui, check-page, check-voice, check-copy, check-permission-words, check-xcode and check-ui-tests to see them."}\n' "$n" "$failing"
         exit 0
     fi
     printf '%s' "$found" >"$blocked"
@@ -116,6 +132,36 @@ fi
 gates || exit 2
 
 command=$(field command)
+
+# After the agent archives or exports an iOS app: the archive as App Store
+# Connect will see it (mobile/app-review.md). App Review's automated check
+# stopped an iPhone app on 13 Nov 2026 for what this finds.
+arg() { # arg NAME: the value of xcodebuild's -NAME in the command, unquoted
+    printf '%s\n' "$command" | tr '\n' ' ' |
+        sed -nE "s/.*-$1[[:space:]]+(\"([^\"]*)\"|'([^']*)'|([^[:space:];&|]+)).*/\2\3\4/p" | head -n 1
+}
+here() { # here PATH: the path as the agent's shell saw it
+    case $1 in
+    /*) printf '%s' "$1" ;;
+    \~/*) printf '%s/%s' "$HOME" "${1#\~/}" ;;
+    *) cwd=$(field cwd) && printf '%s/%s' "${cwd:-${root:-.}}" "$1" ;;
+    esac
+}
+if printf '%s\n' "$command" | grep -qE '(^|[;&|( ])xcodebuild( |$)' &&
+    printf '%s\n' "$command" | grep -qE '(^|[[:space:]])(archive|-exportArchive)([[:space:]]|$)'; then
+    artefact=
+    if [ -n "$(arg exportPath)" ]; then
+        artefact=$(find "$(here "$(arg exportPath)")" -maxdepth 1 -name '*.ipa' 2>/dev/null | head -n 1)
+    elif [ -n "$(arg archivePath)" ]; then
+        artefact=$(here "$(arg archivePath)")
+        case $artefact in *.xcarchive) ;; *) artefact=$artefact.xcarchive ;; esac
+    fi
+    if [ -n "$artefact" ] && [ -e "$artefact" ] && ! out=$("$bin/check-ios-artefact" "$artefact" 2>&1); then
+        printf 'check-ios-artefact failed on %s: fix these before it is uploaded.\n%s\n' "$artefact" "$out" >&2
+        exit 2
+    fi
+fi
+
 printf '%s\n' "$command" |
     grep -qE '(^|[;&|( ]|nice -n [0-9]+ )(cargo( \+[^ ]+)? +(build|b|test|t|check|c|clippy|run|r|nextest)|npm( run)? +(test|t|verify|lint)|npx( --no-install)? +(jest|tsc|eslint))( |$)' ||
     exit 0

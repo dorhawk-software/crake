@@ -20,3 +20,7 @@ the release notes), then the project's own release notes in
   commit's subject is just the version.
 - Tags and publishing are outward-facing: confirm with the person before
   pushing a tag.
+- An iOS build: run `.practices/bin/check-ios-artefact` on the archive or
+  `.ipa` before it is uploaded. An App Review rejection is fixed, written
+  in `mobile/app-review.md`'s way (a rule and a check), and its item
+  marked resolved before resubmitting.

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# The Xcode gate: what App Review stopped an iPhone app for twice, read
+# from the project itself (mobile/app-review.md). For each target that
+# ships (the app and its extensions), in each build configuration:
+#   - TARGETED_DEVICE_FAMILY is the family the app declares: DEVICE_FAMILY
+#     in .practices/config, or the project-level setting;
+#   - a framework its sources import that needs an entitlement
+#     (FamilyControls, ManagedSettings, DeviceActivity, HealthKit, HomeKit,
+#     and ENTITLED_FRAMEWORKS) has it in the target's entitlements file.
+# It reads project.pbxproj with no Xcode, so it runs on Linux and in CI.
+# The built archive is check-ios-artefact's. The reading is in
+# xcode-audit.py.
+#
+#   .practices/bin/check-xcode            # every Xcode project
+#   .practices/bin/check-xcode FILE...    # the same: a changed file starts it
+#
+# Why: on 13 Nov 2026 App Review's automated check stopped an iPhone app
+# (Screen Time limits, SwiftUI, XcodeGen): its widget compiled the shared
+# folder, which linked ManagedSettings, without the Family Controls
+# entitlement. Two days and a resubmission. An earlier build shipped for
+# iPad too: XcodeGen's iOS preset set "1,2" on each target over the
+# project's "1", and the store asked for 13-inch iPad screenshots.
+#
+# Needs python3; without it, it fails, never passes. An XcodeGen spec
+# (project.yml) with no .xcodeproj fails too: generate it, then check.
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+projects=()
+while IFS= read -r p; do
+    [ -f "$p/project.pbxproj" ] && projects+=("$p")
+done < <(xcode_projects)
+if [ ${#projects[@]} = 0 ]; then
+    specs=$(git ls-files --cached --others --exclude-standard -- 'project.yml' '*/project.yml' | head -n 5)
+    for spec in $specs; do
+        dir=$(dirname "$spec")
+        for p in "$dir"/*.xcodeproj; do
+            [ -f "$p/project.pbxproj" ] && projects+=("$p")
+        done
+    done
+    if [ ${#projects[@]} = 0 ] && [ -n "$specs" ]; then
+        echo "check-xcode: $(printf '%s' "$specs" | head -n 1) is an XcodeGen spec, and no .xcodeproj was generated from it; the targets are unchecked."
+        echo "Fix: run xcodegen generate, then check again (or commit the generated project)."
+        exit 2
+    fi
+fi
+if [ ${#projects[@]} = 0 ]; then
+    echo "check-xcode: no Xcode project, nothing to check."
+    exit 0
+fi
+if ! command -v python3 >/dev/null; then
+    echo "check-xcode: needs python3, which isn't installed; the targets are unchecked."
+    exit 2
+fi
+python3 "$PRACTICES_BIN/xcode-audit.py" project --family "$DEVICE_FAMILY" --frameworks "$ENTITLED_FRAMEWORKS" "${projects[@]}"

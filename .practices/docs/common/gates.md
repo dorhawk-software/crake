@@ -26,7 +26,9 @@ check let every commit through on macOS until 2026-10-26.
 3. Pin scanners and their actions by commit, like any third-party action
    ([ci-caching.md](ci-caching.md#pin-third-party-actions-by-commit)).
 
-**Check.** Break the check's config on a branch: the canary fails the job.
+**Check.** Break the check's config once, while the canary is added: the
+canary fails the job. Then undo the break, and say so in the commit
+([below](#a-new-check-is-broken-once-then-trusted)).
 
 ## A rule a machine can check runs where the agent can't skip it
 
@@ -53,6 +55,14 @@ varies from run to run; a hook doesn't.
    - `claude-hook` on Stop and SubagentStop, so the agent can't end its
      turn, or tell the person it's done, while a check fails;
    - `hooks/pre-commit`, and CI for what got past both.
+
+   A slow gate on Stop (minutes of simulator work) skips while its own
+   lock is held, since a run is already under way. It also skips when
+   nothing it checks changed since its last clean run. On 2026-11-21
+   Scops' Stop hook ran its five-minute pixel match at every turn's end,
+   while a sub-agent was still building the same screens. It repeated a
+   finding already being fixed, and queued simulator runs behind the
+   sub-agent's.
 3. Wire the hooks in `.claude/settings.json` from the kit's template.
    `check-hooks` fails a commit whose settings drop them.
 4. A deliberate exception is written where it applies, with its reason
@@ -63,36 +73,60 @@ varies from run to run; a hook doesn't.
 
 **Check.** `tests/enforcement` fails when a practice has a rule that
 ENFORCEMENT.md doesn't classify. Every gate has a planted fault in
-`tests/run` and a mutant in `tests/mutate`
-([below](#a-test-of-a-check-is-proven-by-breaking-the-check)).
+`tests/run`, and was broken once while it was added
+([below](#a-new-check-is-broken-once-then-trusted)).
 
-## A test of a check is proven by breaking the check
+## A new check is broken once, then trusted
 
-**What.** A check's test (its canary) proves the check works only if the
-test fails when the check is broken. So each check has a mutant: one
-line of the check, broken on purpose, in a copy. The test suite must then
-fail on that check's own case.
+**What.** This is what mutation testing means here, and all it means. The
+owner, 2026-11-18: "a mutation testing is only done when incorporating a
+new rule, and the mutation validates during this addition of that single
+rule that the rule catches it, after mutation verifies it works, the
+mutation is no longer present and the script with its test (a quick one)
+is taken as true". So a check is broken on purpose once, while it is
+added or changed, and its test must fail on its own case. Then the break
+is undone, and the commit says how it was proven. No break is stored,
+and nothing reruns one.
 
-**Why.** On 2026-11-15 an agent proved its new checks by breaking them
-by hand. It reported every one "caught". None was: its copies sat
-outside a git repository, so every run stopped before checking, and the
-refusal counted as a kill. Its baseline then read the exit status of the
-wrong command, and passed every board, faults included. A test of a test
-needs its own guards.
+**Why.** Two incidents. On 2026-11-15 an agent proved its new checks by
+breaking them by hand, and reported every one "caught". None was: its
+copies sat outside a git repository, so every run stopped before
+checking, and the refusal counted as a kill. Its baseline read the exit
+status of the wrong command. A break needs its guards. Then the breaks
+were kept: 141 of them, each a full copy of the kit rerunning the whole
+Chrome-backed `tests/run`. A run took about an hour, loaded the owner's
+Mac, and ran again in twelve CI shards on every push. After its first
+run it proved nothing new. The owner, 2026-11-18: "yea, those mutations
+are bullshit", and "stop the local mutation tests, they are pointless".
 
 **Apply.**
-1. A mutant breaks one line, in a full copy of the project (its `.git`
-   too, so it runs as the real one does). Never mutate the real files: an
-   interrupted run leaves the break behind.
-2. First, the unmutated copy passes the whole suite. If it doesn't, no
-   result counts.
-3. A mutation that matches nothing fails the run. A no-op isn't a kill.
-4. Each mutant names the test case it must fail. A failure for another
-   reason (a crash, a refused start) is reported, not counted.
+1. Plant the fault first: a case in the check's test that the check must
+   catch, on its own rule.
+2. Run that test unbroken: it passes. Without a green baseline, no
+   failure means anything.
+3. Break one line of the check, in the working tree, inside the
+   repository. Not in a copy outside it: 2026-11-15's copies failed
+   before checking.
+4. Run the check's test, or only its part (`tests/run check-ui` here).
+   It must fail with a line naming the check's own case. A failure for
+   another reason (a crash, a refused start, a parse error) proves
+   nothing.
 5. Capture a command's exit status on the next line, into a variable.
+6. Undo the break, and see `git diff` hold only the change you meant.
+   The test passes again.
+7. Say it in the commit, on a line of its own: `Proven: the gap check
+   turned off; tests/run failed on gap.html`.
+8. Keep nothing else: no list of breaks, no job that reruns them. The
+   check and its quick test are taken as true.
 
-**Check.** The practices repository runs `tests/mutate` in CI: every
-check in the kit has a mutant, and each one is killed by its own case.
+**Check.** `check-proven`, run by `check-commit-msg` (the commit-msg
+hook): a commit that adds or changes one of the project's checks
+(`CHECK_FILES`) carries a `Proven:` line of three words or more. This
+repository's own commit-msg hook sets `CHECK_FILES` to the kit's
+scripts and hooks. Whether the break was really tried, and failed on its
+own case, is review. Until 2026-11-18 this rule was "A test of a check
+is proven by breaking the check": every check kept a mutant in
+`tests/mutate`, and CI reran them all on every push.
 
 ## Every finding says how to fix it
 
@@ -140,6 +174,87 @@ visited; it reported zero.
 Count the files it reports checking against `git ls-files`.
 
 **Check.** The gate's file count matches the repository's.
+
+## A subset iterates; only the full run gates
+
+**What.** While working on a few screens, a slow gate may run on just
+those (`--only A,B`). Its result says it was partial. Only a full run
+counts before a merge, and the hooks always run the full set.
+
+**Why.** In Scops, an iOS app, a change to a column view every screen
+shares was meant for one screen (2026-11-22). It made another screen
+fade its text at the standard size. Only the full screenshot match
+caught it: 9 findings, a lead 5 pt off. A run of the screen being worked
+on would have passed.
+
+**Apply.**
+1. Give a slow gate a way to run a few of its items by name. An unknown
+   name fails, listing the names it knows.
+2. A partial run says so in its result: "Only 3 of 51 boards: only a
+   full run counts before a merge".
+3. The commit hook and the Stop hook run the full set. Nothing is merged,
+   or called matching, on a partial run.
+
+**Check.** Review: a claim that rests on a partial run is in the
+conversation. The hooks' full run is the gate.
+
+## Cache by content, never by time
+
+**What.** A slow gate reuses an earlier result only under a key made from
+everything that result is made of. Never by a file's age or a timestamp.
+A changed input gives a new key, and the work is done again.
+
+**Why.** Scops' screenshot match took 8.8 min, 71 % of it shooting the
+app on a simulator. The owner asked: "Is it necessary to shoot 51
+screens when only like 2 change?" (2026-11-23). Keyed by content, a run
+with the app unchanged takes 35 s and boots no simulator. A change to a
+board's text alone is caught in 37 s.
+
+**Apply.**
+1. A design render's key: a hash of the board, every file it loaded (as
+   the browser's network log records them; a web font by its versioned
+   URL), the rendering script, and the browser's and system's versions.
+   A web font that doesn't load fails the render, so a fallback face is
+   never kept.
+2. An app shot's key: a hash of the app as built and its test runner,
+   every file, with code signatures and the linker's per-build UUID
+   (`LC_UUID`) left out. Add the scenario, the device type, the runtime
+   and its build, the text size, the appearance and the shooting code.
+3. Hash what was built, not the sources. A comment or a touched file
+   then costs nothing, and a changed resource can't be missed.
+4. While no key changed, nothing boots: no simulator, no browser.
+5. The cache lives outside the repository, on the build disk. An entry
+   no run used for 14 days goes; `--fresh` redoes everything.
+
+**Check.** Before the cache is trusted, prove it and say so in the commit:
+- a design-only change is caught without the simulator (a board's word
+  changed: 5 findings, no simulator booted);
+- a one-line code change forces every shot again, and fails (a 1 pt
+  padding: 51 screens shot, 2 findings);
+- a kept file is byte-identical to the run it came from;
+- two builds of the same tree give the same app hash (every source
+  touched in between).
+
+A hash that differs when nothing changed costs a reshoot, never a wrong
+reuse. It happened once there, after a rebase.
+
+## A slow gate prints each phase's time
+
+**What.** A gate that takes minutes prints how long each phase took, and
+the total. A claim about its speed quotes those lines.
+
+**Why.** "Please time it, i would like to see some optimizations of the
+process" (the owner, 2026-11-23). The phases showed where Scops' 8.8 min
+went: shots 71 %, renders 16 %. Each change after that was measured, not
+guessed: a render pass from 86 s to 10 s, a shot from 7.47 s to 1.26 s.
+
+**Apply.** Print a line per phase (render, lock wait, build, shots,
+match) and a total. The wait for a shared lock gets its own line: it is
+another run's time. Quote a duration with where it was measured, as for
+CI ([agent-working-rules.md](agent-working-rules.md#quote-measured-ci-timings)).
+
+**Check.** todo: the kit's own slow gates (check-ui, check-ui-tests)
+don't print their phases yet.
 
 ## A ratchet for a rule you can't meet yet
 

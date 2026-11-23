@@ -174,6 +174,128 @@ finding. It runs after edits and on Stop (claude-hook) and in pre-commit.
 Whether the mark is good is review; whether it reads clean is
 the hard stop above.
 
+## The type is chosen for the product, never a tool's default
+
+**What.** The typeface is part of the identity, chosen for this product's
+voice and its users' moment, like its colours and its objects. A face that
+came with a template, a design tool or an agent's first draft is a
+placeholder until it is chosen. To choose:
+- propose three or four faces, and the current face made lighter (the
+  cheapest change), each on the same few defining screens with only the
+  type changed: layout, sizes, colours, icons and words stay;
+- show them blind to real people: no labels or file names, an order that
+  puts each option in each position once (a Latin square), every screen at
+  full size, and an open question ("what does each make you feel?") before
+  any leading one;
+- give each option its cost: what a switch changes in the code, the boards,
+  the checks, the licence notice and the wordmark. A new face reopens the
+  identity: say so.
+
+**Why.** Scops (2026-11-21): someone close to the owner said the app
+"looks like AI made it", and named its rounded, heavy face (Nunito at
+800–900), the look of countless generated posters. Four options went on
+one page and on a blind page; the owner and that person picked Literata for
+what the owl says with Source Sans 3 for the interface (2026-11-22). The
+first round's blind set wasn't blind: its images repeated the labelled
+ones on the same page, one option always sat next to the same other, and
+the screens were shown at 268 px, where 12 px tab labels read at 8 px.
+
+**Apply.**
+1. At iteration 1, write in the brief why the face fits; a face nobody
+   chose is a question for the owner.
+2. When the owner or a user doubts the look, run the round above before
+   changing anything, and keep the current face's lighter version among
+   the options.
+3. Put the blind page on its own, with the key only on the proposal, in a
+   closed section.
+
+**Check.** Review: the proposal shows the options on the same screens, a
+blind page, and each option's cost. What a machine can check runs in
+`check-ui`: the rules below.
+
+## Roles by meaning
+
+**What.** A product with two faces gives each a role by what the text is,
+never by its size:
+- the voice face takes what the product says: its titles, its sentences,
+  the words that comfort or explain;
+- the interface face takes what you tap or scan: buttons, labels, tabs,
+  values, and every time and number;
+- times and counts are set in tabular figures, so a countdown doesn't jump
+  as it changes and a column of times lines up.
+
+**Why.** Scops' first type proposal (2026-11-21) assigned the faces by
+size: 28 px and up to the serif. So the 84 px night countdown, the number
+a parent reads at 3 a.m., went to the serif's hairlines, and every
+sentence the owl says (15–17 px) went to the sans: the opposite of the
+proposal's own reasoning. An independent review caught it from the
+generated boards.
+
+**Apply.**
+1. List the roles per screen: each text is voice or interface. Generate
+   from the list, not from a size threshold.
+2. Check that the interface face's figures are tabular, or set
+   `font-variant-numeric: tabular-nums`; a face without a `tnum` feature
+   ignores that setting, so measure.
+3. A one-face product has one role; the figures rule still holds.
+
+**Check.** `check-ui` (rule `tabular`) finds each time (`21:05`, `03:48`)
+and each element marked `data-number`, and measures its figures in its own
+font and settings: ten 0s against ten 1s. Different widths are a finding.
+A time set as a word that never changes or lines up (a title) is marked
+`data-allow="tabular: <reason>"`. Which face takes which role is review.
+
+## A face change keeps the ink
+
+**What.** A new face, or a new weight of the same face, puts down as much
+ink in small text (15 px and under) as the agreed one, within ±5 %, unless
+the owner asked for lighter or heavier. Measure it: sum each small text's
+ink on a render at 2×, against the same text in the agreed face.
+
+**Why.** Scops (2026-11-21): the first type proposal mapped the old
+weights to lighter ones by eye, and its option A's small text came out at
+85–98 % of today's ink ("noc 2 · od 20:58" at 85 %). The owner had
+already turned down thin small text on the night screens (2026-11-19).
+The second round set the small weights from measurement: 99 % (94–106 %).
+
+**Apply.**
+1. Measure before you show a type option: small text, text from 16 to
+   27 px, and the total width (a wider face moves line breaks).
+2. Raise the small weights until the ink matches; a face whose heaviest
+   weight can't reach it says so in its cost.
+3. Give the numbers on the proposal.
+
+**Check.** Review, from the measurement. Scops' `type_measure.mjs` does it
+in Chrome; the kit has no check for it yet (ROADMAP).
+
+## Every face draws the product's own language
+
+**What.** Every letter of the product's languages comes from the face
+itself, never from a system fallback, and the marks those letters carry
+keep their spacing: a caron, an apostrophe-like hook, a ring. Check it in
+the language's own words, at the sizes the product uses.
+
+**Why.** Scops (2026-11-21): Merriweather Sans' ď overhangs its advance by
+0.072 em (Nunito's by 0.045, Source Sans 3's by 0.015), so "teď 10 min"
+read "teď10" and "Teď si" read "Teďsi". Czech writes ď and ť all the time.
+The faces' letters themselves were all there; a face that lacks one, or a
+web font served without the subset that holds it, has the browser draw it
+in a system face, and nobody sees it at a glance.
+
+**Apply.**
+1. Load the subsets the language needs (Google Fonts serves Czech's č, ř,
+   ž from latin-ext).
+2. Look at crops of the words with marks (ď, ť, ľ in Czech and Slovak) in
+   every face on the proposal, and name a face's flaw as its risk.
+
+**Check.** `check-ui` (rule `fallback`) asks Chrome which fonts it really
+drew each element's own text in (`CSS.getPlatformFontsForNode`). Text that
+asks for a face the page loads, drawn partly in a system font, is a
+finding that names the text and the fallback. Text whose stack starts with
+a system or generic family means the system's face and isn't checked; a
+sign the face lacks on purpose (an arrow the system draws) is marked
+`data-allow="fallback: <reason>"`. The spacing around marks is review.
+
 ## Iteration 1: establish the identity
 
 The identity brief above, then the two rules below: the bar, and how far

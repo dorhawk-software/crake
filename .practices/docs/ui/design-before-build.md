@@ -32,6 +32,35 @@ choice happens before the code.
 **Check.** A UI commit points at its proposal or canvas page. The design
 doc lists what was rejected.
 
+## The owner answers one question at a time
+
+**What.** Open questions go to the owner in the agent's question dialog,
+a few per round, one per step. Each step stands alone: the page's link,
+the board's name, the options in plain words, the recommendation first.
+The page with the boards is for looking; the answers come from the dialog.
+
+**Why.** On 2026-11-21 two Scops proposal pages held 22 numbered
+questions. The owner asked: "can we do a questionnaire of the gazzilions
+questinons and we will do them one by one?" In the dialog all 22 were
+answered in six short rounds. Later a step named its board but not the
+page's link. The dialog covers the chat that held the link, and the owner
+wrote: "where is the link to the design? i cannot find it anywhere".
+
+**Apply.**
+1. Number the questions on the page, so each step can name its place.
+2. Ask in the dialog, up to four steps a round, grouped by topic.
+3. Each step carries the page's link and the board's name, two to four
+   options, and "(Recommended)" on the first.
+4. A question with one proposal ("OK as proposed?") still offers two
+   answers: as proposed, or what should differ.
+5. Save each answer to a file as it arrives, so a restart loses nothing.
+   Quote the owner's free-text answers word for word in the decision
+   record.
+
+**Check.** Review: the questions live in the agent's dialog, which no
+script sees. The proposal page's numbered questions are what a script
+could count.
+
 ## The design holds only agreed designs
 
 **What.** After a pick, the losing variants and their labels come off the
@@ -144,6 +173,13 @@ of pixels across the same parts of both: line weights, insets, heights.
 Any image tool that dumps a row of pixels will do (ffmpeg's `crop` to
 `rawvideo`, for one).
 
+Then make the comparing a gate. Scops' screenshot match renders each
+board and shoots each built screen at the same size, then compares them
+object by object, on every commit. A gate that slow needs the rules in
+[gates.md](../common/gates.md) to stay usable: iterate on a subset, gate
+on the whole; cache by content; time every phase. Its shots follow
+[the rule below](#a-screenshot-gate-launches-the-app-once).
+
 **Check.** The handoff includes the side-by-side capture and the measured
 line weights and insets of each new object.
 
@@ -208,9 +244,65 @@ where the fault was found.
 6. Each fault the owner finds becomes a test that fails without the fix
    ([testing.md](../common/testing.md), "A guard test per incident,
    proven able to fail"). A new kind of fault becomes an item in step 3.
+7. Measure text line by line: each line's ink width and left edge, not
+   only the paragraph's box. Type tuned to the design's ink (a weight
+   and a tracking per style) sets each line's tracking from the width
+   the browser gives that line.
+
+A paragraph's box hides a line. Scops' pixel match measured each text's
+box. A note's first line came out 1.0 pt narrower than the board's and
+passed, because its second line was the widest. On 2026-11-21 a new
+board's sentence had its narrow line widest: 1.3 pt short, a finding.
+The cause was the type tuning: one tracking per text style, fitted over
+all its strings. A line with another mix of letters missed by up to a
+point. Tracking set per line, from the line's own browser width, made
+all 29 boards match.
 
 **Check.** The handoff names each object checked at 1:1 against its
 design crop. The commit counts the owner's catches. The goal is zero.
+
+## A screenshot gate launches the app once
+
+**What.** A gate that shoots many screens of an app launches it once.
+Each later screen is switched in place, under a debug-only flag, and
+rebuilt as a launch would build it. A shot waits for the app's own ready
+mark, never a fixed sleep. A guard compares a switched screen with a
+launched one, and is proven able to fail.
+
+**Why.** Scops, an iOS app, shot each screen with a fresh launch and a
+2 s sleep. Over 59 shots a shot took 7.47 s: the launch 4.28 s, waiting
+for a button 1.06 s, the sleep 2.00 s, the screenshot 0.09 s
+(2026-11-23). The owner: "Yes, keep all 51, make shots fast". Switched in
+place, a shot takes 1.26 s. A full run after a code change fell from
+8.8 min to about 3 min.
+
+**Apply.**
+1. The switch lives in debug builds only, behind a launch flag. Scops
+   posts a Darwin notification per scenario.
+2. It rebuilds what a launch builds: the model emptied and seeded again,
+   and a new identity for the root view, so no view keeps its own state.
+3. Each scenario's screen publishes a ready element once it is up
+   (`ready-<scenario>`, on the cover while one is shown). The test waits
+   for it, then fails naming the scenario (15 s there).
+4. It then takes screenshots until two in a row agree, with a limit
+   that fails loudly. A capture taken mid-draw differs from the next.
+5. Before shooting, the test checks the device's text size and
+   appearance, and fails naming both. A wrong setting is then one
+   failure, not a finding on every screen.
+6. The guard: for pairs that leave state of different kinds behind (a
+   view's own state, a cover, the model's), shoot B launched, and A
+   launched then switched to B. Compare them below the status bar.
+7. Allow 2 levels a channel, no more. Surfaces blurred in a Canvas
+   dither differently from run to run, and between a fresh process and
+   a used one. State left behind differs by hundreds of levels.
+
+**Check.** The guard runs with every set of shots, and was broken once:
+with the switch keeping the view tree, it failed with 1,386,033 pixels
+off, worst 236 levels. Of 59 switched screens, 9 matched their launched
+shots exactly, 44 within 1 level and 6 within 2. The match's findings
+were the same either way: none. `check-shots` compares a live switch
+with a fresh start the same way, without the tolerance
+([mobile/devices.md](../mobile/devices.md#a-live-switch-draws-what-a-fresh-start-draws)).
 
 ## A value the scale doesn't have is a question for the owner
 
@@ -251,13 +343,162 @@ live:
 6. What personal data could it carry? Say plainly what is in it, and let
    the user read it first.
 
+Every option, the recommended one above all, is also read against the
+spec's text. An option that contradicts the spec says so, and says how
+the spec would change.
+
 **Why.** The assessments checked proposals against the design rules, not
 against their surroundings. The product owner then had to point out each
 of these six for one feature (2026-10-19). The critique also caught real
 faults before they reached anyone: a clipped mark, and type too small to
 read.
 
-**Apply.** Put the six questions into every review prompt, and answer
-them yourself first. Show before and after side by side.
+On 2026-11-21 a Scops review page recommended a restart button where the
+spec puts the restart in settings. Another board drew it at 12:10; the
+spec allows it "in the evening only". The agent's own pass missed both.
+The independent reviewer, given the spec's sections, quoted the lines.
 
-**Check.** The proposal page or message answers the six questions.
+**Apply.** Put the six questions into every review prompt, and answer
+them yourself first. Give the reviewer the spec's sections the proposal
+touches, and ask it to quote the line each option follows or changes.
+Show before and after side by side.
+
+**Check.** The proposal page or message answers the six questions, and
+quotes the spec line any option changes.
+
+## Proposal pages pass a checklist before review
+
+**What.** Before a reviewer or the owner sees a proposal page, its
+author goes through a checklist and fixes what it finds. `check-page`
+runs the part a script can. The review is then for judgement.
+
+**Why.** Scops' proposal pages went through three review rounds before
+the owner saw them (2026-11-20 to 23). Each round found what a list or a
+script could have: an option's letter alone at a line's end ("C /
+rozhodne"), a table that scrolled sideways at 375 px, an A about
+2,100 px from its B, a 10.4 MB page. The owner chose a checklist the
+author meets first (2026-11-23): the loop "greatly reduces the ability
+to iterate and move the design forward".
+
+**Apply.** Run `check-page` on the page, then `check-ui` and
+`check-copy`. Then go through the list:
+- **Layout, as the owner reads it on a phone.**
+  - Each question sits beside its own images: the question, its boards
+    and the recommendation in one numbered section.
+  - Each before/after pair fits one 812 px screen at 375 px: crop to the
+    band that changes, and put the pair side by side.
+  - Crops are cut at an explicit offset, at the device's 2x, and drawn
+    at most at half their pixel width, each linked to its whole board.
+    The page stays around 1 MB (WebP). macOS' `sips -c` crops around the
+    centre whatever offset it is given: crop a decoded PNG instead.
+  - No one-letter word ends a line where the language ties it, an
+    option's letter included; nothing scrolls sideways at 375 or 390 px.
+  - `<!doctype html>` first, and `<meta charset="utf-8">`.
+- **Options, a fair choice.**
+  - Every option is drawn, at its best. The owner can't judge a sheet
+    nobody drew.
+  - Rivals sit over the same screen and state, the option's letter in
+    the caption.
+  - Each "before" is the alternative being decided.
+- **Content, true and per the spec.**
+  - Every sentence is true on each screen it would show on.
+  - Each row's label promises what it records: name the event it writes.
+  - A recommendation follows the spec, or says what it changes
+    ([above](#review-a-proposal-in-its-place-with-fresh-eyes)).
+- **Each language's rules.** Every form the copy can take (gender, case,
+  the person addressed), any number of people or items, and the
+  product's own names and words, as its copy rules say
+  ([voice.md](../common/voice.md#each-languages-grammar-is-checked)).
+- **Order.** Ask which rows a screen offers before how its words name
+  them. Each question says which earlier answers it depends on.
+
+**Check.** `check-page` reads each page in `UI_PAGES` (by default
+`design/proposals/` and `design/changes/`) at each width in
+`PAGE_WIDTHS` (375 and 390 px): `sideways`, `one-letter-end` (in a
+language whose copy rules tie one-letter words), `image-width`,
+`image-pixels`, `doctype`, `charset`, `lang`. It runs from claude-hook
+after edits and on Stop, and from pre-commit. The rest of the list is
+the author's, and the reviewer's.
+
+## Every fact a screen uses was entered earlier
+
+**What.** When a screen relies on data ("start Wednesday, after
+swimming"), the flow that reaches it contains the step where the person
+gave that data, or where the app got it, with consent. A fact two screens
+show comes from one source, so they never disagree.
+
+**Why.** Scops' onboarding step "Kdy začít" (when to start) recommended
+"Wednesday evening, after swimming", from the week's events (2026-11-16).
+But onboarding never asked for events: they lived only in the Týden
+(week) tab. Every board was right on its own; the flow wasn't. The same
+screen said "three days with no morning events after Wednesday", while
+Týden had a vaccination on Friday at 9:15: two screens disagreeing about
+one fact.
+
+**Apply.**
+1. For each screen, list the facts it shows or decides from. Beside each
+   one, write the step that supplies it: the person's input, the phone's
+   calendar, a default.
+2. Walk the flow in the prototype as a new user. A fact with no earlier
+   step means a missing screen, not a copy fix.
+3. The demo data is one story. A fact shown on two screens (an event, a
+   time, a name) comes from one source in the generator, never typed
+   twice. Mark it where it is shown, `data-fact="swim-time"`.
+4. A step that collects data used later may be skipped ("Teď nic pevného
+   nemáme", nothing fixed yet). The later screen then has a designed
+   state for no data.
+
+**Check.** `check-copy` (fact) compares every element marked
+`data-fact="KEY"` across all the boards, per language: one fact, one
+wording. A board changed alone is still compared with all the others.
+Whether a step supplies each fact is the click-through walk: for each
+screen that recommends something, the reviewer asks "where did this come
+from?" and points to the step.
+
+## Every control records an event or only navigates
+
+**What.** Each button or choice on a board either records an event the
+spec's event table lists, or only moves to another screen. A choice that
+changes what happens next and records nothing is a finding.
+
+**Why.** An event-sourced app rebuilds its state from what was recorded,
+and only recorded events reach a second device. Scops' audit of
+2026-11-21 found choices that recorded nothing: keeping the evening at
+20:50, declining a phase offer, adding a waking nobody tapped. Each was
+forgotten on restart, and the other parent's phone never learned it.
+
+**Apply.**
+1. Give each control on a board its event, or mark it as navigation.
+2. A choice with no event in the spec is a question for the owner:
+   which event records it.
+3. The spec's event table names the buttons that write each event.
+
+**Check.** todo: a check reads every button on the boards and matches its
+label to the spec's event table or a navigation mark; a button left over
+fails.
+
+## Cross each new event with each state before asking
+
+**What.** Before the first question of a round, cross each new event or
+control with each state it can happen in. Every pair the spec doesn't
+answer is a question in that same round.
+
+**Why.** Scops' audit of 2026-11-21 asked the owner 22 questions. Writing
+the answers into the spec found 8 more, those answers found 4, and those
+found 3. Each was a pair nobody had crossed: undoing a pause during a
+wait, then during a visit, then during an extra visit. Four rounds of the
+owner's time went on what one table would have shown.
+
+**Apply.**
+1. List the states (screens or engine modes) and the new events, as a
+   table.
+2. In each cell write what the spec says happens, or "undefined".
+3. Ask about every undefined cell in the round, grouped by event.
+   Recommend the answer of the nearest decided cell.
+4. A reference engine fails loudly on an undefined pair, naming it,
+   instead of guessing ([not-now.md](../common/not-now.md), "Fail loudly
+   instead of a silent stub").
+
+**Check.** todo: in a project with a reference engine, a test enumerates
+every state and event pair and fails on one the engine doesn't define.
+Whether the questions cover the table is review.

@@ -3,9 +3,19 @@
 # width and in light and dark, measured against ui/visual-craft.md (what
 # runs past its surface, cut-off content, targets closer than 8 px, text
 # under 11 px, rings drawn with box-shadow, shadows that fall toward the
-# light, rings within 16 px of text, centring off the axis, states that
-# move content, buttons without an icon, like controls that look unlike,
-# contrast). The measuring is in ui-audit.mjs, beside this script.
+# light, rings within 16 px of a text's ink, centring off the axis, states
+# that move content, buttons without an icon or with a label that names no
+# outcome, like controls that look unlike, targets in a phone's safe areas,
+# labels that wrap, a live page behind an open sheet, contrast, loops that
+# don't stop for reduced motion, words scaled out of their shape) and ui/feedback.md (a busy control,
+# aria-busy="true", that can still be pressed, doesn't end its words in
+# "…", or has nothing moving in it). The measuring is in ui-audit.mjs,
+# beside this script, and ui-motion.mjs; the words a button may not say
+# alone are each language's, in copy-rules/<lang>.mjs.
+#
+# A fixed-width board (a 390 px phone) renders at its own width: say it in
+# <meta name="viewport" content="width=390">, or in canvas.json beside it.
+# A board with no dark rules renders in one theme.
 #
 #   .practices/bin/check-ui            # every board (UI_BOARDS)
 #   .practices/bin/check-ui FILE...    # just these
@@ -62,4 +72,4 @@ $boards
 EOF
 
 nice -n 10 node "$PRACTICES_BIN/ui-audit.mjs" --chrome "$chrome" --widths "$UI_WIDTHS" \
-    --themes "$UI_THEMES" --targets "$UI_TARGETS" --states "$UI_STATES" "${list[@]}"
+    --themes "$UI_THEMES" --targets "$UI_TARGETS" --states "$UI_STATES" --copy-rules "$COPY_RULES" "${list[@]}"

@@ -1,24 +1,37 @@
 // The UI gate's measuring half: renders each HTML board in headless Chrome
-// at every width and theme, and measures what ui/visual-craft.md asks.
+// at every width and theme, and measures what ui/visual-craft.md asks
+// (busy controls and loops: ui-motion.mjs).
 // check-ui runs it; read that script for the settings. No packages: it
 // talks to Chrome over --remote-debugging-pipe (any Node 18+).
 //
 //   node ui-audit.mjs --chrome PATH --widths "1100 1440" --themes "light dark"
 //        --targets SELECTOR --states "focus hover" --min-text 11 --gap 8
-//        --halo 16 FILE...
+//        --halo 16 --safe-top 54 --safe-bottom 34 --safe-gap 8
+//        --copy-rules DIR FILE...
+//
+// A board drawn at a fixed width (a phone's 390 px artboard) says so, in
+// <meta name="viewport" content="width=390"> or in a canvas.json beside
+// it ({"boards": {"name.html": {"w": 390}}}), and renders at that width
+// only. A board with no dark rules (no prefers-color-scheme, light-dark()
+// or dark color-scheme) renders in the first theme only: the other would
+// draw the same pixels (Scops, 2026-11-16: 348 renders where 87 would do).
 //
 // Exit 0: no findings. 1: findings (printed, grouped). 2: it couldn't
 // measure (no Chrome, a page that didn't load): never "clean".
-import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { inflateSync } from "node:zlib";
+import { startChrome } from "./ui-chrome.mjs";
 import { markAudit } from "./ui-mark.mjs";
+import { motionAudit } from "./ui-motion.mjs";
+import { typeAudit } from "./ui-type.mjs";
+import { decodePng, pixelContrast } from "./ui-pixels.mjs";
+import { RULE, fixedWidth, THEMED } from "./ui-board.mjs";
+import { loadRules } from "./copy-audit.mjs";
 
 const opts = { widths: "1100 1440", themes: "light dark", targets: "button, a[href], [role=button], input, select, textarea, summary",
   states: "focus hover active pressed", "min-text": "11", gap: "8", halo: "16", chrome: "",
+  "safe-top": "54", "safe-bottom": "34", "safe-gap": "8", "copy-rules": "",
   "mark-stroke": "1", "mark-brand": "10", "mark-small": "24" };
 const files = [];
 const argv = process.argv.slice(2);
@@ -30,42 +43,18 @@ const die = (msg) => { console.error(`check-ui: ${msg}`); process.exit(2); };
 if (!files.length) die("no boards given");
 if (!opts.chrome || !existsSync(opts.chrome)) die(`no Chrome at "${opts.chrome}". Fix: install Google Chrome or Chromium, or set UI_CHROME in .practices/config.`);
 
-// --- Chrome over a pipe: fd 3 to Chrome, fd 4 from it, JSON messages ending in \0.
-const profile = mkdtempSync(join(tmpdir(), "check-ui-"));
-const args = ["--headless=new", "--remote-debugging-pipe", "--disable-gpu", "--hide-scrollbars", "--no-first-run",
-  "--no-default-browser-check", "--allow-file-access-from-files", "--force-color-profile=srgb", `--user-data-dir=${profile}`];
-if (process.env.CI) args.push("--no-sandbox"); // CI runners' kernels refuse Chrome's sandbox; the pages are the project's own
-const chrome = spawn(opts.chrome, [...args, "about:blank"], { stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"] });
-let chromeErr = "";
-chrome.stderr.on("data", (d) => { chromeErr = (chromeErr + d).slice(-2000); });
-const cleanup = () => { try { chrome.kill(); } catch {} try { rmSync(profile, { recursive: true, force: true }); } catch {} };
-process.on("exit", cleanup);
-const toChrome = chrome.stdio[3], fromChrome = chrome.stdio[4];
-let id = 0, buf = "";
-const waiting = new Map(), events = [];
-fromChrome.on("data", (d) => {
-  buf += d;
-  let at;
-  while ((at = buf.indexOf("\0")) >= 0) {
-    const msg = JSON.parse(buf.slice(0, at));
-    buf = buf.slice(at + 1);
-    if (msg.id && waiting.has(msg.id)) { waiting.get(msg.id)(msg); waiting.delete(msg.id); } else events.push(msg);
-  }
-});
-chrome.on("exit", (code) => { if (waiting.size) die(`Chrome stopped (exit ${code}): ${chromeErr.trim().split("\n").pop()}`); });
-const send = (method, params = {}, sessionId) => new Promise((ok, fail) => {
-  const i = ++id;
-  const timer = setTimeout(() => fail(new Error(`${method}: no answer in 60 s`)), 60000);
-  waiting.set(i, (m) => { clearTimeout(timer); m.error ? fail(new Error(`${method}: ${m.error.message}`)) : ok(m.result); });
-  toChrome.write(JSON.stringify({ id: i, method, params, ...(sessionId ? { sessionId } : {}) }) + "\0");
-});
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { send, openPage, load, cleanup } = startChrome(opts.chrome, die);
 
 // --- What runs in the page. Returns { findings, measured } for one render.
 function audit(cfg) {
   const out = [];
   const measured = { contrastMeasured: 0, contrastSkipped: 0, pending: [] };
-  const RULES = ["contain", "align", "gap", "clip", "text-size", "ring", "shadow", "halo", "centre", "state", "icon", "outcome", "same-look", "contrast", "mark", "ink"];
+  const RULES = ["contain", "align", "gap", "clip", "text-size", "ring", "shadow", "halo", "inset", "centre", "state", "icon", "outcome", "same-look", "contrast", "mark", "ink", "safe", "wrap", "sheet",
+    "busy", "working", "motion", "squash", "fallback", "tabular", "copy", "fact"]; // copy and fact are check-copy's, marked on the same boards
+  // A page behind an open sheet is inert in the product and aria-hidden on a board: nobody reads or taps
+  // it. elementFromPoint skips inert elements, so a scrim inside one no longer covered its text, and
+  // Scops' boards had false contrast findings under the scrim (2026-11-16).
+  const asleep = (e) => !!e.closest("[aria-hidden=true], [inert]");
   const isSvgInner = (e) => e instanceof SVGElement && e.tagName.toLowerCase() !== "svg";
   const cs = (e) => getComputedStyle(e);
   const hiddenByOpacity = (e) => { for (let a = e; a && a.nodeType === 1; a = a.parentElement) if (+cs(a).opacity === 0) return true; return false; };
@@ -180,7 +169,7 @@ function audit(cfg) {
     const hit = document.elementFromPoint(q.left + q.width / 2 - scrollX, q.top + q.height / 2 - scrollY);
     return !!hit && !(hit === e || e.contains(hit) || hit.contains(e));
   };
-  for (const t of texts) t.covered = t.lines.length > 0 && coveredAt(t.e, t.lines[0]);
+  for (const t of texts) t.covered = t.lines.length > 0 && (t.e.closest("[inert]") !== null || coveredAt(t.e, t.lines[0]));
   window.scrollTo(0, 0);
 
   // How much transforms shrink an element on the screen: the scales of it and its ancestors, from
@@ -234,11 +223,18 @@ function audit(cfg) {
   }
 
   // Targets: separate things a person clicks.
-  const targets = [...document.querySelectorAll(cfg.targets)].filter((e) => visible(e) && !e.closest("[aria-hidden=true]"));
+  const targets = [...document.querySelectorAll(cfg.targets)].filter((e) => visible(e) && !asleep(e));
   const outer = targets.filter((e) => !targets.some((o) => o !== e && o.contains(e)));
-  // A segmented control says so by its role: its options are one control (1.6.1).
-  const SEGMENTED = "[role=tablist], [role=radiogroup]";
-  const segment = (e) => e.closest(SEGMENTED);
+  // A segmented control says so by its role: its options are one control (1.6.1). So is a group of
+  // toggles that each say whether they're pressed, a weekday picker (Scops, 2026-11-16: it needed
+  // three marks).
+  const SEGMENTED = "[role=tablist], [role=radiogroup], [role=group]";
+  const segment = (e) => {
+    const g = e.closest(SEGMENTED);
+    if (!g || g.getAttribute("role") !== "group") return g;
+    const options = [...g.querySelectorAll(cfg.targets)].filter(visible);
+    return options.length > 1 && options.every((o) => o.hasAttribute("aria-pressed")) ? g : null;
+  };
 
   // align: a row of buttons follows its column (ui/visual-craft.md, "Buttons follow the column").
   const rowsSeen = new Set();
@@ -295,7 +291,28 @@ function audit(cfg) {
 
   // halo: a ring or glow keeps 16 px from text that isn't its own.
   const notTargetText = texts.filter(({ e, covered }) => !covered && !e.closest(cfg.targets));
+  // Text is measured to its ink, not its line box: the line box holds the font's whole ascent and
+  // descent, and digits have no descenders (Scops, 2026-11-16: lamp digits "03:48" read as 1.9 px into a
+  // glow 18 px below their ink). The canvas measures the run in its own face, loaded or fallback.
+  const pen = document.createElement("canvas").getContext("2d");
+  const ink = (t) => {
+    if (t.ink) return t.ink;
+    t.ink = t.lines;
+    if (t.e instanceof SVGElement || !pen) return t.ink;
+    const s = cs(t.e);
+    pen.font = `${s.fontStyle} ${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
+    const m = pen.measureText(t.n.textContent.trim());
+    const fa = m.fontBoundingBoxAscent, fd = m.fontBoundingBoxDescent;
+    if (!(fa + fd > 0)) return t.ink;
+    t.ink = t.lines.map((q) => {
+      const base = q.top + (q.height - (fa + fd)) / 2 + fa;
+      const top = Math.max(q.top, base - m.actualBoundingBoxAscent), bottom = Math.min(q.bottom, base + m.actualBoundingBoxDescent);
+      return bottom > top ? { left: q.left, right: q.right, top, bottom } : q;
+    });
+    return t.ink;
+  };
   for (const e of all) {
+    if (asleep(e)) continue;
     const s = cs(e);
     let reach = 0;
     // a ring (outline of 2 px or more) or a glow (zero offset, blurred); a hairline is an edge, not a ring
@@ -310,13 +327,62 @@ function audit(cfg) {
     let worst = null;
     for (const t of notTargetText) {
       if (e.contains(t.e) || t.e.contains(e)) continue;
-      for (const q of t.lines) {
+      for (const q of ink(t)) {
         const dx = Math.max(q.left - ring.right, ring.left - q.right), dy = Math.max(q.top - ring.bottom, ring.top - q.bottom);
         const d = Math.max(dx, dy);
         if (d < cfg.halo - 0.05 && (!worst || d < worst.d)) worst = { d, t };
       }
     }
     if (worst) add("halo", e, `${label(e)}'s ring reaches within ${px(worst.d)} px of "${words(worst.t.e)}"; a visible edge keeps ${cfg.halo} px from text.`);
+  }
+
+  // inset: what lies over a surface's edge takes room from its padding. From the covering edge to the
+  // first text keeps the surface's smallest padding on its other sides (Obálka's letter, tucked 10 px
+  // under its envelope with a padding of 14, showed 4 px above its subject and 14 below, 1.6.5).
+  // A cover is a filled box. A drawing's box isn't what it paints (Obálka's postmark, whose box reaches
+  // over the stamp beside it), and a box that only clips paints nothing.
+  const fills = (c) => {
+    const s = cs(c);
+    if (s.backgroundImage !== "none") return true;
+    const m = s.backgroundColor.match(/[\d.]+/g);
+    return !!m && (m.length < 4 || +m[3] > 0);
+  };
+  const drawn = all.filter(fills).map((c) => ({ c, q: c.getBoundingClientRect() }));
+  const onTop = (c, x, yy) => {
+    window.scrollTo(Math.max(0, x - innerWidth / 2), Math.max(0, yy - innerHeight / 2));
+    const hit = document.elementFromPoint(x - scrollX, yy - scrollY);
+    return !!hit && (hit === c || c.contains(hit));
+  };
+  const SIDES = [["top", "bottom", "left", "right", 1], ["bottom", "top", "left", "right", -1], ["left", "right", "top", "bottom", 1], ["right", "left", "top", "bottom", -1]];
+  for (const s of all) {
+    if (!draws(s) || scrolls(s) || allowNode(s, "inset")) continue;
+    const own = texts.filter((t) => !t.covered && s.contains(t.e) && surfaceOf(t.e) === s);
+    if (!own.length) continue;
+    const r = s.getBoundingClientRect(), st = cs(s);
+    const pad = { top: parseFloat(st.paddingTop), bottom: parseFloat(st.paddingBottom), left: parseFloat(st.paddingLeft), right: parseFloat(st.paddingRight) };
+    for (const [lo, hi, a0, a1, k] of SIDES) {
+      const v = (x) => k * x;
+      const want = Math.min(...SIDES.map(([side]) => side).filter((side) => side !== lo).map((side) => pad[side]));
+      let worst = null;
+      for (const { c, q } of drawn) {
+        if (c === s || c.contains(s) || s.contains(c)) continue;
+        if (!(v(q[lo]) <= v(r[lo]) + 0.5 && v(q[hi]) > v(r[lo]) + 0.5 && v(q[hi]) < v(r[hi]))) continue;
+        const from = Math.max(q[a0], r[a0]), to = Math.min(q[a1], r[a1]);
+        if (to - from < 1) continue;
+        let room = null, line = null;
+        for (const t of own) for (const l of t.lines) {
+          if (l[a0] >= q[a1] || l[a1] <= q[a0]) continue;
+          const d = v(l[lo]) - v(q[hi]);
+          if (room === null || d < room) { room = d; line = t; }
+        }
+        if (room === null || room >= want - 1) continue;
+        const mid = (from + to) / 2, along = (r[lo] + q[hi]) / 2;
+        if (!(a0 === "left" ? onTop(c, mid, along) : onTop(c, along, mid))) continue;
+        if (!worst || room < worst.room) worst = { c, room, line, over: k * (q[hi] - r[lo]) };
+      }
+      window.scrollTo(0, 0);
+      if (worst) add("inset", s, `${label(worst.c)} lies ${px(worst.over)} px over ${label(s)}'s ${lo} edge, leaving ${px(worst.room)} px to "${words(worst.line.e)}"; the room from a covering edge to text keeps the surface's padding, ${px(want)} px.`, label(s) + "|" + words(s) + "|" + lo);
+    }
   }
 
   // centre: a centred block sits on its column's axis.
@@ -339,14 +405,21 @@ function audit(cfg) {
     add("icon", e, `the button "${words(e)}" has no icon.`);
   }
 
-  // outcome: a button's label says what happens, never a word that fits either answer.
-  // English, and Czech (1.6.1: a Czech board's "Zrušit" and "Ano" passed): zrušit and storno (cancel), ano, ne,
-  // potvrdit (confirm), přijmout (accept), odmítnout (decline), přerušit (abort).
-  const vague = /^(cancel|ok|okay|yes|no|confirm|submit|accept|decline|proceed|abort|dismiss|zrušit|storno|ano|ne|potvrdit|přijmout|odmítnout|přerušit)$/iu;
+  // outcome: a button's label says what happens, never a word that fits either answer. The words are
+  // language data, in copy-rules/<lang>.mjs (vagueButtons), read for the language the button is in; a
+  // board that names no language gets every language's words. The label is the accessible name when
+  // there is one: a weekday picker's "Ne" is aria-label="Neděle" (Sunday), not "no" (Scops, 2026-11-16).
+  const lower = (w) => w.toLocaleLowerCase();
+  const vagueAll = new Set(Object.values(cfg.vague).flat().map(lower));
+  const vagueIn = (e) => {
+    const l = ((e.closest("[lang]") || {}).lang || "").toLowerCase().split(/[-_]/)[0];
+    return cfg.vague[l] ? new Set(cfg.vague[l].map(lower)) : vagueAll;
+  };
   for (const e of outer) {
     if (!/^(BUTTON)$/.test(e.tagName) && !e.matches("[role=button], input[type=button], input[type=submit]")) continue;
-    const said = (e.tagName === "INPUT" ? e.value : words(e)).replace(/[.!…]+$/, "").trim();
-    if (!vague.test(said) || allowNode(e, "outcome")) continue;
+    const name = (e.getAttribute("aria-label") || "").trim();
+    const said = (e.tagName === "INPUT" ? e.value : name || words(e)).replace(/[.!…]+$/, "").trim();
+    if (!vagueIn(e).has(lower(said)) || allowNode(e, "outcome")) continue;
     add("outcome", e, `the button "${said}" names no outcome: it could mean either answer to the question it sits under.`);
   }
 
@@ -368,7 +441,65 @@ function audit(cfg) {
   for (const [key, g] of groups) {
     if (g.size < 2) continue;
     const looks = [...g.entries()];
-    add("same-look", looks[1][1], `${key.toLowerCase()} comes in ${g.size} looks (height / size / weight / radius / top padding): ${looks.map(([l]) => l).join(" vs ")}; first at "${words(looks[0][1])}", other at "${words(looks[1][1])}".`, key);
+    // No class: every such button on the board is compared with every other, the main button with a
+    // calendar day (Scops, 2026-11-16: 71 findings, mostly noise around a few real ones).
+    const unnamed = /^[A-Z]+\.(?:$| |\[)/.test(key) ? " These have no class: name each component in the markup (b-main, b-ghost, b-chip, b-day), and same-look compares like with like." : "";
+    add("same-look", looks[1][1], `${key.toLowerCase()} comes in ${g.size} looks (height / size / weight / radius / top padding): ${looks.map(([l]) => l).join(" vs ")}; first at "${words(looks[0][1])}", other at "${words(looks[1][1])}".${unnamed}`, key);
+  }
+
+  // safe: a phone keeps the system's areas, drawn by one frame (ui/visual-craft.md, "Both safe areas
+  // belong to the frame"). The frame is marked data-frame="phone" (data-safe-top and data-safe-bottom
+  // when not an iPhone's 54 and 34 px) and draws its home indicator, marked data-home-indicator.
+  // Nothing to tap sits under the status bar, or less than the safe area plus 8 px above the bottom; a
+  // tab bar sits on the safe area itself. What scrolls inside the frame may pass under the indicator.
+  // Scops, 2026-11-15: 21 of 85 screens had a button 16 to 28 px from the bottom.
+  const phones = [...document.querySelectorAll("[data-frame=phone]")].filter((f) => visible(f) && !asleep(f));
+  if (!phones.length && cfg.fixedWidth && cfg.fixedWidth <= 480)
+    add("safe", document.body, `the board is drawn ${cfg.fixedWidth} px wide, a phone, and marks no phone frame: put data-frame="phone" on the element that draws the phone, so its safe areas are measured.`, "no-frame");
+  const scrollsIn = (t, f) => { for (let a = t.parentElement; a && a !== f; a = a.parentElement) if (/auto|scroll/.test(cs(a).overflowY)) return true; return false; };
+  for (const f of phones) {
+    const top = +(f.dataset.safeTop || cfg.safeTop), bottom = +(f.dataset.safeBottom || cfg.safeBottom);
+    const fr = f.getBoundingClientRect();
+    if (!f.querySelector("[data-home-indicator]") && !allowNode(f, "safe"))
+      add("safe", f, `the phone ${label(f)} draws no home indicator: draw it in the frame (marked data-home-indicator), tab bar or not, so the reserved ${bottom} px show.`);
+    for (const t of outer) {
+      if (!f.contains(t) || t.closest("[data-home-indicator]") || scrollsIn(t, f) || allowNode(t, "safe")) continue;
+      const r = t.getBoundingClientRect();
+      if (r.top >= fr.bottom || r.bottom <= fr.top) continue; // drawn out of the frame's view
+      const bar = t.closest("[role=tablist], nav");
+      const need = bottom + (bar ? 0 : cfg.safeGap), from = fr.bottom - r.bottom;
+      if (from < need - 0.05) add("safe", t, `"${words(t)}" ends ${px(from)} px above the phone's bottom edge; the home indicator reserves ${bottom} px${bar ? "" : `, and content keeps ${cfg.safeGap} px more`}.`);
+      else if (r.top - fr.top < top - 0.05) add("safe", t, `"${words(t)}" starts ${px(r.top - fr.top)} px from the phone's top edge, under the status bar (${top} px).`);
+    }
+  }
+
+  // wrap: a button, chip or tab keeps its label on one line. A wrapped one-line control reads as broken,
+  // and nothing overflowed: the box just grew (Scops, 2026-11-16: an icon pushed "Připojit se k rodině,
+  // která už Scops má" onto two lines). Content meant to stack sits in a flex column, and is skipped.
+  const ONE_LINE = "button, [role=button], [role=tab], [role=radio], [role=checkbox], [role=switch], [role=menuitem], [role=option], summary";
+  const wrapped = new Set();
+  for (const t of texts) {
+    if (t.covered) continue;
+    const target = t.e.closest(ONE_LINE);
+    if (!target || !outer.includes(target) || wrapped.has(target) || allowNode(t.e, "wrap")) continue;
+    const tops = [];
+    for (const q of t.lines) if (!tops.some((y0) => Math.abs(y0 - q.top) < q.height / 2)) tops.push(q.top);
+    if (tops.length < 2) continue;
+    let stacked = false;
+    for (let a = t.e; a && a !== target.parentElement; a = a.parentElement) { const s = cs(a); if (/flex/.test(s.display) && /column/.test(s.flexDirection)) { stacked = true; break; } }
+    if (stacked) continue;
+    wrapped.add(target);
+    add("wrap", target, `the label "${words(target)}" wraps onto ${tops.length} lines; a button, chip or tab keeps one.`);
+  }
+
+  // sheet: the page behind an open dialog is inert, and the board says so with aria-hidden="true" on
+  // everything drawn before the dialog in its screen (the frame it sits in). Scops' open sheets gave
+  // dozens of "overlap" findings from the page behind the scrim (2026-11-16).
+  for (const d of document.querySelectorAll("[role=dialog], [role=alertdialog], dialog[open]")) {
+    if (!visible(d) || asleep(d) || allowNode(d, "sheet")) continue;
+    const screen = (d.parentElement && d.parentElement.closest("[data-frame]")) || d.parentElement || document.body;
+    const live = outer.filter((t) => screen.contains(t) && !d.contains(t) && !t.contains(d) && t.compareDocumentPosition(d) & Node.DOCUMENT_POSITION_FOLLOWING);
+    if (live.length) add("sheet", d, `the dialog "${words(d)}" is open, and ${live.length} target${live.length > 1 ? "s" : ""} behind it ${live.length > 1 ? "are" : "is"} live ("${words(live[0])}").`);
   }
 
   // state: a focus or hover state never moves its content.
@@ -477,126 +608,46 @@ function audit(cfg) {
   return { findings: out, measured };
 }
 
-// What each rule is for, where it is written, and how to fix it (common/gates.md: every finding says how to fix it).
-const RULE = {
-  align: ["Buttons follow the column", "Start the row where the text starts (main action first, escape last), or fill the column with equal parts; one forward action may sit at the trailing edge.", "A surface the platform draws (a macOS alert)"],
-  contain: ["Nothing runs past the surface it is drawn on", "Make the surface wider, let the row wrap, or shorten the words.", "A badge or tooltip that hangs over an edge on purpose"],
-  clip: ["Nothing is cut off by a box too small for it", "Make the box fit its content, or let the content wrap.", "A list that scrolls, drawn mid-scroll"],
-  gap: ["Separate targets keep their distance", "Keep 8 px between separate targets; make a repeated action the whole row.", "A segmented control, a grid of like cells, list rows inside one card"],
-  "text-size": ["Nothing anyone reads under 11 px", "Use the 11 px floor of the type scale.", "A glyph inside a shape (an avatar's initials)"],
-  ring: ["Tone, not outlines: a meaningful ring is drawn with outline", "Draw the ring with outline (and outline-offset), not box-shadow.", "A hairline the platform itself draws"],
-  shadow: ["Depth and texture from a concept: shadows fall away from the light", "Give the shadow a downward offset of at least a quarter of its blur.", "Something the concept says glows (a lamp)"],
-  halo: ["Spacing is measured from what you see: 16 px from a visible edge to text", "Move the text or the ringed object until 16 px separate them.", "A checkbox ring beside its own label"],
-  centre: ["Centred means on the axis", "Let the centred block take its column's full width, or centre it in the column.", "-"],
-  state: ["A choice changes everything it owns, and like controls keep one look", "Draw the state with outline, colour or a fill; never with padding, a border or a weight that changes size.", "-"],
-  outcome: ["Every button names its outcome", "Say what happens: the action's verb and object (\"Remove\"), and for the way out, what stays (\"Keep the app\", \"Keep editing\").", "A surface the platform draws (a macOS alert), in the platform's words"],
-  icon: ["A drawn icon set: every main button carries an icon", "Add the family's icon for the button's action.", "An escape button (Cancel), or two answers that must weigh the same"],
-  "same-look": ["One anatomy per job: like controls keep one look", "Build both from one component, or give the different one its own class and reason.", "-"],
-  contrast: ["Text passes contrast: 4.5:1, or 3:1 for large text", "Darken (or, in the dark theme, lighten) the text or its ground.", "A disabled control, which also says it is disabled"],
-  mark: ["A mark holds at its smallest size", "Measure it where it ships smallest: every stroke 1 px or more, no leftover piece of a cut, the brand element 10 px or taller, and the brand touching the letters or a quarter of a stroke clear of them.", "A mark only ever shown large, a poster or a splash", "ui/identity-pass.md"],
-  ink: ["A glyph keeps one ink", "Print the plane or fill as a faint tint of the stroke's colour, or a neutral (white or black at low alpha, the paper).", "A glyph meant to carry two colours (a flag)"],
-  allow: ["Every exception has a written reason", "Write data-allow=\"rule: a reason of at least three words\".", "-"],
-};
-
-
-// --- Contrast on gradients and images: hide every glyph, screenshot the page,
-// and measure each line of text against the pixels that were behind it.
-function decodePng(buf) {
-  let at = 8, w = 0, h = 0, type = 0;
-  const idat = [];
-  while (at < buf.length) {
-    const len = buf.readUInt32BE(at), kind = buf.toString("ascii", at + 4, at + 8), data = buf.subarray(at + 8, at + 8 + len);
-    if (kind === "IHDR") { w = data.readUInt32BE(0); h = data.readUInt32BE(4); type = data[9]; if (data[8] !== 8) throw new Error("PNG: 8-bit only"); }
-    else if (kind === "IDAT") idat.push(data);
-    at += 12 + len;
-  }
-  const bpp = type === 6 ? 4 : type === 2 ? 3 : 0;
-  if (!bpp) throw new Error(`PNG colour type ${type} isn't RGB or RGBA`);
-  const raw = inflateSync(Buffer.concat(idat)), stride = w * bpp, px = Buffer.alloc(h * stride);
-  for (let yy = 0; yy < h; yy++) {
-    const f = raw[yy * (stride + 1)], line = raw.subarray(yy * (stride + 1) + 1, (yy + 1) * (stride + 1)), o = yy * stride;
-    for (let x = 0; x < stride; x++) {
-      const a = x >= bpp ? px[o + x - bpp] : 0, b = yy ? px[o - stride + x] : 0, c = yy && x >= bpp ? px[o - stride + x - bpp] : 0;
-      let v = line[x];
-      if (f === 1) v += a; else if (f === 2) v += b; else if (f === 3) v += (a + b) >> 1;
-      else if (f === 4) { const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c); v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c; }
-      px[o + x] = v & 255;
-    }
-  }
-  return { w, h, bpp, px };
-}
-const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
-async function pixelContrast(s, result, width) {
-  await s("Runtime.evaluate", { expression: `(() => { const st = document.createElement("style"); st.id = "__check_ui_hide"; st.textContent = "*, *::before, *::after { color: transparent !important; -webkit-text-fill-color: transparent !important; text-shadow: none !important; text-decoration-color: transparent !important; caret-color: transparent !important }"; document.head.append(st); })()` });
-  const { cssContentSize } = await s("Page.getLayoutMetrics");
-  const height = Math.ceil(cssContentSize.height), tile = 4000, tiles = [];
-  for (let top = 0; top < height; top += tile) {
-    const { data } = await s("Page.captureScreenshot", { format: "png", captureBeyondViewport: true, clip: { x: 0, y: top, width, height: Math.min(tile, height - top), scale: 1 } });
-    tiles.push({ top, img: decodePng(Buffer.from(data, "base64")) });
-  }
-  const pixel = (x, yy) => {
-    const t = tiles[Math.floor(yy / tile)];
-    if (!t) return null;
-    const { w, h, bpp, px } = t.img, ly = yy - t.top;
-    if (x < 0 || x >= w || ly < 0 || ly >= h) return null;
-    const o = ly * w * bpp + x * bpp;
-    return [px[o], px[o + 1], px[o + 2]];
-  };
-  for (const p of result.measured.pending) {
-    const ratios = [];
-    for (const [lx, ly, lw, lh] of p.lines) {
-      const sx = Math.max(1, Math.floor(lw / 24)), sy = Math.max(1, Math.floor(lh / 6));
-      for (let yy = Math.ceil(ly); yy < ly + lh; yy += sy) for (let x = Math.ceil(lx); x < lx + lw; x += sx) {
-        const bg = pixel(x, yy);
-        if (!bg) continue;
-        const fg = [0, 1, 2].map((i) => p.fg[i] * p.fg[3] + bg[i] * (1 - p.fg[3]));
-        const [l1, l2] = [lum(fg), lum(bg)].sort((a, b) => b - a);
-        ratios.push((l1 + 0.05) / (l2 + 0.05));
-      }
-    }
-    if (!ratios.length) { result.measured.contrastSkipped++; continue; }
-    ratios.sort((a, b) => a - b);
-    const ratio = ratios[Math.floor(ratios.length * 0.05)]; // the worst 5 %: a stray anti-aliased pixel doesn't decide
-    const need = p.large ? 3 : 4.5;
-    result.measured.contrastMeasured++;
-    if (ratio < need - 0.005) result.findings.push({ rule: "contrast", where: p.where, y: p.y, key: p.label + "|" + p.words,
-      text: `"${p.words}" (${p.label}) is ${Math.round(ratio * 100) / 100}:1 against the pixels behind it (a gradient or a drawing); ${p.large ? "large " : ""}text needs ${need}:1.` });
-  }
-  delete result.measured.pending;
-}
-
 // --- Run every board at every width and theme.
-const runs = [], marks = new Map();
+const runs = [], marks = new Map(), types = new Map(), motions = new Map(), rendersOf = new Map();
+const { vague } = await loadRules(opts["copy-rules"]);
 try {
-  const { targetInfos } = await send("Target.getTargets");
-  const page = targetInfos.find((t) => t.type === "page");
-  const { sessionId } = await send("Target.attachToTarget", { targetId: page.targetId, flatten: true });
+  const sessionId = await openPage();
   const s = (m, p) => send(m, p, sessionId);
   await s("Page.enable");
   await s("Runtime.enable");
   await s("Animation.enable");
   for (const file of files) {
     const url = pathToFileURL(resolve(file)).href;
-    for (const theme of opts.themes.split(/\s+/).filter(Boolean)) for (const width of opts.widths.split(/\s+/).filter(Boolean).map(Number)) {
+    const own = fixedWidth(file);
+    const widths = own ? [own] : opts.widths.split(/\s+/).filter(Boolean).map(Number);
+    const themes = opts.themes.split(/\s+/).filter(Boolean);
+    let themed = true;
+    rendersOf.set(file, 0);
+    for (const theme of themes) for (const width of widths) {
+      if (theme !== themes[0] && !themed) continue; // no dark rules: the other theme draws the same pixels
       await s("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: false });
-      await s("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: theme }, { name: "prefers-reduced-motion", value: "reduce" }] });
-      await s("Animation.setPlaybackRate", { playbackRate: 0 }); // every run measures the same frame
-      events.length = 0;
-      await s("Page.navigate", { url });
-      const t0 = Date.now();
-      while (!events.some((e) => e.method === "Page.loadEventFired" && e.sessionId === sessionId)) {
-        if (Date.now() - t0 > 30000) throw new Error(`${file} didn't load in 30 s`);
-        await sleep(25);
+      await load(sessionId, url, { "prefers-color-scheme": theme, "prefers-reduced-motion": "reduce" }, file);
+      if (theme === themes[0] && rendersOf.get(file) === 0) {
+        const t = await s("Runtime.evaluate", { expression: THEMED, returnByValue: true });
+        themed = t.exceptionDetails ? true : t.result.value !== false;
       }
-      await s("Runtime.evaluate", { expression: "document.fonts.ready.then(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))", awaitPromise: true });
-      const cfg = { targets: opts.targets, states: opts.states, minText: +opts["min-text"], gap: +opts.gap, halo: +opts.halo };
+      rendersOf.set(file, rendersOf.get(file) + 1);
+      const cfg = { targets: opts.targets, states: opts.states, minText: +opts["min-text"], gap: +opts.gap, halo: +opts.halo,
+        safeTop: +opts["safe-top"], safeBottom: +opts["safe-bottom"], safeGap: +opts["safe-gap"], fixedWidth: own, vague };
       const r = await s("Runtime.evaluate", { expression: `(${audit.toString()})(${JSON.stringify(cfg)})`, returnByValue: true, awaitPromise: true });
       if (r.exceptionDetails) throw new Error(`${file}: the audit failed in the page: ${r.exceptionDetails.exception?.description || r.exceptionDetails.text}`);
       const result = r.result.value;
       // The marks once per board, on the first render, before contrast hides the text's colour.
       if (!marks.has(file)) marks.set(file, await markAudit(s, width, opts, decodePng));
       result.findings.push(...marks.get(file));
+      // The faces once per board: what Chrome really drew each text in, and the figures of times.
+      if (!types.has(file)) types.set(file, await typeAudit(s));
+      result.findings.push(...types.get(file));
       if (result.measured.pending.length) await pixelContrast(s, result, width);
+      // Busy controls and loops once per board, last: it may load the board again with motion allowed.
+      if (!motions.has(file)) motions.set(file, await motionAudit(s, { targets: opts.targets }, () => load(sessionId, url, { "prefers-color-scheme": theme, "prefers-reduced-motion": "no-preference" }, file)));
+      result.findings.push(...motions.get(file));
       runs.push({ file, theme, width, ...result });
     }
   }
@@ -618,7 +669,6 @@ for (const run of runs) {
     if (!g.seen.has(render)) g.seen.add(render); else if (g.seen.size === 1) g.copies++;
   }
 }
-const perFile = runs.length / files.length;
 const order = Object.keys(RULE);
 const list = [...grouped.values()].sort((a, b) => order.indexOf(a.rule) - order.indexOf(b.rule) || a.file.localeCompare(b.file) || a.y - b.y);
 let last = "";
@@ -631,12 +681,14 @@ for (const g of list) {
     console.log(`  Fix: ${fix}`);
     if (deliberate !== "-") console.log(`  Deliberate (${deliberate})? Mark the element or its group: data-allow="${g.rule}: <the reason>".`);
   }
-  const seen = g.seen.size === perFile ? "" : ` [${[...g.seen].join(", ")}]`;
+  const seen = g.seen.size === rendersOf.get(g.file) ? "" : ` [${[...g.seen].join(", ")}]`;
   const copies = g.copies ? ` (and ${g.copies} more like it)` : "";
   console.log(`  - ${g.file}, ${g.y} px down: ${g.text}${copies}${g.where ? " " + g.where : ""}${seen}`);
 }
 const n = grouped.size;
-console.log(`\ncheck-ui: ${files.length} board${files.length > 1 ? "s" : ""}, ${runs.length} renders (${opts.themes} × ${opts.widths} px): ${n ? n + " finding" + (n > 1 ? "s" : "") : "no findings"}.`);
+const full = opts.themes.split(/\s+/).filter(Boolean).length * opts.widths.split(/\s+/).filter(Boolean).length * files.length;
+const fewer = runs.length < full ? `; fixed-width boards at their own width, boards with no dark rules in one theme` : "";
+console.log(`\ncheck-ui: ${files.length} board${files.length > 1 ? "s" : ""}, ${runs.length} render${runs.length > 1 ? "s" : ""} (${opts.themes} × ${opts.widths} px${fewer}): ${n ? n + " finding" + (n > 1 ? "s" : "") : "no findings"}.`);
 console.log(`check-ui: contrast measured on ${measured} text runs${skipped ? `; ${skipped} could not be measured` : ""}.`);
 cleanup();
 process.exit(n ? 1 : 0);

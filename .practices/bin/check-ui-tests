@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# The UI-test gate: an iOS app's UI tests run where App Review looks
+# (mobile/app-review.md). In a project with XCUITest files (Swift that
+# uses XCUIApplication):
+#   - each file that launches the app pins its language
+#     (-AppleLanguages, -AppleLocale, or the app's own switch: UITEST_LANGUAGE);
+#   - some UI test runs Xcode's accessibility audit (performAccessibilityAudit);
+#   - a test run names an iPhone SE simulator (name=iPhone SE..., or "iPhone
+#     SE (3rd generation)" in a script, workflow or test plan; not in Swift,
+#     where it is only a comment): 375 x 667 pt, the window an iPhone app
+#     gets on an iPad;
+#   - a test run sets a large text size: `xcrun simctl ui <device>
+#     content_size extra-extra-large` (or larger), or the launch argument
+#     -UIPreferredContentSizeCategoryName UICTContentSizeCategoryXXL.
+# Whether every screen is reached, and its main button asserted on
+# screen, is the tests' own job; this checks they run where it matters.
+#
+#   .practices/bin/check-ui-tests            # the whole project
+#   .practices/bin/check-ui-tests FILE...    # the same: a changed file starts it
+#
+# Why: on 18 Nov 2026 App Review refused an iPhone app (Guideline 4) on
+# an iPad Air 11-inch at a larger text size: the onboarding was taller
+# than the 375 x 667 window, and its Continue button was off screen. The
+# iPad simulator opened the app in a tall window, which hid it; an iPhone
+# SE simulator showed it at once. The same day, UI tests that found
+# buttons by their words failed on a Czech simulator: they never set the
+# app's language.
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+read -r -a spec <<<"$EXCLUDE"
+tests=$(git grep --untracked -l -e 'XCUIApplication' -- '*.swift' ${spec[@]+"${spec[@]}"})
+status=$?
+if [ $status -gt 1 ]; then
+    echo "check-ui-tests: git grep failed (exit $status); the UI tests are unchecked."
+    exit 2
+fi
+if [ -z "$tests" ]; then
+    echo "check-ui-tests: no XCUITest files, nothing to check."
+    exit 0
+fi
+# Where a test run is set up: scripts, workflows, test plans, the tests themselves.
+runs=('*.swift' '*.sh' '*.py' '*.rb' '*.yml' '*.yaml' '*.xctestplan' '*.json' '*.mjs' '*.js' 'Makefile' '*Fastfile')
+
+findings=()
+unpinned=
+while IFS= read -r f; do
+    if ! grep -q 'XCUIApplication()' "$f" || ! grep -q '\.launch()' "$f"; then
+        continue
+    fi
+    grep -qE -e "$UITEST_LANGUAGE" "$f" && continue
+    unpinned="$unpinned"$'\n'"    $f"
+done <<<"$tests"
+if [ -n "$unpinned" ]; then
+    findings+=("these launch the app without pinning its language (no match of UITEST_LANGUAGE, $UITEST_LANGUAGE):$unpinned
+    Fix: app.launchArguments += [\"-AppleLanguages\", \"(en)\", \"-AppleLocale\", \"en_US\"] in the helper that launches it, or name the app's own switch in UITEST_LANGUAGE in .practices/config. Why: a test that finds a button by its words fails on a simulator in another language.")
+fi
+if ! printf '%s\n' "$tests" | tr '\n' '\0' | xargs -0 grep -l 'performAccessibilityAudit' >/dev/null 2>&1; then
+    findings+=("no UI test runs Xcode's accessibility audit. Fix: try app.performAccessibilityAudit() on every screen, the first-run screens too. Why: fixed-size type and grey text on a gradient got past every other test.")
+fi
+# The device is chosen outside the tests, so a Swift comment that names it doesn't count.
+if ! git grep --untracked -q -E -e 'name=iPhone SE' -e 'iPhone SE \([0-9]+(st|nd|rd|th) generation\)' \
+    -- "${runs[@]}" ':!*.swift' ${spec[@]+"${spec[@]}"} 2>/dev/null; then
+    findings+=("no test run names an iPhone SE simulator. Fix: run the UI tests with -destination 'platform=iOS Simulator,name=iPhone SE (3rd generation)', in a script or workflow. Why: an iPhone app on an iPad gets a 375 x 667 window; the iPad simulator doesn't show it.")
+fi
+if ! git grep --untracked -q -E -e 'content_size[[:space:]]+(extra-extra-large|extra-extra-extra-large|accessibility-)' \
+    -e 'UICTContentSizeCategory(XXL|XXXL|Accessibility)' -- "${runs[@]}" ${spec[@]+"${spec[@]}"} 2>/dev/null; then
+    findings+=("no test run sets a large text size. Fix: xcrun simctl ui <device> content_size extra-extra-large before the run, or launch with -UIPreferredContentSizeCategoryName UICTContentSizeCategoryXXL. Why: the reviewer's larger text pushed a Continue button off screen.")
+fi
+if [ ${#findings[@]} -gt 0 ]; then
+    echo "[ui-tests] ${#findings[@]} finding(s). Rules: Every screen fits a small iPhone at a large text size; UI tests pin the app's language (.practices/docs/mobile/app-review.md)."
+    printf '  - %s\n' "${findings[@]}"
+    exit 1
+fi
