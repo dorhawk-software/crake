@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# The copy gate: text that is right word by word can still be wrong in its
+# language, in the grammar between words (common/voice.md, "Each
+# language's grammar is checked"). Each language has a rules file,
+# copy-rules/<lang>.mjs beside this script (cs, en, es) or the project's
+# own in COPY_RULES; each piece of copy is checked by its own language's
+# rules: a board's <html lang>, a catalogue's locale (cs.json, values-cs/,
+# cs.lproj/) or block (`cs: {`). Copy that names no language, or a
+# language with no rules file, is a finding: a new locale ships with its
+# rules. It also checks that a fact several boards show (data-fact="KEY")
+# reads the same on each. The reading is in copy-audit.mjs.
+#
+#   .practices/bin/check-copy            # every copy file (COPY_FILES)
+#   .practices/bin/check-copy FILE...    # just these (every board read for its facts)
+#
+# A deliberate exception (a quoted name, a brand) is marked, with its
+# reason of three words or more: data-allow="copy: a brand's own name" on
+# a board's element, or "practices-allow copy: <reason>" on a string's
+# line or the one above.
+#
+# Why: Scops said "Ve 10:20 ho vzbuďte" (2026-11-16). A time is read
+# aloud, "v deset dvacet", so it is "V 10:20". The owner caught it on a
+# screenshot; check-ui measures geometry, and copy had only a reviewer.
+#
+# Needs Node 18+ (and python3 for files that aren't boards); without
+# them it fails, never passes. Settings in .practices/config: COPY_FILES,
+# COPY_LANG, COPY_RULES (see lib.sh).
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+files=()
+context=()
+if [ $# -gt 0 ]; then
+    files=("$@")
+    while IFS= read -r f; do
+        [ -f "$f" ] && context+=(--context "$f")
+    done < <(ui_boards)
+else
+    while IFS= read -r f; do
+        [ -f "$f" ] && files+=("$f")
+    done < <(copy_files)
+fi
+if [ ${#files[@]} = 0 ]; then
+    echo "check-copy: no copy files (COPY_FILES, UI_BOARDS and VOICE_FILES match none), nothing to check."
+    exit 0
+fi
+if ! command -v node >/dev/null; then
+    echo "check-copy: needs Node 18 or newer, and there is no node on PATH; the copy is unchecked." >&2
+    exit 2
+fi
+for f in "${files[@]}"; do
+    case $f in
+    *.html | *.htm) ;;
+    *)
+        if ! command -v python3 >/dev/null; then
+            echo "check-copy: needs python3 to read $f (and the other copy files), and it isn't installed; the copy is unchecked." >&2
+            exit 2
+        fi
+        break
+        ;;
+    esac
+done
+node "$PRACTICES_BIN/copy-audit.mjs" --lang "$COPY_LANG" --rules "$COPY_RULES" \
+    ${context[@]+"${context[@]}"} "${files[@]}"

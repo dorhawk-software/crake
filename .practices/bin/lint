@@ -8,11 +8,18 @@
 # The checks, in a Rust project (a Cargo.toml): rustfmt; clippy on all
 # targets (Cargo.toml's [workspace.lints] make every lint an error); cargo
 # deny (advisories, licences, sources); cargo machete (unused
-# dependencies); unsafe only where allowed (check-unsafe). In a
+# dependencies); unsafe only where allowed (check-unsafe); in a GPUI app
+# (uses_gpui in lib.sh), no element both rounded and clipped
+# (check-gpui-clip). In a
 # JavaScript/TypeScript project (a package.json): `tsc --noEmit` when
 # there's a tsconfig.json, then each npm script in NPM_CHECKS (default
 # "lint"). In every project: no private names (check-private); file sizes
-# (check-size); no "we" in the copy (check-voice); the git hooks
+# (check-size); no "we" in the copy (check-voice); each language's
+# grammar in the copy (check-copy); no "Allow" on a button before a
+# permission prompt (check-permission-words); an Xcode project's targets
+# with the device family and entitlements they need (check-xcode); UI
+# tests that pin the language and run on a small iPhone at a large text
+# size (check-ui-tests); the git hooks
 # installed (not in CI); then every executable file in
 # .practices/lint.d/, the project's own checks.
 #
@@ -38,6 +45,9 @@ if has_rust; then
     step "cargo deny" cargo deny --log-level error check
     step "cargo machete" cargo machete
     step "unsafe code" "$PRACTICES_BIN/check-unsafe"
+    if uses_gpui; then
+        step "GPUI clipping (rounded corners)" "$PRACTICES_BIN/check-gpui-clip"
+    fi
 fi
 if has_node; then
     if [ -f tsconfig.json ]; then
@@ -50,6 +60,10 @@ fi
 step "private names" "$PRACTICES_BIN/check-private"
 step "file sizes" "$PRACTICES_BIN/check-size"
 step "the product's voice" "$PRACTICES_BIN/check-voice"
+step "the copy's grammar" "$PRACTICES_BIN/check-copy"
+step "permission buttons" "$PRACTICES_BIN/check-permission-words"
+step "Xcode targets" "$PRACTICES_BIN/check-xcode"
+step "UI tests" "$PRACTICES_BIN/check-ui-tests"
 if [ -z "${CI:-}" ]; then
     step "git hooks (run .practices/bin/install-hooks)" "$PRACTICES_BIN/install-hooks" --check
 fi

@@ -91,6 +91,31 @@ Porting an agreed design is the one case where the code may come first: there is
 
 **Check.** No `retry`, `--retries` or rerun-on-failure options in CI or the test runner.
 
+## A stuck renderer is asked once more; a failed comparison never is
+
+**What.** When a renderer gives no answer at all (a capture that never
+returns), the gate may render the same input once more, in a fresh page,
+and say so. A second miss fails, naming the input. A comparison that
+failed is never run again.
+
+**Why.** Once in 51 boards, headless Chrome never answered a screenshot
+request, and Scops' screenshot match died with an unnamed timeout
+(2026-11-23). There was no picture, so no finding a retry could hide. A
+retried comparison would hide one; that stays forbidden
+([above](#no-retries-for-flaky-tests)).
+
+**Apply.**
+1. Time out the call (20 s there). Render the same input again in a new
+   page, and print the miss.
+2. Compare the picture exactly as before. A retry can't turn a finding
+   into a pass.
+3. A second miss fails the run and names the input.
+
+**Check.** Prove the retry by forcing hangs with a test-only switch
+(Scops: `BOARD_SHOT_TEST_HANG=main:N`, the first N captures never sent).
+One miss: the run passed, and the retried picture was byte-identical to a
+normal render. Two misses: the run failed, naming the board.
+
 ## Real-machine bugs become tests
 
 **What.** Keep a checklist of what real people have used the app for on real machines. Tick each item with the date and a role, never a name. A bug found there gets a test on the system where it appeared.

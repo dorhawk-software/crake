@@ -63,8 +63,12 @@ user to Settings. Obálka also stopped reporting the "not authorized yet"
 state as an error
 ([87a249f](https://github.com/dorhawk-software/obalka/commit/87a249f)).
 
-**Apply.** A small screen or sheet with the reason and a button that names
-the action ("Turn on reminders"), then the OS prompt.
+**Apply.** A small screen or sheet with the reason and one button,
+"Continue", then the OS prompt. Not "Turn on reminders" or "Allow": App
+Review refuses a button that asks for the permission itself
+([app-review.md](app-review.md#a-button-that-leads-to-a-permission-prompt-says-continue),
+checked by `check-permission-words`). Until 2026-11-18 this rule asked
+for exactly such a button.
 
 **Check.** Fresh install: no prompt appears until the feature is used.
 
@@ -113,7 +117,9 @@ off while Android and every test looked right.
 
 **Apply.** Set `minHeight`, not `height`, on anything holding text. Check
 `useReducedMotion` in every animation. Render the screen tests at a large
-font scale.
+font scale. On iOS, test in an iPhone SE's 375 × 667 pt window at
+xxLarge too: an iPhone app on an iPad gets that window
+([app-review.md](app-review.md#every-screen-fits-a-small-iphone-at-a-large-text-size)).
 
 **Check.** Turn on the largest text size and Reduce Motion, and walk every
 screen.

@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # The voice gate: no "we" in the copy people see (common/voice.md). It
-# reads the strings in VOICE_FILES: string literals in code (not keys, not
-# comments), values in JSON, .strings, .xcstrings and .arb files, messages
-# in .ftl, .po and Android strings.xml, and plain text such as store
-# listings. English and Czech are known; VOICE_WORDS adds other words.
-# The reading is in voice-audit.py, beside this script.
+# reads the strings in VOICE_FILES and the design boards (UI_BOARDS):
+# string literals in code (not keys, not comments), values in JSON,
+# .strings, .xcstrings and .arb files, messages in .ftl, .po and Android
+# strings.xml, plain text such as store listings, and the text of web
+# pages and boards. English and Czech are known; VOICE_WORDS adds other
+# words. A string's language comes from its path, its block or its
+# element's lang; copy that names none is COPY_LANG, the same setting
+# check-copy reads. The reading is in voice-audit.py, beside this script.
 #
-#   .practices/bin/check-voice            # every copy file (VOICE_FILES)
+#   .practices/bin/check-voice            # every copy file and board
 #   .practices/bin/check-voice FILE...    # just these
 #
 # A real quote keeps its words, marked on its line or the one above, with
@@ -32,15 +35,11 @@ else
     done < <(voice_files)
 fi
 if [ ${#files[@]} = 0 ]; then
-    echo "check-voice: no copy files (VOICE_FILES in .practices/config), nothing to check."
+    echo "check-voice: no copy files or boards (VOICE_FILES, UI_BOARDS in .practices/config), nothing to check."
     exit 0
 fi
 if ! command -v python3 >/dev/null; then
     echo "check-voice: needs python3, which isn't installed; the copy is unchecked."
     exit 2
 fi
-if [ -n "$VOICE_WORDS" ]; then
-    python3 "$PRACTICES_BIN/voice-audit.py" --words "$VOICE_WORDS" "${files[@]}"
-else
-    python3 "$PRACTICES_BIN/voice-audit.py" "${files[@]}"
-fi
+python3 "$PRACTICES_BIN/voice-audit.py" --words "$VOICE_WORDS" --lang "$COPY_LANG" "${files[@]}"

@@ -30,8 +30,13 @@ machine.
 | private names | A client's name, host or address is in a file or message. Replace it with a made-up one (ACME, Globex, `*.example`, 192.0.2.x). Never quote the matched text back anywhere. |
 | file sizes | Split the file by topic: a folder module with one file per part. A file in `.practices/size-allowlist` that shrank: lower its number there. |
 | unsafe code | Move it behind a safe function in the crate the project allows it in (UNSAFE_ALLOWED in `.practices/config`). |
+| GPUI clipping (rounded corners) | Round the child that fills each corner with the parent's radius minus its border, and drop `overflow_hidden`. Only when the clip does other work and every corner child rounds itself: `// practices-allow clip: <reason, three words or more>` on the clip's line or the one above. |
 | git hooks | Run `.practices/bin/install-hooks` once in this clone. |
 | coverage under a floor | Add tests for the lines it lists. Never lower a floor. When a crate is well over its floor, raise the floor in `.practices/coverage-floors`. |
+| permission buttons | A button before a system permission prompt says "Continue" ("Pokračovat", "Continuar"), never "Allow" or "Turn on"; the line above it says why. A catalog entry no code uses: delete it. A guide step that names a setting: mark it `practices-allow permission: <reason>`. |
+| Xcode targets | A target built for the wrong devices: set `TARGETED_DEVICE_FAMILY` on that target (XcodeGen sets "1,2" on each). A gated framework without its entitlement: add the entitlement to that target, or keep the framework out of its sources. |
+| UI tests | Pin the language in the launch helper (`-AppleLanguages (en)`); audit every screen with `performAccessibilityAudit()`; run on an iPhone SE simulator at `content_size extra-extra-large`. |
+| check-ios-artefact (after an archive) | Fix the target, archive again, and check again before it is uploaded. Never upload an archive that fails. |
 | disk under its floor | Stop building. Tell the person what takes the room (the message lists it) and ask before going on. |
 | session IDs in a commit message | Remove the trailer or link. A Co-Authored-By line is fine. |
 

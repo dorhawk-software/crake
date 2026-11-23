@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# GPUI clips to a rectangle, never to rounded corners (rust/gpui.md,
+# "Rounded corners don't clip"). So an element that rounds its corners
+# and clips its children (overflow_hidden, overflow_x_hidden,
+# overflow_y_hidden) promises a rounding it doesn't draw: a child that
+# fills a corner shows its square corner past the rounding. This check
+# finds every such element in the project's Rust files, tracked or new
+# (EXCLUDE left out). The lint gate runs it in a GPUI app (uses_gpui).
+#
+#   .practices/bin/check-gpui-clip            # every Rust file
+#   .practices/bin/check-gpui-clip FILE...    # just these
+#
+# One element is one builder chain: the calls at the same depth after
+# `div()`, `text(12.)` or a variable, over any number of lines. A call
+# inside `.child(…)` builds another element. A closure with one parameter
+# that goes on with that parameter (`.when(on, |d| d.rounded(px(4.)))`,
+# `.map(|this| { this.rounded_t(px(6.)) })`) is the same element. Comments
+# and string literals are skipped. Not caught: an element built over
+# several statements through a variable (`let mut r = …; r = r.…`), and
+# one rounded in a helper function and clipped by its caller.
+#
+# A clip kept on purpose (the content slides, and every child that fills
+# a corner rounds its own), marked on the clip's line or the one above,
+# with a reason of three words or more:
+#   // practices-allow clip: the row slides out of it
+#
+# Why: a GPUI app's Settings pane drew three small pictures of a window,
+# each rounded 7 px with overflow_hidden and a square sidebar; the
+# sidebar's corners showed past the picture's (2026-11-18). The HTML board
+# didn't show it: CSS clips to rounded corners, GPUI's ContentMask holds
+# only a rectangle.
+#
+# Needs python3; without it, it fails, never passes. The reading is in
+# gpui-clip-audit.py, beside this script.
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+if [ $# -gt 0 ]; then
+    files=("$@")
+else
+    files=()
+    while IFS= read -r f; do
+        [ -f "$f" ] && files+=("$f")
+    done < <(rust_files)
+fi
+[ ${#files[@]} = 0 ] && exit 0
+if ! command -v python3 >/dev/null; then
+    echo "check-gpui-clip: needs python3, which isn't installed; the Rust files are unchecked."
+    exit 2
+fi
+python3 "$PRACTICES_BIN/gpui-clip-audit.py" "${files[@]}"

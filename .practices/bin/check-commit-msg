@@ -4,7 +4,8 @@
 # (check-private). A commit that changes a design board already in the
 # repository (UI_BOARDS) names the page that shows that change before and
 # after (ui/design-before-build.md, "A touch-up gets its own before and
-# after"):
+# after"). A commit that adds or changes one of the project's checks
+# (CHECK_FILES) says how it was proven (check-proven). The trailer:
 #   Before-after: design/changes/postmark-waves.html   (a file here)
 #   Before-after: https://…                           (a published page)
 #   Before-after: none, only the markup was reindented (why, 3+ words)
@@ -63,4 +64,6 @@ if [ -n "$changed" ]; then
         exit 1
     fi
 fi
+# A commit that adds or changes a check says how it was proven (CHECK_FILES).
+"$PRACTICES_BIN/check-proven" "$msg" || exit 1
 exec "$PRACTICES_BIN/check-private" "$msg"

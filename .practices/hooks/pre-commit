@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # git's pre-commit hook: nothing private (check-private); design boards
-# pass the UI gate (check-ui); the copy has no "we" (check-voice); the
+# pass the UI gate (check-ui), and proposal pages read right on a phone
+# (check-page); the copy has no "we" (check-voice) and keeps
+# its language's grammar (check-copy); no button before a permission prompt
+# says "Allow" (check-permission-words); an Xcode project's targets and UI
+# tests hold (check-xcode, check-ui-tests); the
 # Claude Code hooks stay wired (check-hooks); when Rust files are
 # committed, the lint gate and the coverage floors; when JavaScript or
 # TypeScript files are, the lint gate and the tests (NPM_TEST). It runs at
@@ -22,6 +26,16 @@ if [ -n "$boards" ] && [ -n "$staged" ]; then
         printf '%s\n' "$ui" | tr '\n' '\0' | xargs -0 nice -n 10 "$bin/check-ui" || exit 1
     fi
 fi
+# The proposal and review pages being committed read right on a phone
+# (check-page).
+# shellcheck source=/dev/null
+pages=$(cd "$(git rev-parse --show-toplevel)" && . "$bin/lib.sh" && ui_pages)
+if [ -n "$pages" ] && [ -n "$staged" ]; then
+    read_on_phone=$(printf '%s\n' "$staged" | grep -Fx -f <(printf '%s\n' "$pages") || true)
+    if [ -n "$read_on_phone" ]; then
+        printf '%s\n' "$read_on_phone" | tr '\n' '\0' | xargs -0 nice -n 10 "$bin/check-page" || exit 1
+    fi
+fi
 # The copy being committed speaks as the product, never as "we" (check-voice).
 # shellcheck source=/dev/null
 copy=$(cd "$(git rev-parse --show-toplevel)" && . "$bin/lib.sh" && voice_files)
@@ -30,6 +44,33 @@ if [ -n "$copy" ] && [ -n "$staged" ]; then
     if [ -n "$voice" ]; then
         printf '%s\n' "$voice" | tr '\n' '\0' | xargs -0 "$bin/check-voice" || exit 1
     fi
+fi
+# The copy being committed keeps its language's grammar, and the facts
+# its boards share read the same (check-copy).
+# shellcheck source=/dev/null
+copied=$(cd "$(git rev-parse --show-toplevel)" && . "$bin/lib.sh" && copy_files)
+if [ -n "$copied" ] && [ -n "$staged" ]; then
+    copy=$(printf '%s\n' "$staged" | grep -Fx -f <(printf '%s\n' "$copied") || true)
+    if [ -n "$copy" ]; then
+        printf '%s\n' "$copy" | tr '\n' '\0' | xargs -0 "$bin/check-copy" || exit 1
+    fi
+fi
+# The buttons being committed never say "Allow" before a permission prompt.
+# shellcheck source=/dev/null
+asked=$(cd "$(git rev-parse --show-toplevel)" && . "$bin/lib.sh" && permission_files)
+if [ -n "$asked" ] && [ -n "$staged" ]; then
+    perm=$(printf '%s\n' "$staged" | grep -Fx -f <(printf '%s\n' "$asked") || true)
+    if [ -n "$perm" ]; then
+        printf '%s\n' "$perm" | tr '\n' '\0' | xargs -0 "$bin/check-permission-words" || exit 1
+    fi
+fi
+# A change to an Xcode project, its entitlements, its sources or its test
+# runs: the targets' device families and entitlements, and the UI tests.
+# shellcheck source=/dev/null
+xc=$(cd "$(git rev-parse --show-toplevel)" && . "$bin/lib.sh" && xcode_files)
+if [ -n "$xc" ] && [ -n "$staged" ] && printf '%s\n' "$staged" | grep -qFx -f <(printf '%s\n' "$xc"); then
+    "$bin/check-xcode" || exit 1
+    "$bin/check-ui-tests" || exit 1
 fi
 # The agent's gates stay wired: claude-hook runs after edits and before an
 # agent's turn ends. A settings change that drops it can't be committed.
