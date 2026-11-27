@@ -523,6 +523,45 @@ mark as dorhawk.software/crake's.
   segment draws its own edges): a grey rim around dark teal reads as blur
   in light mode, as it did in settings.html and log.html.
 
+## The identity pass (in progress)
+
+The canvas "Crake — identity" (a Design canvas, drawn 2026-11-11; the
+owner has the link) is the pass's second iteration: "Crake keeps to the
+line". **None of it is built, and nothing above changes until the owner
+agrees to the parts**; the screens in `design/screens/` stay the spec.
+What it proposes: a 1.5 px line down What Crake did and the log (the day,
+newest first), and six objects on it: the line, the branch with the tick
+(a host routed; the only teal), the crossbar (left alone), the return
+(undone), the race (why: two grey lanes, timed), the dot (it happened to
+a tunnel).
+
+Decided on the canvas so far (the owner, 2026-11-27):
+
+- **Only decisions branch.** Routed and undone leave the line; a tunnel
+  that connected, was lost or came back is an ink dot on it. Rejected:
+  lost and back drawn as ink branches (a branch then meant two things).
+- **A tunnel lost is a dotted stretch**: a dot where it was lost, a dot
+  where it came back, the line dotted between. Rejected: the dotted
+  branch (six dots that read as "…" at log size), dots alone, dots with
+  the sentence in semibold.
+- **Icons are signs, never a button's ornament** (Buttons are words
+  only, above): Undo, Copy, Add, Log and System left the proposed set;
+  the pin stays on a pinned host, the lens in the search field, and the
+  policy shield stays as drawn here, with nothing inside it. General is
+  "the tick, set" (two strokes with their stops; rejected: the stock
+  three sliders, one line with a stop). Gateway is "the gate" (two posts
+  under a beam, the line through; rejected: two posts and two rails, an
+  H; a door).
+- **Settings' wait stays the segmented control** of `settings.html`.
+  Rejected: a slider with 1, 2, 3 and 5 s at equal steps.
+
+Still open, for the next round: the opened log row's tint (the canvas
+uses accentSoft, this document navHover), the race drawn two ways and
+restating its sentence, Log and Settings shown in light only and Tunnel
+in dark only, and where the canvas's Log, Tunnel and Panel differ from
+the screens (Copy for helpdesk, Pin, Forget and Switch off as underlined
+words, the panel's footer as one bar). Then iteration 3: the whole app.
+
 ## Screens
 
 | File | What it shows |
