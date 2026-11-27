@@ -130,6 +130,7 @@ impl Panel {
             .border_1()
             .border_color(t.warning_line)
             .rounded(px(6.))
+            // practices-allow clip: a long command stays inside; no child paints a corner
             .overflow_hidden()
             .child(
                 div()

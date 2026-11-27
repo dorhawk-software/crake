@@ -91,6 +91,7 @@ impl NewTunnel {
                 .border_1()
                 .border_color(t.line_strong)
                 .rounded(px(6.))
+                // practices-allow clip: the list scrolls under it; its rows start 4 px in, past the corners
                 .overflow_hidden();
             picker = picker.child(gpui_kit::deferred(menu.occlude()).with_priority(1));
         }

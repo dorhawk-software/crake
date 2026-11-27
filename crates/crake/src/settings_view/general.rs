@@ -23,6 +23,7 @@ impl Settings {
             &[
                 ("none", "Say nothing"),
                 ("quiet", "Quiet notification"),
+                // practices-allow copy: the escape is an opening quote; the next word is "crex"
                 ("crex", "Notification and a \u{201c}crex crex\u{201d}"),
             ],
             &prefs.notify,

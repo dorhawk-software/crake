@@ -474,6 +474,7 @@ mod tests {
         assert_eq!(syn_flow(&syn6()), Some(want));
         let mut synack = syn6();
         synack[packet::IPV6_HEADER + 13] = 0x12;
+        // practices-allow copy: SYN is said "sin", so "a SYN-ACK"
         assert_eq!(syn_flow(&synack), None, "a SYN-ACK isn't a first SYN");
         assert_eq!(unreachable(&icmp6(3, &syn6())), Some(want), "address");
         assert_eq!(unreachable(&icmp6(1, &syn6())), Some(want), "prohibited");

@@ -98,6 +98,7 @@ fn chip(command: &str, t: &Theme) -> impl IntoElement + use<> {
         .border_1()
         .border_color(t.line_strong)
         .rounded(px(6.))
+        // practices-allow clip: a long command stays inside; no child paints a corner
         .overflow_hidden()
         .child(
             div()

@@ -277,8 +277,7 @@ impl NewTunnel {
             .mt(px(8.))
             .border_1()
             .border_color(t.line)
-            .rounded(px(8.))
-            .overflow_hidden();
+            .rounded(px(8.));
         if imported {
             let (i, p) = PROTOCOLS
                 .into_iter()
@@ -286,7 +285,7 @@ impl NewTunnel {
                 .find(|(_, p)| p.0 == "openvpn")
                 .unwrap_or((0, PROTOCOLS[0]));
             protocols = protocols
-                .child(self.protocol_card(i, p, "From the profile you imported", t, cx))
+                .child(self.protocol_card(i, p, "From the profile you imported", Fills::Top, t, cx))
                 .child(self.choose_yourself(folded, t, cx));
             if folded {
                 return protocols;
@@ -298,10 +297,11 @@ impl NewTunnel {
                 .find(|(_, p)| p.0 == self.protocol)
                 .unwrap_or((0, PROTOCOLS[0]));
             return protocols
-                .child(self.protocol_card(i, p, p.2, t, cx))
+                .child(self.protocol_card(i, p, p.2, Fills::Top, t, cx))
                 .child(self.choose_yourself(folded, t, cx));
         } else {
-            protocols = protocols.child(self.protocol_card(0, PROTOCOLS[0], auto_sub, t, cx));
+            protocols =
+                protocols.child(self.protocol_card(0, PROTOCOLS[0], auto_sub, Fills::Top, t, cx));
         }
         if (answered || picked) && !imported {
             protocols = protocols.child(self.choose_yourself(folded, t, cx));
@@ -339,8 +339,19 @@ impl NewTunnel {
                     .map_or(shown.len(), |f| f + 1);
                 shown.insert(after, ipsec);
             }
-            for (i, p) in shown {
-                protocols = protocols.child(self.protocol_card(i, p, p.2, t, cx));
+            // The list ends with the Beta group's last card.
+            let last = if tried {
+                None
+            } else {
+                shown.len().checked_sub(1)
+            };
+            for (at, (i, p)) in shown.into_iter().enumerate() {
+                let fills = if last == Some(at) {
+                    Fills::Bottom
+                } else {
+                    Fills::Neither
+                };
+                protocols = protocols.child(self.protocol_card(i, p, p.2, fills, t, cx));
             }
         }
         protocols
@@ -385,12 +396,13 @@ impl NewTunnel {
     }
 
     /// One protocol's card. Its id is its place in PROTOCOLS, whatever the
-    /// order shown.
+    /// order shown. `fills`: the list's corners it lies in.
     fn protocol_card(
         &self,
         i: usize,
         (id, name, _, code): (&'static str, &'static str, &'static str, &'static str),
         sub: &'static str,
+        fills: Fills,
         t: &Theme,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
@@ -405,6 +417,10 @@ impl NewTunnel {
             .gap(px(12.))
             .when(i > 0, |r| r.border_t_1().border_color(t.line))
             .bg(if on { t.accent_soft } else { t.panel })
+            // The list's radius less its border: GPUI clips children
+            // square, so a chosen card's tint showed past the corners.
+            .when(fills == Fills::Top, |r| r.rounded_t(px(7.)))
+            .when(fills == Fills::Bottom, |r| r.rounded_b(px(7.)))
             .cursor_pointer()
             .child(radio(on, t))
             .child(
@@ -509,6 +525,7 @@ impl NewTunnel {
                 .bg(t.surface)
                 .font_family(fonts::MONO)
                 .text_size(px(14.))
+                // practices-allow clip: a long gateway name stays on its line; text only
                 .overflow_hidden()
                 .whitespace_nowrap()
                 .child(gateway)
@@ -604,4 +621,13 @@ pub(super) fn asking_said(asked: std::time::Duration) -> String {
             crate::head::second_counted(asked)
         )
     }
+}
+
+/// Which of the protocol list's rounded corners a card lies in: it rounds
+/// those itself.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Fills {
+    Top,
+    Bottom,
+    Neither,
 }

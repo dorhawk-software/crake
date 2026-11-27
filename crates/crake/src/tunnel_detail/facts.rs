@@ -126,6 +126,7 @@ pub(super) fn facts(
         .border_1()
         .border_color(t.line)
         .rounded(px(8.))
+        // practices-allow clip: a long gateway name stays inside; no cell paints a corner
         .overflow_hidden()
         .child(
             cell(true)

@@ -14,6 +14,7 @@ use crate::openvpn::AskKind;
 
 /// Where a question's answer comes from, and what stops waiting for it.
 pub(super) struct Asking<'a> {
+    // practices-allow copy: 'a is a lifetime here, not the article
     pub(super) answers: &'a Answers,
     pub(super) answer_rx: &'a mut mpsc::UnboundedReceiver<(u32, String)>,
     pub(super) stop_rx: &'a mut oneshot::Receiver<Stop>,

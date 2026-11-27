@@ -235,6 +235,7 @@ impl NewTunnel {
             .items_stretch()
             .rounded(px(6.))
             .bg(t.surface)
+            // practices-allow clip: a long command stays inside; no child paints a corner
             .overflow_hidden()
             .text_size(px(13.))
             .child(
