@@ -203,7 +203,7 @@ plain `'` and `…` where the code mostly writes the typographic ones (`\u{2019}
   profile_editor/mod.rs:455-490
 - [ ] not seen · Body: the editor with line numbers, or a sentence · profile_editor/mod.rs:492-512
 - [ ] not seen · Footer: note or error, Cancel, "Save and reconnect" · profile_editor/mod.rs:376-419
-- [ ] not seen · "Leave without saving?" footer · profile_editor/mod.rs:333-374
+- [x] drawn on the canvas 2026-11-27, not built · "Leave without saving?" footer · profile_editor/mod.rs:333-374
 
 ### What's new: parts
 
@@ -1029,14 +1029,14 @@ No control defines a pressed look (see "Found on the way"). Focus is one shared 
 
 ### Questions asked in place (no modal dialog exists): 4 confirmations and 1 trust question
 
-- [ ] not seen · "Remove <tunnel>?" + "What Crake learned for it and its saved sign-in go too." →
+- [x] drawn on the canvas 2026-11-27, not built · "Remove <tunnel>?" + "What Crake learned for it and its saved sign-in go too." →
   "Keep it" / "Remove" · settings_view/tunnels.rs:363-425
-- [ ] not seen · "Clear log…" → "Keep it" / "Clear log" · settings_view/privacy.rs:28-62
-- [ ] not seen · "Forget the <n> hosts Crake learned for <tunnel>?" → "Cancel" / "Forget all" ·
+- [x] drawn on the canvas 2026-11-27, not built · "Clear log…" → "Keep it" / "Clear log" · settings_view/privacy.rs:28-62
+- [x] drawn on the canvas 2026-11-27, not built · "Forget the <n> hosts Crake learned for <tunnel>?" → "Cancel" / "Forget all" ·
   tunnel_detail/hosts.rs:537-617
-- [ ] not seen · "Leave without saving?" → "Keep editing" / "Discard changes" ·
+- [x] drawn on the canvas 2026-11-27, not built · "Leave without saving?" → "Keep editing" / "Discard changes" ·
   profile_editor/mod.rs:333-374
-- [ ] not seen · "Crake can't vouch for <tunnel>'s gateway" → "Don't connect" / "Trust it" (asked
+- [x] drawn on the canvas 2026-11-27, not built · "Crake can't vouch for <tunnel>'s gateway" → "Don't connect" / "Trust it" (asked
   by the app during sign-in, not a confirmation of the user's own act) ·
   signin_view/question.rs:211-268
 

@@ -601,10 +601,33 @@ Decided on the canvas so far (the owner, 2026-11-27):
   beside the line, never across it) and its first run (the bird silent).
   A notice's Copy is a word, as every button; the app's still has an
   icon.
+- Asked in place (the user, 2026-11-27): a confirmation is a tinted
+  block where it was asked (a tunnel's question keeps the row's number
+  between its neighbours), two quiet boxes, the keeping answer first and
+  the removing one marked only by danger's ink, no icon. Forget all's
+  "Cancel" becomes "Keep them": a button names its outcome. Rejected: a
+  filled danger button; keeping "Cancel".
+- The gateway's certificate (the user, 2026-11-27): "Trust it", then
+  "Don't connect", both quiet boxes, the fingerprint in the tinted box.
+  The way out is last in every stage of the sign-in window. Rejected:
+  "Don't connect" first (it changed sides between stages).
+- The help card (the user, 2026-11-27): it opens inside its row as a
+  tinted card and the mark turns accent while it is open; the rows below
+  move down. Rejected: the floating card the app has, which covers the
+  next setting's name and control.
+- A notice's way out ("Not now") is muted words without a box; its
+  answers are quiet boxes 30 px high, as the panel's "Got it".
+- Drawn, not built: the other Settings sections (Tunnels, General,
+  Names, Privacy & log, Managed by IT, Diagnostics, About): rows on
+  hairlines with no card outline, the promise and the coffee note as
+  tinted notes, a pushed domain as a tinted chip naming whose DNS, "What's
+  new" as a box (it opens a window) beside two underlined web links.
+- Found by the round's reviewer, not fixed: in dark, a box on a tinted
+  block is darker than the block (it reads as a hole where light reads
+  raised); the map is the whole canvas's, so it waits for the build.
 - Still to draw: New tunnel's steps 2 and 3 and its other protocols,
-  sign-in by password and by certificate and its trust question, the
-  profile editor, the help card a "?" opens, the four confirmations
-  asked in place, the system notifications, and the rest of Settings.
+  sign-in by password and by certificate, the profile editor, and the
+  system notifications.
 
 Nothing on the canvas is open. Iteration 3, the whole app, has its
 inventory: `design/identity-inventory.md` (955 lines from the code,
