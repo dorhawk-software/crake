@@ -308,6 +308,8 @@ one line each:
 - What the identity pass's inventory found in the app (no pressed look,
   New tunnel without the keyboard, two notifications past "Say nothing",
   nothing said when the service is out of reach…): not fixed yet.
+- A colleague's Mac where Crake doesn't work (2026-11-27): cause
+  unknown; waiting for their Diagnostics report.
 - Untried on real systems: the checklist below.
 
 ## Tried by real people (a checklist, ticked one by one)
@@ -318,7 +320,8 @@ who (a role, not a name), and what was found and fixed:
 **docs/engineering/tried-by-people.md** (tick items there). Windows and
 the other Linux desktops haven't met a real person yet; macOS has (a
 colleague's Mac in October, the user's own daily since 2026-10-29: every
-macOS item ticked 2026-11-27); Ubuntu 26.04 with GNOME was the user's
+macOS item ticked 2026-11-27, but it doesn't work on the colleague's Mac
+now, cause unknown); Ubuntu 26.04 with GNOME was the user's
 notebook until October 2026.
 
 ## Lints are errors

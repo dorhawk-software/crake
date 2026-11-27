@@ -424,3 +424,10 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   or a Restart doesn't start; reduced motion is read from GNOME only
   (never on Windows or macOS); the Restart notice can't be put away.
   They are fixed with the identity's build, or sooner if one bites.
+- **A colleague's Mac where Crake doesn't work (reported by the user,
+  2026-11-27).** Crake doesn't work on a colleague's Mac (the one many
+  of October's macOS fixes came from), still unfixed; where it fails
+  (the service, connecting, or the hosts once connected) isn't known
+  yet. Next: the colleague's report (Settings → Diagnostics, or
+  `crake report`), then a test that fails the same way before the fix.
+  Until then, nothing public says macOS works beyond the user's own Mac.

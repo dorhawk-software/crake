@@ -71,6 +71,9 @@ so GNOME-only items wait for someone else on Ubuntu.
 - [ ] Native Wayland (`CRAKE_WAYLAND=1`).
 
 **macOS** (beyond what the colleague has tried):
+- [ ] A colleague's Mac: Crake doesn't work there, cause unknown, still
+  unfixed (reported by the user, 2026-11-27; in Not now). Ticked once it
+  works there.
 - [x] The service approved by the user, craked running under launchd from
   Crake.app, and running again after an upgrade (2026-10-27, the user,
   0.15.4 → 0.16.0 by `brew upgrade`: craked's log says the tunnel switched off at
