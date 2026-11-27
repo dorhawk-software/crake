@@ -591,11 +591,20 @@ Decided on the canvas so far (the owner, 2026-11-27):
   one-line sentence where it has one. Rejected: the sentence only (the
   longer explanations would go), the mark only.
 - Drawn in the identity, not yet built: New tunnel's first step (steps
-  as numbered tabs, the protocol list grouped by tone), sign-in's
-  "Couldn't reach" (a check for what passed, danger's × for the failed
-  step, the escape after the main action), Traffic (nodes by tone, a
-  direct row has no mark), What's new (the changelog's own sentences,
-  dates in mono), and "Forget all…" on tunnel detail.
+  as numbered tabs, the protocol list grouped by tone); sign-in's three
+  stages (single sign-on, a code, "Couldn't reach": a check for what
+  passed, the waiting points for what Crake waits for, danger's × for
+  the failed step, the main action first and the way out last); Traffic
+  (nodes by tone, a direct row has no mark); What's new (the changelog's
+  own sentences, dates in mono); "Forget all…" on tunnel detail; the
+  panel's notices (a question, a notice with a command, the first route
+  beside the line, never across it) and its first run (the bird silent).
+  A notice's Copy is a word, as every button; the app's still has an
+  icon.
+- Still to draw: New tunnel's steps 2 and 3 and its other protocols,
+  sign-in by password and by certificate and its trust question, the
+  profile editor, the help card a "?" opens, the four confirmations
+  asked in place, the system notifications, and the rest of Settings.
 
 Nothing on the canvas is open. Iteration 3, the whole app, has its
 inventory: `design/identity-inventory.md` (955 lines from the code,
