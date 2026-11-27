@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# The archive gate: a built iOS app checked as App Store Connect will see
+# it (mobile/app-review.md). For the app and each extension in an .ipa,
+# .app or .xcarchive:
+#   - UIDeviceFamily in its Info.plist is the family the app declares
+#     (DEVICE_FAMILY, or the Xcode project's setting, or the app's own);
+#   - every framework its executable links, directly or through an
+#     embedded framework (otool -L), that needs an entitlement has it in
+#     the bundle's signature (codesign -d --entitlements).
+# This sees what check-xcode can't: a Swift package or a binary framework
+# that links a gated framework. claude-hook runs it after the agent's
+# `xcodebuild archive` or `-exportArchive`; run it before every upload.
+#
+#   .practices/bin/check-ios-artefact build/Acme.xcarchive
+#   .practices/bin/check-ios-artefact build/export/Acme.ipa
+#
+# Why: on 13 Nov 2026 App Review's automated check stopped an iPhone app
+# because its widget linked ManagedSettings without the Family Controls
+# entitlement; an earlier build of it said UIDeviceFamily 1,2 and shipped
+# for iPad too. Both were in the archive before upload.
+#
+# Needs python3, otool and codesign (Xcode's command line tools, macOS);
+# OTOOL and CODESIGN name others. Without them it fails, never passes.
+
+if [ $# != 1 ]; then
+    echo "usage: check-ios-artefact PATH.(ipa|app|xcarchive)" >&2
+    exit 2
+fi
+case $1 in /*) artefact=$1 ;; *) artefact=$PWD/$1 ;; esac # lib.sh moves to the project's root
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+if ! command -v python3 >/dev/null; then
+    echo "check-ios-artefact: needs python3, which isn't installed; $artefact is unchecked."
+    exit 2
+fi
+project=$(xcode_projects | head -n 1)
+python3 "$PRACTICES_BIN/xcode-audit.py" artefact --family "$DEVICE_FAMILY" --frameworks "$ENTITLED_FRAMEWORKS" \
+    --project "$project" "${artefact%/}"

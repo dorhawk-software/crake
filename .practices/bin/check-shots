@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# A live switch draws what a fresh start draws (mobile/devices.md): the
+# same screen, shot after a switch inside the running app (theme,
+# language, text size) and after a fresh start in that setting, is the
+# same pixel for pixel. Lists every region that differs, and fails on any.
+#
+#   .practices/bin/check-shots [--skip-top PX] FRESH LIVE
+#   .practices/bin/check-shots --only-top PX PAGE PLACEHOLDER
+#
+# FRESH and LIVE are two PNG screenshots, or two folders whose PNGs of
+# the same name are compared. --skip-top leaves out the status bar, whose
+# clock moves between the shots. The measuring is in shots-diff.mjs.
+#
+# A placeholder is drawn on the page's own edges (ui/feedback.md): with
+# --only-top, only the band above PX is compared, the page loaded against
+# its placeholder, the status bar included. Below it they differ anyway.
+# Fix the clock first (xcrun simctl status_bar <device> override --time
+# 9:41) so the bar matches. On 25 Nov 2026 a placeholder stopped at the
+# status bar while its page ran under it, and cut the page's glow off.
+#
+# Why: in Obálka a "Testovací" pill read "Testovac" after a switch to the
+# dark theme and was whole after a restart (2026-11-16). Its box kept its
+# size; only the last glyph was gone, and every check looked at fresh
+# starts.
+#
+# Needs Node 18+; without it it fails, never passes.
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+if ! command -v node >/dev/null; then
+    echo "check-shots: needs Node 18 or newer, and there is no node on PATH." >&2
+    exit 2
+fi
+exec node "$(dirname "$0")/shots-diff.mjs" "$@"

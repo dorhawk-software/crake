@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# The page gate: a proposal or review page, checked as the owner reads it,
+# on a phone (ui/design-before-build.md, "Proposal pages pass a checklist
+# before review"). Each page, rendered in headless Chrome at each width in
+# PAGE_WIDTHS (375 and 390 px) at 2x: nothing scrolls sideways; no
+# one-letter word ends a line where its language ties it (the language's
+# copy-rules/<lang>.mjs has a "one-letter-end" rule: Czech), an option's
+# letter included; no image runs past the screen or is drawn wider than
+# its pixels at 2x; the doctype and the charset are there; the text names
+# its language. The measuring is in page-audit.mjs, beside this script.
+#
+#   .practices/bin/check-page            # every page (UI_PAGES)
+#   .practices/bin/check-page FILE...    # just these
+#
+# The rest of the checklist (each question beside its own images, options
+# drawn fairly, every sentence true on its screen) is the author's, before
+# the review.
+#
+# Why: Scops' proposal pages went through three review rounds before the
+# owner saw them (2026-11-20 to 23), and each round found what a script
+# finds: "C / rozhodne", an option's letter ending a line, and a table that
+# scrolled sideways at 375 px.
+#
+# Needs Node 18+ and Chrome or Chromium; without them it fails, never
+# passes. Settings in .practices/config: UI_PAGES, PAGE_WIDTHS, COPY_LANG,
+# COPY_RULES, UI_CHROME (see lib.sh).
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+if [ $# -gt 0 ]; then
+    pages=$(printf '%s\n' "$@")
+else
+    pages=$(ui_pages)
+fi
+if [ -z "$pages" ]; then
+    echo "check-page: no pages (UI_PAGES matches no file): nothing to read"
+    exit 0
+fi
+
+if ! command -v node >/dev/null; then
+    echo "check-page: needs Node 18 or newer, and there is no node on PATH." >&2
+    exit 2
+fi
+chrome=$UI_CHROME
+if [ -z "$chrome" ]; then
+    for c in "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+        "/Applications/Chromium.app/Contents/MacOS/Chromium" \
+        "$(command -v google-chrome 2>/dev/null)" "$(command -v google-chrome-stable 2>/dev/null)" \
+        "$(command -v chromium 2>/dev/null)" "$(command -v chromium-browser 2>/dev/null)"; do
+        if [ -n "$c" ] && [ -x "$c" ]; then
+            chrome=$c
+            break
+        fi
+    done
+fi
+
+list=()
+while IFS= read -r f; do
+    [ -n "$f" ] && list+=("$f")
+done <<EOF
+$pages
+EOF
+
+nice -n 10 node "$PRACTICES_BIN/page-audit.mjs" --chrome "$chrome" --widths "$PAGE_WIDTHS" \
+    --lang "$COPY_LANG" --copy-rules "$COPY_RULES" "${list[@]}"

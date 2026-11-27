@@ -31,3 +31,21 @@ UI_BOARDS=':(glob)design/screens/*.html'
 # log and the helpdesk copy), and the changelog. Test fixtures that quote
 # a gateway's own prompt are marked on their line (2026-11-16).
 VOICE_FILES=':(glob)CHANGELOG.md :(glob)crates/crake/src/**/*.rs :(glob)crates/craked/src/**/*.rs :(glob)crates/crake-proto/src/**/*.rs'
+
+# Crake's copy is English: its strings, the changelog and the boards that
+# name no language (practices 1.7, 2026-11-27).
+COPY_LANG=en
+
+# check-page reads the proposal and review pages written from now on. The
+# 68 from before the rule (practices 1.12's phone widths, 1.16's reviewed
+# mocks) stay as they were shown, for the reason UI_BOARDS gives above:
+# they are the record. .practices/pages-before-the-rule lists them and
+# only shrinks; a page changed or shown again leaves it (2026-11-27).
+# Crake is a desktop app, but its owner reads proposals on a phone too, so
+# the widths stay the kit's.
+UI_PAGES=':(glob)design/proposals/**/*.html :(glob)design/changes/**/*.html'
+while IFS= read -r before; do
+    case $before in '' | '#'*) continue ;; esac
+    UI_PAGES="$UI_PAGES :(exclude)$before"
+done <.practices/pages-before-the-rule
+unset before

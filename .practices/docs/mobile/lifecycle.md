@@ -63,8 +63,12 @@ user to Settings. Obálka also stopped reporting the "not authorized yet"
 state as an error
 ([87a249f](https://github.com/dorhawk-software/obalka/commit/87a249f)).
 
-**Apply.** A small screen or sheet with the reason and a button that names
-the action ("Turn on reminders"), then the OS prompt.
+**Apply.** A small screen or sheet with the reason and one button,
+"Continue", then the OS prompt. Not "Turn on reminders" or "Allow": App
+Review refuses a button that asks for the permission itself
+([app-review.md](app-review.md#a-button-that-leads-to-a-permission-prompt-says-continue),
+checked by `check-permission-words`). Until 2026-11-18 this rule asked
+for exactly such a button.
 
 **Check.** Fresh install: no prompt appears until the feature is used.
 
@@ -113,7 +117,9 @@ off while Android and every test looked right.
 
 **Apply.** Set `minHeight`, not `height`, on anything holding text. Check
 `useReducedMotion` in every animation. Render the screen tests at a large
-font scale.
+font scale. On iOS, test in an iPhone SE's 375 × 667 pt window at
+xxLarge too: an iPhone app on an iPad gets that window
+([app-review.md](app-review.md#every-screen-fits-a-small-iphone-at-a-large-text-size)).
 
 **Check.** Turn on the largest text size and Reduce Motion, and walk every
 screen.
@@ -198,3 +204,32 @@ themselves, with no opacity.
 **Check.** Crop the dimmed control beside the design at full
 resolution, on Android. The label's colour matches.
 
+## The first screen never waits on the network
+
+**What.** What the app shows at launch comes from what is on the phone.
+Results from the network arrive later and update the screen. Every
+network wait has a deadline, and its end says so in words.
+
+**Why.** The owner, 25 Nov 2026, after an app's home screen stayed on
+its placeholder in an elevator with almost no signal: "this should
+generally not happen in any application so should be a rule and check".
+That app turned out not to wait on the network at launch; its page came
+from another process ([ui/feedback.md](../ui/feedback.md#a-placeholder-ends)).
+So this rule comes from the owner's request, not from a network bug. A
+phone often says it is online when almost nothing gets through: in a
+lift, on a train, on hotel Wi-Fi behind a sign-in page.
+
+**Apply.**
+1. Draw the first screen from the device's own store. Load the network
+   result after it, and show it when it arrives.
+2. Give every request a timeout of a few seconds, not the system's
+   minute. Purchases, accounts and sync wait in the background.
+3. Honour a launch argument that starts the app offline: every request
+   of the app's own fails at once.
+4. A UI test launches with it and asserts the first screen's content.
+
+**Check.** `check-ui-tests` fails when no UI test launches the app
+offline: no Swift UI test file matches `UITEST_OFFLINE` (by default any
+launch argument ending in `Offline`, such as `"-AcmeOffline"`). It runs
+in lint, claude-hook and pre-commit. That the app really stubs its
+networking, and that the test asserts the first screen, is review.

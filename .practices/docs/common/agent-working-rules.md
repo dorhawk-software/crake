@@ -124,6 +124,72 @@ Never work around the failure with `CARGO_BUILD_BUILD_DIR`, `CARGO_TARGET_DIR` o
 
 **Check.** No more than one or two portal captures in a session.
 
+## Long gates run in the main session
+
+**What.** A gate that takes minutes (a simulator suite, a pixel match) runs in the agent's main session, one at a time. A sub-agent writes code and runs the quick checks; it hands the long gate back. An agent's work is done only once it has stopped: before a gate starts, no other agent still runs one.
+
+**Why.** On 2026-11-21 a Scops sub-agent waited for its UI suite in the background and was stopped as stalled, twice, with its work uncommitted. An agent from that morning, whose work had been committed hours before, still ran its own suite under the shared lock.
+
+**Apply.**
+1. A sub-agent's brief names the long gates it leaves to the main session.
+2. Before a long gate, list the running agents and test processes, and stop the orphans.
+3. Run a gate in the foreground with a timeout, or in the background with its notification awaited; never in a sleep loop.
+
+**Check.** Review: which agents run is visible only to the session that started them.
+
+## Only the lock's own script waits for the lock
+
+**What.** A shared lock is taken and waited for only by the script that owns it. That script can take over a lock whose holder is gone; a loop written around it can't.
+
+**Why.** Scops' pixel match keeps a lock folder with the holder's process ID, and takes it over when that process is gone. On 2026-11-21 an agent waited for it in its own `until [ ! -d lock ]; do sleep 5; done`. A killed run left the lock behind, twice, and the loop waited for hours on a lock nobody held.
+
+**Apply.** Call the gate's script and let it wait. To run two gates in turn, run them one after the other; never poll another gate's lock.
+
+**Check.** todo: a PreToolUse claude-hook could refuse a command that polls a `*.lock` path in a loop.
+
+## Simulators run one at a time until the machine is measured
+
+**What.** A gate runs one simulator or emulator at a time, under its own
+lock. Running several at once on the developer's machine waits until
+load, temperature and memory are measured there, and found to have room.
+
+**Why.** On 2026-11-23 three iOS simulators shot a screenshot gate at
+once on a 64 GB M-series laptop. The shots fell from 395 s to 163 s. The
+laptop reached a load average of 387, every core at 94–100 %, up to
+103 °C, with 52 GB of memory in use; the run was stopped that day.
+Xcode's own parallel testing was worse for this: it gave the whole test
+class to one clone, and copied 3.1 GB per clone to the internal disk.
+
+**Apply.**
+1. One simulator at a time, under the gate's lock
+   ([above](#only-the-locks-own-script-waits-for-the-lock)).
+2. Before parallel runs become a default, measure them on the machine,
+   with nothing else running: load average, temperature, memory. Try two
+   devices, not three.
+3. Parallel runs go to a machine with the room for them, such as CI.
+4. Write the measurement and the decision down
+   ([not-now.md](not-now.md)).
+
+**Check.** todo: claude-hook could refuse booting a second simulator
+while one is booted (`xcrun simctl list devices booted`).
+
+## Don't edit a script while it runs
+
+**What.** A script that a run is executing isn't edited until the run
+ends. Wait, or stop the run first.
+
+**Why.** bash reads a script as it runs, line by line. On 2026-11-23 a
+screenshot gate's `run.sh` was edited during a run. The run died with
+"syntax error near unexpected token" after minutes of shots it had
+already taken.
+
+**Apply.** Before editing a gate's script, check that no run of it is
+going (`pgrep -fl run.sh`). A script whose body is one function, called
+as `main "$@"; exit` on its last line, is read whole before it starts.
+
+**Check.** todo: claude-hook could refuse an edit to a shell script that
+a running process executes (`pgrep -f <path>`).
+
 ## Write down what is deferred
 
 See [not-now.md](not-now.md). Whatever is decided "not now" is written in the repo, in the same commit.

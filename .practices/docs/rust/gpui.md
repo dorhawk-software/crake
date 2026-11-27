@@ -1,6 +1,6 @@
 # Rust: GPUI desktop apps
 
-What applies to apps built on GPUI (directly or through `gpui-kit`): build profiles that keep frames smooth in development, headless window tests, a journey suite that drives the real app shell, a demo mode, window buttons on macOS, CI packages, and how to keep a patched GPUI current.
+What applies to apps built on GPUI (directly or through `gpui-kit`): build profiles that keep frames smooth in development, headless window tests, a journey suite that drives the real app shell, a demo mode, window buttons on macOS, rounded corners that GPUI doesn't clip, CI packages, and how to keep a patched GPUI current.
 
 Links point at commits in [Crake](https://github.com/dorhawk-software/crake).
 
@@ -238,6 +238,62 @@ fn no_translation_names_a_modifier() {
     }
 }
 ```
+
+## Rounded corners don't clip
+
+**What.** GPUI clips children to a rectangle, never to rounded corners.
+A child that fills a rounded element's corner rounds that corner itself:
+the parent's radius minus its border width. `overflow_hidden()` on a
+rounded element doesn't round its children.
+
+**Why.** A GPUI app's Settings pane (2026-11-18) drew three small
+pictures of a window, 64 × 44 px, each
+`.rounded(px(7.)).overflow_hidden().border_1()` with a square sidebar
+child. On screen, the sidebar's square corners showed past the picture's
+rounded ones. GPUI's `ContentMask` holds only bounds, no corner radii
+(gpui-fast 0.1.16, `src/window.rs`). The HTML design board looked right:
+CSS's `overflow: hidden` does clip to rounded corners. The owner:
+"settings switcher has clipping (no idea how this was NOT caught by a
+rule and or check - extend pls)".
+
+**Apply.**
+```rust
+div()
+    .w(px(64.))
+    .h(px(44.))
+    .rounded(px(7.))
+    .border_1()
+    .child(
+        div()
+            .absolute()
+            .left_0()
+            .top_0()
+            .bottom_0()
+            .w(px(20.))
+            .rounded_l(px(6.)) // 7 px, less the 1 px border
+            .bg(side),
+    )
+```
+1. Round each child that reaches a corner, on the corners it reaches
+   (`rounded_l`, `rounded_tr`).
+2. Its radius is the parent's minus the border between them: 7 − 1 = 6.
+3. Keep `overflow_hidden()` off a rounded element. When the clip does
+   other work (a row that slides out of it), every corner child rounds
+   its own corners, and a comment on the clip's line or the one above
+   says why, in three words or more:
+   `// practices-allow clip: the row slides out of it`.
+4. The board can't show this, so compare the app itself with the board,
+   at 2× or more.
+
+**Check.** `check-gpui-clip`, in the lint gate of a GPUI app (claude-hook,
+pre-commit, CI). An element that rounds and clips in one builder chain is
+a finding, with its fix. It reads a chain over many lines, and a
+one-parameter closure that goes on with the element
+(`.when(on, |d| d.rounded(px(4.)))`). A call inside `.child(…)` is
+another element; comments and strings are skipped. It doesn't follow an
+element built over several statements through a variable, or one rounded
+in a helper and clipped by its caller. Whether each corner child has the
+right radius is review: look at the app at 2×.
 
 ## CI packages for GPUI on Linux
 

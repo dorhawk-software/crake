@@ -4,7 +4,8 @@ The rules for drawing an interface that looks made, not generated. They
 apply to any product and any toolkit. The process that uses them is in
 [identity-pass.md](identity-pass.md). Entering dates, times and numbers
 is in [pickers.md](pickers.md); asking for consent is in
-[consent.md](consent.md).
+[consent.md](consent.md); showing work under way and answering a press
+is in [feedback.md](feedback.md).
 
 Many of these rules are geometry: a gap, a distance from an edge, an
 axis. A person reviewing a scaled-down board cannot see a 2 px gap, and
@@ -19,7 +20,12 @@ each commit (pre-commit), and in CI. Its findings go back to the agent,
 grouped by rule, each with its fix. A deliberate exception is marked in
 the board, `data-allow="rule: the reason"`, and a mark without a reason
 is a finding too. What it checks, and what is still a reviewer's, is in
-[ENFORCEMENT.md](../ENFORCEMENT.md).
+[ENFORCEMENT.md](../ENFORCEMENT.md). A board drawn at a fixed width (a
+390 px phone) says so, `<meta name="viewport" content="width=390">` or a
+`canvas.json` beside it, and renders at that width only. A board with no
+dark rules renders in one theme. The words on the boards are checked too,
+for their language's grammar, by `check-copy`
+([common/voice.md](../common/voice.md#each-languages-grammar-is-checked)).
 
 Each rule names the incident behind it. Product details are labelled
 examples.
@@ -183,6 +189,16 @@ the icons are the part of the identity the user sees on every screen.
 6. Use icons generously. Every settings row, list item and main button
    carries one from the family. On Scops (2026-11-14) the owner asked
    for icons everywhere, settings first.
+7. Keep one map from action to icon in code, with no default. Its lookup
+   fails loudly when a label has no icon, so a new button without one
+   breaks the build, not the review. On Scops (2026-11-16) `check-ui`
+   found 189 buttons without an icon. Most were quiet text buttons,
+   written by hand 16 times in three weights. The fix was one `ghost()`
+   component and that map.
+8. A single choice is a `role="radiogroup"`, not a row of buttons: chips,
+   month and year grids, day grids, quick times, method cards. It is the
+   right meaning for a screen reader, and `check-ui` treats the group as
+   one control, not as many main buttons without icons.
 
 **Check.** No icon on any screen is a system or stock symbol unless the
 design doc says why. Each icon of the family, side by side at 24 and at
@@ -253,6 +269,17 @@ the signature of Shrike, another Dorhawk product.
 7. Shadows fall away from the light. Scops' green buttons had a glow
    that blurred 8 px above their top edge. The owner asked whether the
    soft top and sharp bottom were intended. They were not.
+8. A glow is not depth. Scops' lit beads had an amber glow with no
+   offset (2026-11-16). It gave 32 shadow findings and 20 halo findings,
+   and it fogged the label "hotovo 5 min" beside it. Now a lit bead shines
+   by its own gradient, with a small shadow that falls down. It still
+   reads as lit, and nothing around it is fogged.
+9. A bottom sheet casts no shadow upward. Light comes from above, so a
+   raised sheet's shadow falls behind it, where nobody sees it. Separate
+   the sheet by tone, the scrim and a 1 px top highlight
+   (`inset 0 1px 0`). Scops' sheets cast `0 -18px 50px` upward.
+10. A ring that means something (focus, the selected item) is an
+    `outline`, never a `box-shadow` of `0 0 0 1px`.
 
 **Check.**
 - Each depth effect is explained by the concept in one sentence.
@@ -338,12 +365,155 @@ but no script measured it.
 3. A badge or tooltip that hangs over an edge on purpose, or a list
    drawn mid-scroll, is marked in the board with its reason:
    `data-allow="contain: the count badge sits over the corner it numbers"`.
+4. A board's CSS clips to rounded corners; GPUI clips to a rectangle. In
+   a GPUI app, a child in a rounded corner rounds that corner itself
+   ([rust/gpui.md](../rust/gpui.md#rounded-corners-dont-clip)).
 
 **Check.** `.practices/bin/check-ui` measures every element against the
 surface it is drawn on, and every clipping box against its content, at
 each width and theme. A surface that clips is measured once, by clip, so
 one `data-allow="clip: …"` covers a screen drawn mid-scroll. It runs after every edit to a board, before the
 agent's turn ends, and before each commit.
+
+## A button label stays on one line
+
+**What.** A button, chip or tab keeps its label on one line
+(`white-space: nowrap`). If the label doesn't fit, shorten it, give the
+button its own row, or make it a list row. Content meant to stack (a card,
+a list row with a subtitle) is a flex column.
+
+**Why.** Adding icons on Scops (2026-11-16) pushed "Připojit se k rodině,
+která už Scops má" (join a family that already uses Scops) onto two lines.
+"Další dítě" (another child) wrapped beside a hint. Nothing overflowed:
+the box just grew, so no check saw it. A one-line control that wraps reads
+as broken.
+
+**Apply.**
+1. Give every button, chip and tab `white-space: nowrap`.
+2. A long label is shortened first: the verb and its object.
+3. A label that stays long gets the button its own row, full width at
+   phone width, or becomes a list row.
+4. A target with two lines on purpose (a title and a subtitle) stacks
+   them in a flex column.
+
+**Check.** `check-ui` (wrap) flags a target (a button, a tab, a radio, a
+switch, a menu item) whose text runs onto a second line, unless it sits in
+a flex column inside the target. A card-sized target whose text is a
+paragraph on purpose is marked `data-allow="wrap: …"`.
+
+## A joined line breaks between its parts
+
+**What.** Parts joined on one line by a separator ("this week · 18 in
+all", "Day 3 of 7 · limits start after", "Today | 3 apps") never break
+at the separator. The line keeps to one line where it fits; where it
+doesn't, each part gets a line of its own, without the separator. In a
+sentence that wraps anyway, the separator is tied to the words on both
+sides with no-break spaces, so the sentence breaks somewhere else.
+
+**Why.** On 25 Nov 2026 an iPhone app's Today showed "2 čisté dny" over
+"tento týden ·" and "celkem 18" ("2 clean days", "this week ·", "18 in
+all"). The owner asked: "is this alignment OK? Seems weird to be on three
+rows". The line was allowed two lines (`.lineLimit(2)`) and broke where
+the Czech ran out of width, right after the dot. The dot then ended a
+line and joined nothing, and "celkem 18" read as a leftover. The
+English fitted, so the screenshots never showed it.
+
+**Apply.**
+1. A short joined line (a caption, a status, a chip) keeps to one line:
+   `.lineLimit(1)` in SwiftUI, `white-space: nowrap` on the web.
+2. Where it may not fit (a longer language, a large text size), offer
+   the parts on lines of their own, without the separator:
+   `ViewThatFits(in: .horizontal) { joined.lineLimit(1); VStack(alignment:
+   .leading) { part1; part2 } }`. Each part is its own string in the
+   catalogue.
+3. A joined phrase inside a sentence that wraps: write the separator
+   with a no-break space on both sides (`\u{00A0}·\u{00A0}`, `&nbsp;·&nbsp;`)
+   in the source and in every translation.
+
+**Check.** `check-views` (join) reads the Swift files (`MOTION_FILES`, the ones
+`check-motion` reads). It finds a `Text` whose own string joins parts
+with " · " or " | " beside an ordinary space, with no `.lineLimit(1)` or
+horizontal `.fixedSize` in its modifiers. A sum of `Text`s is read to
+its end. A dot that isn't a separator is marked
+`// practices-allow join: <the reason>`, with a reason of three words or
+more. It runs in lint, in claude-hook after an edit and on Stop, and in
+pre-commit. `check-ui` (join) measures design boards: a separator whose
+line differs from the nearest character before or after it is a
+finding; `data-allow="join: …"` marks a quoted one. Not read yet
+(ROADMAP.md): a string built elsewhere and shown with `Text(name)`, a
+translation that adds a separator the source lacks, and Kotlin and
+Compose.
+
+## Alike buttons stacked become one block
+
+**What.** Two buttons that look alike never sit one under the other with
+nothing between them. When both answer one question ("close until
+when?"), they become one block: one surface, the rows rounded only at
+its ends, a hairline between. Otherwise a word sits between them ("or"),
+or the second takes a different look, the way a main action and a second
+one differ. A run of three or more alike rows is a list, and reads as
+one.
+
+**Why.** On 25 Nov 2026 an iPhone app's Focus card showed "Close all
+until 04:00" and "Until a date…" as two identical dark bars, 8 pt apart.
+The owner: "The buttons zavřít vše do 4 or do data being right under
+each other is visually confusing, either there should be a section like
+'nebo' between them, or they should be both in a bigger button one block
+with rounded corners and separated by some separator". The design board
+had drawn them in two colours; the build gave both the card's one button
+style, and nothing compared them.
+
+**Apply.**
+1. Two answers to one question: one block. In SwiftUI, a `VStack(spacing:
+   0)` of the two buttons, the style rounding the first at the top and the
+   second at the bottom, and a 1 pt view between them in the style's seam
+   colour.
+2. Two separate actions: give the lesser one a different look, or put a
+   word between ("or"), or move it away.
+3. Three or more like actions are a list: rows of one block, or a list
+   screen.
+
+**Check.** `check-views` (stack) finds two `Button`s with the same
+`.buttonStyle`, the second straight after the first (only closing braces
+and `#if` blocks between), outside an `HStack`, `Form`, `List` or
+toolbar. `check-ui` (stack) measures boards: two buttons with a surface
+of the same look, in one column, less than 24 px apart with nothing drawn
+between, not part of a run of three. Marked `practices-allow stack:` or
+`data-allow="stack: …"` with a reason. Whether three alike rows are a
+list or a muddle is review.
+
+## A box has no stripe down one side
+
+**What.** A box never wears a thick stripe down one edge, the accent of a
+generic callout. What the stripe would say, the product says with its own
+sign: the chip or badge it already uses for that meaning, an icon at the
+line's start, or the whole box's tone. A hairline that separates rows is
+not a stripe.
+
+**Why.** On 25 Nov 2026 an iPhone app's lock confirmation drew its
+warning as a grey box with a 4 pt orange stripe down its left edge. The
+design board had drawn it that way, and nobody critiqued the drawing. The
+owner, on the device: "Seems kinda ai sloppy and on top of that it
+contains rounding visual bug". The stripe was a second shape laid over
+the box, with corners of its own, and two curves met at its left edge. It
+looked like no other part of the app, whose sign for "closed by you" is
+the board's red chip. The warning now wears that chip.
+
+**Apply.**
+1. Ask what the stripe means. If the product has a sign for it (a chip,
+   a badge, an icon), use that sign.
+2. If not, tint the whole box, or let the words carry it, the first ones
+   in bold.
+3. A progress bar along a card's edge is a drawing of progress, not an
+   accent: mark it.
+
+**Check.** `check-views` (stripe) finds an `.overlay` or `.background`
+aligned to one edge (`.leading`, `.trailing`, `.top`, `.bottom`) that
+draws a shape 2 to 6 pt thick along it. `check-ui` (stripe) finds a box
+with a ground of its own and a border 2 px or more on one side only, or
+an inset shadow that draws one. Marked `practices-allow stripe:` or
+`data-allow="stripe: …"` with a reason. A stripe drawn as a sibling view
+in an `HStack`, or as a gradient, is review.
 
 ## Buttons follow the column
 
@@ -418,7 +588,12 @@ outcome, and that the app stays.
 **Check.** `check-ui` (outcome) flags every button whose whole label is
 a word that names no outcome: Cancel, OK, Okay, Yes, No, Confirm,
 Submit, Accept, Decline, Proceed, Abort, Dismiss, and in Czech Zrušit,
-Storno, Ano, Ne, Potvrdit, Přijmout, Odmítnout, Přerušit.
+Storno, Ano, Ne, Potvrdit, Přijmout, Odmítnout, Přerušit. The words are
+language data, each language's `vagueButtons` in `copy-rules/<lang>.mjs`
+(Spanish: Aceptar, Cancelar, Sí, No…), read for the language the button
+is in. The label is the accessible name when there is one: in a weekday
+picker, "Ne" with `aria-label="Neděle"` is Sunday, not "no" (Scops,
+2026-11-16).
 
 ## Separate targets keep their distance
 
@@ -450,8 +625,12 @@ worse: it turned flat chips into raised tiles, and raised tiles need air.
 pair of targets, across and down. It flags anything under 8 px, except
 the three cases above, marked `data-allow="gap: …"`. A segmented
 control that says so by its role (`role="tablist"` or
-`role="radiogroup"`) needs no mark. The reviewers get 1:1 crops of dense areas, not only scaled-down
-sheets.
+`role="radiogroup"`) needs no mark, nor does a group of toggles that
+each say whether they're pressed (`role="group"`, every option
+`aria-pressed`: a weekday picker). The targets of a page behind an open
+sheet aren't measured: it is `aria-hidden` or `inert`
+([below](#a-sheets-page-is-inert-and-the-board-says-so)). The reviewers
+get 1:1 crops of dense areas, not only scaled-down sheets.
 
 ## Spacing is measured from what you see
 
@@ -466,15 +645,31 @@ screens the disc came within 3 to 13 px of the text above. The owner saw
 it on the first night: the gap above the halo looked smaller than
 anywhere else. One change caused it, not 22 separate mistakes.
 
+The same holds the other way round: what lies over a surface's edge
+takes room from its padding. Obálka tucked its letter 10 px under the
+envelope it comes out of (2026-11-16). The letter kept its padding of
+14, so only 4 to 6 px showed above the subject against 14 below the
+last line. The owner: "the message title seems to be kinda hidden under
+the blue top bar".
+
 **Apply.**
 1. Build room for effects into the object itself. Scops' owl has room
    above the disc in its own viewBox, so every screen gained the gap at
    once.
 2. Keep at least 16 px between a visible edge and the nearest text.
+3. When something covers a surface's edge, pad that side by the overlap
+   plus the padding the other sides keep: Obálka's letter has 24 at the
+   top, the 10 under the envelope and 14.
 
 **Check.** `check-ui` (halo) measures every ring of 2 px or more and
-every glow to the nearest text that isn't its own. The painted extent of
-drawings (a disc behind a mascot) is still a project's own script
+every glow to the ink of the nearest text that isn't its own. The ink,
+not the line box: the line box holds the font's whole descent, and digits
+have none. Scops' lamp digits "03:48" read as 1.9 px into a glow whose
+visible gap was 18 px (2026-11-16). `check-ui` (inset) measures, on every
+filled surface with text, each filled box painted over one of its edges:
+from that box's edge to the nearest text must be at least the surface's
+smallest padding on its other sides. The painted extent of drawings (a
+disc behind a mascot) is still a project's own script
 ([ENFORCEMENT.md](../ENFORCEMENT.md)).
 
 ## Centred means on the axis
@@ -675,12 +870,26 @@ the ink pill for all toasts; the sending one counts down in words.
 2. If two places use different anatomies for the same job, pick one and
    redraw the other.
 3. Write the anatomy down: parts, order, sizes, the action's place.
+4. Name each component in the markup with a class: `b-main`, `b-sub`,
+   `b-ghost`, `b-chip`, `b-day`, `b-day-adj`, `b-val`, `b-row`. A variant
+   that is meant to differ (a muted day of the next month) gets its own
+   class, and the design doc gives its reason. The design doc's list of
+   components and the classes are the same list.
+
+**Why the classes.** `check-ui` (same-look) compares like with like:
+the same tag, classes and role. Scops' buttons had inline styles and no
+classes (2026-11-16), so every button on a screen was compared with
+every other: the main button, the child switcher, a calendar day, a
+chip. That gave 71 findings, mostly noise around a few real ones: "Utišil
+se" in 800 weight beside "Jít za ním hned" in 700, in one row; inputs 56
+px high with 18 px type on one screen and 52 and 16 on the next.
 
 **Check.** The design doc lists each component's anatomy, and the canvas
 shows no second version. `check-ui` (same-look) flags like targets (the
 same tag, classes and role) of different height, type, radius or padding.
 A button with no words (an icon button) is a kind of its own, compared
-by height, radius and padding only.
+by height, radius and padding only. When the like targets have no class,
+the finding asks for the component's name first.
 
 ## A choice changes everything it owns
 
@@ -774,16 +983,51 @@ inside the home indicator's area. There were three causes:
    the safe area, with a short fade over the scrolling content.
 4. Bottom sheets add the safe area to their bottom padding too.
 
-**Check.** A script measures every tappable element against the bottom
-edge and flags anything closer than 34 px. Every phone board shows the
-home indicator.
+**Check.** `check-ui` (safe) measures every target in a phone frame,
+marked `data-frame="phone"`. It flags anything that ends less than 34 + 8
+px above the frame's bottom, or that starts under the status bar (54 px).
+A tab bar (`nav` or `role="tablist"`) sits on the safe area itself, so it
+needs the 34 px only. What scrolls inside the frame may pass under the
+home indicator. A frame that draws no home indicator (marked
+`data-home-indicator`) is a finding. So is a board drawn at a phone's
+width (480 px or less) with no frame marked. Other sizes go on the
+frame: `data-safe-top="24" data-safe-bottom="48"`.
+
+## A sheet's page is inert, and the board says so
+
+**What.** While a sheet or dialog is open, the page behind it takes no
+taps and no screen reader reads it: it is `inert` in the product. A board
+that draws an open `role="dialog"` says the same, with
+`aria-hidden="true"` on everything drawn before the dialog in its screen.
+
+**Why.** Scops' screens with an open sheet produced dozens of "targets
+overlap" findings (2026-11-16). They were buttons of the page behind the
+scrim. A real app makes that page inert; the boards didn't say so, so a
+check couldn't tell the page from the sheet. Marking them `inert` on the
+boards brought false contrast findings instead (1.9:1 under the scrim):
+Chrome's hit test skips inert elements, so the scrim inside the page no
+longer covered its text. `check-ui` now skips both.
+
+**Apply.**
+1. In the product, set `inert` on the page while a sheet is open, and
+   clear it when the sheet closes.
+2. On a board, mark everything drawn before the dialog in its screen
+   `aria-hidden="true"`. Do it in one place: the board writer (Scops'
+   `finish()`), never by hand per screen.
+3. A dialog that isn't modal (a popover over a live page) is marked
+   `data-allow="sheet: …"`.
+
+**Check.** `check-ui` (sheet) flags an open dialog (`role="dialog"`,
+`role="alertdialog"`, `<dialog open>`) while a target drawn before it in
+its screen (its `data-frame`, or its parent) is still live. The targets
+and text of an `aria-hidden` or `inert` page aren't measured.
 
 ## Words in the product's voice
 
 **What.** Screens speak in the product's own voice. Dialogs use little
 text and a button that names and does the action. Serious moments get
-calm words, not jokes. Who speaks (the app, never "we") is in
-[common/voice.md](../common/voice.md).
+calm words, not jokes. Who speaks (the app, never "we", except a
+companion's inclusive "we") is in [common/voice.md](../common/voice.md).
 
 **Why.** Tern's first-run lines carry its idea ("Bring your mail home.",
 "Only you hold the key."). Its inbox zero carried a meme, which a review
@@ -810,7 +1054,10 @@ full forms on purpose: they read as care.
 **Check.** No "OK" or "Yes" buttons (`check-ui` outcome, see
 [Every button names its outcome](#every-button-names-its-outcome)). No
 jokes on screens that can show sensitive content. Every screen that
-mentions a person is on the board in every gender.
+mentions a person is on the board in every gender. The grammar between
+words that a script can decide ("V 10:20", "ve středu") is
+`check-copy`'s, per language
+([common/voice.md](../common/voice.md#each-languages-grammar-is-checked)).
 
 ## Answer the next question where it arises
 
@@ -847,10 +1094,90 @@ have said nothing.
 
 **Apply.**
 1. Use the product's own mark or objects instead of a generic spinner
-   wherever it waits.
+   wherever it waits. Every wait over about a second shows it, and a
+   pressed control shows it too ([feedback.md](feedback.md)).
 2. Play one-off moments once. Loop only while work is actually
    happening.
 3. Give every motion a still frame for reduced motion that still makes
    sense.
 
-**Check.** Turn on reduced motion. Every screen still reads correctly.
+A resize is motion too: its frames never show squashed words
+([below](#a-resize-never-shows-a-squashed-frame)).
+
+**Check.** `check-ui` (motion) renders every board with reduced motion,
+and flags any animation that still loops there. A loop that is the
+content itself is marked `data-allow="motion: …"`. Every other check
+measures the same reduced-motion render. Whether every screen still
+reads correctly with reduced motion, and whether a motion tells the
+product's story, is review.
+
+## A selection switches at once
+
+**What.** Choosing a bar, a row or a tab changes the highlight in the
+same frame. The old choice goes dark and the new one lights at once.
+Nothing fades between them. A highlight that slides from the old place
+to the new one is the only exception, and it moves as one piece.
+
+**Why.** On 25 Nov 2026 the owner tapped one bar after another on an
+iPhone app's two-week chart. It flickered: for a moment the old and the
+new bar were both lit. The code set the selected day inside
+`withAnimation(.snappy)`, and each bar's colour followed the selection.
+So the two bars faded across each other. Apple's own Screen Time chart
+switches at once.
+
+**Apply.**
+1. Set the selection without animation. Animate what moves because of
+   it, such as a scroll to the chosen row, on its own.
+2. Numbers that change with the selection may roll
+   (`.contentTransition(.numericText())`), as long as the bars don't fade.
+3. A highlight that slides on purpose (a capsule under the chosen tab)
+   is one shape that moves. Mark that line with
+   `// practices-allow motion: <the reason>`.
+
+**Check.** `check-motion` reads the Swift files (`MOTION_FILES`). It
+finds a selection state set inside `withAnimation`, or followed by
+`.animation(_:value:)`. A selection state is a name like `selected…`,
+`selection…`, `highlighted…`, `…Selection` or `…Selected`;
+`MOTION_SELECTION` adds the app's own. A marked line needs a reason of
+three words or more. It runs in lint, in claude-hook after an edit and
+on Stop, and in pre-commit. Kotlin, Compose and the web aren't read yet
+(ROADMAP.md). Whether a highlight under another name cross-fades is
+review.
+
+## A resize never shows a squashed frame
+
+**What.** When a window or a panel changes size, its content is laid out
+at the new size for every frame it shows. No frame shows content scaled
+to a size it wasn't laid out for: words never stretch or squash, even
+for a tenth of a second.
+
+**Why.** Gentes' Settings window shrinks to fit each tab. The owner,
+2026-11-18: "I noticed i opened Gerntes settings and went to the Privacy
+tab (which is not as tall as the first tab), and the contents were
+squashed before they re-rendered and text was looking good again, as if
+something was rendered first at 150 px (an exampple), the squashed to
+like 80 px and then re-rendered at 80 px to be nice". Then: "make this
+last re-rendering issue another rule and check pls". The window changed
+size in code, and macOS scaled the last picture it had into the new
+bounds until the app drew again, a frame or two later. Gentes f5c8854
+pins that picture to the window's top left while it resizes: cropped,
+never scaled.
+
+**Apply.**
+1. Resize without the system's frame animation, or lay the content out
+   at every frame of it.
+2. Follow what the platform does with tabs. macOS Settings windows
+   animate their height between tabs, with the content laid out at every
+   frame; a fixed-size window is the other way.
+3. Animate a panel's size (its height, a clip, a crossfade), never a
+   scale of its content. A scale that keeps the shape (a popover
+   appearing) is fine.
+4. Record the resize frame by frame (a screen recording, or animations
+   slowed down) and look at each frame. The words keep one size
+   throughout.
+
+**Check.** `check-ui` (squash) flags an element holding words that is
+drawn scaled out of its shape (`scaleY(.7)`), and one that plays a
+`@keyframes` rule that would scale it so, under any media. A drawing
+whose squash is its idea, with no words in it, isn't measured. The app's
+own resize is review: record it and look at every frame.

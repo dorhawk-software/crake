@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# git's commit-msg hook, through check-commit-msg: a commit that adds or
+# changes one of the project's checks (CHECK_FILES) says how the check was
+# proven, on a line of its own (common/gates.md, "A new check is broken
+# once, then trusted"):
+#   Proven: the gap check turned off; tests/run failed on gap.html
+#
+#   .practices/bin/check-proven MSG_FILE
+#
+# Why: mutation testing is done once, while a check is added. The owner,
+# 2026-11-18: "after mutation verifies it works, the mutation is no longer
+# present and the script with its test (a quick one) is taken as true".
+# So the proof lives in the commit that adds the check, and nowhere else.
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+msg=${1:?usage: check-proven MSG_FILE}
+[ -f "$msg" ] || { echo "check-proven: no message file $msg" >&2; exit 2; }
+[ -n "$CHECK_FILES" ] || exit 0
+
+read -r -a spec <<<"$CHECK_FILES"
+checks=$(git diff --cached --name-only --diff-filter=AM -- "${spec[@]}") || {
+    echo "check-proven: git couldn't list the staged files (CHECK_FILES: $CHECK_FILES)." >&2
+    exit 2
+}
+[ -n "$checks" ] || exit 0
+proof=$(grep -v '^#' "$msg" | sed -n 's/^Proven:[[:space:]]*//p' | head -n 1)
+if [ "$(printf '%s\n' "$proof" | wc -w | tr -d ' ')" -lt 3 ]; then
+    {
+        echo "check-proven: this commit adds or changes checks, and doesn't say how they were proven:"
+        printf '%s\n' "$checks" | sed 's/^/  /'
+        echo "Break each new or changed check once in the working tree, run its test and see it"
+        echo "fail on the check's own case, then undo the break (common/gates.md, \"A new check is"
+        echo "broken once, then trusted\"). Say so in the message, on a line of its own:"
+        echo "  Proven: <what was broken, and which case failed>"
+    } >&2
+    exit 1
+fi

@@ -361,6 +361,14 @@ check, the magic numbers). Read .practices/README.md.
   (build, test, check, clippy, run) and blocks on failure; until
   2026-11-11 only after `cargo build` / `cargo test`. It also keeps the
   disk's floor (`.practices/bin/disk-guard`).
+  Since practices 1.16 (2026-11-27) it also runs before a Bash command,
+  after edits and when a turn ends, with the page, copy and voice checks.
+- The design and copy gates' settings are Crake's (`.practices/config`):
+  check-ui measures `design/screens/`; check-page reads proposal pages
+  written from 2026-11-27 on (the 68 older ones are listed in
+  `.practices/pages-before-the-rule`, which only shrinks); copy that
+  names no language is English (`COPY_LANG=en`). A new proposal page is
+  phone-wide and its mocks are marked `data-mock` and `data-reviewed`.
 - Coverage (`.practices/bin/check-coverage`, cargo-llvm-cov, about a minute):
   each crate's share of lines run by the tests stays at or above its floor
   (crake 73%, craked 63%, crake-proto 98%, lint-literals 82% as of Oct 2026;

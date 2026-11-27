@@ -12,8 +12,14 @@ set -uo pipefail
 
 PRACTICES_BIN=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # The project is the repository this kit sits in (.practices/bin), not
-# the one the caller happens to be in.
-if ! ROOT=$(git -C "$PRACTICES_BIN" rev-parse --show-toplevel 2>/dev/null); then
+# the one the caller happens to be in. In a git hook, git sets GIT_DIR and
+# runs the hook at the top of the tree being committed, which may be a
+# linked worktree whose hooks are the main tree's (core.hooksPath): there,
+# `git -C .practices/bin rev-parse --show-toplevel` answers .practices/bin
+# itself, and every check ran from the wrong folder (Scops, 2026-11-22).
+if [ -n "${GIT_DIR:-}" ]; then
+    ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "practices: run this inside the project's git repository" >&2; exit 2; }
+elif ! ROOT=$(git -C "$PRACTICES_BIN" rev-parse --show-toplevel 2>/dev/null); then
     echo "practices: run this inside the project's git repository" >&2
     exit 2
 fi
@@ -58,6 +64,12 @@ UI_THEMES='light dark'
 UI_TARGETS='button, a[href], [role=button], input, select, textarea, summary'
 UI_STATES='focus hover active pressed'
 UI_CHROME=''
+# The page gate (check-page): the proposal and review pages the owner
+# reads on a phone (git pathspecs; empty: none), and the widths (px) each
+# is read at. Crake keeps its proposals in design/proposals/, Scops its
+# in design/changes/.
+UI_PAGES=':(glob)design/proposals/**/*.html :(glob)design/changes/**/*.html'
+PAGE_WIDTHS='375 390'
 # The voice gate (check-voice): the files that hold the copy people see
 # (git pathspecs; tests and generated files left out), and more first-person plural words to flag, as a regex
 # alternation (a language the check doesn't know). The changelog is What's new
@@ -65,6 +77,51 @@ UI_CHROME=''
 # 1.6.1 neither was read, and a FAQ's "not even us" passed.
 VOICE_FILES=':(glob)CHANGELOG*.md :(glob)**/content/**/*.ts :(glob)**/content/**/*.tsx :(glob)**/content/**/*.js :(glob)**/content/**/*.json :(glob)**/content/**/*.md :(glob)**/i18n/** :(glob)**/locales/** :(glob)**/l10n/** :(glob)**/*.lproj/*.strings :(glob)**/*.xcstrings :(glob)**/*.ftl :(glob)**/*.po :(glob)**/*.arb :(glob)**/res/values*/strings.xml :(glob)fastlane/metadata/**/*.txt :(exclude,glob)**/__tests__/** :(exclude,glob)**/*.test.* :(exclude,glob)**/*.spec.* :(exclude,glob)**/tests/** :(exclude,glob)**/*.generated.*'
 VOICE_WORDS=''
+# The copy gate (check-copy): the files it reads (git pathspecs; empty: the
+# design boards and the copy files, UI_BOARDS and VOICE_FILES), the
+# language of copy that names none (empty: such copy is a finding, never a
+# guess; check-voice reads it too, for the -me verbs a language carries),
+# and the folder of the project's own copy-rules/<lang>.mjs files,
+# which add to the kit's (cs, en, es) and add languages.
+COPY_FILES=''
+COPY_LANG=''
+COPY_RULES='.practices/copy-rules'
+# The project's own checks (git pathspecs: a lint.d script, a scanner's
+# rules). A commit that adds or changes one says, in a "Proven:" line, how
+# the check was broken once and its test failed (check-proven,
+# common/gates.md). Empty: off. The environment may set it, as the
+# practices repository's own commit-msg hook does.
+CHECK_FILES=${CHECK_FILES-}
+# The permission-button gate (check-permission-words): the code files it
+# reads besides the copy files (VOICE_FILES), tests left out, and more
+# verbs and permission nouns as regex alternations (a language it doesn't
+# know: it knows English, Czech, Spanish and Vietnamese).
+PERMISSION_FILES=':(glob)**/*.swift :(glob)**/*.kt :(glob)**/*.java :(glob)**/*.ts :(glob)**/*.tsx :(glob)**/*.js :(glob)**/*.jsx :(glob)**/*.dart :(exclude,glob)**/*Tests/** :(exclude,glob)**/*Tests.swift :(exclude,glob)**/__tests__/** :(exclude,glob)**/*.test.* :(exclude,glob)**/*.spec.* :(exclude,glob)**/tests/** :(exclude,glob)**/test/** :(exclude,glob)**/androidTest/** :(exclude,glob)**/e2e/**'
+PERMISSION_VERBS=''
+PERMISSION_NOUNS=''
+# The Xcode gate (check-xcode, check-ios-artefact): the device families
+# the app ships for (TARGETED_DEVICE_FAMILY's form: 1 iPhone, 2 iPad,
+# "1,2" both; empty: the project-level setting in the .xcodeproj), and
+# more frameworks that need an entitlement, as Framework=entitlement pairs.
+DEVICE_FAMILY=''
+ENTITLED_FRAMEWORKS=''
+# The UI-test gate (check-ui-tests): the launch arguments that pin the
+# app's language (a regex; add the app's own switch, "-AcmeLanguage").
+UITEST_LANGUAGE='-AppleLanguages|-AppleLocale'
+# ... and the launch argument that starts the app offline, its own
+# networking stubbed (a regex; any "-...Offline" by default).
+UITEST_OFFLINE='"-[A-Za-z]*Offline"'
+# ... the switches that launch the app in one of its screen states (an
+# ERE whose first quoted string is the switch), each passed by an audited
+# test; and the ratchet listing states from before that rule.
+UITEST_STATES='arguments\.contains\("-[A-Za-z][A-Za-z0-9]*"\)'
+UITEST_STATES_BASELINE='.practices/unaudited-states'
+# The motion gate (check-motion) and the views gate (check-views): the
+# Swift files they read, tests left
+# out, and more names of selection states (a regex, matched whole, added
+# to selected..., selection..., highlighted..., ...Selection, ...Selected).
+MOTION_FILES=':(glob)**/*.swift :(exclude,glob)**/*Tests/** :(exclude,glob)**/*Tests.swift'
+MOTION_SELECTION=''
 
 if [ -f .practices/config ]; then
     # shellcheck source=/dev/null
@@ -73,6 +130,23 @@ fi
 
 has_rust() { [ -f "$ROOT/Cargo.toml" ]; }
 has_node() { [ -f "$ROOT/package.json" ]; }
+
+# A GPUI app: Cargo.lock holds a gpui crate (gpui, gpui-kit, gpui-fast,
+# gpui-pre…), or a Cargo.toml, tracked or new, names one as a dependency.
+uses_gpui() {
+    local spec manifest
+    has_rust || return 1
+    if [ -f "$ROOT/Cargo.lock" ] && grep -Eq '^name = "gpui([-_][A-Za-z0-9_-]+)?"$' "$ROOT/Cargo.lock"; then
+        return 0
+    fi
+    read -r -a spec <<<"$EXCLUDE"
+    while IFS= read -r manifest; do
+        [ -f "$manifest" ] &&
+            grep -Eq '^[[:space:]]*(gpui([-_][A-Za-z0-9_-]+)?[[:space:]]*[=.]|\[([a-z-]+\.)?(dev-|build-)?dependencies\.gpui)' "$manifest" &&
+            return 0
+    done < <(git ls-files --cached --others --exclude-standard -- 'Cargo.toml' '*/Cargo.toml' ${spec[@]+"${spec[@]}"})
+    return 1
+}
 
 # The project's Rust files, tracked or new, without the excluded ones.
 rust_files() {
@@ -91,11 +165,83 @@ js_files() {
         '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' ${spec[@]+"${spec[@]}"}
 }
 
-# The files check-voice reads: tracked or new, matching VOICE_FILES.
+# The files check-voice reads: tracked or new, matching VOICE_FILES, and
+# the design boards (UI_BOARDS): a board's copy is the product's copy.
+# Until 1.7.3 the boards were read for grammar but never for "we".
 voice_files() {
     local spec
-    [ -n "$VOICE_FILES" ] || return 0
-    read -r -a spec <<<"$VOICE_FILES $EXCLUDE"
+    {
+        if [ -n "$VOICE_FILES" ]; then
+            read -r -a spec <<<"$VOICE_FILES $EXCLUDE"
+            git ls-files --cached --others --exclude-standard -- "${spec[@]}"
+        fi
+        [ -z "$UI_BOARDS" ] || ui_boards
+    } | awk '!seen[$0]++'
+}
+
+# The files check-copy reads: tracked or new, matching COPY_FILES, or the
+# boards and the copy files when it is empty.
+copy_files() {
+    local spec
+    if [ -z "$COPY_FILES" ]; then
+        { ui_boards; voice_files; } | awk '!seen[$0]++'
+        return 0
+    fi
+    read -r -a spec <<<"$COPY_FILES $EXCLUDE"
+    git ls-files --cached --others --exclude-standard -- "${spec[@]}"
+}
+
+# The files check-permission-words reads: the copy files (VOICE_FILES,
+# without the boards) and the code files in PERMISSION_FILES. Prose (a
+# changelog, a FAQ page, store notes) holds no buttons and is left out.
+permission_files() {
+    local spec
+    {
+        if [ -n "$VOICE_FILES" ]; then
+            read -r -a spec <<<"$VOICE_FILES $EXCLUDE"
+            git ls-files --cached --others --exclude-standard -- "${spec[@]}"
+        fi
+        if [ -n "$PERMISSION_FILES" ]; then
+            read -r -a spec <<<"$PERMISSION_FILES $EXCLUDE"
+            git ls-files --cached --others --exclude-standard -- "${spec[@]}"
+        fi
+    } | grep -vE '\.(md|txt|html?)$' | awk '!seen[$0]++'
+}
+
+# The Swift files check-motion and check-views read: tracked or new,
+# matching MOTION_FILES.
+motion_files() {
+    local spec
+    [ -n "$MOTION_FILES" ] || return 0
+    read -r -a spec <<<"$MOTION_FILES $EXCLUDE"
+    git ls-files --cached --others --exclude-standard -- "${spec[@]}"
+}
+
+# The files whose change can change what check-xcode and check-ui-tests
+# find: Xcode projects, XcodeGen specs, entitlements, Info.plists, Swift
+# and Objective-C sources, test plans, scripts and workflows.
+xcode_files() {
+    local spec
+    read -r -a spec <<<"$EXCLUDE"
+    git ls-files --cached --others --exclude-standard -- '*.pbxproj' 'project.yml' '*/project.yml' \
+        '*.entitlements' '*Info.plist' '*.swift' '*.m' '*.mm' '*.xctestplan' '*.xcconfig' \
+        '*.sh' '.github/workflows/*' 'Makefile' 'fastlane/Fastfile' ${spec[@]+"${spec[@]}"} | awk '!seen[$0]++'
+}
+
+# The Xcode projects: each tracked or new .xcodeproj, without CocoaPods'.
+xcode_projects() {
+    local spec
+    read -r -a spec <<<"$EXCLUDE"
+    git ls-files --cached --others --exclude-standard -- '*.xcodeproj/project.pbxproj' ':!Pods/**' ':!**/Pods/**' \
+        ':!**/node_modules/**' ${spec[@]+"${spec[@]}"} | sed 's|/project\.pbxproj$||'
+}
+
+# The proposal and review pages check-page reads: tracked or new,
+# matching UI_PAGES.
+ui_pages() {
+    local spec
+    [ -n "$UI_PAGES" ] || return 0
+    read -r -a spec <<<"$UI_PAGES $EXCLUDE"
     git ls-files --cached --others --exclude-standard -- "${spec[@]}"
 }
 

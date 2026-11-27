@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The agent's gates stay wired: .claude/settings.json runs claude-hook
-# after Bash, Edit and Write (PostToolUse), and when the agent's turn ends
-# (Stop and SubagentStop). A hook that isn't registered never runs, and
+# before Bash (PreToolUse: an upload to App Store Connect is checked
+# first), after Bash, Edit and Write (PostToolUse), and when the agent's
+# turn ends (Stop and SubagentStop). A hook that isn't registered never runs, and
 # nothing else would say so.
 #
 #   .practices/bin/check-hooks
@@ -38,6 +39,8 @@ def runs(event, tool=None):
 for tool in ("Bash", "Edit", "Write", "MultiEdit"):
     if not runs("PostToolUse", tool):
         print(f"PostToolUse doesn't run claude-hook after {tool}")
+if not runs("PreToolUse", "Bash"):
+    print("PreToolUse doesn't run claude-hook before Bash")
 for event in ("Stop", "SubagentStop"):
     if not runs(event):
         print(f"{event} doesn't run claude-hook")

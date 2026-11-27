@@ -44,6 +44,39 @@ in seconds.
 changes with it, and the arithmetic holds. A search of all boards for
 time- and date-shaped text finds no typed or display-only value.
 
+## A time turns on a wheel; a menu holds a handful
+
+**What.** A time is picked with the platform's time picker: a wheel in
+the steps it allows (every 15 minutes), offering only valid times. On iOS
+that is a `DatePicker` (wheel, or a compact row that opens one), placed
+in the product's own card. A list built from data (every quarter hour,
+every country, every member) is a wheel or a list screen, never a menu.
+A menu keeps a few fixed choices, twelve at most.
+
+**Why.** On 25 Nov 2026 an iPhone app picked a lock's end time from a
+`Menu` of every quarter hour after now: up to 96 lines in a system
+popover that covered the calendar it belonged to, scrolled to find the
+evening. The owner: "This time selector is real ugly, can it be made into
+the apps design maybe? Is that possible? Or what is apples
+recommendation?" "Picked, not typed" already said "a time wheel for
+times"; nothing checked it.
+
+**Apply.**
+1. A time: the platform's time picker, in minute steps, with the earliest
+   and latest valid times set. Show the result in the product's own type
+   (the flaps, the board's numerals) where it's read.
+2. A list built from data: a wheel (`.pickerStyle(.wheel)`), or a list
+   screen with search when it's long.
+3. A menu: a few fixed choices, each a word, never a range of numbers.
+
+**Check.** `check-views` (menu) finds a `Menu` whose content has a
+`ForEach`, and a `Picker` built from a `ForEach` that isn't `.wheel`,
+`.inline`, `.segmented`, `.palette` or `.navigationLink`; a short list
+from data is marked `practices-allow menu: <reason>`. `check-ui` (menu)
+finds a `<select>`, listbox or menu with more than 12 choices on a board,
+unless marked `data-allow="menu: …"`. Kotlin and Compose
+(`DropdownMenu` over a range) aren't read yet (ROADMAP.md).
+
 ## Every calendar jumps to a month and year
 
 **What.** In any calendar, the month's name is a button. It opens a year

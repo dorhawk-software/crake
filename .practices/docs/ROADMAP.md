@@ -17,7 +17,8 @@ is the source of everything Rust here; its commit links are in each doc.
   [window buttons](ui/window-buttons.md),
   [keyboard shortcuts](ui/keyboard-shortcuts.md),
   [an identity pass](ui/identity-pass.md), [visual craft](ui/visual-craft.md),
-  [dates, times and numbers](ui/pickers.md), [consent](ui/consent.md)
+  [dates, times and numbers](ui/pickers.md), [consent](ui/consent.md),
+  [feedback while it works](ui/feedback.md)
 - [x] Rust docs: [conventions](rust/conventions.md), [lints](rust/lints.md),
   [coverage](rust/coverage.md), [GPUI](rust/gpui.md)
 - [x] Templates: lints, clippy, deny (GPL and closed-source lists), toolchain,
@@ -26,6 +27,11 @@ is the source of everything Rust here; its commit links are in each doc.
   check-private (fails closed), check-unsafe, check-coverage (floors per
   OS, never lowered, skips counted), check-commit-msg, install-hooks,
   claude-hook, disk-guard, prune-caches, sweep-target; `bin/install`
+- [x] check-gpui-clip: in a GPUI app, no element both rounded and clipped
+  in one builder chain (Unreleased)
+- [ ] check-gpui-clip follows an element built over several statements
+  through a variable (`let mut r = div()…; r = r.overflow_hidden()`), and
+  one rounded in a helper and clipped by its caller
 - [x] Tests of the kit (`tests/run`), under bash 3.2 on macOS
 - [x] Guides: [how it works](guides/how-it-works.md),
   [adopt in a Rust project](guides/adopt-in-a-rust-project.md),
@@ -142,15 +148,44 @@ is the source of everything Rust here; its commit links are in each doc.
     CI: contain, clip, align, gap, text-size, ring, shadow, halo, centre,
     state, icon, same-look, contrast (on the pixels behind the text).
     Each check has a planted fault in `tests/run` and a mutant in
-    `tests/mutate` (1.6.0). ink: one hue per glyph (1.6.3).
+    `tests/mutate` (1.6.0; the stored mutants were dropped on
+    2026-11-18, each check now broken once while it is added). ink: one hue per glyph (1.6.3). inset: what
+    covers an edge takes room from the padding (1.6.5).
+  - [x] Scops' round 2 (2026-11-16, 903 findings on 87 boards, then 0):
+    both safe areas of a phone frame, labels on one line, the page behind
+    an open sheet; inert pages and groups of pressed toggles understood;
+    a halo measured to the text's ink; a button's accessible name read;
+    fixed-width boards at their own width and boards without dark rules
+    in one theme (348 renders where 87 would do); Chrome's first page
+    opened or retried, and `--no-sandbox` for root (1.7.0).
+  - [x] `check-copy`: each language's grammar by its own rules file (cs,
+    en, es, and a project's own), copy that names no language or a
+    language without rules as findings, one wording per `data-fact`
+    across the boards; the button words `outcome` refuses moved into the
+    same files (1.7.0).
+  - [x] Feedback while it works, from the Windows-app runner (2026-11-18:
+    a still egg for minutes of work, and an Open button that gave no sign
+    for 10 to 30 s): busy, a control marked `aria-busy="true"` disabled,
+    without a pointer cursor, its words ending in "…"; working, something
+    in it moving with motion allowed; motion, nothing looping with
+    reduced motion (Unreleased).
+  - [x] A resize never shows a squashed frame: squash, words drawn
+    scaled out of their shape, now or by a `@keyframes` rule
+    (Unreleased). A transition to a scaled state isn't read yet.
+  - [ ] Motion with reduced motion, the rest: finite animations and
+    transitions that still play, SVG `<animate>` loops, generic spinners.
+  - [ ] `check-copy` reads a board as written: text a script writes at
+    load isn't read. Read the rendered DOM where `check-ui` renders.
+  - [ ] A click-through test of a prototype: each `data-fact` first shown
+    after the step that collects it (ui/design-before-build.md, "Every
+    fact a screen uses was entered earlier").
   - [ ] The next checks, most value for least effort (the 2026-11-15
-    audit, [ENFORCEMENT.md](ENFORCEMENT.md)): the bottom safe area on
-    phone boards (34 + 8 px); values off the project's spacing and type
-    scale; a border census (borders and inset rings that aren't focus or
+    audit, [ENFORCEMENT.md](ENFORCEMENT.md)): values off the project's
+    spacing and type scale; a border census (borders and inset rings that aren't focus or
     a checkbox, nested cards); leftover text (TODO, lorem, "Option A");
     the face that actually renders (CDP `CSS.getPlatformFontsForNode`);
     one shadow recipe per elevation and a declared light direction;
-    nothing still animating under reduced motion; a row partly covered
+    a row partly covered
     by a drawing; one stroke cap and width per icon family; grain where
     the identity declares texture.
   - [ ] `actions/check-ui`: the gate in a project's CI, on macOS (boards
@@ -179,8 +214,8 @@ convention. Each one leaves this list when it's built.
   is published (phase 5).
 - Scenario suites (one test per scenario, run everywhere) are a documented
   pattern; the shared macro is phase 4.
-- Safe areas and typed values (`ui/visual-craft.md`, `ui/pickers.md`) are
-  a project's own scripts until `check-ui` measures them (phase 7).
+- Typed values (`ui/pickers.md`) are a project's own script until
+  `check-ui` measures them (phase 7).
 
 ## Every rule a machine can check, a gate
 
@@ -221,11 +256,28 @@ rows are this list's source; the most valuable first.
     wiping a simulator or emulator that isn't on the demo list.
   - [ ] Releases (common/releases.md, mobile/releases.md) and mobile CI
     have no script in the kit yet: phase 2's release script carries them.
+  - [ ] The PreToolUse claude-hook also refuses a command that polls a
+    `*.lock` path in a loop ("Only the lock's own script waits for the
+    lock").
+  - [ ] A Stop hook's slow gate skips while its lock is held, and when
+    nothing it checks changed since its last clean run (common/gates.md).
+  - [ ] The PreToolUse claude-hook also refuses booting a second
+    simulator while one is booted ("Simulators run one at a time until
+    the machine is measured"), and an edit to a shell script a running
+    process executes ("Don't edit a script while it runs").
+  - [ ] The kit's slow gates (check-ui, check-ui-tests) print each
+    phase's time and the total (common/gates.md, "A slow gate prints each
+    phase's time").
   - [x] check-voice reads JSX text between tags (1.6.1).
-  - [ ] check-voice reads the copy on design boards, and knows more
-    languages' we-words than English and Czech.
-  - [ ] tests/mutate lists the kit's checks and fails when one has no
-    mutant ("A test of a check is proven by breaking the check").
+  - [x] check-voice reads the copy on design boards and web pages, in
+    each element's lang, and takes COPY_LANG for copy that names none
+    (1.7.3).
+  - [ ] check-voice knows more languages' we-words than English and
+    Czech.
+  - [x] A check is proven by breaking it once, while it is added, and
+    the commit says so: `check-proven` asks for a `Proven:` line
+    (Unreleased). Until 2026-11-18 this item asked tests/mutate to keep
+    a mutant for every check; tests/mutate and its CI shards are gone.
 - **Rust:**
   - [ ] `clippy::allow_attributes` and `allow_attributes_without_reason`
     denied in Cargo-lints.toml.
@@ -233,13 +285,90 @@ rows are this list's source; the most valuable first.
     not applied).
   - [ ] A case-clash check for every project (`git ls-files` folded to
     lower case has no duplicates).
+- **Mobile, from App Review** ([mobile/app-review.md](mobile/app-review.md),
+  three rejections of an iPhone app in November 2026):
+  - [x] `check-permission-words`, `check-xcode`, `check-ios-artefact`
+    and `check-ui-tests`, in lint, claude-hook and pre-commit, each with
+    its planted faults in `tests/run` (Unreleased).
+  - [x] check-ios-artefact before the agent's upload: claude-hook's
+    PreToolUse refuses `-exportArchive` to `upload`, `altool` and
+    `iTMSTransporter` uploads of a failing or unnamed build (1.13.0).
+  - [ ] check-ios-artefact before every other upload: phase 2's release
+    script, the reusable mobile release workflow, and fastlane's
+    `pilot`/`deliver` (no build path in the command to read).
+  - [ ] check-ui-tests reads Espresso, Detox and Maestro tests, and a
+    dark-mode run.
+  - [x] Every screen state audited: each launch switch in the app's
+    code is passed by an audited test, an audit exception names its
+    element, and each audited screen keeps its picture (Unreleased).
+  - [ ] Each screen's main button asserted on screen, checked against
+    the same list of states.
+  - [ ] Spacing measured, not only looked at: a UI test helper that
+    fails when a text's frame comes closer than N pt to its row's edges
+    (the row a wrapped line touched, 25 Nov 2026).
+  - [ ] check-permission-words follows a view to the file that asks for
+    the permission, so a bare "Allow" there is found too.
+- **Mobile, from a phone in an elevator** (25 Nov 2026: a home screen
+  stuck on its placeholder, its glow cut off, and a chart that flickered
+  on each tap):
+  - [x] `check-motion` (Swift), the offline UI test in `check-ui-tests`,
+    and `check-shots --only-top` (Unreleased).
+  - [ ] check-motion reads Kotlin and Compose (`animate*AsState`,
+    `animateColorAsState` keyed on a selection) and the web (a CSS
+    `transition` on a `selected` or `aria-selected` rule).
+  - [ ] check-views stripe sees a stripe drawn as a sibling view in an
+    HStack, or as a gradient; check-ui the same on boards.
+  - [ ] check-page reviewed finds a screen mock drawn without
+    `data-mock` (a phone-shaped frame), and ties a record to a critique
+    kept beside the page, so a hash can't be written without one.
+  - [ ] check-views stack sees alike buttons of two styles that draw the
+    same (two names for one look), and a pair split across two views.
+  - [ ] check-views menu reads Kotlin and Compose (`DropdownMenu` over a
+    range or a list) and a long `Menu` of literal choices.
+  - [ ] check-views follows a string to its Text: a `tr("a · b")` or
+    `String(localized:)` assigned to a name and shown with `Text(name)`,
+    and a catalogue translation that adds a separator its source lacks;
+    then Kotlin and Compose (`Text("a · b")` without `maxLines = 1`).
+  - [ ] A placeholder ends, as a check: a UI test pattern that holds the
+    content back with a launch argument and asserts the message and its
+    retry button; check-ui-tests asks for one, like the offline launch.
+  - [ ] The offline UI test checked from the app's side: the launch
+    argument is read in the app's code and routes every request to a
+    stub that fails at once (URLProtocol), not only the app's own client.
 - **TypeScript:**
   - [ ] A shared ESLint flat config (`curly: all`, `no-console`, comments
     that disable a rule say why, `--max-warnings 0`) and a reusable Node
     CI workflow that runs `.practices/bin/lint`.
 - **UI:** the next checks for `check-ui`, in phase 7 above.
   - [x] A commit that changes an existing board names its before/after
-    page (`check-commit-msg`, 1.7.0).
+    page (`check-commit-msg`, 1.6.2).
   - [ ] A `before-after` script: renders a board's object (a selector) at
     HEAD and in the working tree, both themes, at the device's pixel
     ratio, and writes the page the trailer names.
+  - [ ] Every control on a board records an event or only navigates: a
+    check matches each button's label to the spec's event table or a
+    `data-nav` mark.
+  - [ ] A pixel match measures each line of text, not only the
+    paragraph's box.
+  - [ ] State × event: a test pattern for a project's reference engine
+    that fails on a pair the engine doesn't define.
+  - [x] Type: text drawn in a system fallback (`fallback`) and times in
+    proportional figures (`tabular`), in check-ui (Unreleased).
+  - [ ] Type roles: a page declares its faces' roles (`meta type-roles`,
+    `data-role`) and check-ui compares each element's face with its role.
+  - [ ] A face change keeps the ink: small text's ink on a derived board
+    against the board it came from, within 5 %.
+  - [x] `check-page`: a proposal page read at 375 and 390 px, as the
+    owner reads it on a phone: sideways scroll, a one-letter word at a
+    line's end where its language ties it, images past the screen or
+    blurred past 2x, the doctype, charset and language (Unreleased).
+  - [ ] check-page measures the rest a script can: a before/after pair
+    taller than one 812 px screen at 375 px, and a page's weight (about
+    1 MB).
+  - [ ] Scops' screenshot match as a kit script: boards rendered in one
+    Chrome and app shots, each kept under a key of what it is made of,
+    `--only` for iterating, each phase timed (common/gates.md,
+    ui/design-before-build.md). Until then it lives in that project.
+  - [ ] check-shots takes a dither tolerance (`--dither 2`), so it can
+    serve as a screenshot gate's switch guard (ui/design-before-build.md,
+    "A screenshot gate launches the app once").

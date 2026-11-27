@@ -24,6 +24,15 @@
 
 [ "$PRIVATE_TERMS" = none ] && exit 0
 terms=$PRIVATE_TERMS
+# A linked worktree (git worktree add) has no copy of a git-ignored file: the terms are the main
+# worktree's, the first `git worktree list` names. Every commit from a worktree was refused with
+# "no dev/private-terms" while the file sat in the main tree (Scops, 2026-11-22).
+if [ ! -f "$terms" ]; then
+    main=$(git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')
+    if [ -n "$main" ] && [ -f "$main/$PRIVATE_TERMS" ] && git check-ignore -q "$PRIVATE_TERMS"; then
+        terms=$main/$PRIVATE_TERMS
+    fi
+fi
 if [ ! -f "$terms" ]; then
     if [ -n "${PRACTICES_PRIVATE_TERMS:-}" ]; then
         terms=$(mktemp)
@@ -37,7 +46,7 @@ if [ ! -f "$terms" ]; then
         echo "a file with only comments says there are none. Or set PRIVATE_TERMS=none in .practices/config."
         exit 1
     fi
-elif ! git check-ignore -q "$terms"; then
+elif ! git check-ignore -q "$PRIVATE_TERMS"; then
     echo "check-private: $terms isn't git-ignored, so it would be committed. Add it to .gitignore."
     exit 1
 fi

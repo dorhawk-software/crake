@@ -59,6 +59,35 @@ not scattered across feature task lists.
 **Check.** The checklist names, for each feature, the last walk on each
 platform.
 
+## A live switch draws what a fresh start draws
+
+**What.** A setting that changes the look while the app runs (the
+theme, the language, the text size) is walked both ways: switched inside
+the running app, and from a fresh start in that setting. The same screen
+is the same, pixel for pixel, outside the status bar.
+
+**Why.** In Obálka the "Testovací" pill on a test box read "Testovac"
+after a switch to the dark theme, and was whole after a restart
+(2026-11-16). The owner had seen it two days before it was found. Its box
+kept its size; Android drew the text a hair wider and lost the last
+glyph. Every walk and check until then looked at fresh starts.
+
+**Apply.**
+1. Shoot each screen of the walk after a fresh start in the setting, into
+   one folder. On Android: `adb shell am force-stop`, start the app, and
+   `adb exec-out screencap -p > fresh/NAME.png`.
+2. Switch the setting inside the running app (or, with the app following
+   the system, `adb shell cmd uimode night yes`; on an iOS simulator,
+   `xcrun simctl ui booted appearance dark`), and shoot the same screens,
+   with the same names, into a second folder.
+3. Compare them. A difference is a fault the live switch leaves: a
+   measured box, a cached style or face that kept its old value.
+
+**Check.** `.practices/bin/check-shots --skip-top PX fresh/ live/` lists
+every region that differs (`7×21 px differ at 636,1766`) and fails on
+any; `--skip-top` leaves out the status bar's clock. Shooting the
+screens is the project's own walk.
+
 ## A crash report from the field becomes a test
 
 **What.** An error seen in crash reports from a beta build becomes a test

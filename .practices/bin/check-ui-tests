@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+# The UI-test gate: an iOS app's UI tests run where App Review looks
+# (mobile/app-review.md). In a project with XCUITest files (Swift that
+# uses XCUIApplication):
+#   - each file that launches the app pins its language
+#     (-AppleLanguages, -AppleLocale, or the app's own switch: UITEST_LANGUAGE);
+#   - some UI test runs Xcode's accessibility audit (performAccessibilityAudit);
+#   - a test run names an iPhone SE simulator (name=iPhone SE..., or "iPhone
+#     SE (3rd generation)" in a script, workflow or test plan; not in Swift,
+#     where it is only a comment): 375 x 667 pt, the window an iPhone app
+#     gets on an iPad;
+#   - a test run sets a large text size: `xcrun simctl ui <device>
+#     content_size extra-extra-large` (or larger), or the launch argument
+#     -UIPreferredContentSizeCategoryName UICTContentSizeCategoryXXL;
+#   - some UI test launches the app offline (a launch argument matching
+#     UITEST_OFFLINE, any "-...Offline" by default), which the app honours
+#     by stubbing its own networking (mobile/lifecycle.md);
+#   - an audit exception names its element: a closure line that returns
+#     true on the audit type alone (`if issue.auditType == .textClipped {
+#     return true }`, `case .contrast: return true`) turns a whole check off;
+#   - each file that audits keeps a picture of each screen
+#     (XCTAttachment(screenshot:)), for the eye check of spacing and
+#     clipping that no audit makes;
+#   - every screen state the app's code can be launched in (a switch
+#     matching UITEST_STATES, `arguments.contains("-AcmeTour")` by default)
+#     is passed by a test that runs the audit, unless its line or the one
+#     above says `practices-allow audit: <reason>` (a marketing render, not
+#     a screen), or it's listed in UITEST_STATES_BASELINE, the ratchet for
+#     states from before this rule (one per line, "-AcmeTour  # why");
+#     a listed state that is now audited, or gone, must leave the list.
+# Whether every screen is reached, and its main button asserted on
+# screen, is the tests' own job; this checks they run where it matters.
+#
+#   .practices/bin/check-ui-tests            # the whole project
+#   .practices/bin/check-ui-tests FILE...    # the same: a changed file starts it
+#
+# Why: on 18 Nov 2026 App Review refused an iPhone app (Guideline 4) on
+# an iPad Air 11-inch at a larger text size: the onboarding was taller
+# than the 375 x 667 window, and its Continue button was off screen. The
+# iPad simulator opened the app in a tall window, which hid it; an iPhone
+# SE simulator showed it at once. The same day, UI tests that found
+# buttons by their words failed on a Czech simulator: they never set the
+# app's language. On 25 Nov 2026 the owner asked that no app's first
+# screen ever wait on the network. The same day a wrapped line touched its
+# row's edges on a phone: the audit had its clipping check turned off as a
+# whole, and the new board was built under a demo switch no audit
+# visited. The owner: "ideally, you cannot start working on something
+# until it is tracked by practices".
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+read -r -a spec <<<"$EXCLUDE"
+tests=$(git grep --untracked -l -e 'XCUIApplication' -- '*.swift' ${spec[@]+"${spec[@]}"})
+status=$?
+if [ $status -gt 1 ]; then
+    echo "check-ui-tests: git grep failed (exit $status); the UI tests are unchecked."
+    exit 2
+fi
+if [ -z "$tests" ]; then
+    echo "check-ui-tests: no XCUITest files, nothing to check."
+    exit 0
+fi
+# Where a test run is set up: scripts, workflows, test plans, the tests themselves.
+runs=('*.swift' '*.sh' '*.py' '*.rb' '*.yml' '*.yaml' '*.xctestplan' '*.json' '*.mjs' '*.js' 'Makefile' '*Fastfile')
+
+findings=()
+unpinned=
+while IFS= read -r f; do
+    if ! grep -q 'XCUIApplication()' "$f" || ! grep -q '\.launch()' "$f"; then
+        continue
+    fi
+    grep -qE -e "$UITEST_LANGUAGE" "$f" && continue
+    unpinned="$unpinned"$'\n'"    $f"
+done <<<"$tests"
+if [ -n "$unpinned" ]; then
+    findings+=("these launch the app without pinning its language (no match of UITEST_LANGUAGE, $UITEST_LANGUAGE):$unpinned
+    Fix: app.launchArguments += [\"-AppleLanguages\", \"(en)\", \"-AppleLocale\", \"en_US\"] in the helper that launches it, or name the app's own switch in UITEST_LANGUAGE in .practices/config. Why: a test that finds a button by its words fails on a simulator in another language.")
+fi
+if ! printf '%s\n' "$tests" | tr '\n' '\0' | xargs -0 grep -l 'performAccessibilityAudit' >/dev/null 2>&1; then
+    findings+=("no UI test runs Xcode's accessibility audit. Fix: try app.performAccessibilityAudit() on every screen, the first-run screens too. Why: fixed-size type and grey text on a gradient got past every other test.")
+fi
+# The device is chosen outside the tests, so a Swift comment that names it doesn't count.
+if ! git grep --untracked -q -E -e 'name=iPhone SE' -e 'iPhone SE \([0-9]+(st|nd|rd|th) generation\)' \
+    -- "${runs[@]}" ':!*.swift' ${spec[@]+"${spec[@]}"} 2>/dev/null; then
+    findings+=("no test run names an iPhone SE simulator. Fix: run the UI tests with -destination 'platform=iOS Simulator,name=iPhone SE (3rd generation)', in a script or workflow. Why: an iPhone app on an iPad gets a 375 x 667 window; the iPad simulator doesn't show it.")
+fi
+if ! git grep --untracked -q -E -e 'content_size[[:space:]]+(extra-extra-large|extra-extra-extra-large|accessibility-)' \
+    -e 'UICTContentSizeCategory(XXL|XXXL|Accessibility)' -- "${runs[@]}" ${spec[@]+"${spec[@]}"} 2>/dev/null; then
+    findings+=("no test run sets a large text size. Fix: xcrun simctl ui <device> content_size extra-extra-large before the run, or launch with -UIPreferredContentSizeCategoryName UICTContentSizeCategoryXXL. Why: the reviewer's larger text pushed a Continue button off screen.")
+fi
+if ! printf '%s\n' "$tests" | tr '\n' '\0' | xargs -0 grep -lE -e "$UITEST_OFFLINE" >/dev/null 2>&1; then
+    findings+=("no UI test launches the app offline (no match of UITEST_OFFLINE, $UITEST_OFFLINE). Fix: a test launches with app.launchArguments += [\"-AcmeOffline\"], the app then fails every request of its own at once, and the test asserts the first screen's content. Name the app's own switch in UITEST_OFFLINE. Why: the first screen never waits on the network (.practices/docs/mobile/lifecycle.md).")
+fi
+audited=$(printf '%s\n' "$tests" | tr '\n' '\0' | xargs -0 grep -l 'performAccessibilityAudit' 2>/dev/null)
+if [ -n "$audited" ]; then
+    # An exception on the type alone: nothing after the type but the closing brace.
+    blanket=$(printf '%s\n' "$audited" | tr '\n' '\0' | xargs -0 grep -HnE \
+        -e 'auditType[[:space:]]*==[[:space:]]*\.[A-Za-z]+[[:space:]]*\{[[:space:]]*return[[:space:]]+true' \
+        -e '(^|[{;])[[:space:]]*case[[:space:]]+\.[A-Za-z]+[[:space:]]*:[[:space:]]*return[[:space:]]+true' 2>/dev/null)
+    if [ -n "$blanket" ]; then
+        findings+=("an audit exception turns a whole check off:
+$(printf '%s\n' "$blanket" | sed 's/^/    /')
+    Fix: name the element as well, \`if issue.auditType == .textClipped, issue.element?.identifier == \"appName\" { return true }\`, with a comment saying why it's a false finding. Why: a whole check off hid a line cut short on a phone (25 Nov 2026).")
+    fi
+    pictureless=$(printf '%s\n' "$audited" | tr '\n' '\0' | xargs -0 grep -L 'XCTAttachment(screenshot:' 2>/dev/null)
+    if [ -n "$pictureless" ]; then
+        findings+=("these run the audit without keeping a picture of the screen:
+$(printf '%s\n' "$pictureless" | sed 's/^/    /')
+    Fix: in the helper that audits, let shot = XCTAttachment(screenshot: app.screenshot()); shot.lifetime = .keepAlways; add(shot). Then look at the pictures from the iPhone SE run at xxLarge. Why: no audit measures spacing; a row whose wrapped line touched its edges passed every check (25 Nov 2026).")
+    fi
+fi
+# Every state the app can be launched in is audited, or says why not.
+app_files=$(git grep --untracked -l -E -e "$UITEST_STATES" -- '*.swift' ${spec[@]+"${spec[@]}"} 2>/dev/null |
+    grep -v -x -F -e "$(printf '%s' "$tests")" | grep -v -E '(^|/)[^/]*Tests?(/|\.swift$)')
+listed=
+[ -f "$UITEST_STATES_BASELINE" ] && listed=$(sed -E 's/#.*//; s/[[:space:]]+$//; s/^[[:space:]]+//' "$UITEST_STATES_BASELINE" | grep -v '^$' | awk '{ print $1 }')
+unaudited=
+seen=
+if [ -n "$app_files" ]; then
+    while IFS= read -r f; do
+        while IFS=: read -r n line; do
+            [ -n "$n" ] || continue
+            if [ "$n" -gt 1 ] && sed -n "$((n - 1))p" "$f" | grep -q 'practices-allow audit:'; then
+                allowed=yes
+            else
+                allowed=
+            fi
+            printf '%s\n' "$line" | grep -q 'practices-allow audit:' && allowed=yes
+            for sw in $(printf '%s\n' "$line" | grep -oE -e "$UITEST_STATES" | sed -E 's/^[^"]*"([^"]+)".*/\1/'); do
+                seen="$seen $sw"
+                [ -n "$allowed" ] && continue
+                if [ -n "$audited" ] && printf '%s\n' "$audited" | tr '\n' '\0' | xargs -0 grep -qF -e "\"$sw\"" 2>/dev/null; then
+                    continue
+                fi
+                printf '%s\n' "$listed" | grep -qx -F -e "$sw" && continue
+                unaudited="$unaudited"$'\n'"    $sw ($f:$n)"
+            done
+        done < <(grep -nE -e "$UITEST_STATES" "$f")
+    done <<<"$app_files"
+fi
+if [ -n "$unaudited" ]; then
+    findings+=("these screen states are never audited:$unaudited
+    Fix: first write the test that launches with the switch and runs try app.performAccessibilityAudit() (the helper keeps its picture), then build the state. A switch that draws no screen of the app (a marketing render) gets // practices-allow audit: <reason> on its line or the one above. Why: a new board was built under a switch no audit visited, and a line touching its row's edges reached a phone (25 Nov 2026).")
+fi
+stale=
+for sw in $listed; do
+    case " $seen " in *" $sw "*) ;; *) stale="$stale $sw (gone)"; continue ;; esac
+    if [ -n "$audited" ] && printf '%s\n' "$audited" | tr '\n' '\0' | xargs -0 grep -qF -e "\"$sw\"" 2>/dev/null; then
+        stale="$stale $sw (audited now)"
+    fi
+done
+if [ -n "$stale" ]; then
+    findings+=("$UITEST_STATES_BASELINE lists states that no longer need it:$stale. Fix: delete their lines; at zero, delete the file. Why: a baseline that isn't lowered lets the count climb back (common/gates.md).")
+fi
+if [ ${#findings[@]} -gt 0 ]; then
+    echo "[ui-tests] ${#findings[@]} finding(s). Rules: Every screen fits a small iPhone at a large text size; Xcode's accessibility audit runs on every screen; An audit exception names its element; Every screen state is audited before it's built; UI tests pin the app's language (.practices/docs/mobile/app-review.md); The first screen never waits on the network (.practices/docs/mobile/lifecycle.md)."
+    printf '  - %s\n' "${findings[@]}"
+    exit 1
+fi

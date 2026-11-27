@@ -29,7 +29,7 @@ each, who owns which file, and how a change here reaches every project.
  actions/*, .github/workflows/rust-*.yml ◀── uses: …@v1 ── .github/workflows/*.yml
 
  templates/claude-settings.json ───── --templates ─▶ .claude/settings.json
-                                                    (PostToolUse, Stop ─▶ .practices/bin/claude-hook)
+                                                    (PreToolUse, PostToolUse, Stop ─▶ .practices/bin/claude-hook)
 
  .claude-plugin/marketplace.json ◀── /plugin install ── Claude Code
    plugin/ (skills only)
@@ -105,15 +105,24 @@ also in `rules.md`.
 | --- | --- | --- |
 | `lint` | rustfmt, clippy, cargo deny, cargo machete, then the checks below and `lint.d/*` | Claude hook, pre-commit, CI |
 | `check-private` | no name from `dev/private-terms` in files or the message; fails closed | lint, both git hooks |
-| `check-voice` | no "we" in the copy people see ([common/voice.md](../common/voice.md)); a quote is marked `practices-allow voice: reason` | lint, Claude hook (edits, Stop), pre-commit |
+| `check-voice` | no "we" in the copy people see ([common/voice.md](../common/voice.md)); a quote or a companion's inclusive "we" is marked `practices-allow voice: reason` | lint, Claude hook (edits, Stop), pre-commit |
+| `check-copy` | each language's grammar between words, by that language's rules file ([common/voice.md](../common/voice.md#each-languages-grammar-is-checked)); copy names its language, and the language ships its rules; a `data-fact` reads the same on every board; an exception is marked `data-allow="copy: reason"` or `practices-allow copy: reason` | lint, Claude hook (edits, Stop), pre-commit |
+| `check-permission-words` | no "Allow" on a button before a permission prompt ([mobile/app-review.md](../mobile/app-review.md#a-button-that-leads-to-a-permission-prompt-says-continue)); stale catalog entries skipped; an exception is marked `practices-allow permission: reason` | lint, Claude hook (edits, Stop), pre-commit |
+| `check-xcode` | each shipped Xcode target built for `DEVICE_FAMILY`, with the entitlement each gated framework it imports needs ([mobile/app-review.md](../mobile/app-review.md)) | lint, Claude hook (edits, Stop), pre-commit |
+| `check-ios-artefact` | a built archive or `.ipa`: each bundle's device family, each binary's linked frameworks against its signed entitlements (macOS) | Claude hook (after `xcodebuild archive` or `-exportArchive`), before an upload |
+| `check-ui-tests` | XCUITests pin the language (`UITEST_LANGUAGE`), run the accessibility audit with exceptions that name their element and a picture of each screen, launch the app offline once (`UITEST_OFFLINE`), pass every screen state the app reads (`UITEST_STATES`, ratchet `.practices/unaudited-states`) to an audited test, run on an iPhone SE at a large text size | lint, Claude hook (edits, Stop), pre-commit |
+| `check-motion` | no selection animated in Swift, so the old and the new choice never cross-fade ([ui/visual-craft.md](../ui/visual-craft.md#a-selection-switches-at-once)); a deliberate slide is marked `practices-allow motion: reason` | lint, Claude hook (edits, Stop), pre-commit |
+| `check-views` | SwiftUI views: no joined line that may wrap at its separator, no alike buttons stacked loose ([ui/visual-craft.md](../ui/visual-craft.md#a-joined-line-breaks-between-its-parts)), no menu built from data ([ui/pickers.md](../ui/pickers.md#a-time-turns-on-a-wheel-a-menu-holds-a-handful)), no stripe down one side of a box ([ui/visual-craft.md](../ui/visual-craft.md#a-box-has-no-stripe-down-one-side)); a deliberate one is marked `practices-allow join|stack|menu|stripe: reason` | lint, Claude hook (edits, Stop), pre-commit |
 | `check-size` | 700 lines per file, 1000 per integration test, the shrinking allowlist | lint |
 | `check-unsafe` | `unsafe` only in `UNSAFE_ALLOWED` | lint |
+| `check-gpui-clip` | in a GPUI app, no element both rounded and clipped: GPUI clips to a rectangle ([rust/gpui.md](../rust/gpui.md#rounded-corners-dont-clip)); a clip kept on purpose is marked `practices-allow clip: reason` | lint |
 | `check-coverage` | each crate at or over its floor, per OS; floors never lowered | pre-commit, CI |
 | `check-commit-msg` | no session IDs or session links; no private names | commit-msg hook |
 | `install-hooks` | points git at `.practices/hooks` (`--check` to verify) | once per clone; lint checks it |
 | `check-ui` | design boards rendered in headless Chrome at each width and theme: nothing past its surface, buttons follow their column and name their outcome, 8 px between targets, 11 px text, contrast and the rest of [ui/visual-craft.md](../ui/visual-craft.md)'s measurable rules, and each mark at its smallest size ([ui/identity-pass.md](../ui/identity-pass.md)); `data-allow="rule: reason"` marks a deliberate exception | Claude hook (edits, Stop), pre-commit |
+| `check-page` | proposal and review pages (`UI_PAGES`) at 375 and 390 px, as the owner reads them on a phone: nothing scrolls sideways, no one-letter word ends a line where its language ties it, no image past the screen or blurred past 2x, the doctype, charset and language there ([ui/design-before-build.md](../ui/design-before-build.md#proposal-pages-pass-a-checklist-before-review)); every screen mock carries the record of its critique, unchanged since ([the same](../ui/design-before-build.md#every-mock-is-critiqued-before-its-shown-and-again-after-it-changes)) | Claude hook (edits, Stop), pre-commit |
 | `check-hooks` | `.claude/settings.json` still runs `claude-hook` after edits and on Stop | pre-commit |
-| `claude-hook` | disk floor after every command; lint after cargo builds; check-ui on a board that changed; on Stop, the turn can't end while a board fails | Claude Code |
+| `claude-hook` | disk floor after every command; lint after cargo builds; check-ui on a board that changed, check-page on a proposal page that changed, check-voice and check-copy on copy that changed, check-permission-words on copy or code, check-motion and check-views on Swift, check-xcode and check-ui-tests on Xcode files; check-ios-artefact after an archive; on Stop, the turn can't end while a changed file fails a gate | Claude Code |
 | `disk-guard` | keeps `DISK_FLOOR_GB` free where cargo builds | Claude hook |
 | `prune-caches` | deletes GitHub caches a newer one of the same kind replaced | CI on main |
 | `sweep-target` | keeps only the build units cargo used, before caching by hand | CI, packaging |
@@ -250,6 +259,18 @@ by `bin/install --templates`:
 ```json
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.practices/bin/claude-hook",
+            "timeout": 900
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
@@ -291,8 +312,17 @@ by `bin/install --templates`:
 After each shell command an agent runs, `claude-hook` checks the disk floor,
 and after a cargo build, test, check, clippy, run or nextest it runs the lint
 gate. After any edit, it runs `check-ui` on each design board whose content
-changed, and `check-voice` on each copy file that changed, and on any that
-failed before. A failure goes back to the
+changed, `check-page` on each proposal page that changed, `check-voice` on
+each copy file that changed, and `check-copy` on
+each board or copy file that changed, and on any that failed before. A
+change to copy or code runs `check-permission-words`; one to Swift runs
+`check-motion` and `check-views`; one to an Xcode
+project, an entitlements file, Swift or a test script runs `check-xcode`
+and `check-ui-tests`. After `xcodebuild archive` or `-exportArchive`,
+`check-ios-artefact` reads what was built. Before a shell command that
+uploads a build to App Store Connect (PreToolUse: `-exportArchive` to
+`upload`, `altool`, `iTMSTransporter`), it reads that build first and
+refuses the upload while it fails. A failure goes back to the
 agent as an error to fix before going on (exit 2). On Stop and
 SubagentStop it refuses to let the turn end while a board still fails, so
 the agent can't tell the person it's done; blocked twice on the same
