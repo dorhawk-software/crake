@@ -555,12 +555,22 @@ Decided on the canvas so far (the owner, 2026-11-27):
 - **Settings' wait stays the segmented control** of `settings.html`.
   Rejected: a slider with 1, 2, 3 and 5 s at equal steps.
 
-Still open, for the next round: the opened log row's tint (the canvas
-uses accentSoft, this document navHover), the race drawn two ways and
-restating its sentence, Log and Settings shown in light only and Tunnel
-in dark only, and where the canvas's Log, Tunnel and Panel differ from
-the screens (Copy for helpdesk, Pin, Forget and Switch off as underlined
-words, the panel's footer as one bar). Then iteration 3: the whole app.
+- **An action is a quiet box**, as the screens have it (Pin, Unpin,
+  Forget, Switch off, Copy for helpdesk, Show in ACME, Add): a hairline
+  box around the word. Rejected: underlined words (an underline reads as
+  a link, and the target has no edge).
+- **The panel's foot is one tinted bar**, Full log and Copy for helpdesk
+  as its two halves with a short hairline between; the half pointed at
+  takes navHover to the bar's own edges and corner, at once, and the
+  keyboard's ring sits inside the half. Rejected: the two bordered
+  buttons of `tray-panel.html` (which changes with the build).
+- The opened log row's tint is navHover, as this document says; Log,
+  Settings and Tunnel detail are drawn in both themes.
+
+Still open, for the next round: the race drawn two ways (Main, the log's
+opened row) and restating its sentence, and the "System" chip and rows
+the screens have and the canvas doesn't. Then iteration 3: the whole
+app.
 
 ## Screens
 
