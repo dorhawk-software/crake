@@ -577,6 +577,26 @@ Decided on the canvas so far (the owner, 2026-11-27):
   two chips. Rejected: the "System" chip of `log.html` (the chip column
   then meant two things; the dot already says it was an event).
 
+- **The line stays with the day.** It appears only where time passes
+  and Crake decides: the panel and the log. New tunnel, sign-in, Traffic
+  and What's new hold the identity through type, tone, the marks and
+  quiet boxes. Rejected (found by an independent review, 2026-11-27):
+  the line as New tunnel's steps (dotted would mean "not reached",
+  against "gone"), as sign-in's checks (an ink dot would mean "passed"),
+  as What's new's versions.
+- **Traffic is the first of three parts in the panel's foot**: Traffic,
+  Full log, Copy for helpdesk. Rejected: a quiet box beside the chart's
+  legend.
+- **A setting keeps its "?"** (it opens the explaining card) and its
+  one-line sentence where it has one. Rejected: the sentence only (the
+  longer explanations would go), the mark only.
+- Drawn in the identity, not yet built: New tunnel's first step (steps
+  as numbered tabs, the protocol list grouped by tone), sign-in's
+  "Couldn't reach" (a check for what passed, danger's × for the failed
+  step, the escape after the main action), Traffic (nodes by tone, a
+  direct row has no mark), What's new (the changelog's own sentences,
+  dates in mono), and "Forget all…" on tunnel detail.
+
 Nothing on the canvas is open. Iteration 3, the whole app, has its
 inventory: `design/identity-inventory.md` (955 lines from the code,
 2026-11-27: two inventories made apart and reconciled against the code;
