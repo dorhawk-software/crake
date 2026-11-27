@@ -363,6 +363,8 @@ check, the magic numbers). Read .practices/README.md.
   disk's floor (`.practices/bin/disk-guard`).
   Since practices 1.16 (2026-11-27) it also runs before a Bash command,
   after edits and when a turn ends, with the page, copy and voice checks.
+  Since 1.17.1 (2026-11-27) a turn may not end on a question asked in
+  prose: feedback goes through the question dialog (`check-asked`).
 - The design and copy gates' settings are Crake's (`.practices/config`):
   check-ui measures `design/screens/`; check-page reads proposal pages
   written from 2026-11-27 on (the 68 older ones are listed in

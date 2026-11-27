@@ -166,6 +166,8 @@ own extra checks in `.practices/lint.d/`.
 | `check-ui-tests` | XCUITests that pin the app's language, run Xcode's accessibility audit (exceptions name their element, each screen keeps its picture) on every screen state the app can be launched in, launch the app offline once, and run on an iPhone SE simulator at a large text size |
 | `check-motion` | no selection animated in Swift (`withAnimation` setting it, `.animation(_:value:)` following it), so the old and the new choice never cross-fade; a deliberate slide is marked `practices-allow motion: reason` |
 | `motion-audit.py` | check-motion's reading half (python3, no packages) |
+| `check-asked` | the questionnaire gate: a turn whose last message asks the person in prose, with no question-dialog call, is sent back to ask there; run by claude-hook when the agent's turn ends, on the session's transcript |
+| `asked-audit.py` | check-asked's reading half (python3, no packages) |
 | `check-views` | SwiftUI views: no joined line (`Text("this week · 18 in all")`) that may wrap at its separator, no two alike buttons stacked loose, no `Menu` or menu-style `Picker` built from a `ForEach`, no stripe down one side of a box; a deliberate one is marked `practices-allow join|stack|menu|stripe: reason` |
 | `view-audit.py` | check-views' reading half (python3, no packages) |
 | `check-shots` | a screen shot after a live switch (theme, language, text size) against the same screen after a fresh start: every region that differs, with `--skip-top` for the status bar; with `--only-top PX`, a placeholder against its loaded page over the top band; `shots-diff.mjs` measures |

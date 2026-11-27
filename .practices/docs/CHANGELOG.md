@@ -3,6 +3,33 @@
 What changed for the projects that use the practices. Written by hand,
 newest first, in the kinds common/changelog.md describes.
 
+## 1.17.1 (2026-11-27)
+
+### Fixed
+
+- **"Feedback is asked in a questionnaire" is a gate now.** 1.17.0 shipped
+  it as an instruction only, which nothing checked. The new `check-asked`
+  runs from `claude-hook` when the agent's turn ends: it reads the
+  session's transcript, and a last message that asks in prose (a
+  "Decisions for you" heading, a closing question, two or more questions,
+  "say if", "let me know which"), in a turn that never opened the question
+  dialog, sends the agent back to ask there. Quoted speech, code and block
+  quotes aren't read; blocked twice on the same message, the agent may
+  stop, and the person is told. Nothing to set up: the Stop hook is
+  already in `.claude/settings.json`. Expect an agent to be sent back once
+  when it ends a turn on "Want me to…?".
+
+## 1.17.0 (2026-11-27)
+
+### New
+
+- **Feedback is asked in a questionnaire** (`common/agent-working-rules.md`).
+  When the agent needs an answer, it asks in its question dialog, never in
+  the prose of a report: options, the recommended one first. It chooses
+  one questionnaire of several steps for independent questions, or one
+  question after another when an answer changes the next. Review only:
+  no script sees the dialog.
+
 ## 1.16.1 (2026-11-25)
 
 ### Fixed

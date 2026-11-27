@@ -34,8 +34,9 @@ doc lists what was rejected.
 
 ## The owner answers one question at a time
 
-**What.** Open questions go to the owner in the agent's question dialog,
-a few per round, one per step. Each step stands alone: the page's link,
+**What.** Open questions go to the owner in the agent's question dialog
+([agent working rules](../common/agent-working-rules.md), "Feedback is
+asked in a questionnaire"), a few per round, one per step. Each step stands alone: the page's link,
 the board's name, the options in plain words, the recommendation first.
 The page with the boards is for looking; the answers come from the dialog.
 

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# The questionnaire gate: feedback is asked in a questionnaire
+# (common/agent-working-rules.md). It reads a Claude Code session's
+# transcript and finds a turn whose last message asks the person
+# something in prose (a "Decisions for you" heading, a closing question,
+# two or more questions, "let me know which") while the turn never opened
+# the question dialog. The reading is in asked-audit.py.
+#
+#   .practices/bin/check-asked TRANSCRIPT [MESSAGE_FILE]
+#
+# claude-hook runs it when the agent's turn ends (Stop), with the
+# transcript Claude Code names and the turn's last message. A finding
+# sends the agent back to ask in the dialog. What a message only quotes
+# (code, a block quote, quoted speech) isn't read. There is no mark to
+# allow a question: reword it as a statement, or ask it properly.
+#
+# Why: on 2026-11-27 the rule was released as an instruction only, and
+# the owner called the missing gate a bug: "it missing seems like a bug
+# to me". The same day a report had ended in four decisions as
+# paragraphs, the case the rule was written for.
+#
+# Needs python3; without it, it fails, never passes.
+
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+
+if [ $# -lt 1 ]; then
+    echo "usage: check-asked TRANSCRIPT [MESSAGE_FILE]" >&2
+    exit 2
+fi
+if ! command -v python3 >/dev/null; then
+    echo "check-asked: needs python3, which isn't installed; the turn's questions are unchecked."
+    exit 2
+fi
+python3 "$PRACTICES_BIN/asked-audit.py" "$@"

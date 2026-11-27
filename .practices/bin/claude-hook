@@ -27,6 +27,9 @@
 # Stop and SubagentStop: the agent may not end its turn while a file it
 # changed fails a gate. Blocked twice on the same findings, it may
 # stop, and the person is told what is still open.
+# Stop also runs the questionnaire gate (check-asked) on the session's
+# transcript: a turn whose last message asks the person in prose, and
+# never opened the question dialog, goes back to ask there.
 #
 # Why the UI part: on 2026-11-15 an agent called a board ready while a
 # button stuck out of its panel. The rule was written; nothing measured
@@ -175,19 +178,44 @@ fi
 
 if [ "$event" = Stop ] || [ "$event" = SubagentStop ]; then
     blocked=${gitdir:+$gitdir/practices-blocked}
-    if found=$(gates 2>&1); then
+    found=$(gates 2>&1)
+    gated=$?
+    # The questionnaire gate: the turn's last message may not ask the person in
+    # prose (check-asked). Only the main agent's turn: a subagent answers its parent.
+    asked='' prose=0
+    transcript=$(field transcript_path)
+    if [ "$event" = Stop ] && [ -n "$transcript" ] && [ -f "$transcript" ]; then
+        said=$(mktemp)
+        field last_assistant_message >"$said"
+        asked=$("$bin/check-asked" "$transcript" "$said" 2>&1)
+        prose=$?
+        rm -f "$said"
+    fi
+    if [ $gated = 0 ] && [ $prose = 0 ]; then
         [ -n "$blocked" ] && rm -f "$blocked"
         exit 0
     fi
+    [ $prose = 0 ] || found=$(printf '%s\n%s' "$found" "$asked")
     # Blocked before on exactly these findings: the agent can't fix them. It may stop; the person is told.
-    if [ "$(field stop_hook_active)" = true ] && [ -f "$blocked" ] && [ "$found" = "$(cat "$blocked")" ]; then
+    if [ "$(field stop_hook_active)" = true ] && [ -n "$blocked" ] && [ -f "$blocked" ] && [ "$found" = "$(cat "$blocked")" ]; then
         n=$(printf '%s\n' "$found" | grep -c '^  - ')
-        failing=$(cat "$gitdir"/practices-*.failing 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
-        printf '{"systemMessage": "%s finding(s) still open in %s. The agent stopped without fixing them; run .practices/bin/check-ui, check-page, check-voice, check-copy, check-permission-words, check-motion, check-views, check-xcode and check-ui-tests to see them."}\n' "$n" "$failing"
+        where=
+        if [ $gated != 0 ]; then
+            failing=$(cat "$gitdir"/practices-*.failing 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
+            where=" in $failing"
+        fi
+        [ $prose = 0 ] || where="$where (the last message asks in prose where the question dialog was due)"
+        printf '{"systemMessage": "%s finding(s) still open%s. The agent stopped without fixing them; run .practices/bin/check-ui, check-page, check-voice, check-copy, check-permission-words, check-motion, check-views, check-xcode and check-ui-tests to see them."}\n' "$n" "$where"
         exit 0
     fi
-    printf '%s' "$found" >"$blocked"
-    printf "You may not stop yet: files you changed fail a gate. Fix them, or mark a deliberate exception with its reason. Don't tell the person the work is ready while this fails.\n%s\n" "$found" >&2
+    [ -n "$blocked" ] && printf '%s' "$found" >"$blocked"
+    if [ $gated != 0 ]; then
+        printf "You may not stop yet: files you changed fail a gate. Fix them, or mark a deliberate exception with its reason. Don't tell the person the work is ready while this fails.\n" >&2
+    fi
+    if [ $prose != 0 ]; then
+        printf "You may not stop yet: your last message asks the person in prose. Ask in the question dialog, then report.\n" >&2
+    fi
+    printf '%s\n' "$found" >&2
     exit 2
 fi
 

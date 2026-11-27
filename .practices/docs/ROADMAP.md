@@ -313,6 +313,10 @@ rows are this list's source; the most valuable first.
   on each tap):
   - [x] `check-motion` (Swift), the offline UI test in `check-ui-tests`,
     and `check-shots --only-top` (Unreleased).
+  - [x] `check-asked`: the agent's last message asks nothing in prose that
+    belonged in the question dialog (the Stop hook reads the transcript)
+  - [ ] check-asked sees a question worded as a statement ("I'll wait for
+    your choice"), and a dialog step that doesn't stand alone
   - [ ] check-motion reads Kotlin and Compose (`animate*AsState`,
     `animateColorAsState` keyed on a selection) and the web (a CSS
     `transition` on a `selected` or `aria-selected` rule).
