@@ -76,9 +76,11 @@ so GNOME-only items wait for someone else on Ubuntu.
   0.15.4 → 0.16.0 by `brew upgrade`: craked's log says the tunnel switched off at
   11:32:09 UTC as Homebrew stopped it, the new craked was up 23 s later
   with no "isn't running", and it was on again at 11:33:06).
-- [ ] An upgrade keeping the tunnels up: 0.16.0's change, so first the
+- [x] An upgrade keeping the tunnels up: 0.16.0's change, so first the
   upgrade from 0.16.0 (Homebrew runs the installed version's steps; the
-  one above, from 0.15.4, still switched them off, as expected).
+  one above, from 0.15.4, still switched them off, as expected). Ticked
+  2026-11-27 by the user, after a few weeks of daily use on their Mac
+  with Homebrew's upgrades: the tunnels stayed up through them.
 - History of the service item (0.7; also in Not now). 2026-10-26, the
   user, 0.15.1 → 0.15.2 by `brew upgrade`:
   approved and running before; after it craked wasn't running at all
@@ -88,16 +90,18 @@ so GNOME-only items wait for someone else on Ubuntu.
   user switched it off and on in System Settings. Since then the app
   registers it again (`service::revive`); open until an upgrade shows
   that works.
-- [ ] The panel under the menu bar, placed at the icon on each display.
-- [ ] The Traffic window: connections listed with their ways and rates.
+- [x] The panel under the menu bar, placed at the icon on each display
+  (2026-11-27, the user, a few weeks of daily use).
+- [x] The Traffic window: connections listed with their ways and rates
+  (2026-11-27, the user).
 - [x] Out of the Dock but while a window of Crake's own is open
   (2026-10-27, the user, 0.16.0 from Homebrew): in the Dock with Settings
   or the log open, gone once they closed (`windows/dock.rs`; until then
   it sat in the Dock all the time).
-- [ ] The bird dimmed with its neighbours on a display not in use: a
+- [x] The bird dimmed with its neighbours on a display not in use: a
   template image since 2026-10-28 (`tray::template`), the plain bird
   only; with a badge or the call it stays coloured (the user saw it
-  bright there, 2026-10-28).
+  bright there, 2026-10-28; seen dimmed by the user, 2026-11-27).
 - [x] The bird crisp on a display that isn't Retina (2026-10-27, the
   user, 0.16.0): the 1x drawing macOS picks there (`tray::Icon::mac`;
   until then it halved the 2x one into a blur).
