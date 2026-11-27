@@ -567,10 +567,19 @@ Decided on the canvas so far (the owner, 2026-11-27):
 - The opened log row's tint is navHover, as this document says; Log,
   Settings and Tunnel detail are drawn in both themes.
 
-Still open, for the next round: the race drawn two ways (Main, the log's
-opened row) and restating its sentence, and the "System" chip and rows
-the screens have and the canvas doesn't. Then iteration 3: the whole
-app.
+- **An opened row draws the race in the sentence's place.** Closed, a
+  routed row keeps its sentence; opened, the two lanes say the same and
+  how long Crake waited directly, once. Rejected: the sentence and the
+  lanes both in full (said twice), the lanes with only their times
+  ("3 s" leaned on the × to say what it counts).
+- **The log's chip always names the tunnel**, on a tunnel's own event
+  too (connected, lost the gateway, back); a row about two tunnels has
+  two chips. Rejected: the "System" chip of `log.html` (the chip column
+  then meant two things; the dot already says it was an event).
+
+Nothing on the canvas is open. Next is iteration 3: the whole app,
+inventoried from the code and redrawn, then the build (`log.html`,
+`tray-panel.html` and the code change with it).
 
 ## Screens
 
