@@ -7,7 +7,12 @@ Method: two inventories were made from the code alone on 2026-11-27, one by swee
 one by following the entry points and the strings. They were compared line by line, and every
 difference was settled by opening the code (nothing was built or run). Section 8 says how.
 
-Grades: every line starts `- [ ] not seen`. Nobody has graded anything yet. A line is ticked and
+Grades: every line starts `- [ ] not seen` until it is graded: matches, drifts (the identity is
+there, details differ), misses, or not drawn in the identity (the canvas has no board for it).
+The eight windows captured on 2026-11-27 are graded as wholes; their parts and states are not.
+The profile editor is still not seen (demo mode did not open it).
+
+At first: Nobody has graded anything yet. A line is ticked and
 its grade written in place of "not seen" once someone has looked at that item in the running app.
 
 Paths are relative to `crates/crake/src/` unless they start with `craked/`, `crake-proto/`,
@@ -20,21 +25,21 @@ plain `'` and `…` where the code mostly writes the typographic ones (`\u{2019}
 
 ### Windows (9, one per `open_window` call)
 
-- [ ] not seen · Panel: undecorated pop-up at the tray icon, 452 px wide, height fitted, closes on
+- [x] drifts (captured 2026-11-27, macOS, demo, light and dark): "What Crake did" has marks but no line; the foot is three bordered buttons (Traffic too), the canvas has one bar of two · Panel: undecorated pop-up at the tray icon, 452 px wide, height fitted, closes on
   focus loss · windows.rs:167 (opened in `open_panel`, :99), view panel/mod.rs:163
-- [ ] not seen · Settings ("Crake settings", 1040 × 820, not resizable, never taller than the
+- [x] drifts (captured 2026-11-27: Tunnels, General, Learning): rows sit in outlined cards, the canvas has hairlines; General, Names, Privacy, Diagnostics and About carry stock icons; "+ Add" is dashed with a plus · Settings ("Crake settings", 1040 × 820, not resizable, never taller than the
   screen) · windows.rs:257, view settings_view/mod.rs:190
-- [ ] not seen · Tunnel detail ("Crake tunnel", 900 wide, one at a time, re-used for another
+- [x] drifts (captured 2026-11-27, light and dark): the four facts sit in an outlined grid and the policy in a tinted box; "Forget all…" and the counts over the bars are not on the canvas · Tunnel detail ("Crake tunnel", 900 wide, one at a time, re-used for another
   tunnel) · windows.rs:316, view tunnel_detail/mod.rs:85
-- [ ] not seen · New tunnel / Edit tunnel ("Crake new tunnel", 720 × 860, shrinks per step, one at
+- [x] not drawn in the identity (captured 2026-11-27, step 1, light and dark): no board on the canvas · New tunnel / Edit tunnel ("Crake new tunnel", 720 × 860, shrinks per step, one at
   a time) · windows.rs:381, view new_tunnel/view.rs:123
-- [ ] not seen · Sign-in ("Sign in to <tunnel>", 340 wide, fits its card, minimizable, one per
+- [x] not drawn in the identity (captured 2026-11-27: the "Couldn't reach" stage only): no board on the canvas · Sign-in ("Sign in to <tunnel>", 340 wide, fits its card, minimizable, one per
   tunnel) · windows.rs:444 (options :672), view signin_view/mod.rs:138
-- [ ] not seen · Log ("Crake log", 980 wide) · windows.rs:492, view log_view/mod.rs:79
-- [ ] not seen · Traffic ("Crake traffic", 920 × 860) · windows.rs:553, view traffic_view/mod.rs:469
+- [x] misses (captured 2026-11-27, light and dark): no line, branch, dot or race; filters are an outlined segment row; a hairline under every row · Log ("Crake log", 980 wide) · windows.rs:492, view log_view/mod.rs:79
+- [x] not drawn in the identity (captured 2026-11-27, light and dark): no board on the canvas; its bars and marks already follow the chart rules · Traffic ("Crake traffic", 920 × 860) · windows.rs:553, view traffic_view/mod.rs:469
 - [ ] not seen · Profile editor ("<tunnel>'s profile", 820 × 640, the only resizable window) ·
   windows.rs:622 (`is_resizable: true` :634), view profile_editor/mod.rs:447
-- [ ] not seen · What's new ("What's new in Crake", 600 × 640) · whats_new/open.rs:29, view
+- [x] not drawn in the identity (captured 2026-11-27, light and dark): no board on the canvas · What's new ("What's new in Crake", 600 × 640) · whats_new/open.rs:29, view
   whats_new/view.rs:184
 
 ### Surfaces that are not windows
