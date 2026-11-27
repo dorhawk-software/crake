@@ -577,9 +577,12 @@ Decided on the canvas so far (the owner, 2026-11-27):
   two chips. Rejected: the "System" chip of `log.html` (the chip column
   then meant two things; the dot already says it was an event).
 
-Nothing on the canvas is open. Next is iteration 3: the whole app,
-inventoried from the code and redrawn, then the build (`log.html`,
-`tray-panel.html` and the code change with it).
+Nothing on the canvas is open. Iteration 3, the whole app, has its
+inventory: `design/identity-inventory.md` (955 lines from the code,
+2026-11-27: two inventories made apart and reconciled against the code;
+its proof and counts are in its section 8). Every line is "not seen"
+until someone grades it from a picture. Then the redraws, and the build
+(`log.html`, `tray-panel.html` and the code change with it).
 
 ## Screens
 

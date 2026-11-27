@@ -305,6 +305,9 @@ one line each:
   a proposal).
 - For SignPath: openconnect on tap-windows6 (no Wintun), its unbuffered
   fix offered upstream; then the application.
+- What the identity pass's inventory found in the app (no pressed look,
+  New tunnel without the keyboard, two notifications past "Say nothing",
+  nothing said when the service is out of reach…): not fixed yet.
 - Untried on real systems: the checklist below.
 
 ## Tried by real people (a checklist, ticked one by one)
@@ -312,10 +315,11 @@ one line each:
 Asked for by the user, 2026-10-14: what someone has used Crake for on a
 real machine (not a VM made for tests), each item ticked with the date and
 who (a role, not a name), and what was found and fixed:
-**docs/engineering/tried-by-people.md** (tick items there). Windows, the
-other Linux desktops and most of macOS haven't met a real person yet;
-Ubuntu 26.04 with GNOME was the user's notebook until October 2026; the
-user now works on a Mac.
+**docs/engineering/tried-by-people.md** (tick items there). Windows and
+the other Linux desktops haven't met a real person yet; macOS has (a
+colleague's Mac in October, the user's own daily since 2026-10-29: every
+macOS item ticked 2026-11-27); Ubuntu 26.04 with GNOME was the user's
+notebook until October 2026.
 
 ## Lints are errors
 

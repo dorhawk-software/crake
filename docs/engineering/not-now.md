@@ -410,3 +410,17 @@ the AUR account, Fortinet's tests (7f, CLAUDE.local.md).
   absent); and scripts/windows/openconnect-unbuffered.c is offered to
   openconnect upstream, so a later release can ship it unmodified. Then
   the application, through signpath.org/apply.
+
+- **What the identity pass's inventory found in the app (2026-11-27)**,
+  none of it fixed yet; each with its place in the code under "Found on
+  the way" in `design/identity-inventory.md`: no pressed look on any
+  control; New tunnel can't be worked from the keyboard beyond its text
+  fields; "Ask me first" and "another tunnel answered too" are notified
+  even with "Say nothing" chosen; two checkboxes that differ (New
+  tunnel's and sign-in's); the help text for "Try tunnels in this order"
+  has nowhere to show; Settings, the log, tunnel detail and Traffic say
+  nothing when the service is out of reach (an open tunnel detail goes
+  blank); no word when the app fails to start, a window fails to open
+  or a Restart doesn't start; reduced motion is read from GNOME only
+  (never on Windows or macOS); the Restart notice can't be put away.
+  They are fixed with the identity's build, or sooner if one bites.
